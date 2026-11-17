@@ -1,0 +1,21 @@
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
+import AppShell, { type NavItem } from "@/components/AppShell";
+
+const nav: NavItem[] = [
+  { href: "/retailer", labelKey: "nav.home", icon: "🏠" },
+  { href: "/retailer/catalogue", labelKey: "nav.catalogue", icon: "🛒" },
+  { href: "/retailer/orders", labelKey: "nav.orders", icon: "📦" },
+  { href: "/retailer/account", labelKey: "nav.account", icon: "👤" },
+];
+
+export default async function RetailerLayout({ children }: { children: React.ReactNode }) {
+  const session = await getSession();
+  if (!session || session.role !== "RETAILER") redirect("/login");
+
+  return (
+    <AppShell nav={nav} userName={session.name} roleKey="role.retailer">
+      {children}
+    </AppShell>
+  );
+}

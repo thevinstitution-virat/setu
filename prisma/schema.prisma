@@ -1,0 +1,224 @@
+// Setu — unified distribution platform (retailer / sales agent / delivery agent / admin)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  RETAILER
+  SALES_AGENT
+  DELIVERY_AGENT
+}
+
+enum OrderStatus {
+  PLACED
+  CONFIRMED
+  PACKED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  ONLINE
+  CREDIT
+}
+
+enum PaymentStatus {
+  PENDING
+  COLLECTED
+  SETTLED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  phone        String?  @unique
+  email        String?  @unique
+  loginId      String?  @unique
+  passwordHash String?
+  role         Role
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  retailerProfile      RetailerProfile?
+  salesAgentProfile    SalesAgentProfile?
+  deliveryAgentProfile DeliveryAgentProfile?
+
+  orderEvents OrderStatusEvent[]
+}
+
+model Region {
+  id    String @id @default(cuid())
+  name  String @unique
+  areas Area[]
+}
+
+model Area {
+  id       String @id @default(cuid())
+  name     String
+  regionId String
+  region   Region @relation(fields: [regionId], references: [id])
+
+  retailers   RetailerProfile[]
+  beats       Beat[]
+
+  @@unique([regionId, name])
+}
+
+model RetailerProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  outletName    String
+  shopNumber    String
+  complexName   String
+  pinCode       String
+  areaId        String
+  area          Area     @relation(fields: [areaId], references: [id])
+  salesAgentId  String?
+  salesAgent    SalesAgentProfile? @relation(fields: [salesAgentId], references: [id])
+  createdAt     DateTime @default(now())
+
+  orders Order[]
+  visits Visit[]
+}
+
+model SalesAgentProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  beats      Beat[]
+  retailers  RetailerProfile[]
+  visits     Visit[]
+  attendance Attendance[]
+}
+
+model Beat {
+  id           String   @id @default(cuid())
+  name         String
+  salesAgentId String
+  salesAgent   SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
+  areaId       String
+  area         Area     @relation(fields: [areaId], references: [id])
+}
+
+model DeliveryAgentProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  deliveries Delivery[]
+}
+
+model Product {
+  id            String  @id @default(cuid())
+  name          String
+  sku           String  @unique
+  category      String
+  unit          String
+  price         Float
+  mrp           Float
+  gstRate       Float   @default(0)
+  specialOffer  String?
+  imageUrl      String?
+  active        Boolean @default(true)
+
+  orderItems OrderItem[]
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  orderNumber String      @unique
+  retailerId  String
+  retailer    RetailerProfile @relation(fields: [retailerId], references: [id])
+  placedById  String?
+  status      OrderStatus @default(PLACED)
+  subtotal    Float       @default(0)
+  gstAmount   Float       @default(0)
+  totalAmount Float
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  items         OrderItem[]
+  statusEvents  OrderStatusEvent[]
+  delivery      Delivery?
+  visit         Visit?
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  gstRate   Float   @default(0)
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Float
+}
+
+model OrderStatusEvent {
+  id        String      @id @default(cuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    OrderStatus
+  note      String?
+  actorId   String?
+  actor     User?       @relation(fields: [actorId], references: [id])
+  createdAt DateTime    @default(now())
+}
+
+model Visit {
+  id            String    @id @default(cuid())
+  salesAgentId  String
+  salesAgent    SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
+  retailerId    String
+  retailer      RetailerProfile   @relation(fields: [retailerId], references: [id])
+  checkInAt     DateTime  @default(now())
+  checkInLat    Float?
+  checkInLng    Float?
+  checkOutAt    DateTime?
+  notes         String?
+  orderId       String?   @unique
+  order         Order?    @relation(fields: [orderId], references: [id])
+}
+
+model Attendance {
+  id           String    @id @default(cuid())
+  salesAgentId String
+  salesAgent   SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
+  date         String
+  checkInAt    DateTime?
+  checkInLat   Float?
+  checkInLng   Float?
+  checkOutAt   DateTime?
+
+  @@unique([salesAgentId, date])
+}
+
+model Delivery {
+  id               String        @id @default(cuid())
+  orderId          String        @unique
+  order            Order         @relation(fields: [orderId], references: [id])
+  deliveryAgentId  String
+  deliveryAgent    DeliveryAgentProfile @relation(fields: [deliveryAgentId], references: [id])
+  assignedAt       DateTime      @default(now())
+  deliveredAt      DateTime?
+  lat              Float?
+  lng              Float?
+  podPhotoUrl      String?
+  podSignatureData String?
+  paymentMethod    PaymentMethod @default(CASH)
+  paymentStatus    PaymentStatus @default(PENDING)
+  codAmount        Float         @default(0)
+}
