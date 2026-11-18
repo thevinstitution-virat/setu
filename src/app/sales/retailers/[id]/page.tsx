@@ -73,7 +73,7 @@ export default function RetailerDetailPage({
   if (showOrder) {
     return (
       <div>
-        <button className="text-sm text-brand-dark mb-3" onClick={() => setShowOrder(false)}>
+        <button className="text-sm text-[var(--kesar-text)] mb-3" onClick={() => setShowOrder(false)}>
           ← Back to {retailer.outletName}
         </button>
         <OrderBuilder products={products} onSubmitAction={placeOrder} submitLabel="Place order for retailer" />
@@ -84,7 +84,7 @@ export default function RetailerDetailPage({
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-semibold">{retailer.outletName}</h1>
+        <h1 className="page-title">{retailer.outletName}</h1>
         <p className="text-sm text-foreground/50">
           Shop {retailer.shopNumber}, {retailer.complexName} · {retailer.area.name}
         </p>
@@ -103,7 +103,7 @@ export default function RetailerDetailPage({
           </div>
           <button
             onClick={() => checkOutVisit(openVisit.id)}
-            className="rounded-xl bg-black/5 text-sm font-medium px-3 py-2"
+            className="btn btn-quiet btn-sm"
           >
             Check out
           </button>
@@ -112,7 +112,7 @@ export default function RetailerDetailPage({
 
       <button
         onClick={() => setShowOrder(true)}
-        className="w-full rounded-xl bg-brand text-white font-medium py-3"
+        className="btn btn-kesar w-full"
       >
         Capture order
       </button>

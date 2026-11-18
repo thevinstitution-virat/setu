@@ -31,7 +31,7 @@ export default function CataloguePage() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold mb-4">Catalogue</h1>
+      <h1 className="page-title mb-4">Catalogue</h1>
       {!loaded ? (
         <p className="text-sm text-foreground/50">Loading…</p>
       ) : (

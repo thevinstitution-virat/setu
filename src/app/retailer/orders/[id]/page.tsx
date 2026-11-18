@@ -30,7 +30,7 @@ export default async function RetailerOrderDetail({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">{order.orderNumber}</h1>
+          <h1 className="page-title">{order.orderNumber}</h1>
           <p className="text-xs text-foreground/50">
             {new Date(order.createdAt).toLocaleString()}
           </p>

@@ -18,12 +18,22 @@ export const STATUS_LABEL: Record<OrderStatus, string> = {
 };
 
 export const STATUS_COLOR: Record<OrderStatus, string> = {
-  PLACED: "bg-amber-100 text-amber-800",
-  CONFIRMED: "bg-blue-100 text-blue-800",
-  PACKED: "bg-indigo-100 text-indigo-800",
-  OUT_FOR_DELIVERY: "bg-purple-100 text-purple-800",
-  DELIVERED: "bg-emerald-100 text-emerald-800",
-  CANCELLED: "bg-red-100 text-red-800",
+  PLACED: "st st-placed",
+  CONFIRMED: "st st-confirmed",
+  PACKED: "st st-packed",
+  OUT_FOR_DELIVERY: "st st-out",
+  DELIVERED: "st st-delivered",
+  CANCELLED: "st st-cancelled",
+};
+
+/** Tinted background for a stage tile on the admin pipeline. */
+export const STATUS_TILE: Record<OrderStatus, string> = {
+  PLACED: "tile-placed",
+  CONFIRMED: "tile-confirmed",
+  PACKED: "tile-packed",
+  OUT_FOR_DELIVERY: "tile-out",
+  DELIVERED: "tile-delivered",
+  CANCELLED: "",
 };
 
 export function generateOrderNumber() {

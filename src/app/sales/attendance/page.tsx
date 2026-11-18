@@ -15,7 +15,7 @@ export default function AttendanceHistory() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Attendance</h1>
+      <h1 className="page-title">Attendance</h1>
       <div className="card divide-y divide-black/5">
         {history.map((a) => (
           <div key={a.id} className="flex items-center justify-between px-4 py-3 text-sm">

@@ -81,7 +81,7 @@ export default function AdminTeamPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Team</h1>
+      <h1 className="page-title">Team</h1>
 
       <div className="card p-4 space-y-3">
         <p className="text-sm font-semibold">Add sales or delivery agent</p>
@@ -94,8 +94,8 @@ export default function AdminTeamPage() {
             <option value="DELIVERY_AGENT">Delivery agent</option>
           </select>
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button onClick={createUser} disabled={loading} className="rounded-xl bg-brand text-white font-medium px-4 py-2 text-sm">
+        {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+        <button onClick={createUser} disabled={loading} className="btn btn-kesar btn-sm">
           {loading ? "Adding…" : "Add"}
         </button>
       </div>
@@ -114,7 +114,7 @@ export default function AdminTeamPage() {
               <button
                 onClick={() => toggleActive(u)}
                 className={`text-xs font-medium rounded-lg px-3 py-1.5 ${
-                  u.active ? "bg-emerald-100 text-emerald-800" : "bg-black/5 text-foreground/50"
+                  u.active ? "bg-[var(--mint-tint)] text-[var(--mint-text)] font-bold" : "bg-black/5 text-foreground/50"
                 }`}
               >
                 {u.active ? "Active" : "Inactive"}

@@ -15,7 +15,7 @@ export default async function DeliveryHistory() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Delivery history</h1>
+      <h1 className="page-title">Delivery history</h1>
       <div className="space-y-3">
         {deliveries.map((d) => (
           <div key={d.id} className="card p-4 flex items-center justify-between">

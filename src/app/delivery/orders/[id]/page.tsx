@@ -67,13 +67,13 @@ export default function DeliverOrderPage({ params }: { params: Promise<{ id: str
   if (!order) return <p className="text-sm text-foreground/50">Loading…</p>;
 
   if (order.status === "DELIVERED") {
-    return <p className="text-sm text-emerald-700 font-medium">This order has already been delivered.</p>;
+    return <p className="text-sm text-[var(--mint-text)] font-medium">This order has already been delivered.</p>;
   }
 
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-semibold">{order.retailer.outletName}</h1>
+        <h1 className="page-title">{order.retailer.outletName}</h1>
         <p className="text-sm text-foreground/50">
           Shop {order.retailer.shopNumber}, {order.retailer.complexName}
         </p>
@@ -108,7 +108,7 @@ export default function DeliverOrderPage({ params }: { params: Promise<{ id: str
               key={m}
               onClick={() => setPaymentMethod(m)}
               className={`flex-1 rounded-xl py-2 text-sm font-medium ${
-                paymentMethod === m ? "bg-brand text-white" : "bg-black/5 text-foreground/70"
+                paymentMethod === m ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-black/5 text-foreground/70"
               }`}
             >
               {m === "CASH" ? "Cash" : m === "ONLINE" ? "Online" : "Credit"}
@@ -133,12 +133,12 @@ export default function DeliverOrderPage({ params }: { params: Promise<{ id: str
         )}
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
 
       <button
         onClick={complete}
         disabled={loading}
-        className="w-full rounded-xl bg-brand text-white font-medium py-3 disabled:opacity-60"
+        className="btn btn-kesar w-full"
       >
         {loading ? "Completing…" : "Mark delivered"}
       </button>

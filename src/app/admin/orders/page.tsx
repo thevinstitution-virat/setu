@@ -86,7 +86,7 @@ export default function AdminOrdersPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Orders</h1>
+      <h1 className="page-title">Orders</h1>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         {FILTERS.map((f) => (
@@ -94,7 +94,7 @@ export default function AdminOrdersPage() {
             key={f}
             onClick={() => setFilter(f)}
             className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${
-              filter === f ? "bg-brand text-white" : "bg-black/5 text-foreground/60"
+              filter === f ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-black/5 text-foreground/60"
             }`}
           >
             {f === "ALL" ? "All" : t(`status.${f}`)}
@@ -126,7 +126,7 @@ export default function AdminOrdersPage() {
                     <button
                       disabled={busyId === o.id}
                       onClick={() => advance(o.id)}
-                      className="rounded-lg bg-brand-light text-brand-dark text-xs font-medium px-3 py-1.5"
+                      className="btn btn-soft btn-xs"
                     >
                       Mark {t(`status.${upcoming}`)}
                     </button>
@@ -151,7 +151,7 @@ export default function AdminOrdersPage() {
                   <button
                     disabled={busyId === o.id}
                     onClick={() => cancel(o.id)}
-                    className="rounded-lg bg-red-50 text-red-700 text-xs font-medium px-3 py-1.5"
+                    className="btn btn-danger btn-xs"
                   >
                     Cancel
                   </button>

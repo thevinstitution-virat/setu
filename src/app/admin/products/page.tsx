@@ -78,7 +78,7 @@ export default function AdminProductsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Products</h1>
+      <h1 className="page-title">Products</h1>
 
       <div className="card p-4 space-y-3">
         <p className="text-sm font-semibold">Add product</p>
@@ -103,11 +103,11 @@ export default function AdminProductsPage() {
             onChange={(e) => setForm({ ...form, specialOffer: e.target.value })}
           />
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-[#a8281e]">{error}</p>}
         <button
           onClick={addProduct}
           disabled={loading}
-          className="rounded-xl bg-brand text-white font-medium px-4 py-2 text-sm"
+          className="btn btn-kesar btn-sm"
         >
           {loading ? "Adding…" : "Add product"}
         </button>
@@ -122,13 +122,13 @@ export default function AdminProductsPage() {
                 {p.sku} · {p.category} · ₹{p.price.toFixed(2)} / {p.unit} · GST {p.gstRate}%
               </p>
               {p.specialOffer && (
-                <p className="text-xs text-brand-dark font-medium">🏷️ {p.specialOffer}</p>
+                <p className="text-xs text-[var(--kesar-text)] font-medium">🏷️ {p.specialOffer}</p>
               )}
             </div>
             <button
               onClick={() => toggleActive(p)}
               className={`shrink-0 text-xs font-medium rounded-lg px-3 py-1.5 ${
-                p.active ? "bg-emerald-100 text-emerald-800" : "bg-black/5 text-foreground/50"
+                p.active ? "bg-[var(--mint-tint)] text-[var(--mint-text)] font-bold" : "bg-black/5 text-foreground/50"
               }`}
             >
               {p.active ? "Active" : "Inactive"}

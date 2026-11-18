@@ -43,11 +43,11 @@ export default function AdminRegionsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Regions &amp; areas</h1>
+      <h1 className="page-title">Regions &amp; areas</h1>
 
       <div className="card p-4 flex gap-2">
         <input className="input" placeholder="New region name" value={newRegion} onChange={(e) => setNewRegion(e.target.value)} />
-        <button onClick={addRegion} className="shrink-0 rounded-xl bg-brand text-white font-medium px-4 py-2 text-sm">
+        <button onClick={addRegion} className="btn btn-kesar btn-sm shrink-0">
           Add
         </button>
       </div>
@@ -72,7 +72,7 @@ export default function AdminRegionsPage() {
               />
               <button
                 onClick={() => addArea(r.id)}
-                className="shrink-0 rounded-xl bg-black/5 font-medium px-4 py-2 text-sm"
+                className="btn btn-quiet btn-sm shrink-0"
               >
                 Add area
               </button>

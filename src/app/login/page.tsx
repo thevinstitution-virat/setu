@@ -4,7 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import LanguageToggle from "@/components/LanguageToggle";
+import Link from "next/link";
 import { APP_NAME } from "@/lib/brand";
+import { BrandLockup } from "@/components/BrandMark";
 
 type Region = { id: string; name: string; areas: { id: string; name: string }[] };
 
@@ -15,37 +17,38 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
-        <div className="flex justify-end mb-2">
+        <div className="flex items-center justify-between mb-8">
+          <Link href="/" aria-label={APP_NAME}>
+            <BrandLockup />
+          </Link>
           <LanguageToggle />
         </div>
-        <div className="text-center mb-8">
-          <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand text-white font-bold text-2xl mb-3">
-            S
+
+        <div className="card p-6 sm:p-7">
+          <p className="page-kick">{mode === "retailer" ? t("login.retailerTab") : t("login.teamTab")}</p>
+          <h1 className="page-title">{t("login.title")}</h1>
+          <p className="page-sub mb-6">{t("brand.tagline")}</p>
+
+          <div className="flex rounded-2xl p-1 mb-6 bg-ink/5" role="tablist">
+            {(["retailer", "team"] as const).map((m) => (
+              <button
+                key={m}
+                role="tab"
+                aria-selected={mode === m}
+                className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition ${
+                  mode === m
+                    ? "bg-gradient-to-br from-mor to-[#0c3634] text-white shadow-[0_10px_20px_-12px_rgba(8,38,37,.9)]"
+                    : "text-[var(--ink-2)]"
+                }`}
+                onClick={() => setMode(m)}
+              >
+                {m === "retailer" ? t("login.retailerTab") : t("login.teamTab")}
+              </button>
+            ))}
           </div>
-          <h1 className="text-2xl font-semibold text-foreground">{APP_NAME}</h1>
-          <p className="text-sm text-foreground/60 mt-1">{t("brand.tagline")}</p>
-        </div>
 
-        <div className="flex rounded-xl bg-black/5 p-1 mb-6">
-          <button
-            className={`flex-1 rounded-lg py-2 text-sm font-medium transition ${
-              mode === "retailer" ? "bg-white shadow text-brand-dark" : "text-foreground/60"
-            }`}
-            onClick={() => setMode("retailer")}
-          >
-            {t("login.retailerTab")}
-          </button>
-          <button
-            className={`flex-1 rounded-lg py-2 text-sm font-medium transition ${
-              mode === "team" ? "bg-white shadow text-brand-dark" : "text-foreground/60"
-            }`}
-            onClick={() => setMode("team")}
-          >
-            {t("login.teamTab")}
-          </button>
+          {mode === "retailer" ? <RetailerLogin /> : <TeamLogin />}
         </div>
-
-        {mode === "retailer" ? <RetailerLogin /> : <TeamLogin />}
       </div>
     </div>
   );
@@ -180,7 +183,7 @@ function RetailerLogin() {
       {step === "otp" && (
         <>
           {devCode && (
-            <p className="text-xs rounded-lg bg-brand-light text-brand-dark px-3 py-2">
+            <p className="text-xs rounded-lg bg-[var(--genda-tint)] text-[var(--genda-text)] px-3 py-2">
               Demo mode — no SMS is sent. Your OTP is{" "}
               <span className="font-semibold">{devCode}</span>.
             </p>
@@ -199,7 +202,7 @@ function RetailerLogin() {
             {t("login.verify")}
           </Button>
           <button
-            className="text-sm text-brand-dark w-full text-center"
+            className="text-sm text-[var(--kesar-text)] w-full text-center"
             onClick={() => setStep("phone")}
           >
             {t("login.changeNumber")}
@@ -278,7 +281,7 @@ function RetailerLogin() {
         </>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
     </div>
   );
 }
@@ -331,7 +334,7 @@ function TeamLogin() {
       <Button onClick={submit} loading={loading}>
         {t("login.loginButton")}
       </Button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
     </div>
   );
 }
@@ -358,7 +361,7 @@ function Button({
     <button
       onClick={onClick}
       disabled={loading}
-      className="w-full rounded-xl bg-brand text-white font-medium py-3 hover:bg-brand-dark transition disabled:opacity-60"
+      className="btn btn-kesar w-full"
     >
       {loading ? "Please wait…" : children}
     </button>
@@ -372,7 +375,7 @@ function Stepper({ steps, active }: { steps: string[]; active: number }) {
         <div key={s} className="flex-1">
           <div
             className={`h-1.5 rounded-full ${
-              i <= active ? "bg-brand" : "bg-black/10"
+              i <= active ? "bg-[var(--kesar)]" : "bg-black/10"
             }`}
           />
         </div>

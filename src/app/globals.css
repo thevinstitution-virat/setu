@@ -221,3 +221,175 @@ h3 {
   color: var(--mint-text);
   border-color: transparent;
 }
+
+/* ───────── In-app pages (retailer / sales / delivery / admin) ───────── */
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-sm {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-size: 13.5px;
+}
+
+.btn-xs {
+  min-height: 30px;
+  padding: 0 11px;
+  border-radius: 10px;
+  font-size: 12.5px;
+}
+
+.btn-soft {
+  background: var(--kesar-tint);
+  color: var(--kesar-text);
+}
+
+.btn-soft:hover {
+  filter: brightness(0.97);
+}
+
+.btn-quiet {
+  background: rgba(15, 42, 42, 0.06);
+  color: var(--ink);
+}
+
+.btn-quiet:hover {
+  background: rgba(15, 42, 42, 0.1);
+}
+
+.btn-danger {
+  background: #fde4e1;
+  color: #a8281e;
+}
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.page-kick {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--kesar-text);
+}
+
+.page-title {
+  font-family: var(--font-heading), var(--font-deva), sans-serif;
+  font-weight: 700;
+  font-size: clamp(24px, 3.2vw, 30px);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  margin-top: 4px;
+}
+
+.page-sub {
+  color: var(--muted);
+  font-size: 14.5px;
+  margin-top: 4px;
+}
+
+.stat-num {
+  font-family: var(--font-heading), var(--font-deva), sans-serif;
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.stat-lbl {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.panel-dark {
+  background: linear-gradient(150deg, var(--mor), var(--mor-mid) 60%, var(--mor-dark));
+  color: #fff;
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.14) inset, 0 24px 44px -24px rgba(8, 38, 37, 0.9);
+}
+
+.icon-tile {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  flex: 0 0 auto;
+}
+
+.icon-tile svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Order status chips */
+.st {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  font-weight: 700 !important;
+}
+
+.st-placed {
+  background: var(--genda-tint);
+  color: var(--genda-text);
+}
+
+.st-confirmed {
+  background: #e1eeec;
+  color: var(--mor);
+}
+
+.st-packed {
+  background: var(--ink);
+  color: var(--genda);
+}
+
+.st-out {
+  background: var(--kesar-tint);
+  color: var(--kesar-text);
+}
+
+.st-delivered {
+  background: var(--mint-tint);
+  color: var(--mint-text);
+}
+
+.st-cancelled {
+  background: #fde4e1;
+  color: #a8281e;
+}
+
+/* Stage tiles (admin pipeline) — tinted like the landing owner dashboard */
+.tile-placed {
+  background: var(--genda-tint);
+}
+
+.tile-confirmed {
+  background: #e1eeec;
+}
+
+.tile-packed {
+  background: #fff;
+}
+
+.tile-out {
+  background: var(--kesar-tint);
+}
+
+.tile-delivered {
+  background: var(--mint-tint);
+}

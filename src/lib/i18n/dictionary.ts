@@ -46,6 +46,7 @@ export const dictionary = {
   "common.placeOrder": { en: "Place order", hi: "ऑर्डर करें" },
 
   // Login
+  "login.title": { en: "Sign in", hi: "लॉगिन करें" },
   "login.retailerTab": { en: "Retailer", hi: "रिटेलर" },
   "login.teamTab": { en: "Sales / Delivery / Admin", hi: "सेल्स / डिलीवरी / एडमिन" },
   "login.mobileLabel": { en: "Mobile number", hi: "मोबाइल नंबर" },

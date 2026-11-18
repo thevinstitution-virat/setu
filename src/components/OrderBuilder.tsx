@@ -76,7 +76,7 @@ export default function OrderBuilder({
         if (!inCat.length) return null;
         return (
           <div key={cat} className="space-y-2">
-            <h3 className="text-sm font-semibold text-foreground/60 uppercase tracking-wide">
+            <h3 className="page-kick">
               {cat}
             </h3>
             <div className="space-y-2">
@@ -92,7 +92,7 @@ export default function OrderBuilder({
                       {p.gstRate > 0 && <span className="ml-1">· GST {p.gstRate}%</span>}
                     </p>
                     {p.specialOffer && (
-                      <p className="text-xs text-brand-dark font-medium mt-0.5">
+                      <p className="text-xs text-[var(--kesar-text)] font-medium mt-0.5">
                         🏷️ {p.specialOffer}
                       </p>
                     )}
@@ -105,13 +105,15 @@ export default function OrderBuilder({
         );
       })}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
 
       {items.length > 0 && (
-        <div className="fixed bottom-16 md:bottom-0 inset-x-0 bg-white border-t border-black/5 p-4 z-20">
-          <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs text-foreground/50">
+        <>
+        <div aria-hidden="true" className="h-24" />
+        <div className="fixed bottom-[92px] md:bottom-4 inset-x-3 z-30">
+          <div className="panel-dark max-w-5xl mx-auto flex items-center justify-between gap-4 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-xs text-white/70">
                 {items.length} item{items.length > 1 ? "s" : ""} · {t("pricing.subtotal")} ₹
                 {breakup.subtotal.toFixed(2)}
                 {breakup.gstAmount > 0 && (
@@ -121,17 +123,18 @@ export default function OrderBuilder({
                   </>
                 )}
               </p>
-              <p className="font-semibold">₹{breakup.totalAmount.toFixed(2)}</p>
+              <p className="font-heading font-bold text-lg">₹{breakup.totalAmount.toFixed(2)}</p>
             </div>
             <button
               onClick={submit}
               disabled={loading}
-              className="rounded-xl bg-brand text-white font-medium px-6 py-3 hover:bg-brand-dark transition disabled:opacity-60"
+              className="btn btn-kesar"
             >
               {loading ? "Placing…" : submitLabel}
             </button>
           </div>
         </div>
+        </>
       )}
     </div>
   );
@@ -142,7 +145,7 @@ function QtyStepper({ value, onChange }: { value: number; onChange: (q: number) 
     return (
       <button
         onClick={() => onChange(1)}
-        className="rounded-lg bg-brand-light text-brand-dark text-sm font-medium px-4 py-1.5"
+        className="btn btn-soft btn-sm"
       >
         Add
       </button>
@@ -152,14 +155,14 @@ function QtyStepper({ value, onChange }: { value: number; onChange: (q: number) 
     <div className="flex items-center gap-2">
       <button
         onClick={() => onChange(value - 1)}
-        className="h-8 w-8 rounded-lg bg-black/5 font-medium"
+        className="h-8 w-8 rounded-lg bg-ink/5 hover:bg-ink/10 font-bold"
       >
         −
       </button>
       <span className="w-5 text-center font-medium">{value}</span>
       <button
         onClick={() => onChange(value + 1)}
-        className="h-8 w-8 rounded-lg bg-black/5 font-medium"
+        className="h-8 w-8 rounded-lg bg-ink/5 hover:bg-ink/10 font-bold"
       >
         +
       </button>

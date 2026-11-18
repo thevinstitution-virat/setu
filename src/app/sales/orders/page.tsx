@@ -18,7 +18,7 @@ export default async function SalesOrders() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Orders from your retailers</h1>
+      <h1 className="page-title">Orders from your retailers</h1>
       <div className="space-y-3">
         {orders.map((o) => (
           <div key={o.id} className="card p-4 flex items-center justify-between">

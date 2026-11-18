@@ -39,7 +39,7 @@ export default function BeatPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Today&apos;s beat</h1>
+      <h1 className="page-title">Today&apos;s beat</h1>
       <div className="space-y-3">
         {retailers.map((r) => {
           const visit = r.visits[0];
@@ -51,7 +51,7 @@ export default function BeatPage() {
                   Shop {r.shopNumber} · {r.area.name}
                 </p>
                 {visit && (
-                  <p className="text-xs text-brand-dark mt-1">
+                  <p className="text-xs text-[var(--kesar-text)] mt-1">
                     Visited {new Date(visit.checkInAt).toLocaleTimeString()}
                     {visit.checkOutAt ? " · Checked out" : ""}
                   </p>
@@ -61,14 +61,14 @@ export default function BeatPage() {
                 <button
                   onClick={() => checkIn(r.id)}
                   disabled={busyId === r.id}
-                  className="shrink-0 rounded-xl bg-brand text-white text-sm font-medium px-3 py-2"
+                  className="btn btn-kesar btn-sm shrink-0"
                 >
                   Check in
                 </button>
               ) : (
                 <Link
                   href={`/sales/retailers/${r.id}`}
-                  className="shrink-0 rounded-xl bg-black/5 text-sm font-medium px-3 py-2"
+                  className="btn btn-quiet btn-sm shrink-0"
                 >
                   Open
                 </Link>

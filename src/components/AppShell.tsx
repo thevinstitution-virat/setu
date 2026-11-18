@@ -5,9 +5,25 @@ import { usePathname, useRouter } from "next/navigation";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import type { DictKey } from "@/lib/i18n/dictionary";
 import LanguageToggle from "@/components/LanguageToggle";
-import { APP_SHORT_NAME } from "@/lib/brand";
+import { BrandLockup } from "@/components/BrandMark";
+import Icon, { type IconName } from "@/components/Icon";
 
-export type NavItem = { href: string; labelKey: DictKey; icon: string };
+export type NavItem = { href: string; labelKey: DictKey; icon: IconName };
+
+/**
+ * The nav item for the current page: the longest href that is the path itself
+ * or a parent of it. Plain `startsWith` marked the role's home link ("/sales")
+ * active on every page, since every page path starts with it.
+ */
+function activeHref(pathname: string, nav: NavItem[]) {
+  let best: string | null = null;
+  for (const { href } of nav) {
+    if (pathname === href || pathname.startsWith(href + "/")) {
+      if (!best || href.length > best.length) best = href;
+    }
+  }
+  return best;
+}
 
 export default function AppShell({
   children,
@@ -23,6 +39,7 @@ export default function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const { t } = useLanguage();
+  const current = activeHref(pathname, nav);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -31,44 +48,44 @@ export default function AppShell({
   }
 
   return (
-    <div className="min-h-screen flex flex-col pb-20 md:pb-0">
-      <header className="sticky top-0 z-10 bg-white border-b border-black/5">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-mor to-[#0c3634] text-genda font-bold flex items-center justify-center">
-              <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M2 17c4-7 16-7 20 0" />
-                <path d="M2 17h20M6 17v-3.5M10 17v-5M14 17v-5M18 17v-3.5" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-heading font-bold leading-none">{APP_SHORT_NAME}</p>
-              <p className="text-xs text-foreground/50 leading-none mt-1">{t(roleKey)}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <LanguageToggle />
-            <span className="text-sm text-foreground/70 hidden sm:inline">{userName}</span>
-            <button
-              onClick={logout}
-              className="text-xs font-bold rounded-lg px-3 py-1.5 bg-ink/5 hover:bg-ink/10 transition"
-            >
-              {t("common.logout")}
-            </button>
-          </div>
+    <div className="min-h-screen flex flex-col pb-24 md:pb-0">
+      <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[rgba(246,241,231,0.78)] backdrop-blur-xl backdrop-saturate-150">
+        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center gap-3">
+          <Link href={nav[0]?.href ?? "/"} className="min-w-0" aria-label={t(roleKey)}>
+            <BrandLockup sub={t(roleKey)} />
+          </Link>
+
+          <nav className="hidden md:flex items-center gap-1 ml-4" aria-label="Main">
+            {nav.map((item) => (
+              <NavLink key={item.href} item={item} active={item.href === current} />
+            ))}
+          </nav>
+
+          <span className="flex-1" />
+          <LanguageToggle />
+          <span className="text-sm font-semibold text-[var(--ink-2)] hidden lg:inline max-w-[160px] truncate">
+            {userName}
+          </span>
+          <button
+            onClick={logout}
+            className="btn btn-quiet btn-xs"
+            aria-label={t("common.logout")}
+            title={t("common.logout")}
+          >
+            <Icon name="logout" className="h-4 w-4" />
+            <span className="hidden sm:inline">{t("common.logout")}</span>
+          </button>
         </div>
-        <nav className="hidden md:flex max-w-5xl mx-auto px-4 gap-1 pb-2">
-          {nav.map((item) => (
-            <NavLink key={item.href} item={item} active={pathname.startsWith(item.href)} />
-          ))}
-        </nav>
       </header>
 
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-5">{children}</main>
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-6">{children}</main>
 
-      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-black/5 flex z-10">
+      <nav
+        className="md:hidden fixed bottom-3 inset-x-3 z-20 flex rounded-2xl glass"
+        aria-label="Main"
+      >
         {nav.map((item) => (
-          <NavLinkMobile key={item.href} item={item} active={pathname.startsWith(item.href)} />
+          <NavLinkMobile key={item.href} item={item} active={item.href === current} />
         ))}
       </nav>
     </div>
@@ -80,11 +97,15 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
   return (
     <Link
       href={item.href}
-      className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-        active ? "bg-brand-light text-brand-dark" : "text-foreground/60 hover:bg-black/5"
+      aria-current={active ? "page" : undefined}
+      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold transition ${
+        active
+          ? "bg-gradient-to-br from-mor to-[#0c3634] text-white shadow-[0_10px_20px_-12px_rgba(8,38,37,.9)]"
+          : "text-[var(--ink-2)] hover:bg-ink/5"
       }`}
     >
-      {item.icon} {t(item.labelKey)}
+      <Icon name={item.icon} className={`h-4 w-4 ${active ? "text-genda" : ""}`} />
+      {t(item.labelKey)}
     </Link>
   );
 }
@@ -94,11 +115,18 @@ function NavLinkMobile({ item, active }: { item: NavItem; active: boolean }) {
   return (
     <Link
       href={item.href}
-      className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs ${
-        active ? "text-brand-dark" : "text-foreground/50"
+      aria-current={active ? "page" : undefined}
+      className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[11.5px] font-bold ${
+        active ? "text-[var(--kesar-text)]" : "text-[var(--muted)]"
       }`}
     >
-      <span className="text-lg leading-none">{item.icon}</span>
+      <span
+        className={`grid place-items-center h-8 w-12 rounded-xl transition ${
+          active ? "bg-[var(--kesar-tint)]" : ""
+        }`}
+      >
+        <Icon name={item.icon} className="h-5 w-5" />
+      </span>
       {t(item.labelKey)}
     </Link>
   );

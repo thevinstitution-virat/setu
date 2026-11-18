@@ -23,7 +23,7 @@ export default async function RetailerAccount() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Account</h1>
+      <h1 className="page-title">Account</h1>
       <div className="card divide-y divide-black/5">
         {rows.map(([label, value]) => (
           <div key={label} className="flex justify-between px-4 py-3 text-sm">

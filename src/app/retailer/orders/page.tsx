@@ -18,7 +18,7 @@ export default async function RetailerOrders() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Your orders</h1>
+      <h1 className="page-title">Your orders</h1>
       {orders.length === 0 && (
         <p className="text-sm text-foreground/50">No orders placed yet.</p>
       )}

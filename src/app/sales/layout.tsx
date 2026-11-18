@@ -3,10 +3,10 @@ import { getSession } from "@/lib/auth";
 import AppShell, { type NavItem } from "@/components/AppShell";
 
 const nav: NavItem[] = [
-  { href: "/sales", labelKey: "nav.today", icon: "📍" },
-  { href: "/sales/beat", labelKey: "nav.beat", icon: "🗺️" },
-  { href: "/sales/orders", labelKey: "nav.orders", icon: "📦" },
-  { href: "/sales/attendance", labelKey: "nav.attendance", icon: "🕒" },
+  { href: "/sales", labelKey: "nav.today", icon: "pin" },
+  { href: "/sales/beat", labelKey: "nav.beat", icon: "route" },
+  { href: "/sales/orders", labelKey: "nav.orders", icon: "box" },
+  { href: "/sales/attendance", labelKey: "nav.attendance", icon: "clock" },
 ];
 
 export default async function SalesLayout({ children }: { children: React.ReactNode }) {

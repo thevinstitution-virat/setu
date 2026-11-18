@@ -3,11 +3,11 @@ import { getSession } from "@/lib/auth";
 import AppShell, { type NavItem } from "@/components/AppShell";
 
 const nav: NavItem[] = [
-  { href: "/admin", labelKey: "nav.pipeline", icon: "📊" },
-  { href: "/admin/orders", labelKey: "nav.orders", icon: "📦" },
-  { href: "/admin/products", labelKey: "nav.products", icon: "🏷️" },
-  { href: "/admin/team", labelKey: "nav.team", icon: "👥" },
-  { href: "/admin/regions", labelKey: "nav.regions", icon: "🗺️" },
+  { href: "/admin", labelKey: "nav.pipeline", icon: "chart" },
+  { href: "/admin/orders", labelKey: "nav.orders", icon: "box" },
+  { href: "/admin/products", labelKey: "nav.products", icon: "tag" },
+  { href: "/admin/team", labelKey: "nav.team", icon: "users" },
+  { href: "/admin/regions", labelKey: "nav.regions", icon: "map" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
