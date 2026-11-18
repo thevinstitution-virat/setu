@@ -1,15 +1,17 @@
+import { formatINR } from "@/lib/money";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getDb } from "@/lib/tenant";
 import { STATUS_COLOR } from "@/lib/orders";
 import { getServerLang, tr } from "@/lib/i18n/server";
 
 export default async function SalesOrders() {
+  const db = await getDb();
   const session = await getSession();
   const lang = await getServerLang();
-  const agent = await prisma.salesAgentProfile.findUnique({ where: { userId: session!.userId } });
+  const agent = await db.salesAgentProfile.findUnique({ where: { userId: session!.userId } });
 
   const orders = agent
-    ? await prisma.order.findMany({
+    ? await db.order.findMany({
         where: { retailer: { salesAgentId: agent.id } },
         orderBy: { createdAt: "desc" },
         include: { retailer: true, items: true },
@@ -25,7 +27,7 @@ export default async function SalesOrders() {
             <div>
               <p className="font-medium text-sm">{o.retailer.outletName}</p>
               <p className="text-xs text-foreground/50">
-                {o.orderNumber} · {o.items.length} items · ₹{o.totalAmount.toFixed(2)}
+                {o.orderNumber} · {o.items.length} items · {formatINR(o.totalAmount)}
               </p>
             </div>
             <span className={`text-xs font-medium px-2 py-1 rounded-full ${STATUS_COLOR[o.status]}`}>

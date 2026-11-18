@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { guard } from "@/lib/guard";
+import { audit, requestIp } from "@/lib/audit";
+import { emit } from "@/lib/jobs";
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getSession();
-  if (!session || session.role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await guard("orders.dispatch");
+  if (!auth.ok) return auth.res;
+  const { session, db } = auth;
   const { id } = await params;
   const body = await req.json().catch(() => null);
   const deliveryAgentId = body?.deliveryAgentId as string | undefined;
@@ -17,19 +17,19 @@ export async function POST(
     return NextResponse.json({ error: "deliveryAgentId is required" }, { status: 400 });
   }
 
-  const order = await prisma.order.findUnique({ where: { id }, include: { delivery: true } });
+  const order = await db.order.findUnique({ where: { id }, include: { delivery: true } });
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (order.status === "DELIVERED" || order.status === "CANCELLED") {
     return NextResponse.json({ error: "Order can no longer be assigned" }, { status: 400 });
   }
 
-  await prisma.delivery.upsert({
+  await db.delivery.upsert({
     where: { orderId: id },
     update: { deliveryAgentId },
     create: { orderId: id, deliveryAgentId },
   });
 
-  const updated = await prisma.order.update({
+  const updated = await db.order.update({
     where: { id },
     data: {
       status: "OUT_FOR_DELIVERY",
@@ -38,6 +38,9 @@ export async function POST(
       },
     },
   });
+
+  await audit(db, { actorId: session.userId, action: "order.assign", entity: "Order", entityId: id, before: { status: order.status, deliveryAgentId: order.delivery?.deliveryAgentId ?? null }, after: { status: "OUT_FOR_DELIVERY", deliveryAgentId }, ip: requestIp(req) });
+  await emit("order.status", { tenantId: auth.tenant.id, orderId: id, from: order.status, to: "OUT_FOR_DELIVERY" });
 
   return NextResponse.json({ order: updated });
 }

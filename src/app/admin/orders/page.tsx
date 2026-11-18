@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatINR } from "@/lib/money";
 import { STATUS_COLOR, nextStatus } from "@/lib/orders";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import type { OrderStatus } from "@/generated/prisma/client";
@@ -111,8 +112,7 @@ export default function AdminOrdersPage() {
                 <div>
                   <p className="text-sm font-medium">{o.retailer.outletName}</p>
                   <p className="text-xs text-foreground/50">
-                    {o.orderNumber} · {o.retailer.area.name} · {o.items.length} items · ₹
-                    {o.totalAmount.toFixed(2)}
+                    {o.orderNumber} · {o.retailer.area.name} · {o.items.length} items · {formatINR(o.totalAmount)}
                   </p>
                 </div>
                 <span className={`text-xs font-medium px-2 py-1 rounded-full ${STATUS_COLOR[o.status]}`}>

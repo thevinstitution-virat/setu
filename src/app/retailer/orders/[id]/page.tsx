@@ -1,6 +1,7 @@
+import { formatINR } from "@/lib/money";
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getDb } from "@/lib/tenant";
 import { STATUS_COLOR } from "@/lib/orders";
 import { getServerLang, tr } from "@/lib/i18n/server";
 import OrderTimeline from "@/components/OrderTimeline";
@@ -10,12 +11,13 @@ export default async function RetailerOrderDetail({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const db = await getDb();
   const { id } = await params;
   const session = await getSession();
   const lang = await getServerLang();
-  const profile = await prisma.retailerProfile.findUnique({ where: { userId: session!.userId } });
+  const profile = await db.retailerProfile.findUnique({ where: { userId: session!.userId } });
 
-  const order = await prisma.order.findUnique({
+  const order = await db.order.findUnique({
     where: { id },
     include: {
       items: { include: { product: true } },
@@ -63,24 +65,24 @@ export default async function RetailerOrderDetail({
                   <span className="text-foreground/40"> (GST {item.gstRate}%)</span>
                 )}
               </span>
-              <span>₹{(item.price * item.quantity).toFixed(2)}</span>
+              <span>{formatINR(item.price * item.quantity)}</span>
             </div>
           ))}
         </div>
         <div className="border-t border-black/5 mt-3 pt-3 space-y-1">
           <div className="flex justify-between text-sm text-foreground/60">
             <span>{tr("pricing.subtotal", lang)}</span>
-            <span>₹{order.subtotal.toFixed(2)}</span>
+            <span>{formatINR(order.subtotal)}</span>
           </div>
           {order.gstAmount > 0 && (
             <div className="flex justify-between text-sm text-foreground/60">
               <span>{tr("pricing.gst", lang)}</span>
-              <span>₹{order.gstAmount.toFixed(2)}</span>
+              <span>{formatINR(order.gstAmount)}</span>
             </div>
           )}
           <div className="flex justify-between font-semibold text-sm">
             <span>{tr("pricing.total", lang)}</span>
-            <span>₹{order.totalAmount.toFixed(2)}</span>
+            <span>{formatINR(order.totalAmount)}</span>
           </div>
         </div>
       </div>

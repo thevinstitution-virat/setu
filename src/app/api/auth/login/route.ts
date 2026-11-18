@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { getTenant } from "@/lib/tenant";
+import { tenantDb } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
 import { createSessionCookie, roleHome } from "@/lib/auth";
 
 export async function POST(req: Request) {
+  const tenant = await getTenant();
+  if (!tenant) return NextResponse.json({ error: "Unknown business address" }, { status: 404 });
+  const db = tenantDb(tenant.id);
+
   const body = await req.json().catch(() => null);
   const loginId = body?.loginId?.trim();
   const password = body?.password ?? "";
@@ -12,10 +17,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Login ID and password are required" }, { status: 400 });
   }
 
-  const user = await prisma.user.findFirst({
-    where: {
-      OR: [{ loginId }, { email: loginId }],
-    },
+  const user = await db.user.findFirst({
+    where: { OR: [{ loginId }, { email: loginId }] },
   });
 
   if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {
@@ -26,7 +29,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "This account has been deactivated" }, { status: 403 });
   }
 
-  await createSessionCookie({ userId: user.id, role: user.role, name: user.name });
+  await createSessionCookie({ userId: user.id, tenantId: tenant.id, role: user.role, name: user.name });
 
   return NextResponse.json({ ok: true, redirect: roleHome(user.role) });
 }

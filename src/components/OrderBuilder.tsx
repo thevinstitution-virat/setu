@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { formatINR } from "@/lib/money";
 import { priceBreakup } from "@/lib/orders";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 
@@ -85,9 +86,9 @@ export default function OrderBuilder({
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">{p.name}</p>
                     <p className="text-xs text-foreground/50">
-                      ₹{p.price.toFixed(2)} / {p.unit}
+                      {formatINR(p.price)} / {p.unit}
                       {p.mrp > p.price && (
-                        <span className="line-through ml-1 text-foreground/30">₹{p.mrp.toFixed(2)}</span>
+                        <span className="line-through ml-1 text-foreground/30">{formatINR(p.mrp)}</span>
                       )}
                       {p.gstRate > 0 && <span className="ml-1">· GST {p.gstRate}%</span>}
                     </p>
@@ -114,16 +115,15 @@ export default function OrderBuilder({
           <div className="panel-dark max-w-5xl mx-auto flex items-center justify-between gap-4 px-4 py-3">
             <div className="min-w-0">
               <p className="text-xs text-white/70">
-                {items.length} item{items.length > 1 ? "s" : ""} · {t("pricing.subtotal")} ₹
-                {breakup.subtotal.toFixed(2)}
+                {items.length} item{items.length > 1 ? "s" : ""} · {t("pricing.subtotal")} {formatINR(breakup.subtotal)}
                 {breakup.gstAmount > 0 && (
                   <>
                     {" "}
-                    + {t("pricing.gst")} ₹{breakup.gstAmount.toFixed(2)}
+                    + {t("pricing.gst")} {formatINR(breakup.gstAmount)}
                   </>
                 )}
               </p>
-              <p className="font-heading font-bold text-lg">₹{breakup.totalAmount.toFixed(2)}</p>
+              <p className="font-heading font-bold text-lg">{formatINR(breakup.totalAmount)}</p>
             </div>
             <button
               onClick={submit}

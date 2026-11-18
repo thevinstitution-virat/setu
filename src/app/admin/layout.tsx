@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
+import { pageSession } from "@/lib/guard";
 import AppShell, { type NavItem } from "@/components/AppShell";
 
 const nav: NavItem[] = [
@@ -8,10 +8,11 @@ const nav: NavItem[] = [
   { href: "/admin/products", labelKey: "nav.products", icon: "tag" },
   { href: "/admin/team", labelKey: "nav.team", icon: "users" },
   { href: "/admin/regions", labelKey: "nav.regions", icon: "map" },
+  { href: "/admin/import", labelKey: "nav.import", icon: "upload" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession();
+  const session = await pageSession();
   if (!session || session.role !== "ADMIN") redirect("/login");
 
   return (

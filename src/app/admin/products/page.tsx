@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatINR, toPaise } from "@/lib/money";
 
 type Product = {
   id: string;
@@ -54,7 +55,12 @@ export default function AdminProductsPage() {
       const res = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, specialOffer: form.specialOffer || undefined }),
+        body: JSON.stringify({
+          ...form,
+          price: toPaise(form.price),
+          mrp: toPaise(form.mrp),
+          specialOffer: form.specialOffer || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -119,7 +125,7 @@ export default function AdminProductsPage() {
             <div className="min-w-0">
               <p className="text-sm font-medium truncate">{p.name}</p>
               <p className="text-xs text-foreground/50">
-                {p.sku} · {p.category} · ₹{p.price.toFixed(2)} / {p.unit} · GST {p.gstRate}%
+                {p.sku} · {p.category} · {formatINR(p.price)} / {p.unit} · GST {p.gstRate}%
               </p>
               {p.specialOffer && (
                 <p className="text-xs text-[var(--kesar-text)] font-medium">🏷️ {p.specialOffer}</p>

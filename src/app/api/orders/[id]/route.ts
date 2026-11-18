@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { guard } from "@/lib/guard";
 
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await guard();
+  if (!auth.ok) return auth.res;
+  const { session, db } = auth;
   const { id } = await params;
 
-  const order = await prisma.order.findUnique({
+  const order = await db.order.findUnique({
     where: { id },
     include: {
       retailer: { include: { user: true, area: { include: { region: true } } } },
@@ -23,17 +23,17 @@ export async function GET(
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   if (session.role === "RETAILER") {
-    const profile = await prisma.retailerProfile.findUnique({ where: { userId: session.userId } });
+    const profile = await db.retailerProfile.findUnique({ where: { userId: session.userId } });
     if (profile?.id !== order.retailerId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
   } else if (session.role === "SALES_AGENT") {
-    const agent = await prisma.salesAgentProfile.findUnique({ where: { userId: session.userId } });
+    const agent = await db.salesAgentProfile.findUnique({ where: { userId: session.userId } });
     if (!agent || order.retailer.salesAgentId !== agent.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
   } else if (session.role === "DELIVERY_AGENT") {
-    const agent = await prisma.deliveryAgentProfile.findUnique({ where: { userId: session.userId } });
+    const agent = await db.deliveryAgentProfile.findUnique({ where: { userId: session.userId } });
     if (!agent || order.delivery?.deliveryAgentId !== agent.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

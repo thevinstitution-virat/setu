@@ -1,29 +1,32 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
-import { generateOrderNumber, priceBreakup } from "@/lib/orders";
+import { requireTenant } from "@/lib/tenant";
+import { withTenantTx } from "@/lib/db";
+import { guard } from "@/lib/guard";
+import { emit } from "@/lib/jobs";
+import { nextOrderNumber, priceBreakup } from "@/lib/orders";
 
 export async function GET() {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await guard();
+  if (!auth.ok) return auth.res;
+  const { session, db } = auth;
 
   let where = {};
 
   if (session.role === "RETAILER") {
-    const profile = await prisma.retailerProfile.findUnique({ where: { userId: session.userId } });
+    const profile = await db.retailerProfile.findUnique({ where: { userId: session.userId } });
     if (!profile) return NextResponse.json({ orders: [] });
     where = { retailerId: profile.id };
   } else if (session.role === "SALES_AGENT") {
-    const agent = await prisma.salesAgentProfile.findUnique({ where: { userId: session.userId } });
+    const agent = await db.salesAgentProfile.findUnique({ where: { userId: session.userId } });
     if (!agent) return NextResponse.json({ orders: [] });
     where = { retailer: { salesAgentId: agent.id } };
   } else if (session.role === "DELIVERY_AGENT") {
-    const agent = await prisma.deliveryAgentProfile.findUnique({ where: { userId: session.userId } });
+    const agent = await db.deliveryAgentProfile.findUnique({ where: { userId: session.userId } });
     if (!agent) return NextResponse.json({ orders: [] });
     where = { delivery: { deliveryAgentId: agent.id } };
   }
 
-  const orders = await prisma.order.findMany({
+  const orders = await db.order.findMany({
     where,
     include: {
       retailer: { include: { user: true } },
@@ -37,8 +40,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await guard();
+  if (!auth.ok) return auth.res;
+  const { session, db } = auth;
 
   const body = await req.json().catch(() => null);
   const items: { productId: string; quantity: number }[] = body?.items ?? [];
@@ -51,15 +55,15 @@ export async function POST(req: Request) {
   }
 
   if (session.role === "RETAILER") {
-    const profile = await prisma.retailerProfile.findUnique({ where: { userId: session.userId } });
+    const profile = await db.retailerProfile.findUnique({ where: { userId: session.userId } });
     if (!profile) return NextResponse.json({ error: "Retailer profile not found" }, { status: 404 });
     retailerId = profile.id;
   } else if (session.role === "SALES_AGENT") {
     if (!retailerId) {
       return NextResponse.json({ error: "retailerId is required" }, { status: 400 });
     }
-    const agent = await prisma.salesAgentProfile.findUnique({ where: { userId: session.userId } });
-    const retailer = await prisma.retailerProfile.findUnique({ where: { id: retailerId } });
+    const agent = await db.salesAgentProfile.findUnique({ where: { userId: session.userId } });
+    const retailer = await db.retailerProfile.findUnique({ where: { id: retailerId } });
     if (!agent || !retailer || retailer.salesAgentId !== agent.id) {
       return NextResponse.json({ error: "Retailer not assigned to you" }, { status: 403 });
     }
@@ -67,47 +71,48 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Not permitted to place orders" }, { status: 403 });
   }
 
-  const products = await prisma.product.findMany({
-    where: { id: { in: items.map((i) => i.productId) } },
+  if (items.some((i) => !Number.isInteger(i.quantity) || i.quantity < 1 || i.quantity > 100000)) {
+    return NextResponse.json({ error: "Quantities must be whole numbers of at least 1" }, { status: 400 });
+  }
+
+  const products = await db.product.findMany({
+    where: { id: { in: items.map((i) => i.productId) }, active: true },
   });
   const productMap = new Map(products.map((p) => [p.id, p]));
+  if (items.some((i) => !productMap.has(i.productId))) {
+    return NextResponse.json({ error: "Some products are no longer available" }, { status: 400 });
+  }
 
   const lines = items.map((i) => {
-    const product = productMap.get(i.productId);
-    return { quantity: i.quantity, price: product?.price ?? 0, gstRate: product?.gstRate ?? 0 };
+    const product = productMap.get(i.productId)!;
+    return { productId: i.productId, quantity: i.quantity, price: product.price, gstRate: product.gstRate };
   });
   const { subtotal, gstAmount, totalAmount } = priceBreakup(lines);
 
-  const order = await prisma.order.create({
-    data: {
-      orderNumber: generateOrderNumber(),
-      retailerId: retailerId!,
-      placedById: session.userId,
-      subtotal,
-      gstAmount,
-      totalAmount,
-      notes,
-      items: {
-        create: items.map((i) => {
-          const product = productMap.get(i.productId);
-          return {
-            productId: i.productId,
-            quantity: i.quantity,
-            price: product?.price ?? 0,
-            gstRate: product?.gstRate ?? 0,
-          };
-        }),
+  const tenant = await requireTenant();
+  // Number + order + visit link commit together, or not at all.
+  const order = await withTenantTx(tenant.id, async (tx) => {
+    const created = await tx.order.create({
+      data: {
+        orderNumber: await nextOrderNumber(tx, tenant.id),
+        retailerId: retailerId!,
+        placedById: session.userId,
+        subtotal,
+        gstAmount,
+        totalAmount,
+        notes,
+        items: { create: lines },
+        statusEvents: { create: { status: "PLACED", actorId: session.userId } },
       },
-      statusEvents: {
-        create: { status: "PLACED", actorId: session.userId },
-      },
-    },
-    include: { items: true },
+      include: { items: true },
+    });
+    if (visitId) {
+      await tx.visit.updateMany({ where: { id: visitId, orderId: null }, data: { orderId: created.id } });
+    }
+    return created;
   });
 
-  if (visitId) {
-    await prisma.visit.update({ where: { id: visitId }, data: { orderId: order.id } }).catch(() => {});
-  }
+  await emit("order.placed", { tenantId: tenant.id, orderId: order.id, placedBy: session.userId });
 
   return NextResponse.json({ order });
 }

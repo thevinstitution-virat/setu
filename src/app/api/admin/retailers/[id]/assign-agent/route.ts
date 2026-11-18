@@ -1,23 +1,26 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { guard } from "@/lib/guard";
+import { audit, requestIp } from "@/lib/audit";
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getSession();
-  if (!session || session.role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await guard("retailers.manage");
+  if (!auth.ok) return auth.res;
+  const { session, db } = auth;
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const salesAgentId = body?.salesAgentId || null;
 
-  const retailer = await prisma.retailerProfile.update({
+  const before = await db.retailerProfile.findUnique({ where: { id }, select: { salesAgentId: true } });
+  if (!before) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const retailer = await db.retailerProfile.update({
     where: { id },
     data: { salesAgentId },
   });
+
+  await audit(db, { actorId: session.userId, action: "retailer.assign_agent", entity: "RetailerProfile", entityId: id, before, after: { salesAgentId }, ip: requestIp(req) });
 
   return NextResponse.json({ retailer });
 }

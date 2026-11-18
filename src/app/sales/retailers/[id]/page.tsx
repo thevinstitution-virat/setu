@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, use as usePromise } from "react";
+import { formatINR } from "@/lib/money";
 import { useRouter } from "next/navigation";
 import OrderBuilder, { ProductLite } from "@/components/OrderBuilder";
 import { STATUS_COLOR } from "@/lib/orders";
@@ -125,7 +126,7 @@ export default function RetailerDetailPage({
               <div>
                 <p className="text-sm font-medium">{o.orderNumber}</p>
                 <p className="text-xs text-foreground/50">
-                  {new Date(o.createdAt).toLocaleDateString()} · ₹{o.totalAmount.toFixed(2)}
+                  {new Date(o.createdAt).toLocaleDateString()} · {formatINR(o.totalAmount)}
                 </p>
               </div>
               <span className={`text-xs font-medium px-2 py-1 rounded-full ${STATUS_COLOR[o.status]}`}>

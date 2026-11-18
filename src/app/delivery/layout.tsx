@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
+import { pageSession } from "@/lib/guard";
 import AppShell, { type NavItem } from "@/components/AppShell";
 
 const nav: NavItem[] = [
@@ -8,7 +8,7 @@ const nav: NavItem[] = [
 ];
 
 export default async function DeliveryLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession();
+  const session = await pageSession();
   if (!session || session.role !== "DELIVERY_AGENT") redirect("/login");
 
   return (

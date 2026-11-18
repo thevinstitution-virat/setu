@@ -1,18 +1,16 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { guard } from "@/lib/guard";
 import type { OrderStatus } from "@/generated/prisma/client";
 
 export async function GET(req: Request) {
-  const session = await getSession();
-  if (!session || session.role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await guard("orders.view_all");
+  if (!auth.ok) return auth.res;
+  const { db } = auth;
 
   const url = new URL(req.url);
   const status = url.searchParams.get("status") as OrderStatus | null;
 
-  const orders = await prisma.order.findMany({
+  const orders = await db.order.findMany({
     where: status ? { status } : {},
     orderBy: { createdAt: "desc" },
     include: {

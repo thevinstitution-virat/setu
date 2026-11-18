@@ -6,13 +6,21 @@
     "dev": "next dev -p 3100",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "db:seed": "prisma db seed",
+    "worker": "tsx scripts/worker.ts",
+    "tenant:create": "tsx scripts/tenant-create.ts",
+    "typecheck": "tsc --noEmit --incremental false"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1172.0",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
+    "exceljs": "^4.4.0",
     "jose": "^6.2.17",
     "next": "16.4.6",
+    "pg-boss": "^10.4.2",
     "prisma": "^6.19.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -31,6 +39,7 @@
     "eslint-config-next": "16.4.6",
     "tailwindcss": "4.3.3",
     "tsx": "^4.23.15",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }

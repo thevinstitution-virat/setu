@@ -1,12 +1,14 @@
+import { formatINR } from "@/lib/money";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getDb } from "@/lib/tenant";
 
 export default async function DeliveryHistory() {
+  const db = await getDb();
   const session = await getSession();
-  const agent = await prisma.deliveryAgentProfile.findUnique({ where: { userId: session!.userId } });
+  const agent = await db.deliveryAgentProfile.findUnique({ where: { userId: session!.userId } });
 
   const deliveries = agent
-    ? await prisma.delivery.findMany({
+    ? await db.delivery.findMany({
         where: { deliveryAgentId: agent.id, order: { status: "DELIVERED" } },
         include: { order: { include: { retailer: true } } },
         orderBy: { deliveredAt: "desc" },
@@ -22,7 +24,7 @@ export default async function DeliveryHistory() {
             <div>
               <p className="font-medium text-sm">{d.order.retailer.outletName}</p>
               <p className="text-xs text-foreground/50">
-                {d.order.orderNumber} · ₹{d.order.totalAmount.toFixed(2)} · {d.paymentMethod}
+                {d.order.orderNumber} · {formatINR(d.order.totalAmount)} · {d.paymentMethod}
               </p>
             </div>
             <span className="text-xs text-foreground/50">

@@ -1,27 +1,29 @@
+import { formatINR } from "@/lib/money";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getDb } from "@/lib/tenant";
 import { STATUS_COLOR, ORDER_STATUS_FLOW } from "@/lib/orders";
 import { getServerLang, tr } from "@/lib/i18n/server";
 import Icon from "@/components/Icon";
 
 export default async function RetailerHome() {
+  const db = await getDb();
   const session = await getSession();
   const lang = await getServerLang();
-  const profile = await prisma.retailerProfile.findUnique({
+  const profile = await db.retailerProfile.findUnique({
     where: { userId: session!.userId },
     include: { area: { include: { region: true } } },
   });
 
   const latestOrder = profile
-    ? await prisma.order.findFirst({
+    ? await db.order.findFirst({
         where: { retailerId: profile.id },
         orderBy: { createdAt: "desc" },
         include: { items: { include: { product: true } }, delivery: { include: { deliveryAgent: { include: { user: true } } } } },
       })
     : null;
 
-  const orderCount = profile ? await prisma.order.count({ where: { retailerId: profile.id } }) : 0;
+  const orderCount = profile ? await db.order.count({ where: { retailerId: profile.id } }) : 0;
   const reachedIdx = latestOrder ? ORDER_STATUS_FLOW.indexOf(latestOrder.status) : -1;
 
   return (
@@ -41,8 +43,7 @@ export default async function RetailerHome() {
               <p className="text-xs font-bold uppercase tracking-[0.12em] text-genda">Latest order</p>
               <p className="font-heading font-bold text-xl mt-1">{latestOrder.orderNumber}</p>
               <p className="text-sm text-white/70 mt-0.5">
-                {latestOrder.items.length} item{latestOrder.items.length !== 1 ? "s" : ""} · ₹
-                {latestOrder.totalAmount.toFixed(2)}
+                {latestOrder.items.length} item{latestOrder.items.length !== 1 ? "s" : ""} · {formatINR(latestOrder.totalAmount)}
               </p>
             </div>
             <span className={`text-xs px-2.5 py-1 rounded-full ${STATUS_COLOR[latestOrder.status]}`}>

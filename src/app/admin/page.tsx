@@ -1,5 +1,6 @@
+import { formatINR } from "@/lib/money";
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { getDb } from "@/lib/tenant";
 import { STATUS_COLOR, STATUS_TILE } from "@/lib/orders";
 import { getServerLang, tr } from "@/lib/i18n/server";
 import type { OrderStatus } from "@/generated/prisma/client";
@@ -15,11 +16,12 @@ const STATUSES: OrderStatus[] = [
 ];
 
 export default async function AdminPipeline() {
+  const db = await getDb();
   const lang = await getServerLang();
   const [counts, recentOrders, retailerCount, salesAgentCount, deliveryAgentCount, productCount] =
     await Promise.all([
-      Promise.all(STATUSES.map((s) => prisma.order.count({ where: { status: s } }))),
-      prisma.order.findMany({
+      Promise.all(STATUSES.map((s) => db.order.count({ where: { status: s } }))),
+      db.order.findMany({
         take: 10,
         orderBy: { createdAt: "desc" },
         include: {
@@ -27,10 +29,10 @@ export default async function AdminPipeline() {
           delivery: { include: { deliveryAgent: { include: { user: true } } } },
         },
       }),
-      prisma.retailerProfile.count(),
-      prisma.salesAgentProfile.count(),
-      prisma.deliveryAgentProfile.count(),
-      prisma.product.count(),
+      db.retailerProfile.count(),
+      db.salesAgentProfile.count(),
+      db.deliveryAgentProfile.count(),
+      db.product.count(),
     ]);
 
   const countByStatus = Object.fromEntries(STATUSES.map((s, i) => [s, counts[i]]));
@@ -79,7 +81,7 @@ export default async function AdminPipeline() {
               <div className="min-w-0">
                 <p className="text-sm font-bold truncate">{o.retailer.outletName}</p>
                 <p className="text-xs text-[var(--muted)] truncate">
-                  {o.orderNumber} · {o.retailer.area.name} · ₹{o.totalAmount.toFixed(2)}
+                  {o.orderNumber} · {o.retailer.area.name} · {formatINR(o.totalAmount)}
                   {o.delivery?.deliveryAgent && ` · ${o.delivery.deliveryAgent.user.name}`}
                 </p>
               </div>

@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { guard } from "@/lib/guard";
 
 export async function GET() {
-  const session = await getSession();
-  if (!session || session.role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const agents = await prisma.deliveryAgentProfile.findMany({
+  const auth = await guard("team.view");
+  if (!auth.ok) return auth.res;
+  const { db } = auth;
+  const agents = await db.deliveryAgentProfile.findMany({
     include: { user: true },
   });
   return NextResponse.json({ agents });

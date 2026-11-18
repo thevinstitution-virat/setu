@@ -34,6 +34,7 @@ export const dictionary = {
   "nav.products": { en: "Products", hi: "उत्पाद" },
   "nav.team": { en: "Team", hi: "टीम" },
   "nav.regions": { en: "Regions", hi: "क्षेत्र" },
+  "nav.import": { en: "Import", hi: "आयात" },
 
   // Roles
   "role.retailer": { en: "Retailer", hi: "रिटेलर" },

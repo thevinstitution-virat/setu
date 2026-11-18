@@ -1,15 +1,17 @@
+import { formatINR } from "@/lib/money";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getDb } from "@/lib/tenant";
 import { STATUS_COLOR } from "@/lib/orders";
 import { getServerLang, tr } from "@/lib/i18n/server";
 
 export default async function RetailerOrders() {
+  const db = await getDb();
   const session = await getSession();
   const lang = await getServerLang();
-  const profile = await prisma.retailerProfile.findUnique({ where: { userId: session!.userId } });
+  const profile = await db.retailerProfile.findUnique({ where: { userId: session!.userId } });
   const orders = profile
-    ? await prisma.order.findMany({
+    ? await db.order.findMany({
         where: { retailerId: profile.id },
         orderBy: { createdAt: "desc" },
         include: { items: true },
@@ -28,7 +30,7 @@ export default async function RetailerOrders() {
             <div>
               <p className="font-medium text-sm">{o.orderNumber}</p>
               <p className="text-xs text-foreground/50">
-                {o.items.length} items · ₹{o.totalAmount.toFixed(2)} ·{" "}
+                {o.items.length} items · {formatINR(o.totalAmount)} ·{" "}
                 {new Date(o.createdAt).toLocaleDateString()}
               </p>
             </div>

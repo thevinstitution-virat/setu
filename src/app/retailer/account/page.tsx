@@ -1,9 +1,10 @@
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getDb } from "@/lib/tenant";
 
 export default async function RetailerAccount() {
+  const db = await getDb();
   const session = await getSession();
-  const profile = await prisma.retailerProfile.findUnique({
+  const profile = await db.retailerProfile.findUnique({
     where: { userId: session!.userId },
     include: { user: true, area: { include: { region: true } }, salesAgent: { include: { user: true } } },
   });

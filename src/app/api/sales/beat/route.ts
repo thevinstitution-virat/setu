@@ -1,22 +1,20 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { guard } from "@/lib/guard";
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
 export async function GET() {
-  const session = await getSession();
-  if (!session || session.role !== "SALES_AGENT") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const agent = await prisma.salesAgentProfile.findUnique({ where: { userId: session.userId } });
+  const auth = await guard("field.work");
+  if (!auth.ok) return auth.res;
+  const { session, db } = auth;
+  const agent = await db.salesAgentProfile.findUnique({ where: { userId: session.userId } });
   if (!agent) return NextResponse.json({ retailers: [] });
 
   const start = new Date(todayStr() + "T00:00:00");
 
-  const retailers = await prisma.retailerProfile.findMany({
+  const retailers = await db.retailerProfile.findMany({
     where: { salesAgentId: agent.id },
     include: {
       user: true,

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState, use as usePromise } from "react";
+import { formatINR } from "@/lib/money";
 import { useRouter } from "next/navigation";
 import SignaturePad from "@/components/SignaturePad";
 import { getLocation } from "@/lib/geo";
+import { compressImage, dataUrlToBlob, uploadFile } from "@/lib/upload-client";
 
 type OrderDetail = {
   id: string;
@@ -21,6 +23,7 @@ export default function DeliverOrderPage({ params }: { params: Promise<{ id: str
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "ONLINE" | "CREDIT">("CASH");
   const [signature, setSignature] = useState<string | null>(null);
   const [photo, setPhoto] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +36,7 @@ export default function DeliverOrderPage({ params }: { params: Promise<{ id: str
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setPhotoFile(file);
     const reader = new FileReader();
     reader.onload = () => setPhoto(reader.result as string);
     reader.readAsDataURL(file);
@@ -42,15 +46,19 @@ export default function DeliverOrderPage({ params }: { params: Promise<{ id: str
     setError(null);
     setLoading(true);
     try {
-      const loc = await getLocation();
+      // Photos go to file storage; the order keeps only the storage keys.
+      const [loc, photoKey, signatureKey] = await Promise.all([
+        getLocation(),
+        photoFile ? compressImage(photoFile).then((b) => uploadFile(b, "pod-photo")) : null,
+        signature ? uploadFile(dataUrlToBlob(signature), "pod-signature") : null,
+      ]);
       const res = await fetch(`/api/orders/${id}/deliver`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           paymentMethod,
-          codAmount: paymentMethod === "CASH" ? order?.totalAmount : 0,
-          podPhotoUrl: photo,
-          podSignatureData: signature,
+          podPhotoKey: photoKey,
+          podSignatureKey: signatureKey,
           ...loc,
         }),
       });
@@ -90,13 +98,13 @@ export default function DeliverOrderPage({ params }: { params: Promise<{ id: str
               <span>
                 {item.product.name} × {item.quantity}
               </span>
-              <span>₹{(item.price * item.quantity).toFixed(2)}</span>
+              <span>{formatINR(item.price * item.quantity)}</span>
             </div>
           ))}
         </div>
         <div className="border-t border-black/5 mt-2 pt-2 flex justify-between font-semibold text-sm">
           <span>Total</span>
-          <span>₹{order.totalAmount.toFixed(2)}</span>
+          <span>{formatINR(order.totalAmount)}</span>
         </div>
       </div>
 
@@ -116,7 +124,7 @@ export default function DeliverOrderPage({ params }: { params: Promise<{ id: str
           ))}
         </div>
         {paymentMethod === "CASH" && (
-          <p className="text-sm text-foreground/60">Collect ₹{order.totalAmount.toFixed(2)} in cash.</p>
+          <p className="text-sm text-foreground/60">Collect {formatINR(order.totalAmount)} in cash.</p>
         )}
       </div>
 

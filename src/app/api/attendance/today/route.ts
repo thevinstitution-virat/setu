@@ -1,24 +1,22 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { guard } from "@/lib/guard";
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
 export async function GET() {
-  const session = await getSession();
-  if (!session || session.role !== "SALES_AGENT") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const agent = await prisma.salesAgentProfile.findUnique({ where: { userId: session.userId } });
+  const auth = await guard("field.work");
+  if (!auth.ok) return auth.res;
+  const { session, db } = auth;
+  const agent = await db.salesAgentProfile.findUnique({ where: { userId: session.userId } });
   if (!agent) return NextResponse.json({ attendance: null });
 
-  const attendance = await prisma.attendance.findUnique({
+  const attendance = await db.attendance.findUnique({
     where: { salesAgentId_date: { salesAgentId: agent.id, date: todayStr() } },
   });
 
-  const history = await prisma.attendance.findMany({
+  const history = await db.attendance.findMany({
     where: { salesAgentId: agent.id },
     orderBy: { date: "desc" },
     take: 14,
@@ -28,11 +26,10 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await getSession();
-  if (!session || session.role !== "SALES_AGENT") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const agent = await prisma.salesAgentProfile.findUnique({ where: { userId: session.userId } });
+  const auth = await guard("field.work");
+  if (!auth.ok) return auth.res;
+  const { session, db } = auth;
+  const agent = await db.salesAgentProfile.findUnique({ where: { userId: session.userId } });
   if (!agent) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
@@ -40,7 +37,7 @@ export async function POST(req: Request) {
   const date = todayStr();
 
   if (action === "checkin") {
-    const attendance = await prisma.attendance.upsert({
+    const attendance = await db.attendance.upsert({
       where: { salesAgentId_date: { salesAgentId: agent.id, date } },
       update: {},
       create: { salesAgentId: agent.id, date, checkInAt: new Date(), checkInLat: lat, checkInLng: lng },
@@ -49,7 +46,7 @@ export async function POST(req: Request) {
   }
 
   if (action === "checkout") {
-    const attendance = await prisma.attendance.update({
+    const attendance = await db.attendance.update({
       where: { salesAgentId_date: { salesAgentId: agent.id, date } },
       data: { checkOutAt: new Date() },
     });

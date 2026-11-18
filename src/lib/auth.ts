@@ -1,14 +1,21 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { Role } from "@/generated/prisma/client";
+import { getTenant } from "@/lib/tenant";
 
 const SESSION_COOKIE = "setu_session";
-const secret = new TextEncoder().encode(
-  process.env.SESSION_SECRET ?? "setu-dev-secret-change-me"
-);
+
+function sessionSecret() {
+  const s = process.env.SESSION_SECRET;
+  if (!s && process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET must be set in production");
+  }
+  return new TextEncoder().encode(s ?? "setu-dev-secret-change-me");
+}
 
 export type SessionPayload = {
   userId: string;
+  tenantId: string;
   role: Role;
   name: string;
 };
@@ -18,8 +25,9 @@ export async function createSessionCookie(payload: SessionPayload) {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("30d")
-    .sign(secret);
+    .sign(sessionSecret());
 
+  // Host-only cookie: never shared between tenant subdomains.
   const store = await cookies();
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
@@ -30,13 +38,20 @@ export async function createSessionCookie(payload: SessionPayload) {
   });
 }
 
+/**
+ * The signed-in user for the current request. Returns null when there is no
+ * session, or when the session belongs to a different tenant than the host.
+ */
 export async function getSession(): Promise<SessionPayload | null> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, secret);
-    return payload as unknown as SessionPayload;
+    const { payload } = await jwtVerify(token, sessionSecret());
+    const session = payload as unknown as SessionPayload;
+    const tenant = await getTenant();
+    if (!tenant || session.tenantId !== tenant.id) return null;
+    return session;
   } catch {
     return null;
   }

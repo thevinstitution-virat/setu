@@ -1,14 +1,16 @@
+import { formatINR } from "@/lib/money";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getDb } from "@/lib/tenant";
 import Icon from "@/components/Icon";
 
 export default async function DeliveryHome() {
+  const db = await getDb();
   const session = await getSession();
-  const agent = await prisma.deliveryAgentProfile.findUnique({ where: { userId: session!.userId } });
+  const agent = await db.deliveryAgentProfile.findUnique({ where: { userId: session!.userId } });
 
   const deliveries = agent
-    ? await prisma.delivery.findMany({
+    ? await db.delivery.findMany({
         where: { deliveryAgentId: agent.id, order: { status: "OUT_FOR_DELIVERY" } },
         include: { order: { include: { retailer: true, items: true } } },
         orderBy: { assignedAt: "asc" },
@@ -31,7 +33,7 @@ export default async function DeliveryHome() {
         </div>
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-genda">Order value</p>
-          <p className="stat-num mt-2">₹{toCollect.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</p>
+          <p className="stat-num mt-2">{formatINR(toCollect, { whole: true })}</p>
         </div>
       </div>
 
@@ -48,8 +50,7 @@ export default async function DeliveryHome() {
             <div className="flex-1 min-w-0">
               <p className="font-bold text-sm truncate">{d.order.retailer.outletName}</p>
               <p className="text-xs text-[var(--muted)] truncate">
-                {d.order.orderNumber} · {d.order.items.length} items · ₹
-                {d.order.totalAmount.toFixed(2)}
+                {d.order.orderNumber} · {d.order.items.length} items · {formatINR(d.order.totalAmount)}
               </p>
             </div>
             <span className="btn btn-kesar btn-xs">

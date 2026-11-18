@@ -1,4 +1,15 @@
-// Setu — unified distribution platform (retailer / sales agent / delivery agent / admin)
+// Seller's Setu — multi-tenant distribution platform
+// (retailer / sales agent / delivery agent / admin, one app, one database).
+//
+// Tenancy rules (see docs/ROADMAP.md §4.3 and docs/PHASE0.md):
+// - Tenant and TenantDomain are platform tables (no row-level security).
+// - Every other table carries "tenantId" and is protected by Postgres
+//   row-level security: rows are visible only when the session setting
+//   app.tenant_id matches. Use tenantDb() from src/lib/db.ts, never the raw
+//   client, for tenant data.
+// - "tenantId" defaults to current_setting('app.tenant_id'), so creates made
+//   through tenantDb() are stamped automatically.
+// - Money is stored as integer paise (Int). Never Float for money.
 
 generator client {
   provider = "prisma-client"
@@ -6,7 +17,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -38,12 +49,72 @@ enum PaymentStatus {
   SETTLED
 }
 
+enum TenantStatus {
+  TRIAL
+  ACTIVE
+  SUSPENDED
+}
+
+// ───────────────────────────── Platform tables ─────────────────────────────
+
+model Tenant {
+  id        String       @id @default(cuid())
+  slug      String       @unique // subdomain: <slug>.<PLATFORM_DOMAIN>
+  name      String       // display / brand name
+  legalName String?
+  gstin     String?
+  stateCode String?      // GST state code, e.g. "27" for Maharashtra
+  address   String?
+  phone     String?
+  status    TenantStatus @default(TRIAL)
+  plan      String       @default("trial")
+  /// White-label settings: { primary, accent, logoUrl, shortName, ... }
+  brand     Json         @default("{}")
+  /// Business rules: { orderCutoff, slots, minOrderPaise, ... }
+  settings  Json         @default("{}")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  domains           TenantDomain[]
+  users             User[]
+  regions           Region[]
+  areas             Area[]
+  retailers         RetailerProfile[]
+  salesAgents       SalesAgentProfile[]
+  beats             Beat[]
+  deliveryAgents    DeliveryAgentProfile[]
+  products          Product[]
+  orders            Order[]
+  orderItems        OrderItem[]
+  orderStatusEvents OrderStatusEvent[]
+  visits            Visit[]
+  attendance        Attendance[]
+  deliveries        Delivery[]
+  otpChallenges     OtpChallenge[]
+  counters          Counter[]
+  auditLogs         AuditLog[]
+}
+
+/// Custom domains a tenant has verified (e.g. order.agencyname.in).
+model TenantDomain {
+  id         String    @id @default(cuid())
+  tenantId   String
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  host       String    @unique
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+// ───────────────────────────── Tenant tables ─────────────────────────────
+
 model User {
   id           String   @id @default(cuid())
+  tenantId     String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
   name         String
-  phone        String?  @unique
-  email        String?  @unique
-  loginId      String?  @unique
+  phone        String?
+  email        String?
+  loginId      String?
   passwordHash String?
   role         Role
   active       Boolean  @default(true)
@@ -54,121 +125,172 @@ model User {
   deliveryAgentProfile DeliveryAgentProfile?
 
   orderEvents OrderStatusEvent[]
+  auditLogs   AuditLog[]
+
+  @@unique([tenantId, phone])
+  @@unique([tenantId, email])
+  @@unique([tenantId, loginId])
+  @@index([tenantId, role])
 }
 
 model Region {
-  id    String @id @default(cuid())
-  name  String @unique
-  areas Area[]
+  id       String @id @default(cuid())
+  tenantId String @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  name     String
+  areas    Area[]
+
+  @@unique([tenantId, name])
 }
 
 model Area {
   id       String @id @default(cuid())
+  tenantId String @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
   name     String
   regionId String
   region   Region @relation(fields: [regionId], references: [id])
 
-  retailers   RetailerProfile[]
-  beats       Beat[]
+  retailers RetailerProfile[]
+  beats     Beat[]
 
   @@unique([regionId, name])
+  @@index([tenantId])
 }
 
 model RetailerProfile {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id])
-  outletName    String
-  shopNumber    String
-  complexName   String
-  pinCode       String
-  areaId        String
-  area          Area     @relation(fields: [areaId], references: [id])
-  salesAgentId  String?
-  salesAgent    SalesAgentProfile? @relation(fields: [salesAgentId], references: [id])
-  createdAt     DateTime @default(now())
+  id           String             @id @default(cuid())
+  tenantId     String             @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant             @relation(fields: [tenantId], references: [id])
+  userId       String             @unique
+  user         User               @relation(fields: [userId], references: [id])
+  outletName   String
+  shopNumber   String
+  complexName  String
+  pinCode      String
+  areaId       String
+  area         Area               @relation(fields: [areaId], references: [id])
+  salesAgentId String?
+  salesAgent   SalesAgentProfile? @relation(fields: [salesAgentId], references: [id])
+  createdAt    DateTime           @default(now())
 
   orders Order[]
   visits Visit[]
+
+  @@index([tenantId, areaId])
+  @@index([tenantId, salesAgentId])
 }
 
 model SalesAgentProfile {
-  id     String @id @default(cuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id])
+  id       String @id @default(cuid())
+  tenantId String @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id])
 
   beats      Beat[]
   retailers  RetailerProfile[]
   visits     Visit[]
   attendance Attendance[]
+
+  @@index([tenantId])
 }
 
 model Beat {
-  id           String   @id @default(cuid())
+  id           String            @id @default(cuid())
+  tenantId     String            @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
   name         String
   salesAgentId String
   salesAgent   SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
   areaId       String
-  area         Area     @relation(fields: [areaId], references: [id])
+  area         Area              @relation(fields: [areaId], references: [id])
+
+  @@index([tenantId])
 }
 
 model DeliveryAgentProfile {
-  id     String @id @default(cuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id])
+  id       String @id @default(cuid())
+  tenantId String @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id])
 
   deliveries Delivery[]
+
+  @@index([tenantId])
 }
 
 model Product {
-  id            String  @id @default(cuid())
-  name          String
-  sku           String  @unique
-  category      String
-  unit          String
-  price         Float
-  mrp           Float
-  gstRate       Float   @default(0)
-  specialOffer  String?
-  imageUrl      String?
-  active        Boolean @default(true)
+  id           String  @id @default(cuid())
+  tenantId     String  @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant  @relation(fields: [tenantId], references: [id])
+  name         String
+  sku          String
+  category     String
+  unit         String
+  /// Selling rate before GST, in paise.
+  price        Int
+  /// Maximum retail price, in paise.
+  mrp          Int
+  gstRate      Float   @default(0)
+  specialOffer String?
+  imageUrl     String?
+  active       Boolean @default(true)
 
   orderItems OrderItem[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId, active])
 }
 
 model Order {
-  id          String      @id @default(cuid())
-  orderNumber String      @unique
+  id          String          @id @default(cuid())
+  tenantId    String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant          @relation(fields: [tenantId], references: [id])
+  orderNumber String
   retailerId  String
   retailer    RetailerProfile @relation(fields: [retailerId], references: [id])
   placedById  String?
-  status      OrderStatus @default(PLACED)
-  subtotal    Float       @default(0)
-  gstAmount   Float       @default(0)
-  totalAmount Float
+  status      OrderStatus     @default(PLACED)
+  /// Amounts in paise.
+  subtotal    Int             @default(0)
+  gstAmount   Int             @default(0)
+  totalAmount Int
   notes       String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
-  items         OrderItem[]
-  statusEvents  OrderStatusEvent[]
-  delivery      Delivery?
-  visit         Visit?
+  items        OrderItem[]
+  statusEvents OrderStatusEvent[]
+  delivery     Delivery?
+  visit        Visit?
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, retailerId, createdAt])
 }
 
 model OrderItem {
   id        String  @id @default(cuid())
+  tenantId  String  @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
   orderId   String
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId String
-  gstRate   Float   @default(0)
   product   Product @relation(fields: [productId], references: [id])
   quantity  Int
-  price     Float
+  /// Rate per unit before GST, in paise, frozen at order time.
+  price     Int
+  gstRate   Float   @default(0)
+
+  @@index([tenantId, orderId])
 }
 
 model OrderStatusEvent {
   id        String      @id @default(cuid())
+  tenantId  String      @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant      @relation(fields: [tenantId], references: [id])
   orderId   String
   order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   status    OrderStatus
@@ -176,25 +298,33 @@ model OrderStatusEvent {
   actorId   String?
   actor     User?       @relation(fields: [actorId], references: [id])
   createdAt DateTime    @default(now())
+
+  @@index([tenantId, orderId])
 }
 
 model Visit {
-  id            String    @id @default(cuid())
-  salesAgentId  String
-  salesAgent    SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
-  retailerId    String
-  retailer      RetailerProfile   @relation(fields: [retailerId], references: [id])
-  checkInAt     DateTime  @default(now())
-  checkInLat    Float?
-  checkInLng    Float?
-  checkOutAt    DateTime?
-  notes         String?
-  orderId       String?   @unique
-  order         Order?    @relation(fields: [orderId], references: [id])
+  id           String            @id @default(cuid())
+  tenantId     String            @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
+  salesAgentId String
+  salesAgent   SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
+  retailerId   String
+  retailer     RetailerProfile   @relation(fields: [retailerId], references: [id])
+  checkInAt    DateTime          @default(now())
+  checkInLat   Float?
+  checkInLng   Float?
+  checkOutAt   DateTime?
+  notes        String?
+  orderId      String?           @unique
+  order        Order?            @relation(fields: [orderId], references: [id])
+
+  @@index([tenantId, salesAgentId, checkInAt])
 }
 
 model Attendance {
-  id           String    @id @default(cuid())
+  id           String            @id @default(cuid())
+  tenantId     String            @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
   salesAgentId String
   salesAgent   SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
   date         String
@@ -204,21 +334,75 @@ model Attendance {
   checkOutAt   DateTime?
 
   @@unique([salesAgentId, date])
+  @@index([tenantId])
 }
 
 model Delivery {
-  id               String        @id @default(cuid())
-  orderId          String        @unique
-  order            Order         @relation(fields: [orderId], references: [id])
+  id               String               @id @default(cuid())
+  tenantId         String               @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant           Tenant               @relation(fields: [tenantId], references: [id])
+  orderId          String               @unique
+  order            Order                @relation(fields: [orderId], references: [id])
   deliveryAgentId  String
   deliveryAgent    DeliveryAgentProfile @relation(fields: [deliveryAgentId], references: [id])
-  assignedAt       DateTime      @default(now())
+  assignedAt       DateTime             @default(now())
   deliveredAt      DateTime?
   lat              Float?
   lng              Float?
+  /// Storage key (t/<tenantId>/pod-photo/...), served via /api/files/<key>.
   podPhotoUrl      String?
+  /// Storage key of the signature image.
   podSignatureData String?
-  paymentMethod    PaymentMethod @default(CASH)
-  paymentStatus    PaymentStatus @default(PENDING)
-  codAmount        Float         @default(0)
+  paymentMethod    PaymentMethod        @default(CASH)
+  paymentStatus    PaymentStatus        @default(PENDING)
+  /// Cash collected on delivery, in paise.
+  codAmount        Int                  @default(0)
+
+  @@index([tenantId, deliveryAgentId])
+}
+
+/// One-time passwords for phone login. Stored hashed; survives restarts and
+/// works across several app instances.
+model OtpChallenge {
+  id         String    @id @default(cuid())
+  tenantId   String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  phone      String
+  codeHash   String
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId, phone, createdAt])
+}
+
+/// Gap-free per-tenant sequences (order numbers, later invoice series per FY).
+model Counter {
+  tenantId String @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  key      String
+  value    Int    @default(0)
+
+  @@id([tenantId, key])
+}
+
+/// Who changed what. Append-only.
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  action    String   // e.g. "order.status", "product.update", "user.create"
+  entity    String
+  entityId  String?
+  before    Json?
+  after     Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, entity, entityId])
+  @@index([tenantId, createdAt])
 }

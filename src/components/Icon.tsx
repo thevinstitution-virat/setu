@@ -22,6 +22,7 @@ const PATHS = {
   arrow: "M5 12h14M13 6l6 6-6 6",
   plus: "M12 5v14M5 12h14",
   wallet: "M3 7a2 2 0 0 1 2-2h13v4M3 7v10a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2ZM16.5 14h.01",
+  upload: "M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3",
   logout: "M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3",
 } as const;
 
