@@ -6,21 +6,21 @@ import { fyLabel, formatOrderNumber, priceBreakup } from "@/lib/orders";
 describe("classifyHost", () => {
   const d = "sellerssetu.in";
   it("maps a subdomain to a tenant slug", () => {
-    expect(classifyHost("agarwal.sellerssetu.in", d, undefined)).toEqual({ kind: "slug", slug: "agarwal" });
+    expect(classifyHost("agarwal.sellerssetu.in", d, null)).toEqual({ kind: "slug", slug: "agarwal" });
   });
   it("treats the bare domain and www as the platform site", () => {
-    expect(classifyHost("sellerssetu.in", d, undefined)).toEqual({ kind: "platform" });
-    expect(classifyHost("www.sellerssetu.in", d, undefined)).toEqual({ kind: "platform" });
+    expect(classifyHost("sellerssetu.in", d, null)).toEqual({ kind: "platform" });
+    expect(classifyHost("www.sellerssetu.in", d, null)).toEqual({ kind: "platform" });
   });
   it("uses DEFAULT_TENANT_SLUG on the bare domain when set", () => {
     expect(classifyHost("localhost", "localhost", "demo")).toEqual({ kind: "slug", slug: "demo" });
   });
   it("refuses reserved and nested subdomains", () => {
-    expect(classifyHost("api.sellerssetu.in", d, undefined)).toEqual({ kind: "platform" });
-    expect(classifyHost("a.b.sellerssetu.in", d, undefined)).toEqual({ kind: "platform" });
+    expect(classifyHost("api.sellerssetu.in", d, null)).toEqual({ kind: "platform" });
+    expect(classifyHost("a.b.sellerssetu.in", d, null)).toEqual({ kind: "platform" });
   });
   it("treats any other host as a custom domain", () => {
-    expect(classifyHost("order.agarwal.in", d, undefined)).toEqual({ kind: "custom", host: "order.agarwal.in" });
+    expect(classifyHost("order.agarwal.in", d, null)).toEqual({ kind: "custom", host: "order.agarwal.in" });
   });
 });
 
