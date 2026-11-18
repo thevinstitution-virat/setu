@@ -39,7 +39,8 @@ export function normaliseHost(raw: string | null | undefined): string {
 export function classifyHost(
   host: string,
   domain = platformDomain(),
-  defaultSlug = process.env.DEFAULT_TENANT_SLUG
+  /** null = no default tenant (pass null in tests; undefined would read the env). */
+  defaultSlug: string | null = process.env.DEFAULT_TENANT_SLUG || null
 ): { kind: "slug"; slug: string } | { kind: "custom"; host: string } | { kind: "platform" } {
   if (!host || host === domain || host === `www.${domain}` || host === "127.0.0.1" || host === "[::1]") {
     return defaultSlug ? { kind: "slug", slug: defaultSlug } : { kind: "platform" };
