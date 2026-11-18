@@ -2,11 +2,15 @@ import { redirect } from "next/navigation";
 import { getSession, roleHome } from "@/lib/auth";
 import LandingNav from "@/components/landing/LandingNav";
 import HeroSection from "@/components/landing/HeroSection";
-import DayTimelineSection from "@/components/landing/DayTimelineSection";
-import ComparisonSection from "@/components/landing/ComparisonSection";
-import BilingualDemoSection from "@/components/landing/BilingualDemoSection";
-import StatsCountSection from "@/components/landing/StatsCountSection";
-import FeatureGridSection from "@/components/landing/FeatureGridSection";
+import BuiltForStrip from "@/components/landing/BuiltForStrip";
+import JourneySection from "@/components/landing/JourneySection";
+import GodownSection from "@/components/landing/GodownSection";
+import LiveMapSection from "@/components/landing/LiveMapSection";
+import BeatSection from "@/components/landing/BeatSection";
+import BillingSection from "@/components/landing/BillingSection";
+import OwnerDashboardSection from "@/components/landing/OwnerDashboardSection";
+import BilingualSection from "@/components/landing/BilingualSection";
+import StepsSection from "@/components/landing/StepsSection";
 import FaqSection from "@/components/landing/FaqSection";
 import CtaFooterSection from "@/components/landing/CtaFooterSection";
 
@@ -15,15 +19,19 @@ export default async function Home() {
   if (session) redirect(roleHome(session.role));
 
   return (
-    <div className="flex min-h-screen flex-col overflow-x-clip">
+    <div className="ls flex min-h-screen flex-col overflow-x-clip" id="top">
       <LandingNav />
       <main className="flex flex-col">
         <HeroSection />
-        <DayTimelineSection />
-        <ComparisonSection />
-        <BilingualDemoSection />
-        <StatsCountSection />
-        <FeatureGridSection />
+        <BuiltForStrip />
+        <JourneySection />
+        <GodownSection />
+        <LiveMapSection />
+        <BeatSection />
+        <BillingSection />
+        <OwnerDashboardSection />
+        <BilingualSection />
+        <StepsSection />
         <FaqSection />
       </main>
       <CtaFooterSection />

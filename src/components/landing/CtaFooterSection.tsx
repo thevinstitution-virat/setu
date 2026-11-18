@@ -3,50 +3,68 @@
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import { landingContent } from "@/lib/i18n/landing-content";
-import { APP_NAME } from "@/lib/brand";
+
+const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
 
 export default function CtaFooterSection() {
   const { lang } = useLanguage();
   const c = landingContent[lang];
 
   return (
-    <footer className="bg-ink text-white">
-      <div className="landing-grid relative overflow-hidden py-20 text-center">
-        <div aria-hidden className="landing-glow pointer-events-none absolute left-1/2 top-0 h-[400px] w-[700px] -translate-x-1/2" />
-        <div className="relative max-w-xl mx-auto px-4">
-          <h2 className="text-2xl sm:text-3xl font-bold [text-wrap:balance]">{c.ctaFooterTitle}</h2>
-          <p className="mt-3 text-white/60">{c.ctaFooterSub}</p>
-          <Link
-            href="/login"
-            className="inline-block mt-7 rounded-xl bg-gold text-ink font-semibold px-8 py-3 hover:brightness-110 transition"
-          >
-            {c.ctaPrimary}
-          </Link>
-        </div>
-      </div>
-
-      <div className="border-t border-white/10 py-8">
-        <div className="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-          <div>
-            <p className="font-semibold">{APP_NAME}</p>
-            <p className="text-xs text-white/40 mt-0.5">{c.footerTagline}</p>
-          </div>
-          <div className="text-xs text-white/40 space-y-1">
-            <p>{c.footerProductOf}</p>
-            <p>
-              {c.footerDesignBy} ·{" "}
-              <a
-                href="https://vgraphics.in"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gold hover:underline"
-              >
-                vgraphics.in
-              </a>
-            </p>
+    <>
+      <section className="ls-sec" id="demo" style={{ paddingTop: 0 }}>
+        <div className="ls-cta">
+          <svg className="ls-cta-br" viewBox="0 0 1100 220" aria-hidden="true">
+            <path d="M0 210 L 300 40 Q 550 260 800 40 L 1100 210" />
+            <path d="M0 214H1100" />
+            <path d="M300 40V214M800 40V214M380 96V214M460 134V214M550 150V214M640 134V214M720 96V214" />
+          </svg>
+          <div style={{ position: "relative" }}>
+            <div className="ls-kick">{c.ctaKick}</div>
+            <h2 className="ls-h2">{c.ctaTitle}</h2>
+            <p className="ls-sub">{c.ctaSub}</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center", marginTop: 30 }}>
+              <Link href="/login" className="btn btn-kesar btn-lg">
+                {c.ctaStart}
+                <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
+              </Link>
+              {WHATSAPP_NUMBER && (
+                <a
+                  href={`https://wa.me/${WHATSAPP_NUMBER}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-lg"
+                  style={{ background: "rgba(255,255,255,.1)", color: "#fff", border: "1.5px solid rgba(255,255,255,.3)" }}
+                >
+                  {c.ctaWa}
+                </a>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    </footer>
+      </section>
+      <footer className="ls-foot">
+        <a className="ls-brand" href="#top">
+          <span className="ls-brand-mark">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M2 17c4-7 16-7 20 0" />
+              <path d="M2 17h20M6 17v-3.5M10 17v-5M14 17v-5M18 17v-3.5" />
+            </svg>
+          </span>
+          <span>
+            <span className="ls-brand-name">Seller&apos;s Setu</span>
+            <span style={{ display: "block", fontSize: 13, marginTop: 3, color: "var(--muted)" }}>{c.footTag}</span>
+          </span>
+        </a>
+        <span>
+          {c.footProduct} ·{" "}
+          <a href="https://vgraphics.in" target="_blank" rel="noopener noreferrer">
+            {c.footDesign}
+          </a>
+        </span>
+      </footer>
+    </>
   );
 }
