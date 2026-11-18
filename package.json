@@ -11,7 +11,7 @@
     "db:seed": "prisma db seed",
     "worker": "tsx scripts/worker.ts",
     "tenant:create": "tsx scripts/tenant-create.ts",
-    "typecheck": "tsc --noEmit --incremental false"
+    "typecheck": "next typegen && tsc --noEmit --incremental false"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1172.0",
