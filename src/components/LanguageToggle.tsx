@@ -6,19 +6,27 @@ export default function LanguageToggle() {
   const { lang, setLang } = useLanguage();
 
   return (
-    <div className="flex rounded-lg bg-black/5 p-0.5 text-xs font-medium">
+    <div
+      className="inline-flex rounded-xl p-[3px] text-xs font-bold bg-white/60 border border-ink/10"
+      role="group"
+      aria-label="Language"
+    >
       <button
+        type="button"
         onClick={() => setLang("en")}
-        className={`px-2 py-1 rounded-md transition ${
-          lang === "en" ? "bg-white shadow text-brand-dark" : "text-foreground/50"
+        aria-pressed={lang === "en"}
+        className={`px-2.5 py-1 rounded-lg transition ${
+          lang === "en" ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "text-ink-2"
         }`}
       >
         EN
       </button>
       <button
+        type="button"
         onClick={() => setLang("hi")}
-        className={`px-2 py-1 rounded-md transition ${
-          lang === "hi" ? "bg-white shadow text-brand-dark" : "text-foreground/50"
+        aria-pressed={lang === "hi"}
+        className={`px-2.5 py-1 rounded-lg transition ${
+          lang === "hi" ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "text-ink-2"
         }`}
       >
         हिं

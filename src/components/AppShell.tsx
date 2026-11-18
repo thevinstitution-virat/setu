@@ -35,11 +35,14 @@ export default function AppShell({
       <header className="sticky top-0 z-10 bg-white border-b border-black/5">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-xl bg-brand text-white font-bold flex items-center justify-center">
-              S
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-mor to-[#0c3634] text-genda font-bold flex items-center justify-center">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M2 17c4-7 16-7 20 0" />
+                <path d="M2 17h20M6 17v-3.5M10 17v-5M14 17v-5M18 17v-3.5" />
+              </svg>
             </div>
             <div>
-              <p className="text-sm font-semibold leading-none">{APP_SHORT_NAME}</p>
+              <p className="text-sm font-heading font-bold leading-none">{APP_SHORT_NAME}</p>
               <p className="text-xs text-foreground/50 leading-none mt-1">{t(roleKey)}</p>
             </div>
           </div>
@@ -48,7 +51,7 @@ export default function AppShell({
             <span className="text-sm text-foreground/70 hidden sm:inline">{userName}</span>
             <button
               onClick={logout}
-              className="text-xs font-medium rounded-lg px-3 py-1.5 bg-black/5 hover:bg-black/10 transition"
+              className="text-xs font-bold rounded-lg px-3 py-1.5 bg-ink/5 hover:bg-ink/10 transition"
             >
               {t("common.logout")}
             </button>
