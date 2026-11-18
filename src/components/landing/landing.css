@@ -70,8 +70,8 @@
 
 .ls-split {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 56px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+  gap: clamp(32px, 5vw, 64px);
   align-items: center;
 }
 
@@ -128,6 +128,24 @@
   display: flex;
   align-items: center;
   gap: 22px;
+}
+@media (max-width: 520px) {
+  .ls-nav-row {
+    gap: 8px;
+    padding: 0 14px;
+  }
+  .ls-nav-row .ls-brand {
+    gap: 8px;
+    min-width: 0;
+  }
+  .ls-nav-row .ls-brand-name {
+    white-space: nowrap;
+  }
+  .ls-nav-row .btn {
+    padding: 9px 12px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
 }
 .ls-brand {
   display: flex;
@@ -530,7 +548,22 @@
   padding: 7px 10px;
   font-weight: 800;
   font-size: 13px;
+  white-space: nowrap;
+  box-shadow: 0 10px 20px -10px rgba(8, 38, 37, 0.8);
   animation: 16s linear infinite etaVis;
+}
+.ls-etab::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  margin-left: -6px;
+  border: 6px solid transparent;
+  border-bottom: 0;
+  border-top-color: var(--ink);
+}
+.ls-etab b {
+  color: var(--color-genda, #f2b33d);
 }
 @keyframes etaVis {
   0%,
@@ -2350,4 +2383,9 @@
   color: var(--mor);
   font-weight: 700;
   text-decoration: underline;
+}
+.ls-foot a.ls-brand {
+  color: var(--ink);
+  font-weight: inherit;
+  text-decoration: none;
 }
