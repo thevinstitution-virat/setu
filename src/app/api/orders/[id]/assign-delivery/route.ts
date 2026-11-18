@@ -17,10 +17,22 @@ export async function POST(
     return NextResponse.json({ error: "deliveryAgentId is required" }, { status: 400 });
   }
 
+  // Foreign keys are not filtered by row-level security, so check the agent is ours.
+  const agentRow = await db.deliveryAgentProfile.findUnique({ where: { id: deliveryAgentId }, include: { user: { select: { active: true } } } });
+  if (!agentRow || !agentRow.user.active) {
+    return NextResponse.json({ error: "Delivery agent not found" }, { status: 404 });
+  }
+
   const order = await db.order.findUnique({ where: { id }, include: { delivery: true } });
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (order.status === "DELIVERED" || order.status === "CANCELLED") {
     return NextResponse.json({ error: "Order can no longer be assigned" }, { status: 400 });
+  }
+  if (order.creditHold && !order.creditApprovedAt) {
+    return NextResponse.json(
+      { error: `On credit hold: ${order.creditHoldReason ?? "needs approval"}` },
+      { status: 409 }
+    );
   }
 
   await db.delivery.upsert({

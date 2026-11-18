@@ -93,6 +93,14 @@ model Tenant {
   otpChallenges     OtpChallenge[]
   counters          Counter[]
   auditLogs         AuditLog[]
+  ledgerAccounts    LedgerAccount[]
+  journalEntries    JournalEntry[]
+  ledgerLines       LedgerLine[]
+  bills             Bill[]
+  payments          Payment[]
+  allocations       PaymentAllocation[]
+  cheques           Cheque[]
+  cashHandovers     CashHandover[]
 }
 
 /// Custom domains a tenant has verified (e.g. order.agencyname.in).
@@ -126,6 +134,8 @@ model User {
 
   orderEvents OrderStatusEvent[]
   auditLogs   AuditLog[]
+  paymentsCollected Payment[]      @relation("PaymentCollectedBy")
+  handoversGiven    CashHandover[] @relation("HandoverStaff")
 
   @@unique([tenantId, phone])
   @@unique([tenantId, email])
@@ -172,10 +182,19 @@ model RetailerProfile {
   area         Area               @relation(fields: [areaId], references: [id])
   salesAgentId String?
   salesAgent   SalesAgentProfile? @relation(fields: [salesAgentId], references: [id])
+  /// null = use the tenant default (settings.money.defaultPaymentMode)
+  paymentMode  PaymentMode?
+  /// Credit limit in paise. null = tenant default; 0 = no credit.
+  creditLimit  Int?
+  /// Days a bill may stay unpaid before it is overdue. null = tenant default.
+  creditDays   Int?
   createdAt    DateTime           @default(now())
 
-  orders Order[]
-  visits Visit[]
+  orders   Order[]
+  visits   Visit[]
+  bills    Bill[]
+  payments Payment[]
+  accounts LedgerAccount[]
 
   @@index([tenantId, areaId])
   @@index([tenantId, salesAgentId])
@@ -258,10 +277,18 @@ model Order {
   gstAmount   Int             @default(0)
   totalAmount Int
   notes       String?
+  /// Placed over the credit limit or with overdue bills: needs approval before it moves on.
+  creditHold       Boolean   @default(false)
+  creditHoldReason String?
+  creditApprovedBy String?
+  creditApprovedAt DateTime?
+  /// Prepaid: amount reserved from the wallet when the order was placed (paise).
+  walletHold  Int             @default(0)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
   items        OrderItem[]
+  bill         Bill?
   statusEvents OrderStatusEvent[]
   delivery     Delivery?
   visit        Visit?
@@ -405,4 +432,267 @@ model AuditLog {
 
   @@index([tenantId, entity, entityId])
   @@index([tenantId, createdAt])
+}
+
+// ───────────────────────────── Money (Phase 1) ─────────────────────────────
+//
+// Double-entry ledger. Every money event is one JournalEntry whose lines sum
+// to zero (enforced by a deferred database trigger). Amounts are paise,
+// debit positive, credit negative. Entries and lines are append-only (RLS
+// allows only SELECT and INSERT); mistakes are fixed by reversal entries.
+//
+// Bills (what a retailer owes, oldest first) and Payments (what they paid)
+// with Allocations between them give ageing and "which bill is open". The
+// ledger is the source of truth for balances; tests check both agree.
+
+enum PaymentMode {
+  PREPAID
+  POSTPAID
+}
+
+enum AccountType {
+  RECEIVABLE      // per retailer: what they owe us
+  WALLET          // per retailer: prepaid money we hold (credit balance)
+  WALLET_HOLD     // per retailer: wallet money reserved for open orders
+  STAFF_CASH      // per staff member: cash in hand not yet handed over
+  OFFICE_CASH
+  BANK
+  UPI_CLEARING
+  CHEQUES_IN_HAND
+  SALES
+  GST_OUTPUT
+  OPENING_EQUITY
+  DISCOUNT
+  PENALTY_INCOME
+  CASH_SHORTAGE
+}
+
+enum EntryKind {
+  SALE
+  OPENING
+  PAYMENT
+  WALLET_RECHARGE
+  WALLET_HOLD
+  WALLET_RELEASE
+  WALLET_SETTLE
+  CHEQUE_CLEAR
+  CHEQUE_BOUNCE
+  PENALTY
+  DEBIT_NOTE
+  CREDIT_NOTE
+  HANDOVER
+  SHORTAGE_WRITEOFF
+  REVERSAL
+}
+
+enum PayMethod {
+  CASH
+  UPI
+  CHEQUE
+  BANK
+  WALLET
+  CREDIT_NOTE
+}
+
+enum PayPurpose {
+  DUES
+  WALLET
+}
+
+enum PaymentState {
+  PENDING_VERIFICATION
+  CONFIRMED
+  REJECTED
+  REVERSED
+}
+
+enum ChequeStatus {
+  RECEIVED
+  DEPOSITED
+  CLEARED
+  BOUNCED
+}
+
+enum BillKind {
+  ORDER
+  OPENING
+  PENALTY
+  DEBIT_NOTE
+}
+
+model LedgerAccount {
+  id         String           @id @default(cuid())
+  tenantId   String           @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant           @relation(fields: [tenantId], references: [id])
+  type       AccountType
+  /// e.g. "RECEIVABLE:<retailerId>", "STAFF_CASH:<userId>", "BANK"
+  code       String
+  name       String
+  retailerId String?
+  retailer   RetailerProfile? @relation(fields: [retailerId], references: [id])
+  userId     String?
+  createdAt  DateTime         @default(now())
+
+  lines LedgerLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, type])
+}
+
+model JournalEntry {
+  id          String        @id @default(cuid())
+  tenantId    String        @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  kind        EntryKind
+  memo        String?
+  occurredAt  DateTime      @default(now())
+  createdAt   DateTime      @default(now())
+  createdById String?
+  retailerId  String?
+  orderId     String?
+  paymentId   String?
+  /// Set on a REVERSAL entry: the entry it cancels (at most one reversal each).
+  reversesId  String?       @unique
+  reverses    JournalEntry? @relation("Reversal", fields: [reversesId], references: [id])
+  reversedBy  JournalEntry? @relation("Reversal")
+
+  lines LedgerLine[]
+
+  @@index([tenantId, retailerId, occurredAt])
+  @@index([tenantId, kind, occurredAt])
+}
+
+model LedgerLine {
+  id        String        @id @default(cuid())
+  tenantId  String        @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant        @relation(fields: [tenantId], references: [id])
+  entryId   String
+  entry     JournalEntry  @relation(fields: [entryId], references: [id])
+  accountId String
+  account   LedgerAccount @relation(fields: [accountId], references: [id])
+  /// Paise. Debit positive, credit negative.
+  amount    Int
+  createdAt DateTime      @default(now())
+
+  @@index([tenantId, accountId])
+  @@index([entryId])
+}
+
+model Bill {
+  id         String              @id @default(cuid())
+  tenantId   String              @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant              @relation(fields: [tenantId], references: [id])
+  retailerId String
+  retailer   RetailerProfile     @relation(fields: [retailerId], references: [id])
+  kind       BillKind
+  number     String
+  orderId    String?             @unique
+  order      Order?              @relation(fields: [orderId], references: [id])
+  date       DateTime
+  dueDate    DateTime
+  /// Paise owed by this bill.
+  amount     Int
+  /// Paise allocated from payments so far (maintained by allocateRetailer).
+  paid       Int                 @default(0)
+  settled    Boolean             @default(false)
+  note       String?
+  entryId    String?
+  createdAt  DateTime            @default(now())
+
+  allocations PaymentAllocation[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, retailerId, settled, date])
+}
+
+model Payment {
+  id            String              @id @default(cuid())
+  tenantId      String              @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant              @relation(fields: [tenantId], references: [id])
+  number        String
+  retailerId    String
+  retailer      RetailerProfile     @relation(fields: [retailerId], references: [id])
+  purpose       PayPurpose          @default(DUES)
+  method        PayMethod
+  state         PaymentState
+  /// Paise.
+  amount        Int
+  /// UPI reference (UTR), bank reference or cheque number.
+  reference     String?
+  proofKey      String?
+  note          String?
+  /// Collected against this order at delivery (allocated to its bill first).
+  orderId       String?
+  collectedById String?
+  collectedBy   User?               @relation("PaymentCollectedBy", fields: [collectedById], references: [id])
+  collectedAt   DateTime            @default(now())
+  verifiedById  String?
+  verifiedAt    DateTime?
+  rejectReason  String?
+  entryId       String?
+  /// Paise of this payment already allocated to bills.
+  allocated     Int                 @default(0)
+  createdAt     DateTime            @default(now())
+
+  allocations PaymentAllocation[]
+  cheque      Cheque?
+
+  @@unique([tenantId, number])
+  @@index([tenantId, retailerId, collectedAt])
+  @@index([tenantId, state])
+  @@index([tenantId, collectedById, collectedAt])
+}
+
+model PaymentAllocation {
+  id        String   @id @default(cuid())
+  tenantId  String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  paymentId String
+  payment   Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  billId    String
+  bill      Bill     @relation(fields: [billId], references: [id], onDelete: Cascade)
+  amount    Int
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, billId])
+  @@index([tenantId, paymentId])
+}
+
+model Cheque {
+  id           String       @id @default(cuid())
+  tenantId     String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  paymentId    String       @unique
+  payment      Payment      @relation(fields: [paymentId], references: [id])
+  number       String
+  bank         String
+  chequeDate   DateTime
+  status       ChequeStatus @default(RECEIVED)
+  depositedAt  DateTime?
+  clearedAt    DateTime?
+  bouncedAt    DateTime?
+  bounceReason String?
+  createdAt    DateTime     @default(now())
+
+  @@index([tenantId, status])
+}
+
+model CashHandover {
+  id           String   @id @default(cuid())
+  tenantId     String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  staffUserId  String
+  staff        User     @relation("HandoverStaff", fields: [staffUserId], references: [id])
+  receivedById String
+  /// Cash the staff member should have had (paise).
+  expected     Int
+  /// Cash actually counted and received (paise).
+  counted      Int
+  /// expected − counted; positive = short.
+  variance     Int
+  note         String?
+  entryId      String?
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, staffUserId, createdAt])
 }

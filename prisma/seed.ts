@@ -11,6 +11,7 @@ import { PrismaClient } from "../src/generated/prisma/client";
 import { hashPassword } from "../src/lib/password";
 import { nextOrderNumber, priceBreakup } from "../src/lib/orders";
 import { toPaise } from "../src/lib/money";
+import { onOrderDelivered, onOrderPlaced, openingBalance, recordPayment, withMoney } from "../src/lib/ledger";
 
 const prisma = new PrismaClient();
 
@@ -38,6 +39,7 @@ async function wipe() {
   if (process.env.NODE_ENV === "production") throw new Error("Refusing to wipe a production database");
   await prisma.$executeRawUnsafe(
     `TRUNCATE ${[
+      "PaymentAllocation", "Cheque", "CashHandover", "Payment", "Bill", "LedgerLine", "JournalEntry", "LedgerAccount",
       "AuditLog", "Counter", "OtpChallenge", "Delivery", "Visit", "Attendance",
       "OrderStatusEvent", "OrderItem", "Order", "Product", "Beat",
       "RetailerProfile", "SalesAgentProfile", "DeliveryAgentProfile", "Area", "Region", "User",
@@ -160,7 +162,7 @@ async function seedDemo() {
     { productId: products[2].id, quantity: 10, price: products[2].price, gstRate: products[2].gstRate },
   ];
   const b1 = priceBreakup(delivered);
-  await db.order.create({
+  const deliveredOrder = await db.order.create({
     data: {
       orderNumber: await nextOrderNumber(db, tenant.id),
       retailerId: retailer1.retailerProfile!.id,
@@ -194,7 +196,7 @@ async function seedDemo() {
     { productId: products[6].id, quantity: 3, price: products[6].price, gstRate: products[6].gstRate },
   ];
   const b2 = priceBreakup(placed);
-  await db.order.create({
+  const placedOrder = await db.order.create({
     data: {
       orderNumber: await nextOrderNumber(db, tenant.id),
       retailerId: retailer2.retailerProfile!.id,
@@ -204,6 +206,94 @@ async function seedDemo() {
       items: { create: placed },
       statusEvents: { create: { status: "PLACED", actorId: retailer2.id } },
     },
+  });
+
+  await seedMoney(tenant.id, {
+    adminId: (await db.user.findFirstOrThrow({ where: { loginId: "admin" } })).id,
+    salesUserId: salesUser.id,
+    deliveryUserId: deliveryUser.id,
+    agarwal: retailer1.retailerProfile!.id,
+    patel: retailer2.retailerProfile!.id,
+    deliveredOrderId: deliveredOrder.id,
+    placedOrderId: placedOrder.id,
+  });
+}
+
+/**
+ * Money demo data, posted through the real ledger engine so balances, bills
+ * and allocations are exactly what the app would produce:
+ *   Agarwal (postpaid, ₹10,000 limit): overdue opening balance, a delivered
+ *     order paid in cash to the delivery agent, a cheque in hand, a UPI
+ *     payment waiting for verification.
+ *   Patel (prepaid): wallet recharged by UPI; the open order holds wallet money.
+ */
+async function seedMoney(
+  tenantId: string,
+  ids: {
+    adminId: string;
+    salesUserId: string;
+    deliveryUserId: string;
+    agarwal: string;
+    patel: string;
+    deliveredOrderId: string;
+    placedOrderId: string;
+  }
+) {
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, TRUE)`;
+    await tx.retailerProfile.update({ where: { id: ids.agarwal }, data: { paymentMode: "POSTPAID", creditLimit: toPaise(10000), creditDays: 7 } });
+    await tx.retailerProfile.update({ where: { id: ids.patel }, data: { paymentMode: "PREPAID" } });
+  });
+  await prisma.tenant.update({
+    where: { id: tenantId },
+    data: { settings: { money: { upiVpa: "setudemo@okaxis", upiPayeeName: "Setu Demo Distributors", chequeBouncePenalty: toPaise(250) } } },
+  });
+
+  const days = (n: number) => new Date(Date.now() - n * 86_400_000);
+  await withMoney(tenantId, ids.adminId, (ctx) => openingBalance(ctx, ids.agarwal, toPaise(2450), days(20), "Balance from old books"));
+
+  await withMoney(tenantId, ids.deliveryUserId, async (ctx) => {
+    const order = await ctx.tx.order.findUniqueOrThrow({ where: { id: ids.deliveredOrderId } });
+    await onOrderDelivered(ctx, order, {
+      amount: order.totalAmount,
+      method: "CASH",
+      collectorId: ids.deliveryUserId,
+    });
+  });
+  await withMoney(tenantId, ids.salesUserId, (ctx) =>
+    recordPayment(ctx, {
+      retailerId: ids.agarwal,
+      amount: toPaise(1000),
+      method: "CHEQUE",
+      cheque: { number: "004512", bank: "HDFC Bank", date: days(0) },
+      collectorId: ids.salesUserId,
+    })
+  );
+  await withMoney(tenantId, null, (ctx) =>
+    recordPayment(ctx, {
+      retailerId: ids.agarwal,
+      amount: toPaise(500),
+      method: "UPI",
+      reference: "431298765432",
+      note: "Paid on PhonePe",
+      needsVerification: true,
+      collectorId: null,
+    })
+  );
+
+  await withMoney(tenantId, ids.adminId, (ctx) =>
+    recordPayment(ctx, {
+      retailerId: ids.patel,
+      amount: toPaise(1500),
+      method: "UPI",
+      purpose: "WALLET",
+      reference: "431211112222",
+      atOffice: true,
+    })
+  );
+  await withMoney(tenantId, ids.adminId, async (ctx) => {
+    const order = await ctx.tx.order.findUniqueOrThrow({ where: { id: ids.placedOrderId } });
+    await onOrderPlaced(ctx, order);
   });
 }
 

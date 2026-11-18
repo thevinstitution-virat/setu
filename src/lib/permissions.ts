@@ -22,6 +22,15 @@ export const PERMISSIONS = {
   "audit.view": "Read the audit log",
   "field.work": "Sales field work: attendance, beat, visits",
   "delivery.work": "Delivery work: deliver orders, collect cash",
+  "payments.collect": "Record payments collected from retailers",
+  "payments.report": "Report own payments and recharge own wallet (retailers)",
+  "payments.verify": "Confirm or reject payments retailers report",
+  "ledger.view": "See every retailer's khata, ageing and statements",
+  "ledger.adjust": "Opening balances, debit and credit notes, reversals",
+  "credit.manage": "Set credit terms and release orders on credit hold",
+  "cash.handover": "Receive cash from staff and write off shortages",
+  "cheques.manage": "Deposit, clear and bounce cheques",
+  "settings.manage": "Change business settings",
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
@@ -30,9 +39,9 @@ const ALL = Object.keys(PERMISSIONS) as Permission[];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   ADMIN: ALL,
-  RETAILER: ["orders.place"],
-  SALES_AGENT: ["orders.place", "field.work"],
-  DELIVERY_AGENT: ["delivery.work"],
+  RETAILER: ["orders.place", "payments.report"],
+  SALES_AGENT: ["orders.place", "field.work", "payments.collect"],
+  DELIVERY_AGENT: ["delivery.work", "payments.collect"],
 };
 
 export function can(role: Role, perm: Permission | Permission[]): boolean {

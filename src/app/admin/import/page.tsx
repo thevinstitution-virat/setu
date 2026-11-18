@@ -24,6 +24,10 @@ const TYPES = {
     label: "Products",
     hint: "name, sku, category, unit, price (₹ before GST), mrp (₹), gst_rate (%), special_offer. Existing SKUs are updated.",
   },
+  balances: {
+    label: "Opening balances",
+    hint: "phone, amount (₹; positive = retailer owes you, negative = advance you hold), as_of (2026-03-31 or 31/03/2026), note. One opening balance per retailer; import retailers first.",
+  },
 } as const;
 
 type ImportType = keyof typeof TYPES;

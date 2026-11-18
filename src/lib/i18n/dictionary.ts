@@ -35,6 +35,10 @@ export const dictionary = {
   "nav.team": { en: "Team", hi: "टीम" },
   "nav.regions": { en: "Regions", hi: "क्षेत्र" },
   "nav.import": { en: "Import", hi: "आयात" },
+  "nav.khata": { en: "Khata", hi: "खाता बही" },
+  "nav.payments": { en: "Payments", hi: "भुगतान" },
+  "nav.cash": { en: "Cash", hi: "नकद" },
+  "nav.settings": { en: "Settings", hi: "सेटिंग्स" },
 
   // Roles
   "role.retailer": { en: "Retailer", hi: "रिटेलर" },

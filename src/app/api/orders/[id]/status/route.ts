@@ -3,44 +3,74 @@ import { guard } from "@/lib/guard";
 import { emit } from "@/lib/jobs";
 import { audit, requestIp } from "@/lib/audit";
 import { nextStatus } from "@/lib/orders";
+import { can } from "@/lib/permissions";
+import { MoneyError, onOrderCancelled, withMoney } from "@/lib/ledger";
+import { moneyFail } from "@/lib/money-api";
 import type { OrderStatus } from "@/generated/prisma/client";
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+/**
+ * action: "advance" (next status), "cancel", or "approve_credit" (release an
+ * order held for credit; needs credit.manage). Delivery is not done here —
+ * it goes through /deliver so the sale is billed.
+ */
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await guard("orders.manage");
   if (!auth.ok) return auth.res;
-  const { session, db } = auth;
+  const { session, db, tenant } = auth;
   const { id } = await params;
   const body = await req.json().catch(() => null);
-  const action = body?.action as "advance" | "cancel" | undefined;
+  const action = (body?.action ?? "advance") as "advance" | "cancel" | "approve_credit";
+  const note = typeof body?.note === "string" ? body.note.slice(0, 300) : undefined;
 
-  const order = await db.order.findUnique({ where: { id } });
-  if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (action === "approve_credit" && !can(session.role, "credit.manage")) {
+    return NextResponse.json({ error: "You don't have access to this" }, { status: 403 });
+  }
 
-  let newStatus: OrderStatus | null = null;
-  if (action === "cancel") {
-    newStatus = "CANCELLED";
+  let result: { from: OrderStatus; to: OrderStatus | null; order: unknown };
+  try {
+    result = await withMoney(tenant.id, session.userId, async (ctx) => {
+      const order = await ctx.tx.order.findUnique({ where: { id } });
+      if (!order) throw new MoneyError("Not found", 404);
+
+      if (action === "approve_credit") {
+        if (!order.creditHold || order.creditApprovedAt) throw new MoneyError("This order is not on credit hold", 409);
+        const updated = await ctx.tx.order.update({
+          where: { id },
+          data: { creditApprovedBy: session.userId, creditApprovedAt: new Date() },
+        });
+        return { from: order.status, to: null, order: updated };
+      }
+
+      let to: OrderStatus | null;
+      if (action === "cancel") {
+        if (order.status === "DELIVERED") throw new MoneyError("A delivered order can't be cancelled. Issue a credit note instead.");
+        if (order.status === "CANCELLED") throw new MoneyError("Already cancelled", 409);
+        to = "CANCELLED";
+      } else {
+        if (order.creditHold && !order.creditApprovedAt) {
+          throw new MoneyError(`On credit hold: ${order.creditHoldReason ?? "needs approval"}`, 409);
+        }
+        to = nextStatus(order.status);
+        if (to === "DELIVERED") throw new MoneyError("Mark it delivered from the delivery screen so it is billed");
+      }
+      if (!to) throw new MoneyError("No further status transition available");
+
+      if (to === "CANCELLED") await onOrderCancelled(ctx, order);
+      const updated = await ctx.tx.order.update({
+        where: { id },
+        data: { status: to, statusEvents: { create: { status: to, actorId: session.userId, note } } },
+      });
+      return { from: order.status, to, order: updated };
+    });
+  } catch (e) {
+    return moneyFail(e);
+  }
+
+  if (action === "approve_credit") {
+    await audit(db, { actorId: session.userId, action: "order.credit_approve", entity: "Order", entityId: id, after: { note }, ip: requestIp(req) });
   } else {
-    newStatus = nextStatus(order.status);
+    await audit(db, { actorId: session.userId, action: "order.status", entity: "Order", entityId: id, before: { status: result.from }, after: { status: result.to, note }, ip: requestIp(req) });
+    await emit("order.status", { tenantId: tenant.id, orderId: id, from: result.from, to: result.to });
   }
-
-  if (!newStatus) {
-    return NextResponse.json({ error: "No further status transition available" }, { status: 400 });
-  }
-
-  const updated = await db.order.update({
-    where: { id },
-    data: {
-      status: newStatus,
-      statusEvents: { create: { status: newStatus, actorId: session.userId, note: body?.note } },
-    },
-  });
-
-  await audit(db, { actorId: session.userId, action: "order.status", entity: "Order", entityId: id, before: { status: order.status }, after: { status: newStatus, note: body?.note }, ip: requestIp(req) });
-
-  await emit("order.status", { tenantId: auth.tenant.id, orderId: id, from: order.status, to: newStatus });
-
-  return NextResponse.json({ order: updated });
+  return NextResponse.json({ order: result.order });
 }

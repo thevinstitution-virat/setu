@@ -70,6 +70,11 @@ function toCurrent(t: {
   };
 }
 
+/** Forget cached lookups for a tenant after its settings or brand change. */
+export function invalidateTenantCache(tenantId: string) {
+  for (const [host, v] of cache) if (v.tenant?.id === tenantId) cache.delete(host);
+}
+
 export async function resolveTenantByHost(host: string): Promise<CurrentTenant | null> {
   const hit = cache.get(host);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.tenant;

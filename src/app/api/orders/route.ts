@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireTenant } from "@/lib/tenant";
-import { withTenantTx } from "@/lib/db";
 import { guard } from "@/lib/guard";
 import { emit } from "@/lib/jobs";
 import { nextOrderNumber, priceBreakup } from "@/lib/orders";
+import { onOrderPlaced, withMoney } from "@/lib/ledger";
+import { moneyFail } from "@/lib/money-api";
 
 export async function GET() {
   const auth = await guard();
@@ -90,27 +91,35 @@ export async function POST(req: Request) {
   const { subtotal, gstAmount, totalAmount } = priceBreakup(lines);
 
   const tenant = await requireTenant();
-  // Number + order + visit link commit together, or not at all.
-  const order = await withTenantTx(tenant.id, async (tx) => {
-    const created = await tx.order.create({
-      data: {
-        orderNumber: await nextOrderNumber(tx, tenant.id),
-        retailerId: retailerId!,
-        placedById: session.userId,
-        subtotal,
-        gstAmount,
-        totalAmount,
-        notes,
-        items: { create: lines },
-        statusEvents: { create: { status: "PLACED", actorId: session.userId } },
-      },
-      include: { items: true },
+  // Number + order + visit link + wallet reservation / credit check commit
+  // together, or not at all (a prepaid retailer short of balance gets a 402).
+  let order;
+  try {
+    order = await withMoney(tenant.id, session.userId, async (ctx) => {
+      const { tx } = ctx;
+      const created = await tx.order.create({
+        data: {
+          orderNumber: await nextOrderNumber(tx, tenant.id),
+          retailerId: retailerId!,
+          placedById: session.userId,
+          subtotal,
+          gstAmount,
+          totalAmount,
+          notes,
+          items: { create: lines },
+          statusEvents: { create: { status: "PLACED", actorId: session.userId } },
+        },
+        include: { items: true },
+      });
+      if (visitId) {
+        await tx.visit.updateMany({ where: { id: visitId, orderId: null }, data: { orderId: created.id } });
+      }
+      const credit = await onOrderPlaced(ctx, created);
+      return { ...created, creditHold: credit.hold, creditHoldReason: credit.reason };
     });
-    if (visitId) {
-      await tx.visit.updateMany({ where: { id: visitId, orderId: null }, data: { orderId: created.id } });
-    }
-    return created;
-  });
+  } catch (e) {
+    return moneyFail(e);
+  }
 
   await emit("order.placed", { tenantId: tenant.id, orderId: order.id, placedBy: session.userId });
 

@@ -1,7 +1,9 @@
 import { formatINR } from "@/lib/money";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
-import { getDb } from "@/lib/tenant";
+import { getDb, requireTenant } from "@/lib/tenant";
+import { withMoney } from "@/lib/ledger";
+import { khataSummary } from "@/lib/khata";
 import { STATUS_COLOR, ORDER_STATUS_FLOW } from "@/lib/orders";
 import { getServerLang, tr } from "@/lib/i18n/server";
 import Icon from "@/components/Icon";
@@ -23,6 +25,9 @@ export default async function RetailerHome() {
       })
     : null;
 
+  const tenant = await requireTenant();
+  const khata = profile ? await withMoney(tenant.id, session!.userId, (ctx) => khataSummary(ctx, profile.id)) : null;
+
   const orderCount = profile ? await db.order.count({ where: { retailerId: profile.id } }) : 0;
   const reachedIdx = latestOrder ? ORDER_STATUS_FLOW.indexOf(latestOrder.status) : -1;
 
@@ -35,6 +40,8 @@ export default async function RetailerHome() {
           {profile?.area.name}, {profile?.area.region.name}
         </p>
       </div>
+
+      {khata && <KhataCard k={khata} />}
 
       {latestOrder ? (
         <div className="panel-dark p-5 space-y-4">
@@ -116,5 +123,41 @@ export default async function RetailerHome() {
         </Link>
       </div>
     </div>
+  );
+}
+
+function KhataCard({ k }: { k: Awaited<ReturnType<typeof khataSummary>> }) {
+  const owes = k.balances.receivable;
+  const prepaid = k.terms.mode === "PREPAID";
+  return (
+    <Link href="/retailer/khata" className="card p-4 flex items-center gap-3 hover:-translate-y-0.5 transition">
+      <span
+        className={`icon-tile ${
+          k.overdue > 0 ? "bg-[#fde4e1] text-[#a8281e]" : "bg-[var(--mint-tint)] text-[var(--mint-text)]"
+        }`}
+      >
+        <Icon name={prepaid ? "wallet" : "book"} />
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-xs text-[var(--muted)]">
+          {prepaid ? "Wallet balance" : owes > 0 ? "You owe" : owes < 0 ? "Advance with us" : "My khata"}
+        </span>
+        <span className="block font-heading font-bold text-xl leading-tight mt-0.5">
+          {prepaid ? formatINR(k.balances.walletAvailable) : owes === 0 ? "All paid" : formatINR(Math.abs(owes))}
+        </span>
+        {k.overdue > 0 ? (
+          <span className="block text-xs font-bold text-[#a8281e] mt-0.5">{formatINR(k.overdue)} overdue</span>
+        ) : prepaid && owes > 0 ? (
+          <span className="block text-xs text-[var(--muted)] mt-0.5">Dues {formatINR(owes)}</span>
+        ) : k.pendingVerification.amount > 0 ? (
+          <span className="block text-xs text-[var(--muted)] mt-0.5">
+            {formatINR(k.pendingVerification.amount)} waiting for confirmation
+          </span>
+        ) : null}
+      </span>
+      <span className="btn btn-kesar btn-xs">
+        {owes > 0 || prepaid ? "Pay now" : "Open"} <Icon name="arrow" className="h-3.5 w-3.5" />
+      </span>
+    </Link>
   );
 }

@@ -5,6 +5,7 @@ import AppShell, { type NavItem } from "@/components/AppShell";
 const nav: NavItem[] = [
   { href: "/delivery", labelKey: "nav.deliveries", icon: "truck" },
   { href: "/delivery/history", labelKey: "nav.history", icon: "receipt" },
+  { href: "/delivery/cash", labelKey: "nav.cash", icon: "cash" },
 ];
 
 export default async function DeliveryLayout({ children }: { children: React.ReactNode }) {

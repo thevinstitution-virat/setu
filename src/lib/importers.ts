@@ -7,7 +7,7 @@ import { toPaise } from "@/lib/money";
  * retailers by phone, products by SKU.
  */
 
-export type ImportType = "retailers" | "products";
+export type ImportType = "retailers" | "products" | "balances";
 export type Row = Record<string, string>;
 export type RowError = { row: number; message: string };
 
@@ -23,6 +23,12 @@ export const TEMPLATES: Record<ImportType, { columns: string[]; required: string
     columns: ["name", "sku", "category", "unit", "price", "mrp", "gst_rate", "special_offer"],
     required: ["name", "sku", "category", "unit", "price", "mrp"],
     example: ["Masala Chai 250g", "BEV-001", "Beverages", "pack", "85", "95", "5", ""],
+  },
+  balances: {
+    // amount in rupees: positive = retailer owes you, negative = advance you hold
+    columns: ["phone", "amount", "as_of", "note"],
+    required: ["phone", "amount"],
+    example: ["9876543210", "12500.50", "2026-03-31", "Balance from old books"],
   },
 };
 
@@ -215,6 +221,55 @@ export function validateProducts(rows: Row[]): { valid: ProductRow[]; errors: Ro
       gstRate,
       specialOffer: r.special_offer || null,
     });
+  });
+  return { valid, errors };
+}
+
+export type BalanceRow = { row: number; phone: string; amount: number; asOf: Date; note: string };
+
+/** "2026-03-31" or "31/03/2026" → IST midnight. */
+export function parseIndianDate(raw: string): Date | null {
+  const v = raw.trim();
+  let y: number, m: number, d: number;
+  let mt = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(v);
+  if (mt) [y, m, d] = [Number(mt[1]), Number(mt[2]), Number(mt[3])];
+  else if ((mt = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(v))) [d, m, y] = [Number(mt[1]), Number(mt[2]), Number(mt[3])];
+  else return null;
+  const date = new Date(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}T00:00:00+05:30`);
+  if (Number.isNaN(date.getTime())) return null;
+  // Reject 31/02 etc. (Date rolls them over).
+  const back = new Date(date.getTime() + 5.5 * 3_600_000);
+  if (back.getUTCDate() !== d || back.getUTCMonth() + 1 !== m) return null;
+  return date;
+}
+
+export function validateBalances(rows: Row[], today = new Date()): { valid: BalanceRow[]; errors: RowError[] } {
+  const valid: BalanceRow[] = [];
+  const errors: RowError[] = [];
+  const seen = new Map<string, number>();
+  rows.forEach((r, i) => {
+    const row = i + 2;
+    const miss = missing(r, TEMPLATES.balances.required);
+    if (miss.length) return errors.push({ row, message: `Missing ${miss.join(", ")}` });
+    const phone = cleanPhone(r.phone);
+    if (!/^[6-9]\d{9}$/.test(phone)) return errors.push({ row, message: `Phone "${r.phone}" is not a 10-digit mobile number` });
+    if (seen.has(phone)) return errors.push({ row, message: `Phone ${phone} is repeated (first on row ${seen.get(phone)})` });
+    let amount: number;
+    try {
+      amount = toPaise(r.amount);
+    } catch {
+      return errors.push({ row, message: `Amount "${r.amount}" is not a number` });
+    }
+    if (amount === 0) return errors.push({ row, message: "Amount is 0 (leave the row out)" });
+    let asOf = today;
+    if (r.as_of) {
+      const d = parseIndianDate(r.as_of);
+      if (!d) return errors.push({ row, message: `Date "${r.as_of}" should look like 2026-03-31 or 31/03/2026` });
+      if (d > today) return errors.push({ row, message: "Date is in the future" });
+      asOf = d;
+    }
+    seen.set(phone, row);
+    valid.push({ row, phone, amount, asOf, note: (r.note ?? "").slice(0, 200) });
   });
   return { valid, errors };
 }

@@ -55,9 +55,9 @@ export default function AppShell({
             <BrandLockup sub={t(roleKey)} />
           </Link>
 
-          <nav className="hidden md:flex items-center gap-1 ml-4" aria-label="Main">
+          <nav className="hidden md:flex items-center gap-1 ml-4 min-w-0 overflow-x-auto" aria-label="Main">
             {nav.map((item) => (
-              <NavLink key={item.href} item={item} active={item.href === current} />
+              <NavLink key={item.href} item={item} active={item.href === current} compact={nav.length > 6} />
             ))}
           </nav>
 
@@ -81,7 +81,7 @@ export default function AppShell({
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-6">{children}</main>
 
       <nav
-        className="md:hidden fixed bottom-3 inset-x-3 z-20 flex rounded-2xl glass"
+        className="md:hidden fixed bottom-3 inset-x-3 z-20 flex rounded-2xl glass overflow-x-auto"
         aria-label="Main"
       >
         {nav.map((item) => (
@@ -92,20 +92,22 @@ export default function AppShell({
   );
 }
 
-function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+/** compact: long menus (admin) show icons only until the screen is wide enough. */
+function NavLink({ item, active, compact }: { item: NavItem; active: boolean; compact?: boolean }) {
   const { t } = useLanguage();
   return (
     <Link
       href={item.href}
       aria-current={active ? "page" : undefined}
-      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold transition ${
+      title={compact ? t(item.labelKey) : undefined}
+      className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold transition ${
         active
           ? "bg-gradient-to-br from-mor to-[#0c3634] text-white shadow-[0_10px_20px_-12px_rgba(8,38,37,.9)]"
           : "text-[var(--ink-2)] hover:bg-ink/5"
       }`}
     >
       <Icon name={item.icon} className={`h-4 w-4 ${active ? "text-genda" : ""}`} />
-      {t(item.labelKey)}
+      <span className={compact ? "hidden xl:inline" : undefined}>{t(item.labelKey)}</span>
     </Link>
   );
 }
@@ -116,7 +118,7 @@ function NavLinkMobile({ item, active }: { item: NavItem; active: boolean }) {
     <Link
       href={item.href}
       aria-current={active ? "page" : undefined}
-      className={`flex-1 flex flex-col items-center gap-1 py-2.5 text-[11.5px] font-bold ${
+      className={`flex-1 shrink-0 min-w-[64px] flex flex-col items-center gap-1 py-2.5 text-[11.5px] font-bold whitespace-nowrap ${
         active ? "text-[var(--kesar-text)]" : "text-[var(--muted)]"
       }`}
     >

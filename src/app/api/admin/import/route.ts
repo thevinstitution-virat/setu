@@ -3,12 +3,15 @@ import { guard } from "@/lib/guard";
 import { withTenantTx } from "@/lib/db";
 import { audit, requestIp } from "@/lib/audit";
 import { emit } from "@/lib/jobs";
+import { MoneyError, openingBalance } from "@/lib/ledger";
 import {
   MAX_ROWS,
   parseSheet,
   templateCsv,
+  validateBalances,
   validateProducts,
   validateRetailers,
+  type BalanceRow,
   type ImportType,
   type ProductRow,
   type RetailerRow,
@@ -136,12 +139,43 @@ async function importProducts(tx: Tx, rows: ProductRow[]): Promise<Summary> {
   return s;
 }
 
+async function importBalances(tx: Tx, rows: BalanceRow[], tenantId: string, actorId: string): Promise<Summary> {
+  const s: Summary = { created: 0, updated: 0, newRegions: 0, newAreas: 0, errors: [] };
+  const retailers = new Map(
+    (
+      await tx.user.findMany({
+        where: { phone: { in: rows.map((r) => r.phone) }, role: "RETAILER" },
+        select: { phone: true, retailerProfile: { select: { id: true } } },
+      })
+    )
+      .filter((u) => u.retailerProfile)
+      .map((u) => [u.phone!, u.retailerProfile!.id])
+  );
+  const ctx = { tx, tenantId, actorId };
+  for (const r of rows) {
+    const retailerId = retailers.get(r.phone);
+    if (!retailerId) {
+      s.errors.push({ row: r.row, message: `No retailer with phone ${r.phone} (import retailers first)` });
+      continue;
+    }
+    try {
+      await openingBalance(ctx, retailerId, r.amount, r.asOf, r.note || "Opening balance");
+      s.created++;
+    } catch (e) {
+      // openingBalance checks before it writes, so a refused row leaves nothing behind.
+      if (!(e instanceof MoneyError)) throw e;
+      s.errors.push({ row: r.row, message: e.message });
+    }
+  }
+  return s;
+}
+
 export async function GET(req: Request) {
   const auth = await guard("import.run");
   if (!auth.ok) return auth.res;
   const type = new URL(req.url).searchParams.get("type") as ImportType;
-  if (type !== "retailers" && type !== "products") {
-    return NextResponse.json({ error: "type must be retailers or products" }, { status: 400 });
+  if (!["retailers", "products", "balances"].includes(type)) {
+    return NextResponse.json({ error: "type must be retailers, products or balances" }, { status: 400 });
   }
   return new NextResponse("﻿" + templateCsv(type), {
     headers: {
@@ -162,8 +196,8 @@ export async function POST(req: Request) {
   const type = String(form?.get("type") ?? "") as ImportType;
   const mode = String(form?.get("mode") ?? "preview");
   if (!(file instanceof File)) return NextResponse.json({ error: "Attach a CSV or Excel file" }, { status: 400 });
-  if (type !== "retailers" && type !== "products") {
-    return NextResponse.json({ error: "Choose retailers or products" }, { status: 400 });
+  if (!["retailers", "products", "balances"].includes(type)) {
+    return NextResponse.json({ error: "Choose retailers, products or balances" }, { status: 400 });
   }
   if (!/\.(csv|xlsx)$/i.test(file.name)) {
     return NextResponse.json({ error: "Use a .csv or .xlsx file (old .xls: save as .xlsx first)" }, { status: 415 });
@@ -181,7 +215,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `At most ${MAX_ROWS} rows per file; split it` }, { status: 400 });
   }
 
-  const checked = type === "retailers" ? validateRetailers(rows) : validateProducts(rows);
+  const checked =
+    type === "retailers" ? validateRetailers(rows) : type === "products" ? validateProducts(rows) : validateBalances(rows);
 
   // Preview runs the exact same writes inside a transaction and rolls it back,
   // so what it reports is exactly what commit will do.
@@ -193,7 +228,9 @@ export async function POST(req: Request) {
         const s =
           type === "retailers"
             ? await importRetailers(tx, checked.valid as RetailerRow[])
-            : await importProducts(tx, checked.valid as ProductRow[]);
+            : type === "products"
+              ? await importProducts(tx, checked.valid as ProductRow[])
+              : await importBalances(tx, checked.valid as BalanceRow[], tenant.id, session.userId);
         s.errors = [...checked.errors, ...s.errors].sort((a, b) => a.row - b.row);
         if (mode !== "commit" || s.errors.length) throw new Rollback(s);
         return s;

@@ -44,7 +44,7 @@ export function tenantDb(tenantId: string): TenantDb {
   return db;
 }
 
-type Tx = Omit<
+export type Tx = Omit<
   PrismaClient,
   "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
 >;
