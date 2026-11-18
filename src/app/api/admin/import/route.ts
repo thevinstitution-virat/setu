@@ -9,7 +9,9 @@ import {
   parseSheet,
   templateCsv,
   validateBalances,
+  validatePrices,
   validateProducts,
+  type PriceRow,
   validateRetailers,
   type BalanceRow,
   type ImportType,
@@ -116,14 +118,33 @@ async function importProducts(tx: Tx, rows: ProductRow[]): Promise<Summary> {
   const existing = new Map(
     (await tx.product.findMany({ select: { id: true, sku: true } })).map((p) => [p.sku.toUpperCase(), p.id])
   );
+  // Categories, brands and HSN rates by name / code; new names are created.
+  const cats = new Map((await tx.category.findMany({ select: { id: true, name: true } })).map((c) => [c.name.toLowerCase(), c.id]));
+  const brands = new Map((await tx.brand.findMany({ select: { id: true, name: true } })).map((c) => [c.name.toLowerCase(), c.id]));
+  const hsn = new Map((await tx.hsnCode.findMany({ select: { code: true, gstRate: true } })).map((h) => [h.code, h.gstRate]));
+  const idFor = async (map: Map<string, string>, name: string, create: (name: string) => Promise<{ id: string }>) => {
+    let id = map.get(name.toLowerCase());
+    if (!id) {
+      id = (await create(name)).id;
+      map.set(name.toLowerCase(), id);
+    }
+    return id;
+  };
   for (const p of rows) {
     const data = {
       name: p.name,
-      category: p.category,
+      categoryId: await idFor(cats, p.category, (name) => tx.category.create({ data: { name } })),
+      brandId: p.brand ? await idFor(brands, p.brand, (name) => tx.brand.create({ data: { name } })) : null,
+      hsnCode: p.hsnCode,
+      nameHi: p.nameHi,
+      caseUnit: p.caseUnit,
+      caseSize: p.caseSize,
+      moq: p.moq,
       unit: p.unit,
       price: p.price,
       mrp: p.mrp,
-      gstRate: p.gstRate,
+      // The HSN table decides the rate when the code is known.
+      gstRate: (p.hsnCode ? hsn.get(p.hsnCode) : undefined) ?? p.gstRate,
       specialOffer: p.specialOffer,
       active: true,
     };
@@ -134,6 +155,49 @@ async function importProducts(tx: Tx, rows: ProductRow[]): Promise<Summary> {
     } else {
       await tx.product.create({ data: { ...data, sku: p.sku } });
       s.created++;
+    }
+  }
+  return s;
+}
+
+async function importPrices(tx: Tx, rows: PriceRow[]): Promise<Summary> {
+  const s: Summary = { created: 0, updated: 0, newRegions: 0, newAreas: 0, errors: [] };
+  const products = new Map((await tx.product.findMany({ select: { id: true, sku: true } })).map((p) => [p.sku.toUpperCase(), p.id]));
+  const lists = new Map((await tx.priceList.findMany({ select: { id: true, name: true } })).map((l) => [l.name.toLowerCase(), l.id]));
+  const phones = [...new Set(rows.map((r) => r.phone).filter((x): x is string => !!x))];
+  const retailers = new Map(
+    (await tx.user.findMany({ where: { phone: { in: phones }, role: "RETAILER" }, select: { phone: true, retailerProfile: { select: { id: true } } } }))
+      .filter((u) => u.retailerProfile)
+      .map((u) => [u.phone!, u.retailerProfile!.id])
+  );
+  for (const r of rows) {
+    const productId = products.get(r.sku.toUpperCase());
+    if (!productId) {
+      s.errors.push({ row: r.row, message: `No product with SKU ${r.sku}` });
+      continue;
+    }
+    if (r.priceList) {
+      let listId = lists.get(r.priceList.toLowerCase());
+      if (!listId) {
+        listId = (await tx.priceList.create({ data: { name: r.priceList } })).id;
+        lists.set(r.priceList.toLowerCase(), listId);
+      }
+      const key = { priceListId_productId: { priceListId: listId, productId } };
+      const had = await tx.priceListItem.findUnique({ where: key });
+      await tx.priceListItem.upsert({ where: key, create: { priceListId: listId, productId, price: r.price }, update: { price: r.price } });
+      if (had) s.updated++;
+      else s.created++;
+    } else {
+      const retailerId = retailers.get(r.phone!);
+      if (!retailerId) {
+        s.errors.push({ row: r.row, message: `No retailer with phone ${r.phone}` });
+        continue;
+      }
+      const key = { retailerId_productId: { retailerId, productId } };
+      const had = await tx.retailerPrice.findUnique({ where: key });
+      await tx.retailerPrice.upsert({ where: key, create: { retailerId, productId, price: r.price }, update: { price: r.price } });
+      if (had) s.updated++;
+      else s.created++;
     }
   }
   return s;
@@ -174,8 +238,8 @@ export async function GET(req: Request) {
   const auth = await guard("import.run");
   if (!auth.ok) return auth.res;
   const type = new URL(req.url).searchParams.get("type") as ImportType;
-  if (!["retailers", "products", "balances"].includes(type)) {
-    return NextResponse.json({ error: "type must be retailers, products or balances" }, { status: 400 });
+  if (!["retailers", "products", "balances", "prices"].includes(type)) {
+    return NextResponse.json({ error: "type must be retailers, products, balances or prices" }, { status: 400 });
   }
   return new NextResponse("﻿" + templateCsv(type), {
     headers: {
@@ -196,8 +260,8 @@ export async function POST(req: Request) {
   const type = String(form?.get("type") ?? "") as ImportType;
   const mode = String(form?.get("mode") ?? "preview");
   if (!(file instanceof File)) return NextResponse.json({ error: "Attach a CSV or Excel file" }, { status: 400 });
-  if (!["retailers", "products", "balances"].includes(type)) {
-    return NextResponse.json({ error: "Choose retailers, products or balances" }, { status: 400 });
+  if (!["retailers", "products", "balances", "prices"].includes(type)) {
+    return NextResponse.json({ error: "Choose retailers, products, balances or prices" }, { status: 400 });
   }
   if (!/\.(csv|xlsx)$/i.test(file.name)) {
     return NextResponse.json({ error: "Use a .csv or .xlsx file (old .xls: save as .xlsx first)" }, { status: 415 });
@@ -216,7 +280,13 @@ export async function POST(req: Request) {
   }
 
   const checked =
-    type === "retailers" ? validateRetailers(rows) : type === "products" ? validateProducts(rows) : validateBalances(rows);
+    type === "retailers"
+      ? validateRetailers(rows)
+      : type === "products"
+        ? validateProducts(rows)
+        : type === "prices"
+          ? validatePrices(rows)
+          : validateBalances(rows);
 
   // Preview runs the exact same writes inside a transaction and rolls it back,
   // so what it reports is exactly what commit will do.
@@ -230,7 +300,9 @@ export async function POST(req: Request) {
             ? await importRetailers(tx, checked.valid as RetailerRow[])
             : type === "products"
               ? await importProducts(tx, checked.valid as ProductRow[])
-              : await importBalances(tx, checked.valid as BalanceRow[], tenant.id, session.userId);
+              : type === "prices"
+                ? await importPrices(tx, checked.valid as PriceRow[])
+                : await importBalances(tx, checked.valid as BalanceRow[], tenant.id, session.userId);
         s.errors = [...checked.errors, ...s.errors].sort((a, b) => a.row - b.row);
         if (mode !== "commit" || s.errors.length) throw new Rollback(s);
         return s;

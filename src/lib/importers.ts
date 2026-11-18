@@ -7,7 +7,7 @@ import { toPaise } from "@/lib/money";
  * retailers by phone, products by SKU.
  */
 
-export type ImportType = "retailers" | "products" | "balances";
+export type ImportType = "retailers" | "products" | "balances" | "prices";
 export type Row = Record<string, string>;
 export type RowError = { row: number; message: string };
 
@@ -20,15 +20,21 @@ export const TEMPLATES: Record<ImportType, { columns: string[]; required: string
     example: ["Agarwal General Store", "9876543210", "G-12", "Shree Complex", "400058", "Mumbai", "Andheri", "Test agent"],
   },
   products: {
-    columns: ["name", "sku", "category", "unit", "price", "mrp", "gst_rate", "special_offer"],
+    columns: ["name", "sku", "category", "unit", "price", "mrp", "gst_rate", "special_offer", "brand", "hsn_code", "name_hi", "case_unit", "case_size", "moq"],
     required: ["name", "sku", "category", "unit", "price", "mrp"],
-    example: ["Masala Chai 250g", "BEV-001", "Beverages", "pack", "85", "95", "5", ""],
+    example: ["Masala Chai 250g", "BEV-001", "Beverages", "pack", "85", "95", "5", "", "Chaiwala", "0902", "मसाला चाय", "box", "24", "1"],
   },
   balances: {
     // amount in rupees: positive = retailer owes you, negative = advance you hold
     columns: ["phone", "amount", "as_of", "note"],
     required: ["phone", "amount"],
     example: ["9876543210", "12500.50", "2026-03-31", "Balance from old books"],
+  },
+  prices: {
+    // One of price_list (rate in that list; the list is created if new) or phone (a retailer's special rate).
+    columns: ["price_list", "phone", "sku", "price"],
+    required: ["sku", "price"],
+    example: ["Wholesale", "", "BEV-001", "80"],
   },
 };
 
@@ -150,6 +156,12 @@ export type ProductRow = {
   mrp: number;
   gstRate: number;
   specialOffer: string | null;
+  brand: string | null;
+  hsnCode: string | null;
+  nameHi: string | null;
+  caseUnit: string | null;
+  caseSize: number | null;
+  moq: number;
 };
 
 const GST_RATES = new Set([0, 0.25, 3, 5, 12, 18, 28, 40]);
@@ -209,9 +221,23 @@ export function validateProducts(rows: Row[]): { valid: ProductRow[]; errors: Ro
     const sku = r.sku;
     const skuKey = sku.toUpperCase();
     if (seen.has(skuKey)) return errors.push({ row, message: `SKU ${sku} is repeated (first on row ${seen.get(skuKey)})` });
+    const hsn = (r.hsn_code ?? "").trim();
+    if (hsn && !/^\d{4,8}$/.test(hsn)) return errors.push({ row, message: `HSN code "${hsn}" must be 4 to 8 digits` });
+    const caseUnit = (r.case_unit ?? "").trim() || null;
+    const caseSize = (r.case_size ?? "").trim() ? Number(r.case_size) : null;
+    if ((caseUnit === null) !== (caseSize === null)) return errors.push({ row, message: "Give both case_unit and case_size, or neither" });
+    if (caseSize !== null && (!Number.isInteger(caseSize) || caseSize < 2)) return errors.push({ row, message: "case_size must be a whole number of 2 or more" });
+    const moq = (r.moq ?? "").trim() ? Number(r.moq) : 1;
+    if (!Number.isInteger(moq) || moq < 1) return errors.push({ row, message: "moq must be a whole number of at least 1" });
     seen.set(skuKey, row);
     valid.push({
       row,
+      brand: (r.brand ?? "").trim() || null,
+      hsnCode: hsn || null,
+      nameHi: (r.name_hi ?? "").trim() || null,
+      caseUnit,
+      caseSize,
+      moq,
       name: r.name,
       sku,
       category: r.category,
@@ -270,6 +296,35 @@ export function validateBalances(rows: Row[], today = new Date()): { valid: Bala
     }
     seen.set(phone, row);
     valid.push({ row, phone, amount, asOf, note: (r.note ?? "").slice(0, 200) });
+  });
+  return { valid, errors };
+}
+
+export type PriceRow = { row: number; priceList: string | null; phone: string | null; sku: string; price: number };
+
+export function validatePrices(rows: Row[]): { valid: PriceRow[]; errors: RowError[] } {
+  const valid: PriceRow[] = [];
+  const errors: RowError[] = [];
+  const seen = new Map<string, number>();
+  rows.forEach((r, i) => {
+    const row = i + 2;
+    const miss = missing(r, TEMPLATES.prices.required);
+    if (miss.length) return errors.push({ row, message: `Missing ${miss.join(", ")}` });
+    const list = (r.price_list ?? "").trim() || null;
+    const phone = (r.phone ?? "").trim() ? cleanPhone(r.phone) : null;
+    if ((list === null) === (phone === null)) return errors.push({ row, message: "Fill either price_list or phone (not both)" });
+    if (phone && !/^[6-9]\d{9}$/.test(phone)) return errors.push({ row, message: `Phone "${r.phone}" is not a 10-digit mobile number` });
+    let price: number;
+    try {
+      price = toPaise(r.price);
+    } catch {
+      return errors.push({ row, message: "price must be a number in rupees" });
+    }
+    if (price < 0) return errors.push({ row, message: "price can't be negative" });
+    const key = `${list ? `L:${list.toUpperCase()}` : `P:${phone}`}|${r.sku.toUpperCase()}`;
+    if (seen.has(key)) return errors.push({ row, message: `Repeated (first on row ${seen.get(key)})` });
+    seen.set(key, row);
+    valid.push({ row, priceList: list, phone, sku: r.sku.trim(), price });
   });
   return { valid, errors };
 }

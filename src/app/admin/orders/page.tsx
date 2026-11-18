@@ -5,8 +5,9 @@ import { formatINR } from "@/lib/money";
 import { STATUS_COLOR, nextStatus } from "@/lib/orders";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import type { OrderStatus } from "@/generated/prisma/client";
+import OrderLines, { type OrderLineItem, type OrderTotals } from "@/components/store/OrderLines";
 
-type Order = {
+type Order = OrderTotals & {
   id: string;
   orderNumber: string;
   status: OrderStatus;
@@ -18,7 +19,7 @@ type Order = {
   /** Paise reserved from the retailer's wallet for this order. */
   walletHold: number;
   retailer: { outletName: string; area: { name: string } };
-  items: { id: string }[];
+  items: OrderLineItem[];
   delivery: { deliveryAgent: { id: string; user: { name: string } } } | null;
 };
 
@@ -130,6 +131,16 @@ export default function AdminOrdersPage() {
                   {t(`status.${o.status}`)}
                 </span>
               </div>
+
+              <details className="group">
+                <summary className="cursor-pointer text-xs font-bold text-[var(--kesar-text)] list-none">
+                  <span className="group-open:hidden">Show items and totals</span>
+                  <span className="hidden group-open:inline">Hide items</span>
+                </summary>
+                <div className="pt-3">
+                  <OrderLines items={o.items} order={o} />
+                </div>
+              </details>
 
               {((held && open) || (approved && open) || o.walletHold > 0) && (
                 <div className="flex flex-wrap items-center gap-2">

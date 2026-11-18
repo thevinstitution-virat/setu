@@ -9,11 +9,17 @@ export async function GET() {
   const { db } = auth;
   const users = await db.user.findMany({
     where: { role: { in: ["SALES_AGENT", "DELIVERY_AGENT"] } },
+    omit: { passwordHash: true },
     include: { salesAgentProfile: true, deliveryAgentProfile: true },
     orderBy: { createdAt: "desc" },
   });
   const retailers = await db.retailerProfile.findMany({
-    include: { user: true, area: { include: { region: true } }, salesAgent: { include: { user: true } } },
+    // Never send password hashes to the browser.
+    include: {
+      user: { omit: { passwordHash: true } },
+      area: { include: { region: true } },
+      salesAgent: { include: { user: { select: { id: true, name: true } } } },
+    },
     orderBy: { outletName: "asc" },
   });
   return NextResponse.json({ users, retailers });

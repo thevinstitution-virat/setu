@@ -24,7 +24,6 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const products = await db.product.findMany({ where: { active: true }, orderBy: { name: "asc" } });
-
-  return NextResponse.json({ retailer, products });
+  // Products come from /api/catalogue?retailerId= (this retailer's own rates and visibility).
+  return NextResponse.json({ retailer });
 }

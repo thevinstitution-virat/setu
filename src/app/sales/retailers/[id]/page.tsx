@@ -3,7 +3,7 @@
 import { useEffect, useState, use as usePromise } from "react";
 import { formatINR } from "@/lib/money";
 import { useRouter } from "next/navigation";
-import OrderBuilder, { ProductLite } from "@/components/OrderBuilder";
+import Storefront from "@/components/Storefront";
 import { STATUS_COLOR } from "@/lib/orders";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import type { OrderStatus as OrderStatusKey } from "@/generated/prisma/client";
@@ -46,7 +46,6 @@ export default function RetailerDetailPage({
   const router = useRouter();
   const { t } = useLanguage();
   const [retailer, setRetailer] = useState<RetailerDetail | null>(null);
-  const [products, setProducts] = useState<ProductLite[]>([]);
   const [showOrder, setShowOrder] = useState(false);
   const [dues, setDues] = useState<Dues | null>(null);
   const [collecting, setCollecting] = useState(false);
@@ -58,7 +57,6 @@ export default function RetailerDetailPage({
   async function load() {
     const d = await fetch(`/api/sales/retailers/${id}`).then((r) => r.json());
     setRetailer(d.retailer);
-    setProducts(d.products ?? []);
     const k = await fetch(`/api/admin/khata/${id}`);
     setDues(k.ok ? await k.json() : null);
   }
@@ -100,18 +98,6 @@ export default function RetailerDetailPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  async function placeOrder(items: { productId: string; quantity: number }[]) {
-    const openVisit = retailer?.visits.find((v) => !v.checkOutAt);
-    const res = await fetch("/api/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items, retailerId: id, visitId: openVisit?.id }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
-    router.push(`/sales/orders`);
-  }
-
   async function checkOutVisit(visitId: string) {
     await fetch(`/api/visits/${visitId}/checkout`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: "{}" });
     await load();
@@ -127,7 +113,12 @@ export default function RetailerDetailPage({
         <button className="text-sm text-[var(--kesar-text)] mb-3" onClick={() => setShowOrder(false)}>
           ← Back to {retailer.outletName}
         </button>
-        <OrderBuilder products={products} onSubmitAction={placeOrder} submitLabel="Place order for retailer" />
+        <Storefront
+          retailerId={id}
+          visitId={openVisit?.id}
+          submitLabel="Place order for retailer"
+          onPlacedAction={() => router.push("/sales/orders")}
+        />
       </div>
     );
   }

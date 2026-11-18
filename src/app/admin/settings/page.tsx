@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Icon from "@/components/Icon";
-import { toPaise } from "@/lib/money";
+import { formatINR, toPaise } from "@/lib/money";
+import type { CartSettings } from "@/lib/cart-settings";
 
 type Mode = "PREPAID" | "POSTPAID";
 
@@ -87,6 +88,111 @@ function toPatch(f: Form): Money | string {
   };
 }
 
+// ───────────────────────────── cart rules ─────────────────────────────
+
+type CartForm = {
+  minOrderValue: string;
+  deliveryCharge: string;
+  freeDeliveryAbove: string;
+  deliveryGstRate: string;
+  cutoffTime: string;
+  leadDays: string;
+  closedWeekdays: number[];
+  holidays: string[];
+  allowDateChoice: boolean;
+  maxDaysAhead: string;
+};
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DELIVERY_GST = [0, 5, 12, 18, 28];
+
+function toCartForm(c: CartSettings): CartForm {
+  return {
+    minOrderValue: c.minOrderValue ? rupees(c.minOrderValue) : "",
+    deliveryCharge: c.deliveryCharge ? rupees(c.deliveryCharge) : "",
+    freeDeliveryAbove: c.freeDeliveryAbove === null ? "" : rupees(c.freeDeliveryAbove),
+    deliveryGstRate: String(c.deliveryGstRate),
+    cutoffTime: c.cutoffTime,
+    leadDays: String(c.leadDays),
+    closedWeekdays: [...c.closedWeekdays].sort(),
+    holidays: [...c.holidays].sort(),
+    allowDateChoice: c.allowDateChoice,
+    maxDaysAhead: String(c.maxDaysAhead),
+  };
+}
+
+/** Cart form → only the fields that changed, or an error message. */
+function toCartPatch(f: CartForm, saved: CartSettings): Partial<CartSettings> | string {
+  const money = (s: string, label: string, blank: number | null) => {
+    if (!s.trim()) return blank;
+    try {
+      const p = toPaise(s);
+      return p < 0 ? `${label} can't be less than ₹0` : p;
+    } catch {
+      return `${label} must be an amount in rupees`;
+    }
+  };
+  const whole = (s: string, label: string, min: number, max: number) => {
+    const n = Number(s);
+    if (!s.trim() || !Number.isInteger(n) || n < min || n > max) return `${label} must be a whole number from ${min} to ${max}`;
+    return n;
+  };
+  const minOrder = money(f.minOrderValue, "Minimum order", 0);
+  if (typeof minOrder === "string") return minOrder;
+  const charge = money(f.deliveryCharge, "Delivery charge", 0);
+  if (typeof charge === "string") return charge;
+  const freeAbove = money(f.freeDeliveryAbove, "Free delivery amount", null);
+  if (typeof freeAbove === "string") return freeAbove;
+  if (f.cutoffTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(f.cutoffTime)) return "Cut-off time must be HH:MM";
+  const lead = whole(f.leadDays, "Lead days", 0, 14);
+  if (typeof lead === "string") return lead;
+  const ahead = whole(f.maxDaysAhead, "Days ahead", 1, 30);
+  if (typeof ahead === "string") return ahead;
+  if (f.closedWeekdays.length >= 7) return "Keep at least one delivery day open";
+
+  const next: CartSettings = {
+    minOrderValue: minOrder ?? 0,
+    deliveryCharge: charge ?? 0,
+    freeDeliveryAbove: freeAbove,
+    deliveryGstRate: Number(f.deliveryGstRate),
+    cutoffTime: f.cutoffTime,
+    leadDays: lead,
+    closedWeekdays: [...f.closedWeekdays].sort(),
+    holidays: [...f.holidays].sort(),
+    allowDateChoice: f.allowDateChoice,
+    maxDaysAhead: ahead,
+  };
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(next) as (keyof CartSettings)[]) {
+    const was = saved[k];
+    const a = JSON.stringify(next[k]);
+    const b = JSON.stringify(Array.isArray(was) ? [...(was as (string | number)[])].sort() : was);
+    if (a !== b) out[k] = next[k];
+  }
+  return out as Partial<CartSettings>;
+}
+
+/** The delivery charge rule in plain words. */
+function CartSummary({ cart }: { cart: CartForm }) {
+  const p = (v: string) => {
+    if (!v.trim()) return null;
+    try {
+      const n = toPaise(v);
+      return n >= 0 ? n : null;
+    } catch {
+      return null;
+    }
+  };
+  const inr = (n: number) => formatINR(n, { whole: n % 100 === 0 });
+  const min = p(cart.minOrderValue) ?? 0;
+  const charge = p(cart.deliveryCharge) ?? 0;
+  const free = p(cart.freeDeliveryAbove);
+  const parts = [min > 0 ? `Orders need at least ${inr(min)} of goods.` : "Any order size is fine."];
+  if (charge <= 0) parts.push("Delivery is free.");
+  else parts.push(`Delivery costs ${inr(charge)} + ${cart.deliveryGstRate}% GST${free !== null ? `, free from ${inr(free)} of goods` : " on every order"}.`);
+  return <p className="rounded-xl bg-ink/5 px-3 py-2 text-sm text-[var(--ink-2)]">{parts.join(" ")}</p>;
+}
+
 function friendly(msg: string) {
   return msg.replace(/^(\w+) must/, (all, key: string) => (FIELD_LABEL[key] ? `${FIELD_LABEL[key]} must` : all));
 }
@@ -98,6 +204,10 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [cartRaw, setCartRaw] = useState<CartSettings | null>(null);
+  const [cartSaved, setCartSaved] = useState<CartForm | null>(null);
+  const [cart, setCart] = useState<CartForm | null>(null);
+  const [holiday, setHoliday] = useState("");
 
   useEffect(() => {
     fetch("/api/admin/settings")
@@ -107,40 +217,73 @@ export default function SettingsPage() {
         const f = toForm(data.money);
         setSaved(f);
         setForm(f);
+        const c = toCartForm(data.cart);
+        setCartRaw(data.cart);
+        setCartSaved(c);
+        setCart(c);
       })
       .catch((e) => setLoadError(e instanceof Error ? e.message : "Could not load settings"));
   }, []);
 
   if (loadError) return <p className="text-sm text-[#a8281e]">{loadError}</p>;
-  if (!form || !saved) return <p className="text-sm text-[var(--muted)]">Loading…</p>;
+  if (!form || !saved || !cart || !cartSaved || !cartRaw) return <p className="text-sm text-[var(--muted)]">Loading…</p>;
 
-  const dirty = JSON.stringify(form) !== JSON.stringify(saved);
+  const moneyDirty = JSON.stringify(form) !== JSON.stringify(saved);
+  const cartDirty = JSON.stringify(cart) !== JSON.stringify(cartSaved);
+  const dirty = moneyDirty || cartDirty;
   const set = <K extends keyof Form>(k: K, v: Form[K]) => {
     setForm({ ...form, [k]: v });
     setError(null);
   };
+  const setC = <K extends keyof CartForm>(k: K, v: CartForm[K]) => {
+    setCart({ ...cart, [k]: v });
+    setError(null);
+  };
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (!form) return;
-    const patch = toPatch(form);
-    if (typeof patch === "string") {
-      setError(patch);
-      return;
+    if (!form || !cart || !cartRaw) return;
+    const body: Record<string, object> = {};
+    if (moneyDirty) {
+      const patch = toPatch(form);
+      if (typeof patch === "string") {
+        setError(patch);
+        return;
+      }
+      body.money = patch;
     }
+    if (cartDirty) {
+      const patch = toCartPatch(cart, cartRaw);
+      if (typeof patch === "string") {
+        setError(patch);
+        return;
+      }
+      if (Object.keys(patch).length) body.cart = patch;
+      else setCart(cartSaved);
+    }
+    if (!Object.keys(body).length) return;
     setBusy(true);
     setError(null);
     try {
       const res = await fetch("/api/admin/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ money: patch }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(friendly(data.error ?? "Could not save"));
-      const f = toForm(data.money);
-      setSaved(f);
-      setForm(f);
+      if (data.money) {
+        const f = toForm(data.money);
+        setSaved(f);
+        setForm(f);
+      }
+      if (data.cart) {
+        const c = toCartForm(data.cart);
+        setCartRaw(data.cart);
+        setCartSaved(c);
+        setCart(c);
+      }
       setSavedAt(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save");
@@ -153,11 +296,21 @@ export default function SettingsPage() {
     <form onSubmit={save} className="space-y-5 max-w-2xl pb-24">
       <div>
         <p className="page-kick">Settings</p>
-        <h1 className="page-title">Money rules</h1>
-        <p className="page-sub">Defaults for new retailers and how payments work. You can change terms for one retailer from their khata.</p>
+        <h1 className="page-title">Money and cart rules</h1>
+        <p className="page-sub">
+          Defaults for new retailers, how payments work, and what an order needs. You can change terms for one retailer from their khata.
+        </p>
+        <div className="flex gap-2 mt-3">
+          <a href="#money" className="chip">
+            Money
+          </a>
+          <a href="#cart" className="chip">
+            Cart rules
+          </a>
+        </div>
       </div>
 
-      <section className="card p-5 space-y-4">
+      <section id="money" className="card p-5 space-y-4 scroll-mt-20">
         <p className="font-heading font-bold">New retailers</p>
         <div>
           <span className="block text-sm font-medium text-[var(--ink-2)] mb-1.5">Default payment mode</span>
@@ -299,6 +452,145 @@ export default function SettingsPage() {
         </div>
       </section>
 
+      <div id="cart" className="pt-4 scroll-mt-20">
+        <p className="page-kick">Cart rules</p>
+        <h2 className="font-heading font-bold text-xl text-[var(--ink)] mt-1">What an order needs</h2>
+        <p className="text-sm text-[var(--muted)] mt-1">Checked in the retailer&apos;s cart and again when the order is placed.</p>
+      </div>
+
+      <section className="card p-5 space-y-4">
+        <p className="font-heading font-bold">Order value and delivery charge</p>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <label className="block">
+            <span className="block text-sm font-medium text-[var(--ink-2)] mb-1">Minimum order (₹)</span>
+            <input className="input" inputMode="decimal" placeholder="No minimum" value={cart.minOrderValue} onChange={(e) => setC("minOrderValue", e.target.value)} />
+            <span className="block text-xs text-[var(--muted)] mt-1">Goods value after discounts, before GST. Blank or 0 = no minimum.</span>
+          </label>
+          <label className="block">
+            <span className="block text-sm font-medium text-[var(--ink-2)] mb-1">Delivery charge (₹)</span>
+            <input className="input" inputMode="decimal" placeholder="Free delivery" value={cart.deliveryCharge} onChange={(e) => setC("deliveryCharge", e.target.value)} />
+            <span className="block text-xs text-[var(--muted)] mt-1">Added before GST. Blank or 0 = delivery is always free.</span>
+          </label>
+          <label className={`block ${cart.deliveryCharge.trim() && Number(cart.deliveryCharge) !== 0 ? "" : "opacity-50"}`}>
+            <span className="block text-sm font-medium text-[var(--ink-2)] mb-1">Free delivery above (₹)</span>
+            <input
+              className="input"
+              inputMode="decimal"
+              placeholder="Always charge"
+              value={cart.freeDeliveryAbove}
+              onChange={(e) => setC("freeDeliveryAbove", e.target.value)}
+            />
+            <span className="block text-xs text-[var(--muted)] mt-1">Goods worth this much or more get free delivery. Blank = always charge.</span>
+          </label>
+          <label className="block">
+            <span className="block text-sm font-medium text-[var(--ink-2)] mb-1">GST on delivery charge</span>
+            <select className="input" value={cart.deliveryGstRate} onChange={(e) => setC("deliveryGstRate", e.target.value)}>
+              {DELIVERY_GST.map((g) => (
+                <option key={g} value={String(g)}>
+                  {g}%
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <CartSummary cart={cart} />
+      </section>
+
+      <section className="card p-5 space-y-4">
+        <p className="font-heading font-bold">Delivery days</p>
+        <div className="grid grid-cols-2 gap-4">
+          <label className="block">
+            <span className="block text-sm font-medium text-[var(--ink-2)] mb-1">Order cut-off time</span>
+            <input className="input" type="time" value={cart.cutoffTime} onChange={(e) => setC("cutoffTime", e.target.value)} />
+            <span className="block text-xs text-[var(--muted)] mt-1">Orders after this go a day later. Blank = none.</span>
+          </label>
+          <label className="block">
+            <span className="block text-sm font-medium text-[var(--ink-2)] mb-1">Lead days</span>
+            <input className="input" inputMode="numeric" value={cart.leadDays} onChange={(e) => setC("leadDays", e.target.value)} />
+            <span className="block text-xs text-[var(--muted)] mt-1">Days from order to delivery. 0 = same day, 1 = next day.</span>
+          </label>
+        </div>
+        {cart.cutoffTime && (
+          <button type="button" className="btn btn-quiet btn-xs -mt-2" onClick={() => setC("cutoffTime", "")}>
+            Remove cut-off time
+          </button>
+        )}
+        <div>
+          <span className="block text-sm font-medium text-[var(--ink-2)] mb-1.5">Closed on</span>
+          <div className="grid grid-cols-7 gap-1.5 max-w-md">
+            {WEEKDAYS.map((d, i) => {
+              const closed = cart.closedWeekdays.includes(i);
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  aria-pressed={closed}
+                  onClick={() => setC("closedWeekdays", closed ? cart.closedWeekdays.filter((x) => x !== i) : [...cart.closedWeekdays, i].sort())}
+                  className={`rounded-xl py-2 text-xs font-bold transition ${closed ? "bg-[#fde4e1] text-[#a8281e]" : "bg-ink/5 text-[var(--ink-2)]"}`}
+                >
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+          <span className="block text-xs text-[var(--muted)] mt-1">Tap a day to mark it closed (red). No deliveries on closed days.</span>
+        </div>
+        <div className="space-y-2">
+          <span className="block text-sm font-medium text-[var(--ink-2)]">Holidays</span>
+          <div className="flex gap-2 max-w-sm">
+            <input className="input" type="date" min={today} value={holiday} aria-label="Holiday date" onChange={(e) => setHoliday(e.target.value)} />
+            <button
+              type="button"
+              className="btn btn-quiet btn-sm !min-h-[44px] shrink-0"
+              disabled={!holiday || cart.holidays.includes(holiday) || cart.holidays.length >= 100}
+              onClick={() => {
+                setC("holidays", [...cart.holidays, holiday].sort());
+                setHoliday("");
+              }}
+            >
+              <Icon name="plus" className="h-4 w-4" /> Add
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {cart.holidays.length === 0 && <span className="text-xs text-[var(--muted)]">No holidays added.</span>}
+            {cart.holidays.map((h) => (
+              <span key={h} className={`chip ${h < today ? "opacity-50" : ""}`}>
+                {new Date(`${h}T00:00:00`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+                <button type="button" aria-label={`Remove holiday ${h}`} onClick={() => setC("holidays", cart.holidays.filter((x) => x !== h))}>
+                  <Icon name="x" className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input type="checkbox" className="sr-only peer" checked={cart.allowDateChoice} onChange={(e) => setC("allowDateChoice", e.target.checked)} />
+          <span
+            aria-hidden="true"
+            className={`mt-0.5 shrink-0 h-6 w-11 rounded-full p-0.5 transition peer-focus-visible:ring-2 peer-focus-visible:ring-mor ${
+              cart.allowDateChoice ? "bg-mor" : "bg-ink/15"
+            }`}
+          >
+            <span className={`block h-5 w-5 rounded-full bg-white shadow transition ${cart.allowDateChoice ? "translate-x-5" : ""}`} />
+          </span>
+          <span>
+            <span className="block text-sm font-medium">Let retailers choose the delivery day</span>
+            <span className="block text-xs text-[var(--muted)]">Off: every order goes on the earliest delivery day.</span>
+          </span>
+        </label>
+        <label className={`block max-w-xs ${cart.allowDateChoice ? "" : "opacity-50"}`}>
+          <span className="block text-sm font-medium text-[var(--ink-2)] mb-1">Days ahead to offer</span>
+          <input
+            className="input"
+            inputMode="numeric"
+            disabled={!cart.allowDateChoice}
+            value={cart.maxDaysAhead}
+            onChange={(e) => setC("maxDaysAhead", e.target.value)}
+          />
+          <span className="block text-xs text-[var(--muted)] mt-1">How many open delivery days they can pick from (1 to 30).</span>
+        </label>
+      </section>
+
       <div className="sticky bottom-3 z-10">
         <div className="card p-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm">
@@ -317,7 +609,16 @@ export default function SettingsPage() {
           </p>
           <div className="flex gap-2">
             {dirty && (
-              <button type="button" className="btn btn-quiet btn-sm" disabled={busy} onClick={() => setForm(saved)}>
+              <button
+                type="button"
+                className="btn btn-quiet btn-sm"
+                disabled={busy}
+                onClick={() => {
+                  setForm(saved);
+                  setCart(cartSaved);
+                  setError(null);
+                }}
+              >
                 Undo
               </button>
             )}

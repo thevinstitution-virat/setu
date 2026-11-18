@@ -1,42 +1,37 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import OrderBuilder, { ProductLite } from "@/components/OrderBuilder";
+import { Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Storefront from "@/components/Storefront";
 
 export default function CataloguePage() {
-  const router = useRouter();
-  const [products, setProducts] = useState<ProductLite[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/products")
-      .then((r) => r.json())
-      .then((d) => {
-        setProducts((d.products ?? []).filter((p: { active: boolean }) => p.active));
-        setLoaded(true);
-      });
-  }, []);
-
-  async function placeOrder(items: { productId: string; quantity: number }[]) {
-    const res = await fetch("/api/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
-    router.push(`/retailer/orders/${data.order.id}`);
-  }
-
   return (
     <div>
       <h1 className="page-title mb-4">Catalogue</h1>
-      {!loaded ? (
-        <p className="text-sm text-foreground/50">Loading…</p>
-      ) : (
-        <OrderBuilder products={products} onSubmitAction={placeOrder} submitLabel="Place order" />
-      )}
+      <Suspense fallback={<p className="text-sm text-[var(--muted)]">Loading…</p>}>
+        <Catalogue />
+      </Suspense>
     </div>
+  );
+}
+
+/** ?q= ?category= ?brand= ?scheme= ?product= (links from the home page) set the starting filters. */
+function Catalogue() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const initial = {
+    q: params.get("q"),
+    category: params.get("category"),
+    brand: params.get("brand"),
+    scheme: params.get("scheme"),
+    product: params.get("product"),
+  };
+  return (
+    <Storefront
+      key={params.toString()}
+      initial={initial}
+      submitLabel="Place order"
+      onPlacedAction={(order) => router.push(`/retailer/orders/${order.id}`)}
+    />
   );
 }

@@ -23,10 +23,13 @@ beforeAll(async () => {
 
 afterAll(() => prisma.$disconnect());
 
+/** Seeded products only: other test files add their own ("Test ..."). */
+const seeded = { NOT: { name: { startsWith: "Test " } } };
+
 describe("row-level security", () => {
   it("each tenant sees only its own rows", async () => {
-    expect(await tenantDb(demoId).product.count()).toBe(10);
-    expect(await tenantDb(secondId).product.count()).toBe(2);
+    expect(await tenantDb(demoId).product.count({ where: seeded })).toBe(10);
+    expect(await tenantDb(secondId).product.count({ where: seeded })).toBe(2);
   });
 
   it("the raw client without a tenant sees nothing (fails closed)", async () => {
@@ -89,7 +92,7 @@ describe("row-level security", () => {
   });
 
   it("platform jobs can read across tenants only via asPlatform", async () => {
-    const n = await asPlatform((tx) => tx.product.count());
+    const n = await asPlatform((tx) => tx.product.count({ where: seeded }));
     expect(n).toBe(12);
   });
 });

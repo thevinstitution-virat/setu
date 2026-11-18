@@ -9,6 +9,8 @@ const nav: NavItem[] = [
   { href: "/admin/payments", labelKey: "nav.payments", icon: "card" },
   { href: "/admin/cash", labelKey: "nav.cash", icon: "cash" },
   { href: "/admin/products", labelKey: "nav.products", icon: "tag" },
+  { href: "/admin/pricing", labelKey: "nav.pricing", icon: "rupee" },
+  { href: "/admin/schemes", labelKey: "nav.schemes", icon: "percent" },
   { href: "/admin/team", labelKey: "nav.team", icon: "users" },
   { href: "/admin/regions", labelKey: "nav.regions", icon: "map" },
   { href: "/admin/import", labelKey: "nav.import", icon: "upload" },

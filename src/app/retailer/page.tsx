@@ -7,6 +7,8 @@ import { khataSummary } from "@/lib/khata";
 import { STATUS_COLOR, ORDER_STATUS_FLOW } from "@/lib/orders";
 import { getServerLang, tr } from "@/lib/i18n/server";
 import Icon from "@/components/Icon";
+import HomeShelves from "@/components/store/HomeShelves";
+import { formatDay } from "@/components/store/format";
 
 export default async function RetailerHome() {
   const db = await getDb();
@@ -52,6 +54,9 @@ export default async function RetailerHome() {
               <p className="text-sm text-white/70 mt-0.5">
                 {latestOrder.items.length} item{latestOrder.items.length !== 1 ? "s" : ""} · {formatINR(latestOrder.totalAmount)}
               </p>
+              {latestOrder.deliveryDate && latestOrder.status !== "DELIVERED" && latestOrder.status !== "CANCELLED" && (
+                <p className="text-xs font-semibold text-genda mt-1">Delivery {formatDay(latestOrder.deliveryDate)}</p>
+              )}
             </div>
             <span className={`text-xs px-2.5 py-1 rounded-full ${STATUS_COLOR[latestOrder.status]}`}>
               {tr(`status.${latestOrder.status}`, lang)}
@@ -101,6 +106,8 @@ export default async function RetailerHome() {
           </Link>
         </div>
       )}
+
+      <HomeShelves />
 
       <div className="grid grid-cols-2 gap-3">
         <Link href="/retailer/catalogue" className="card p-4 flex flex-col gap-3 hover:-translate-y-0.5 transition">

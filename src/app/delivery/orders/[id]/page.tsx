@@ -7,6 +7,7 @@ import SignaturePad from "@/components/SignaturePad";
 import { getLocation } from "@/lib/geo";
 import { compressImage, dataUrlToBlob, uploadFile } from "@/lib/upload-client";
 import Icon from "@/components/Icon";
+import OrderLines, { type OrderLineItem } from "@/components/store/OrderLines";
 import PaymentFields, { emptyPayment, paymentError, toCollectBody, type PaymentValue } from "@/components/PaymentFields";
 
 type Dues = { balances: { receivable: number }; overdue: number };
@@ -16,6 +17,14 @@ type OrderDetail = {
   orderNumber: string;
   status: string;
   totalAmount: number;
+  grossAmount: number;
+  discountAmount: number;
+  deliveryCharge: number;
+  subtotal: number;
+  gstAmount: number;
+  couponCode: string | null;
+  deliveryDate: string | null;
+  notes: string | null;
   retailerId: string;
   /** Paise reserved from the retailer's wallet (prepaid); paid automatically on delivery. */
   walletHold: number;
@@ -23,7 +32,7 @@ type OrderDetail = {
   creditHoldReason: string | null;
   creditApprovedAt: string | null;
   retailer: { outletName: string; shopNumber: string; complexName: string; user: { phone: string | null } };
-  items: { id: string; quantity: number; price: number; product: { name: string } }[];
+  items: OrderLineItem[];
 };
 
 export default function DeliverOrderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -125,21 +134,9 @@ export default function DeliverOrderPage({ params }: { params: Promise<{ id: str
       </div>
 
       <div className="card p-4">
-        <p className="text-sm font-semibold mb-2">{order.orderNumber}</p>
-        <div className="space-y-1">
-          {order.items.map((item) => (
-            <div key={item.id} className="flex justify-between text-sm">
-              <span>
-                {item.product.name} × {item.quantity}
-              </span>
-              <span>{formatINR(item.price * item.quantity)}</span>
-            </div>
-          ))}
-        </div>
-        <div className="border-t border-black/5 mt-2 pt-2 flex justify-between font-semibold text-sm">
-          <span>Total</span>
-          <span>{formatINR(order.totalAmount)}</span>
-        </div>
+        <p className="text-sm font-semibold mb-3">{order.orderNumber}</p>
+        <OrderLines items={order.items} order={order} freeCallout />
+        {order.notes && <p className="text-xs text-[var(--muted)] mt-3">Note: {order.notes}</p>}
       </div>
 
       <div className="card p-4 space-y-4">

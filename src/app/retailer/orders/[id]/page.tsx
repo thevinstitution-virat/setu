@@ -1,10 +1,10 @@
-import { formatINR } from "@/lib/money";
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getDb } from "@/lib/tenant";
 import { STATUS_COLOR } from "@/lib/orders";
 import { getServerLang, tr } from "@/lib/i18n/server";
 import OrderTimeline from "@/components/OrderTimeline";
+import OrderLines from "@/components/store/OrderLines";
 
 export default async function RetailerOrderDetail({
   params,
@@ -56,35 +56,8 @@ export default async function RetailerOrderDetail({
 
       <div className="card p-4">
         <p className="text-sm font-semibold mb-3">Items</p>
-        <div className="space-y-2">
-          {order.items.map((item) => (
-            <div key={item.id} className="flex justify-between text-sm">
-              <span>
-                {item.product.name} × {item.quantity}
-                {item.gstRate > 0 && (
-                  <span className="text-foreground/40"> (GST {item.gstRate}%)</span>
-                )}
-              </span>
-              <span>{formatINR(item.price * item.quantity)}</span>
-            </div>
-          ))}
-        </div>
-        <div className="border-t border-black/5 mt-3 pt-3 space-y-1">
-          <div className="flex justify-between text-sm text-foreground/60">
-            <span>{tr("pricing.subtotal", lang)}</span>
-            <span>{formatINR(order.subtotal)}</span>
-          </div>
-          {order.gstAmount > 0 && (
-            <div className="flex justify-between text-sm text-foreground/60">
-              <span>{tr("pricing.gst", lang)}</span>
-              <span>{formatINR(order.gstAmount)}</span>
-            </div>
-          )}
-          <div className="flex justify-between font-semibold text-sm">
-            <span>{tr("pricing.total", lang)}</span>
-            <span>{formatINR(order.totalAmount)}</span>
-          </div>
-        </div>
+        <OrderLines items={order.items} order={order} />
+        {order.notes && <p className="text-xs text-[var(--muted)] mt-3">Note: {order.notes}</p>}
       </div>
     </div>
   );

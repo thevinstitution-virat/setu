@@ -22,11 +22,15 @@ const TYPES = {
   },
   products: {
     label: "Products",
-    hint: "name, sku, category, unit, price (₹ before GST), mrp (₹), gst_rate (%), special_offer. Existing SKUs are updated.",
+    hint: "name, sku, category, unit, price (₹ before GST), mrp (₹), gst_rate (%), special_offer, brand, hsn_code, name_hi (Hindi name), case_unit + case_size (e.g. box of 24), moq. New categories and brands are created; a known HSN code sets the GST rate. Existing SKUs are updated.",
   },
   balances: {
     label: "Opening balances",
     hint: "phone, amount (₹; positive = retailer owes you, negative = advance you hold), as_of (2026-03-31 or 31/03/2026), note. One opening balance per retailer; import retailers first.",
+  },
+  prices: {
+    label: "Prices",
+    hint: "price_list or phone, sku, price (₹ before GST). With price_list: the rate in that list (new lists are created). With phone: that retailer's special rate. Import products first.",
   },
 } as const;
 

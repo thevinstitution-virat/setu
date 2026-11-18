@@ -39,6 +39,8 @@ async function wipe() {
   if (process.env.NODE_ENV === "production") throw new Error("Refusing to wipe a production database");
   await prisma.$executeRawUnsafe(
     `TRUNCATE ${[
+      "SchemeRedemption", "Scheme", "Banner", "RetailerPrice", "PriceListItem", "PriceList",
+      "RetailerGroupMember", "RetailerGroup", "HsnCode", "Brand", "Category",
       "PaymentAllocation", "Cheque", "CashHandover", "Payment", "Bill", "LedgerLine", "JournalEntry", "LedgerAccount",
       "AuditLog", "Counter", "OtpChallenge", "Delivery", "Visit", "Attendance",
       "OrderStatusEvent", "OrderItem", "Order", "Product", "Beat",
@@ -49,13 +51,37 @@ async function wipe() {
 }
 
 type ProductRow = [string, string, string, string, number, number, number, string | null];
+/** Optional extras per SKU: brand, Hindi name, HSN code, case pack. */
+type Extra = { brand?: string; nameHi?: string; hsn?: string; caseUnit?: string; caseSize?: number; aliases?: string };
 
-async function seedProducts(db: Db, rows: ProductRow[]) {
+async function seedProducts(db: Db, rows: ProductRow[], extras: Record<string, Extra> = {}) {
+  const cats = new Map<string, string>();
+  const brands = new Map<string, string>();
   const out = [];
+  let sort = 0;
   for (const [name, sku, category, unit, price, mrp, gstRate, specialOffer] of rows) {
+    if (!cats.has(category)) cats.set(category, (await db.category.create({ data: { name: category, sort: cats.size } })).id);
+    const x = extras[sku] ?? {};
+    if (x.brand && !brands.has(x.brand)) brands.set(x.brand, (await db.brand.create({ data: { name: x.brand, sort: brands.size } })).id);
     out.push(
       await db.product.create({
-        data: { name, sku, category, unit, price: toPaise(price), mrp: toPaise(mrp), gstRate, specialOffer },
+        data: {
+          name,
+          sku,
+          categoryId: cats.get(category)!,
+          brandId: x.brand ? brands.get(x.brand)! : null,
+          nameHi: x.nameHi ?? null,
+          aliases: x.aliases ?? null,
+          hsnCode: x.hsn ?? null,
+          caseUnit: x.caseUnit ?? null,
+          caseSize: x.caseSize ?? null,
+          unit,
+          price: toPaise(price),
+          mrp: toPaise(mrp),
+          gstRate,
+          specialOffer,
+          sort: sort++,
+        },
       })
     );
   }
@@ -108,16 +134,35 @@ async function seedDemo() {
 
   const products = await seedProducts(db, [
     ["Masala Chai 250g", "BEV-001", "Beverages", "pack", 85, 95, 5, null],
-    ["Instant Coffee 100g", "BEV-002", "Beverages", "jar", 220, 240, 18, "Buy 2 get 5% off"],
-    ["Potato Chips 150g", "SNK-001", "Snacks", "pack", 40, 45, 12, null],
-    ["Chocolate Cookies 200g", "SNK-002", "Snacks", "pack", 60, 65, 18, null],
+    ["Instant Coffee 100g", "BEV-002", "Beverages", "jar", 220, 285, 18, "Buy 2 get 5% off"],
+    ["Potato Chips 150g", "SNK-001", "Snacks", "pack", 40, 50, 12, null],
+    ["Chocolate Cookies 200g", "SNK-002", "Snacks", "pack", 60, 80, 18, null],
     ["Toor Dal 1kg", "GRO-001", "Grocery", "pack", 140, 150, 5, null],
     ["Basmati Rice 5kg", "GRO-002", "Grocery", "bag", 520, 560, 5, "Festive price, limited stock"],
     ["Sunflower Oil 1L", "GRO-003", "Grocery", "bottle", 165, 175, 5, null],
-    ["Toothpaste 150g", "PC-001", "Personal Care", "tube", 90, 99, 18, null],
-    ["Bathing Soap (pack of 4)", "PC-002", "Personal Care", "pack", 120, 130, 18, "Flat 8% off this week"],
-    ["Dish Wash Liquid 500ml", "HH-001", "Household", "bottle", 95, 105, 18, null],
-  ]);
+    ["Toothpaste 150g", "PC-001", "Personal Care", "tube", 90, 120, 18, null],
+    ["Bathing Soap (pack of 4)", "PC-002", "Personal Care", "pack", 120, 160, 18, "Flat 8% off this week"],
+    ["Dish Wash Liquid 500ml", "HH-001", "Household", "bottle", 95, 125, 18, null],
+  ], {
+    // Brand names are made up for the demo.
+    "BEV-001": { brand: "Sunrise", nameHi: "मसाला चाय", hsn: "0902", caseUnit: "box", caseSize: 24, aliases: "tea" },
+    "BEV-002": { brand: "Sunrise", nameHi: "इंस्टेंट कॉफ़ी", hsn: "2101", caseUnit: "box", caseSize: 12 },
+    "SNK-001": { brand: "Crunchy", nameHi: "आलू चिप्स", hsn: "2005", caseUnit: "carton", caseSize: 30, aliases: "wafers" },
+    "SNK-002": { brand: "Crunchy", nameHi: "चॉकलेट बिस्कुट", hsn: "1905", caseUnit: "carton", caseSize: 24, aliases: "biscuit" },
+    "GRO-001": { brand: "Kisan Gold", nameHi: "तूर दाल", hsn: "0713", aliases: "arhar" },
+    "GRO-002": { brand: "Kisan Gold", nameHi: "बासमती चावल", hsn: "1006", aliases: "chawal" },
+    "GRO-003": { brand: "Kisan Gold", nameHi: "सूरजमुखी तेल", hsn: "1512", caseUnit: "carton", caseSize: 12, aliases: "tel" },
+    "PC-001": { brand: "Fresh Smile", nameHi: "टूथपेस्ट", hsn: "3306", caseUnit: "box", caseSize: 36 },
+    "PC-002": { brand: "Fresh Smile", nameHi: "नहाने का साबुन", hsn: "3401", caseUnit: "box", caseSize: 12, aliases: "sabun" },
+    "HH-001": { brand: "Ghar Clean", nameHi: "बर्तन धोने का लिक्विड", hsn: "3402", caseUnit: "box", caseSize: 24 },
+  });
+  for (const [code, rate, description] of [
+    ["0902", 5, "Tea"], ["2101", 18, "Coffee extracts"], ["2005", 12, "Prepared vegetables, chips"], ["1905", 18, "Biscuits"],
+    ["0713", 5, "Pulses"], ["1006", 5, "Rice"], ["1512", 5, "Sunflower oil"], ["3306", 18, "Oral care"],
+    ["3401", 18, "Soap"], ["3402", 18, "Cleaning preparations"],
+  ] as const) {
+    await db.hsnCode.create({ data: { code, gstRate: rate, description } });
+  }
 
   const retailer1 = await db.user.create({
     data: {
@@ -169,6 +214,7 @@ async function seedDemo() {
       placedById: retailer1.id,
       status: "DELIVERED",
       ...b1,
+      grossAmount: b1.subtotal,
       items: { create: delivered },
       statusEvents: {
         create: [
@@ -203,9 +249,36 @@ async function seedDemo() {
       placedById: retailer2.id,
       status: "PLACED",
       ...b2,
+      grossAmount: b2.subtotal,
       items: { create: placed },
       statusEvents: { create: { status: "PLACED", actorId: retailer2.id } },
     },
+  });
+
+  const retailer3 = await db.user.create({
+    data: {
+      name: "Sai Super Mart",
+      phone: "9988776655",
+      role: "RETAILER",
+      retailerProfile: {
+        create: {
+          outletName: "Sai Super Mart",
+          shopNumber: "1",
+          complexName: "Station Road",
+          pinCode: "400014",
+          areaId: mumbai.areas[2].id,
+          salesAgentId: salesUser.salesAgentProfile!.id,
+        },
+      },
+    },
+    include: { retailerProfile: true },
+  });
+
+  await seedPricing(db, tenant.id, {
+    products,
+    agarwal: retailer1.retailerProfile!.id,
+    sai: retailer3.retailerProfile!.id,
+    bandraId: mumbai.areas[1].id,
   });
 
   await seedMoney(tenant.id, {
@@ -216,6 +289,95 @@ async function seedDemo() {
     patel: retailer2.retailerProfile!.id,
     deliveredOrderId: deliveredOrder.id,
     placedOrderId: placedOrder.id,
+  });
+}
+
+/**
+ * Phase 2 demo: the same product shows different rates and schemes to the
+ * three retailers.
+ *   Agarwal (Andheri): default rates, plus a special rate on Masala Chai.
+ *   Patel (Bandra): default rates; the Bandra-only soap offer.
+ *   Sai Super Mart (Dadar): "Wholesale" price list + "Key accounts" group (3% off).
+ * Everyone: Masala Chai buy 12 get 1, snacks quantity slab, coupon WELCOME50.
+ */
+async function seedPricing(
+  db: Db,
+  tenantId: string,
+  ids: { products: { id: string; sku: string; price: number }[]; agarwal: string; sai: string; bandraId: string }
+) {
+  const p = (sku: string) => ids.products.find((x) => x.sku === sku)!;
+  const wholesale = await db.priceList.create({
+    data: {
+      name: "Wholesale",
+      description: "Bulk buyers, about 4% below the default rate",
+      items: { create: ids.products.map((x) => ({ productId: x.id, price: Math.round((x.price * 0.96) / 50) * 50 })) },
+    },
+  });
+  const keyAccounts = await db.retailerGroup.create({
+    data: { name: "Key accounts", description: "Large outlets", members: { create: [{ retailerId: ids.sai }] } },
+  });
+  await db.retailerProfile.update({ where: { id: ids.sai }, data: { priceListId: wholesale.id } });
+  await db.retailerPrice.create({ data: { retailerId: ids.agarwal, productId: p("BEV-001").id, price: toPaise(82), note: "Agreed on visit" } });
+
+  const snacks = await db.category.findFirstOrThrow({ where: { name: "Snacks" } });
+  await db.scheme.create({
+    data: { name: "Chai 12 + 1", type: "BUY_X_GET_Y", params: { buyQty: 12, getQty: 1, freeProductId: null, maxSets: null }, productIds: [p("BEV-001").id], priority: 10 },
+  });
+  await db.scheme.create({
+    data: {
+      name: "Snacks quantity slab",
+      type: "SLAB",
+      params: { basis: "qty", slabs: [{ min: 20, percent: 2 }, { min: 50, percent: 4 }], cap: null },
+      categoryIds: [snacks.id],
+      priority: 20,
+    },
+  });
+  await db.scheme.create({
+    data: {
+      name: "Soap 6 + dish wash free",
+      description: "Bandra launch offer",
+      type: "BUY_X_GET_Y",
+      params: { buyQty: 6, getQty: 1, freeProductId: p("HH-001").id, maxSets: 5 },
+      productIds: [p("PC-002").id],
+      areaIds: [ids.bandraId],
+      budget: toPaise(5000),
+      priority: 30,
+    },
+  });
+  await db.scheme.create({
+    data: { name: "Key account 3% off", type: "PERCENT", params: { percent: 3, cap: toPaise(500) }, groupIds: [keyAccounts.id], priority: 200 },
+  });
+  await db.scheme.create({
+    data: {
+      name: "Welcome ₹50 off",
+      type: "FLAT",
+      params: { amount: toPaise(50), perUnit: false, minValue: toPaise(1000) },
+      couponCode: "WELCOME50",
+      maxUsesPerRetailer: 1,
+      priority: 300,
+    },
+  });
+  await db.banner.create({ data: { title: "Chai season", subtitle: "Buy 12 Masala Chai, get 1 free", linkType: "product", linkId: p("BEV-001").id, sort: 0 } });
+  await db.banner.create({ data: { title: "Bandra launch", subtitle: "6 soaps + dish wash free", linkType: "product", linkId: p("PC-002").id, areaIds: [ids.bandraId], sort: 1 } });
+
+  await prisma.tenant.update({
+    where: { id: tenantId },
+    data: {
+      settings: {
+        cart: {
+          minOrderValue: toPaise(500),
+          deliveryCharge: toPaise(30),
+          freeDeliveryAbove: toPaise(2000),
+          deliveryGstRate: 18,
+          cutoffTime: "18:00",
+          leadDays: 1,
+          closedWeekdays: [0],
+          holidays: [],
+          allowDateChoice: true,
+          maxDaysAhead: 5,
+        },
+      },
+    },
   });
 }
 
@@ -244,9 +406,15 @@ async function seedMoney(
     await tx.retailerProfile.update({ where: { id: ids.agarwal }, data: { paymentMode: "POSTPAID", creditLimit: toPaise(10000), creditDays: 7 } });
     await tx.retailerProfile.update({ where: { id: ids.patel }, data: { paymentMode: "PREPAID" } });
   });
+  const t = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { settings: true } });
   await prisma.tenant.update({
     where: { id: tenantId },
-    data: { settings: { money: { upiVpa: "setudemo@okaxis", upiPayeeName: "Setu Demo Distributors", chequeBouncePenalty: toPaise(250) } } },
+    data: {
+      settings: {
+        ...((t.settings ?? {}) as object),
+        money: { upiVpa: "setudemo@okaxis", upiPayeeName: "Setu Demo Distributors", chequeBouncePenalty: toPaise(250) },
+      },
+    },
   });
 
   const days = (n: number) => new Date(Date.now() - n * 86_400_000);
@@ -343,7 +511,7 @@ async function main() {
   console.log("Seed complete.");
   console.log("Tenant 'demo'   → http://demo.localhost:3100");
   console.log("  Admin: admin / admin123 · Sales: 'Test agent' / 123456789 · Delivery: deliveryagent@gmail.com / 123456789");
-  console.log("  Retailer OTP phones: 9876543210, 9123456780");
+  console.log("  Retailer OTP phones: 9876543210 (Agarwal), 9123456780 (Patel), 9988776655 (Sai Super Mart)");
   console.log("Tenant 'second' → http://second.localhost:3100");
   console.log("  Admin: admin / second123 · Retailer OTP phone: 9876543210");
 }

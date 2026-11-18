@@ -6,6 +6,7 @@ import { nextStatus } from "@/lib/orders";
 import { can } from "@/lib/permissions";
 import { MoneyError, onOrderCancelled, withMoney } from "@/lib/ledger";
 import { moneyFail } from "@/lib/money-api";
+import { releaseRedemptions } from "@/lib/order-place";
 import type { OrderStatus } from "@/generated/prisma/client";
 
 /**
@@ -55,7 +56,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       }
       if (!to) throw new MoneyError("No further status transition available");
 
-      if (to === "CANCELLED") await onOrderCancelled(ctx, order);
+      if (to === "CANCELLED") {
+        await onOrderCancelled(ctx, order);
+        await releaseRedemptions(ctx.tx, order.id);
+      }
       const updated = await ctx.tx.order.update({
         where: { id },
         data: { status: to, statusEvents: { create: { status: to, actorId: session.userId, note } } },

@@ -60,10 +60,10 @@ enum TenantStatus {
 model Tenant {
   id        String       @id @default(cuid())
   slug      String       @unique // subdomain: <slug>.<PLATFORM_DOMAIN>
-  name      String       // display / brand name
+  name      String // display / brand name
   legalName String?
   gstin     String?
-  stateCode String?      // GST state code, e.g. "27" for Maharashtra
+  stateCode String? // GST state code, e.g. "27" for Maharashtra
   address   String?
   phone     String?
   status    TenantStatus @default(TRIAL)
@@ -101,6 +101,17 @@ model Tenant {
   allocations       PaymentAllocation[]
   cheques           Cheque[]
   cashHandovers     CashHandover[]
+  brands            Brand[]
+  categories        Category[]
+  hsnCodes          HsnCode[]
+  priceLists        PriceList[]
+  priceListItems    PriceListItem[]
+  retailerPrices    RetailerPrice[]
+  retailerGroups    RetailerGroup[]
+  groupMembers      RetailerGroupMember[]
+  schemes           Scheme[]
+  redemptions       SchemeRedemption[]
+  banners           Banner[]
 }
 
 /// Custom domains a tenant has verified (e.g. order.agencyname.in).
@@ -132,10 +143,10 @@ model User {
   salesAgentProfile    SalesAgentProfile?
   deliveryAgentProfile DeliveryAgentProfile?
 
-  orderEvents OrderStatusEvent[]
-  auditLogs   AuditLog[]
-  paymentsCollected Payment[]      @relation("PaymentCollectedBy")
-  handoversGiven    CashHandover[] @relation("HandoverStaff")
+  orderEvents       OrderStatusEvent[]
+  auditLogs         AuditLog[]
+  paymentsCollected Payment[]          @relation("PaymentCollectedBy")
+  handoversGiven    CashHandover[]     @relation("HandoverStaff")
 
   @@unique([tenantId, phone])
   @@unique([tenantId, email])
@@ -190,8 +201,13 @@ model RetailerProfile {
   creditDays   Int?
   createdAt    DateTime           @default(now())
 
+  priceListId String?
+  priceList   PriceList? @relation(fields: [priceListId], references: [id])
+
   orders   Order[]
   visits   Visit[]
+  groups   RetailerGroupMember[]
+  prices   RetailerPrice[]
   bills    Bill[]
   payments Payment[]
   accounts LedgerAccount[]
@@ -241,51 +257,84 @@ model DeliveryAgentProfile {
 }
 
 model Product {
-  id           String  @id @default(cuid())
-  tenantId     String  @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant       Tenant  @relation(fields: [tenantId], references: [id])
-  name         String
-  sku          String
-  category     String
-  unit         String
-  /// Selling rate before GST, in paise.
-  price        Int
+  id              String   @id @default(cuid())
+  tenantId        String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  name            String
+  /// Hindi name (Devanagari) — shown in Hindi and used for search.
+  nameHi          String?
+  /// Extra search words, comma separated (local names, misspellings).
+  aliases         String?
+  description     String?
+  sku             String
+  categoryId      String
+  category        Category @relation(fields: [categoryId], references: [id])
+  brandId         String?
+  brand           Brand?   @relation(fields: [brandId], references: [id])
+  hsnCode         String?
+  /// Base selling unit (piece, pack, kg …). Prices and quantities are per base unit.
+  unit            String
+  /// Optional bigger pack, e.g. "box" of caseSize base units.
+  caseUnit        String?
+  caseSize        Int?
+  /// Minimum order quantity in base units.
+  moq             Int      @default(1)
+  /// Default selling rate before GST, in paise (price lists and retailer prices override it).
+  price           Int
   /// Maximum retail price, in paise.
-  mrp          Int
-  gstRate      Float   @default(0)
-  specialOffer String?
-  imageUrl     String?
-  active       Boolean @default(true)
+  mrp             Int
+  /// GST %. Kept in sync with the HSN code's rate when one is set.
+  gstRate         Float    @default(0)
+  specialOffer    String?
+  /// Storage keys of product photos; the first is the main one.
+  images          String[] @default([])
+  /// Empty = visible to every area / group.
+  visibleAreaIds  String[] @default([])
+  visibleGroupIds String[] @default([])
+  sort            Int      @default(0)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
 
-  orderItems OrderItem[]
+  orderItems     OrderItem[]
+  priceListItems PriceListItem[]
+  retailerPrices RetailerPrice[]
 
   @@unique([tenantId, sku])
   @@index([tenantId, active])
+  @@index([tenantId, categoryId])
+  @@index([tenantId, brandId])
 }
 
 model Order {
-  id          String          @id @default(cuid())
-  tenantId    String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant      Tenant          @relation(fields: [tenantId], references: [id])
-  orderNumber String
-  retailerId  String
-  retailer    RetailerProfile @relation(fields: [retailerId], references: [id])
-  placedById  String?
-  status      OrderStatus     @default(PLACED)
-  /// Amounts in paise.
-  subtotal    Int             @default(0)
-  gstAmount   Int             @default(0)
-  totalAmount Int
-  notes       String?
+  id               String          @id @default(cuid())
+  tenantId         String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant           Tenant          @relation(fields: [tenantId], references: [id])
+  orderNumber      String
+  retailerId       String
+  retailer         RetailerProfile @relation(fields: [retailerId], references: [id])
+  placedById       String?
+  status           OrderStatus     @default(PLACED)
+  /// Amounts in paise. gross − discount + deliveryCharge = subtotal (taxable); subtotal + gst = total.
+  grossAmount      Int             @default(0)
+  discountAmount   Int             @default(0)
+  deliveryCharge   Int             @default(0)
+  couponCode       String?
+  /// Delivery day chosen or assigned at order time (IST date).
+  deliveryDate     DateTime?       @db.Date
+  priceListId      String?
+  subtotal         Int             @default(0)
+  gstAmount        Int             @default(0)
+  totalAmount      Int
+  notes            String?
   /// Placed over the credit limit or with overdue bills: needs approval before it moves on.
-  creditHold       Boolean   @default(false)
+  creditHold       Boolean         @default(false)
   creditHoldReason String?
   creditApprovedBy String?
   creditApprovedAt DateTime?
   /// Prepaid: amount reserved from the wallet when the order was placed (paise).
-  walletHold  Int             @default(0)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  walletHold       Int             @default(0)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
   items        OrderItem[]
   bill         Bill?
@@ -299,17 +348,26 @@ model Order {
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
-  tenantId  String  @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant    Tenant  @relation(fields: [tenantId], references: [id])
-  orderId   String
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
-  quantity  Int
+  id           String  @id @default(cuid())
+  tenantId     String  @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant  @relation(fields: [tenantId], references: [id])
+  orderId      String
+  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product @relation(fields: [productId], references: [id])
+  quantity     Int
   /// Rate per unit before GST, in paise, frozen at order time.
-  price     Int
-  gstRate   Float   @default(0)
+  price        Int
+  gstRate      Float   @default(0)
+  /// Scheme discount on this line before GST, in paise.
+  discount     Int     @default(0)
+  /// MRP per unit at order time, in paise.
+  mrp          Int?
+  /// Ordered in cases: cases × caseSize = quantity.
+  cases        Int?
+  caseSize     Int?
+  /// Free goods line given by this scheme (price 0).
+  freeSchemeId String?
 
   @@index([tenantId, orderId])
 }
@@ -422,7 +480,7 @@ model AuditLog {
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
   actorId   String?
   actor     User?    @relation(fields: [actorId], references: [id])
-  action    String   // e.g. "order.status", "product.update", "user.create"
+  action    String // e.g. "order.status", "product.update", "user.create"
   entity    String
   entityId  String?
   before    Json?
@@ -451,10 +509,10 @@ enum PaymentMode {
 }
 
 enum AccountType {
-  RECEIVABLE      // per retailer: what they owe us
-  WALLET          // per retailer: prepaid money we hold (credit balance)
-  WALLET_HOLD     // per retailer: wallet money reserved for open orders
-  STAFF_CASH      // per staff member: cash in hand not yet handed over
+  RECEIVABLE // per retailer: what they owe us
+  WALLET // per retailer: prepaid money we hold (credit balance)
+  WALLET_HOLD // per retailer: wallet money reserved for open orders
+  STAFF_CASH // per staff member: cash in hand not yet handed over
   OFFICE_CASH
   BANK
   UPI_CLEARING
@@ -579,25 +637,25 @@ model LedgerLine {
 }
 
 model Bill {
-  id         String              @id @default(cuid())
-  tenantId   String              @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant     Tenant              @relation(fields: [tenantId], references: [id])
+  id         String          @id @default(cuid())
+  tenantId   String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant          @relation(fields: [tenantId], references: [id])
   retailerId String
-  retailer   RetailerProfile     @relation(fields: [retailerId], references: [id])
+  retailer   RetailerProfile @relation(fields: [retailerId], references: [id])
   kind       BillKind
   number     String
-  orderId    String?             @unique
-  order      Order?              @relation(fields: [orderId], references: [id])
+  orderId    String?         @unique
+  order      Order?          @relation(fields: [orderId], references: [id])
   date       DateTime
   dueDate    DateTime
   /// Paise owed by this bill.
   amount     Int
   /// Paise allocated from payments so far (maintained by allocateRetailer).
-  paid       Int                 @default(0)
-  settled    Boolean             @default(false)
+  paid       Int             @default(0)
+  settled    Boolean         @default(false)
   note       String?
   entryId    String?
-  createdAt  DateTime            @default(now())
+  createdAt  DateTime        @default(now())
 
   allocations PaymentAllocation[]
 
@@ -606,13 +664,13 @@ model Bill {
 }
 
 model Payment {
-  id            String              @id @default(cuid())
-  tenantId      String              @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant        Tenant              @relation(fields: [tenantId], references: [id])
+  id            String          @id @default(cuid())
+  tenantId      String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant          @relation(fields: [tenantId], references: [id])
   number        String
   retailerId    String
-  retailer      RetailerProfile     @relation(fields: [retailerId], references: [id])
-  purpose       PayPurpose          @default(DUES)
+  retailer      RetailerProfile @relation(fields: [retailerId], references: [id])
+  purpose       PayPurpose      @default(DUES)
   method        PayMethod
   state         PaymentState
   /// Paise.
@@ -624,15 +682,15 @@ model Payment {
   /// Collected against this order at delivery (allocated to its bill first).
   orderId       String?
   collectedById String?
-  collectedBy   User?               @relation("PaymentCollectedBy", fields: [collectedById], references: [id])
-  collectedAt   DateTime            @default(now())
+  collectedBy   User?           @relation("PaymentCollectedBy", fields: [collectedById], references: [id])
+  collectedAt   DateTime        @default(now())
   verifiedById  String?
   verifiedAt    DateTime?
   rejectReason  String?
   entryId       String?
   /// Paise of this payment already allocated to bills.
-  allocated     Int                 @default(0)
-  createdAt     DateTime            @default(now())
+  allocated     Int             @default(0)
+  createdAt     DateTime        @default(now())
 
   allocations PaymentAllocation[]
   cheque      Cheque?
@@ -695,4 +753,211 @@ model CashHandover {
   createdAt    DateTime @default(now())
 
   @@index([tenantId, staffUserId, createdAt])
+}
+
+// ───────────────────────────── Catalogue, pricing, schemes (Phase 2) ─────────────────────────────
+
+model Brand {
+  id        String   @id @default(cuid())
+  tenantId  String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  logoKey   String?
+  sort      Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  products Product[]
+
+  @@unique([tenantId, name])
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  tenantId  String     @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  name      String
+  parentId  String?
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  imageKey  String?
+  sort      Int        @default(0)
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+
+  products Product[]
+
+  @@unique([tenantId, name])
+}
+
+/// GST rate by HSN code. Changing a rate here updates every product with that code.
+model HsnCode {
+  id          String  @id @default(cuid())
+  tenantId    String  @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant  @relation(fields: [tenantId], references: [id])
+  code        String
+  description String?
+  gstRate     Float
+
+  @@unique([tenantId, code])
+}
+
+/// A named set of rates (Wholesale, Retail, Key account …) assigned to retailers.
+model PriceList {
+  id          String   @id @default(cuid())
+  tenantId    String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  items     PriceListItem[]
+  retailers RetailerProfile[]
+
+  @@unique([tenantId, name])
+}
+
+model PriceListItem {
+  id          String    @id @default(cuid())
+  tenantId    String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  priceListId String
+  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  /// Rate before GST, in paise.
+  price       Int
+
+  @@unique([priceListId, productId])
+  @@index([tenantId, productId])
+}
+
+/// A special rate for one retailer; beats their price list.
+model RetailerPrice {
+  id         String          @id @default(cuid())
+  tenantId   String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant          @relation(fields: [tenantId], references: [id])
+  retailerId String
+  retailer   RetailerProfile @relation(fields: [retailerId], references: [id])
+  productId  String
+  product    Product         @relation(fields: [productId], references: [id])
+  price      Int
+  note       String?
+  updatedAt  DateTime        @updatedAt
+
+  @@unique([retailerId, productId])
+  @@index([tenantId, productId])
+}
+
+model RetailerGroup {
+  id          String   @id @default(cuid())
+  tenantId    String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  members RetailerGroupMember[]
+
+  @@unique([tenantId, name])
+}
+
+model RetailerGroupMember {
+  tenantId   String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant          @relation(fields: [tenantId], references: [id])
+  groupId    String
+  group      RetailerGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  retailerId String
+  retailer   RetailerProfile @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, retailerId])
+  @@index([tenantId, retailerId])
+}
+
+enum SchemeType {
+  BUY_X_GET_Y
+  SLAB
+  PERCENT
+  FLAT
+}
+
+/// A trade scheme. Applies to the items in scope (products / brands / categories;
+/// all empty = the whole cart) for the targeted retailers (areas / groups /
+/// retailers; all empty = everyone) within the date window. Params by type are
+/// validated in src/lib/schemes.ts.
+model Scheme {
+  id                 String     @id @default(cuid())
+  tenantId           String     @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant             Tenant     @relation(fields: [tenantId], references: [id])
+  name               String
+  description        String?
+  type               SchemeType
+  params             Json
+  productIds         String[]   @default([])
+  brandIds           String[]   @default([])
+  categoryIds        String[]   @default([])
+  areaIds            String[]   @default([])
+  groupIds           String[]   @default([])
+  retailerIds        String[]   @default([])
+  /// Set = applies only when the retailer enters this code.
+  couponCode         String?
+  startsAt           DateTime?
+  endsAt             DateTime?
+  /// Lower runs first.
+  priority           Int        @default(100)
+  /// false = once it applies to an item, no later scheme applies to that item.
+  stackable          Boolean    @default(true)
+  /// Total discount + free-goods value this scheme may give, in paise (null = no cap).
+  budget             Int?
+  spent              Int        @default(0)
+  maxUsesPerRetailer Int?
+  active             Boolean    @default(true)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  redemptions SchemeRedemption[]
+
+  @@unique([tenantId, couponCode])
+  @@index([tenantId, active])
+}
+
+model SchemeRedemption {
+  id         String   @id @default(cuid())
+  tenantId   String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  schemeId   String
+  scheme     Scheme   @relation(fields: [schemeId], references: [id])
+  orderId    String
+  retailerId String
+  /// Discount + free-goods value given, in paise.
+  value      Int
+  freeQty    Int      @default(0)
+  reversed   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, schemeId])
+  @@index([tenantId, retailerId, schemeId])
+  @@index([tenantId, orderId])
+}
+
+model Banner {
+  id        String    @id @default(cuid())
+  tenantId  String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  title     String
+  subtitle  String?
+  imageKey  String?
+  /// product | brand | category | scheme | url
+  linkType  String?
+  linkId    String?
+  areaIds   String[]  @default([])
+  groupIds  String[]  @default([])
+  startsAt  DateTime?
+  endsAt    DateTime?
+  sort      Int       @default(0)
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId, active])
 }

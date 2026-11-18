@@ -32,6 +32,8 @@ export const dictionary = {
   "nav.history": { en: "History", hi: "इतिहास" },
   "nav.pipeline": { en: "Pipeline", hi: "पाइपलाइन" },
   "nav.products": { en: "Products", hi: "उत्पाद" },
+  "nav.pricing": { en: "Pricing", hi: "मूल्य" },
+  "nav.schemes": { en: "Schemes", hi: "स्कीम" },
   "nav.team": { en: "Team", hi: "टीम" },
   "nav.regions": { en: "Regions", hi: "क्षेत्र" },
   "nav.import": { en: "Import", hi: "आयात" },
