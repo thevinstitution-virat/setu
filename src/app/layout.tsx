@@ -1,24 +1,32 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Noto_Sans_Devanagari } from "next/font/google";
+import { Geist_Mono, Sansation, Funnel_Sans, Anek_Devanagari } from "next/font/google";
 import "./globals.css";
 import { APP_NAME } from "@/lib/brand";
 import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
 import { getServerLang } from "@/lib/i18n/server";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const sansation = Sansation({
+  variable: "--font-heading",
   subsets: ["latin"],
+  weight: ["300", "400", "700"],
+  style: ["normal", "italic"],
+});
+
+const funnelSans = Funnel_Sans({
+  variable: "--font-body",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+});
+
+const anekDevanagari = Anek_Devanagari({
+  variable: "--font-deva",
+  subsets: ["devanagari"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
-});
-
-const notoDevanagari = Noto_Sans_Devanagari({
-  variable: "--font-deva",
-  subsets: ["devanagari"],
-  weight: ["400", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -34,7 +42,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#146c5b",
+  themeColor: "#155651",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -45,7 +53,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang={lang}
-      className={`${geistSans.variable} ${geistMono.variable} ${notoDevanagari.variable} h-full antialiased`}
+      className={`${sansation.variable} ${funnelSans.variable} ${anekDevanagari.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
