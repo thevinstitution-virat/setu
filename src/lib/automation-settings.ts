@@ -19,6 +19,12 @@ export type AutomationSettings = {
   usualOrder: { on: boolean };
   /** A5: split a day's orders into trips. */
   tripPlan: { on: boolean; maxDrops: number };
+  /**
+   * A6: demand forecast. Reorder suggestions to suppliers (enough for the
+   * supplier's lead time + coverDays, with safety stock for serviceLevel %),
+   * and the next-day load sheet (topUp: load up to the usual for that weekday).
+   */
+  forecast: { on: boolean; coverDays: number; serviceLevel: number; topUp: boolean };
 };
 
 export const AUTOMATION_DEFAULTS: AutomationSettings = {
@@ -28,6 +34,7 @@ export const AUTOMATION_DEFAULTS: AutomationSettings = {
   checks: { on: true, cashShort: 20_000, farMetres: 300, closedTimes: 3, discountPct: 20 },
   usualOrder: { on: true },
   tripPlan: { on: true, maxDrops: 25 },
+  forecast: { on: true, coverDays: 7, serviceLevel: 90, topUp: true },
 };
 
 export type AutomationKey = keyof AutomationSettings;
@@ -50,6 +57,8 @@ const LIMITS: Record<string, [number, number]> = {
   closedTimes: [2, 10],
   discountPct: [1, 90],
   maxDrops: [3, 100],
+  coverDays: [1, 60],
+  serviceLevel: [50, 99],
 };
 
 /**

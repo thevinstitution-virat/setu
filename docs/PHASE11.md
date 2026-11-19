@@ -77,7 +77,7 @@ Each is a `check` with the facts; accept = "Looked into it", reject = "Not a pro
 
 ### Runs, jobs, cost log
 
-- `runFeature` logs an `AutomationRun` (feature, trigger `cron` / `manual` / `seed`, start, end, how many made, error) with a 120 s transaction limit; one feature failing doesn't stop the others.
+- `runFeature` logs an `AutomationRun` (feature, trigger `schedule` / `manual`, start, end, how many made, error) with a 120 s transaction limit; one feature failing doesn't stop the others.
 - Worker jobs (IST): `automation.daily` **06:00** every day (expire, visit plans, collections, checks), `automation.weekly` **06:30 Monday** (credit review). Every trial or active business with the feature on.
 - `AiCostLog` (feature, provider, model, input and output tokens, cost in paise, credits, who) and `recordAiUse()`, which also adds the credits to the month's `ai_credits` usage counter. Nothing calls it yet; the language features will.
 
@@ -110,7 +110,7 @@ Migration `20261120090000_automation` (applied locally):
 
 ## Demo data (`npm run db:seed`)
 
-After the demo history, the seed runs the daily automations and the credit review once (trigger `seed`). On a fresh seed: 2 visit plans, 5 credit stops, 3 new credit limits.
+After the demo history, the seed runs the daily automations and the credit review once (as `manual` runs). On a fresh seed: 2 visit plans, 5 credit stops, 3 new credit limits.
 
 ## Tests
 

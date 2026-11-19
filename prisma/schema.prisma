@@ -1773,6 +1773,8 @@ model Supplier {
   email       String?
   gstin       String?
   address     String?
+  /// Days from sending a purchase order to the goods arriving (A6 reorder suggestions plan for this). 0–90.
+  leadDays    Int      @default(3)
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
 

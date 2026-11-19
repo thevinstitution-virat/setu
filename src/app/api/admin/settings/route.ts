@@ -18,6 +18,7 @@ import {
 } from "@/lib/engage-settings";
 import { parseReportSettings, reportSettings } from "@/lib/report-settings";
 import { automationSettings, parseAutomationSettings } from "@/lib/automation-settings";
+import { aiSettings, parseAiSettings } from "@/lib/ai-settings";
 import { channelStatus } from "@/lib/outbox";
 import { isStateCode, normaliseGstin, validGstin } from "@/lib/gst";
 import { invalidateTenantCache } from "@/lib/tenant";
@@ -51,6 +52,7 @@ const SECTIONS = {
   referral: { read: referralSettings, parse: (i: Record<string, unknown>) => parseReferralSettings(i) },
   reports: { read: reportSettings, parse: (i: Record<string, unknown>) => parseReportSettings(i) },
   automation: { read: automationSettings, parse: (i: Record<string, unknown>) => parseAutomationSettings(i) },
+  ai: { read: aiSettings, parse: (i: Record<string, unknown>) => parseAiSettings(i) },
 } as const;
 
 function parseBusiness(b: Record<string, unknown>) {

@@ -15,9 +15,11 @@ import { beatForDay, teamScope } from "@/lib/field";
 import { moneySettings, termsFor } from "@/lib/money-settings";
 import { deliverySettings, slotLabel } from "@/lib/delivery-settings";
 import { addOrders, autoSequence, createTrip, sequenceStops } from "@/lib/trips";
-import { usagePeriod } from "@/lib/billing";
 import { formatINR } from "@/lib/money";
 import { automationSettings, type AutomationSettings } from "@/lib/automation-settings";
+import { suggest, type NewSuggestion } from "@/lib/suggest";
+import { applyReorder, reviewReorder } from "@/lib/forecast";
+import { applyCatalogue, type CatalogueEdit } from "@/lib/catalogue-assist";
 import {
   ANOMALY_LABEL,
   CREDIT_BAND_LABEL,
@@ -46,7 +48,7 @@ const daysFrom = (a: Date, b: Date) => Math.round((Date.parse(istDay(b)) - Date.
 
 // ---------- suggestions ----------
 
-export const SUGGESTION_KINDS = ["visit_plan", "credit_limit", "credit_stop", "credit_restore", "check", "trip_plan"] as const;
+export const SUGGESTION_KINDS = ["visit_plan", "credit_limit", "credit_stop", "credit_restore", "check", "trip_plan", "reorder", "catalogue"] as const;
 export type SuggestionKind = (typeof SUGGESTION_KINDS)[number];
 export const isSuggestionKind = (v: unknown): v is SuggestionKind => typeof v === "string" && (SUGGESTION_KINDS as readonly string[]).includes(v);
 
@@ -57,7 +59,11 @@ export const KIND_LABEL: Record<SuggestionKind, string> = {
   credit_restore: "Give credit back",
   check: "Check",
   trip_plan: "Trip plan",
+  reorder: "Reorder",
+  catalogue: "Catalogue",
 };
+/** Kinds with their own screen (Products → Catalogue assist), kept out of the inbox. */
+export const OWN_SCREEN_KINDS: SuggestionKind[] = ["catalogue"];
 
 /** Who may decide each kind: any one of the permissions (admins have every permission). */
 export const KIND_PERMISSION: Record<SuggestionKind, Permission[]> = {
@@ -67,45 +73,13 @@ export const KIND_PERMISSION: Record<SuggestionKind, Permission[]> = {
   credit_restore: ["credit.manage"],
   check: ["reports.view"],
   trip_plan: ["orders.dispatch"],
+  reorder: ["stock.manage"],
+  catalogue: ["catalogue.manage"],
 };
 
 export type Who = { userId: string; role: Role };
 const canAny = (role: Role, perms: Permission[]) => perms.some((p) => can(role, p));
 export const kindsFor = (role: Role) => SUGGESTION_KINDS.filter((k) => canAny(role, KIND_PERMISSION[k]));
-
-type NewSuggestion = {
-  kind: SuggestionKind;
-  subjectType: string;
-  subjectId: string;
-  title: string;
-  detail?: string;
-  reasons?: string[];
-  payload?: Prisma.InputJsonValue;
-  score?: number;
-  dedupeKey: string;
-  forDate?: string;
-  expiresAt?: Date;
-};
-
-/** Writes a suggestion unless one with the same key exists (whatever its state). Returns it only when new. */
-async function suggest(tx: Tx, s: NewSuggestion) {
-  if (await tx.suggestion.findFirst({ where: { dedupeKey: s.dedupeKey }, select: { id: true } })) return null;
-  return tx.suggestion.create({
-    data: {
-      kind: s.kind,
-      subjectType: s.subjectType,
-      subjectId: s.subjectId,
-      title: s.title,
-      detail: s.detail ?? "",
-      reasons: s.reasons ?? [],
-      payload: s.payload ?? {},
-      score: Math.max(0, Math.min(100, Math.round(s.score ?? 0))),
-      dedupeKey: s.dedupeKey,
-      forDate: s.forDate,
-      expiresAt: s.expiresAt,
-    },
-  });
-}
 
 // ---------- shared reads ----------
 
@@ -583,7 +557,7 @@ async function canDecide(tx: Tx, who: Who, s: { kind: string; payload: unknown }
  * transaction; `retailerIds` picks which shops of a visit plan to keep.
  * Returns the audit notes for the caller to write.
  */
-export async function decide(ctx: Ctx, who: Who, id: string, d: { accept: boolean; note?: string; retailerIds?: string[] }, now = new Date()) {
+export async function decide(ctx: Ctx, who: Who, id: string, d: { accept: boolean; note?: string; retailerIds?: string[]; edit?: CatalogueEdit }, now = new Date()) {
   const s = await ctx.tx.suggestion.findUnique({ where: { id } });
   if (!s) throw new MoneyError("Suggestion not found", 404);
   if (!(await canDecide(ctx.tx, who, s))) throw new MoneyError("You can't decide this one", 403);
@@ -597,10 +571,10 @@ export async function decide(ctx: Ctx, who: Who, id: string, d: { accept: boolea
     await ctx.tx.suggestion.update({ where: { id }, data: { status: "REJECTED", decidedById: who.userId, decidedAt: now, note } });
     return { status: "REJECTED" as const, audits: [] as AuditNote[] };
   }
-  return applyAndClose(ctx, id, { who, note, retailerIds: d.retailerIds, now });
+  return applyAndClose(ctx, id, { who, note, retailerIds: d.retailerIds, edit: d.edit, now });
 }
 
-async function applyAndClose(ctx: Ctx, id: string, o: { who?: Who; note?: string | null; retailerIds?: string[]; auto?: boolean; now?: Date }) {
+async function applyAndClose(ctx: Ctx, id: string, o: { who?: Who; note?: string | null; retailerIds?: string[]; edit?: CatalogueEdit; auto?: boolean; now?: Date }) {
   const tx = ctx.tx;
   const s = await tx.suggestion.findUniqueOrThrow({ where: { id } });
   const p = s.payload as Record<string, unknown>;
@@ -634,6 +608,14 @@ async function applyAndClose(ctx: Ctx, id: string, o: { who?: Who; note?: string
       audits.push({ action: "trip.create", entity: "Trip", entityId: trip.id, after: { orders: t.orderIds.length, suggestionId: s.id } });
     }
     result = { trips: made };
+  } else if (s.kind === "reorder") {
+    const r = await applyReorder(ctx, p, o.now ?? new Date());
+    audits.push({ action: "po.create", entity: "PurchaseOrder", entityId: r.poId, after: { number: r.number, lines: r.lines, suggestionId: s.id } });
+    result = r;
+  } else if (s.kind === "catalogue") {
+    const r = await applyCatalogue(ctx, p, o.edit);
+    audits.push({ action: "product.update", entity: "Product", entityId: r.productId, before: r.before, after: { ...r.after, suggestionId: s.id } });
+    result = r.after as Prisma.InputJsonValue;
   }
   // "check": accepting means "looked into it"; nothing to apply.
 
@@ -650,7 +632,8 @@ async function applyAndClose(ctx: Ctx, id: string, o: { who?: Who; note?: string
  * priority). A supervisor sees visit plans for their own team only.
  */
 export async function listSuggestions(tx: Tx, who: Who, f: { status?: "OPEN" | "ACCEPTED" | "REJECTED" | "EXPIRED"; kind?: SuggestionKind; take?: number } = {}) {
-  const kinds = kindsFor(who.role).filter((k) => !f.kind || k === f.kind);
+  const inboxKinds = kindsFor(who.role).filter((k) => !OWN_SCREEN_KINDS.includes(k));
+  const kinds = f.kind ? kindsFor(who.role).filter((k) => k === f.kind) : inboxKinds;
   if (!kinds.length) return { items: [], counts: {} as Record<string, number> };
   const scope = await teamScope(tx, who);
   const agentIds = scope === null ? null : (await tx.salesAgentProfile.findMany({ where: { userId: { in: scope } }, select: { id: true } })).map((a) => a.id);
@@ -662,7 +645,7 @@ export async function listSuggestions(tx: Tx, who: Who, f: { status?: "OPEN" | "
       orderBy: status === "OPEN" ? [{ score: "desc" }, { createdAt: "desc" }] : [{ decidedAt: "desc" }, { createdAt: "desc" }],
       take: Math.min(f.take ?? 100, 200),
     }),
-    tx.suggestion.groupBy({ by: ["kind"], where: { status: "OPEN", OR: kindsFor(who.role).map(visible) }, _count: { _all: true } }),
+    tx.suggestion.groupBy({ by: ["kind"], where: { status: "OPEN", OR: (f.kind ? kinds : inboxKinds).map(visible) }, _count: { _all: true } }),
   ]);
   const deciders = await tx.user.findMany({ where: { id: { in: [...new Set(items.map((i) => i.decidedById).filter((x): x is string => !!x))] } }, select: { id: true, name: true } });
   const nameOf = new Map(deciders.map((u) => [u.id, u.name]));
@@ -674,7 +657,7 @@ export async function listSuggestions(tx: Tx, who: Who, f: { status?: "OPEN" | "
 
 // ---------- running ----------
 
-export type Feature = "visit_plan" | "collections" | "checks" | "credit" | "expire";
+export type Feature = "visit_plan" | "collections" | "checks" | "credit" | "reorder" | "expire";
 
 /** Runs one automation for one business in its own transaction and logs it (AutomationRun). Errors are logged, not thrown. */
 export async function runFeature(tenantId: string, feature: Feature, trigger: "schedule" | "manual", now = new Date()) {
@@ -690,6 +673,7 @@ export async function runFeature(tenantId: string, feature: Feature, trigger: "s
         if (feature === "collections") return reviewCollections(ctx, now, s);
         if (feature === "checks") return runChecks(ctx, addDay(day, -1), s);
         if (feature === "credit") return reviewCredit(ctx, now, s);
+        if (feature === "reorder") return reviewReorder(ctx, now, s);
         return (await tx.suggestion.updateMany({ where: { status: "OPEN", expiresAt: { lte: now } }, data: { status: "EXPIRED" } })).count;
       },
       { timeout: 120_000 }
@@ -704,7 +688,7 @@ export async function runFeature(tenantId: string, feature: Feature, trigger: "s
   }
 }
 
-export const DAILY: Feature[] = ["expire", "visit_plan", "collections", "checks"];
+export const DAILY: Feature[] = ["expire", "visit_plan", "collections", "checks", "reorder"];
 
 /** Every live business: the daily set (06:00 IST), plus the credit review on Mondays. */
 export async function runAutomations(now = new Date(), opts: { weekly?: boolean } = {}) {
@@ -732,15 +716,7 @@ export async function usualOrderFor(tx: Tx, retailerId: string, now = new Date()
   );
 }
 
-// ---------- AI cost log (for the language features to come) ----------
+// ---------- AI cost log ----------
 
-/** Logs one AI call and adds its credits and cost to this month's usage (billed over the plan's allowance). */
-export async function recordAiUse(tx: Tx, tenantId: string, u: { feature: string; provider: string; model: string; inputTokens: number; outputTokens: number; costPaise: number; credits: number; actorId?: string | null }, now = new Date()) {
-  for (const n of [u.inputTokens, u.outputTokens, u.costPaise, u.credits]) if (!Number.isInteger(n) || n < 0) throw new MoneyError("AI usage must be whole, non-negative numbers");
-  await tx.aiCostLog.create({ data: { ...u, actorId: u.actorId ?? null, createdAt: now } });
-  await tx.usageCounter.upsert({
-    where: { tenantId_period_metric: { tenantId, period: usagePeriod(now), metric: "ai_credits" } },
-    create: { tenantId, period: usagePeriod(now), metric: "ai_credits", value: u.credits, costPaise: u.costPaise },
-    update: { value: { increment: u.credits }, costPaise: { increment: u.costPaise } },
-  });
-}
+/** Moved to lib/ai.ts with the AI gateway (Phase 12). */
+export { recordAiUse } from "@/lib/ai";

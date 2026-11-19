@@ -7,7 +7,8 @@ import { formatINR } from "@/lib/money";
 import { ErrorBox, TabBar, errText, send, shortDate, useFetch } from "@/components/admin/AdminKit";
 import { VISIT_REASON, type VisitReason } from "@/lib/automation-math";
 
-type Kind = "visit_plan" | "credit_limit" | "credit_stop" | "credit_restore" | "check" | "trip_plan";
+type Kind = "visit_plan" | "credit_limit" | "credit_stop" | "credit_restore" | "check" | "trip_plan" | "reorder";
+type ReorderLine = { productId: string; name: string; unit: string; qty: number; unitCost: number | null; available: number; onOrder: number; daily: number; daysLeft: number | null };
 type Status = "OPEN" | "ACCEPTED" | "REJECTED" | "EXPIRED";
 type PlanShop = { retailerId: string; name: string; area: string; score: number; reasons: VisitReason[]; overdue: number; onRoute: boolean };
 type PlannedTrip = { driverId: string; driverName: string; vehicleName: string | null; orderIds: string[]; drops: number; value: number; km: number | null; areas: string[] };
@@ -39,6 +40,7 @@ const KIND_LABEL: Record<Kind, string> = {
   credit_restore: "Credit back",
   check: "Checks",
   trip_plan: "Trip plans",
+  reorder: "Reorders",
 };
 const ACCEPT_LABEL: Record<Kind, string> = {
   visit_plan: "Add to their day",
@@ -47,6 +49,7 @@ const ACCEPT_LABEL: Record<Kind, string> = {
   credit_restore: "Give credit back",
   check: "Looked into it",
   trip_plan: "Make the trips",
+  reorder: "Draft the order",
 };
 const REJECT_LABEL: Partial<Record<Kind, string>> = { check: "Not a problem" };
 const STATUS_TABS = [
@@ -214,6 +217,37 @@ function SuggestionCard({ s, onDone }: { s: Item; onDone: () => void }) {
         </ul>
       )}
 
+      {s.kind === "reorder" && (
+        <div className="overflow-x-auto rounded-2xl border border-[var(--line)]">
+          <table className="w-full text-sm" style={{ minWidth: 420 }}>
+            <thead>
+              <tr className="border-b border-[var(--line)] text-xs text-[var(--muted)]">
+                <th className="px-3 py-2 text-left font-semibold">Product</th>
+                <th className="px-3 py-2 text-right font-semibold">A day</th>
+                <th className="px-3 py-2 text-right font-semibold">Left</th>
+                <th className="px-3 py-2 text-right font-semibold">Order</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--line)]">
+              {(s.payload.lines as ReorderLine[]).map((l) => (
+                <tr key={l.productId}>
+                  <td className="px-3 py-2">{l.name}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{l.daily.toLocaleString("en-IN", { maximumFractionDigits: 1 })}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">
+                    {l.available}
+                    {l.daysLeft !== null && <span className="block text-[11px] text-[var(--muted)]">{l.daysLeft} days</span>}
+                  </td>
+                  <td className="px-3 py-2 text-right font-semibold tabular-nums">
+                    {l.qty} {l.unit}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {Number(s.payload.value) > 0 && <p className="px-3 py-2 text-xs text-[var(--muted)]">About {rs(Number(s.payload.value))} at last cost</p>}
+        </div>
+      )}
+
       {(s.kind === "credit_limit" || s.kind === "credit_stop") && (
         <p className="text-sm">
           Limit: <span className="font-semibold">{rs(s.payload.from as number | null | undefined ?? (s.payload.effective as number | null))}</span> →{" "}
@@ -253,6 +287,14 @@ function SuggestionCard({ s, onDone }: { s: Item; onDone: () => void }) {
           {s.decidedBy && ` by ${s.decidedBy}`}
           {s.decidedAt && `, ${shortDate(s.decidedAt, true)}`}
           {s.note && ` · “${s.note}”`}
+          {s.kind === "reorder" && s.result && typeof s.result.poId === "string" && (
+            <>
+              {" · "}
+              <Link href={`/admin/stock/purchase-orders/${s.result.poId}`} className="font-bold text-[var(--kesar-text)]">
+                {String(s.result.number)}
+              </Link>
+            </>
+          )}
           {s.kind === "trip_plan" && s.result && Array.isArray(s.result.trips) && (
             <>
               {" · "}
