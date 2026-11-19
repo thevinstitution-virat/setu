@@ -45,12 +45,20 @@ export const dictionary = {
   "nav.payments": { en: "Payments", hi: "भुगतान" },
   "nav.cash": { en: "Cash", hi: "नकद" },
   "nav.settings": { en: "Settings", hi: "सेटिंग्स" },
+  "nav.field": { en: "Field team", hi: "फ़ील्ड टीम" },
+  "nav.teamToday": { en: "Team today", hi: "टीम आज" },
+  "nav.shops": { en: "New shops", hi: "नई दुकानें" },
+  "nav.targets": { en: "Targets", hi: "लक्ष्य" },
+  "nav.leave": { en: "Leave", hi: "छुट्टी" },
+  "nav.beats": { en: "Beats", hi: "बीट" },
+  "nav.reports": { en: "Reports", hi: "रिपोर्ट" },
 
   // Roles
   "role.retailer": { en: "Retailer", hi: "रिटेलर" },
   "role.salesAgent": { en: "Sales Agent", hi: "सेल्स एजेंट" },
   "role.deliveryAgent": { en: "Delivery Agent", hi: "डिलीवरी एजेंट" },
   "role.admin": { en: "Admin", hi: "एडमिन" },
+  "role.supervisor": { en: "Supervisor", hi: "सुपरवाइज़र" },
 
   // Common
   "common.logout": { en: "Log out", hi: "लॉग आउट" },
@@ -59,7 +67,7 @@ export const dictionary = {
   // Login
   "login.title": { en: "Sign in", hi: "लॉगिन करें" },
   "login.retailerTab": { en: "Retailer", hi: "रिटेलर" },
-  "login.teamTab": { en: "Sales / Delivery / Admin", hi: "सेल्स / डिलीवरी / एडमिन" },
+  "login.teamTab": { en: "Staff", hi: "स्टाफ़" },
   "login.mobileLabel": { en: "Mobile number", hi: "मोबाइल नंबर" },
   "login.sendOtp": { en: "Send OTP", hi: "OTP भेजें" },
   "login.otpLabel": { en: "OTP sent to", hi: "OTP भेजा गया" },
@@ -75,6 +83,15 @@ export const dictionary = {
   "login.loginIdLabel": { en: "Login ID", hi: "लॉगिन आईडी" },
   "login.passwordLabel": { en: "Password", hi: "पासवर्ड" },
   "login.loginButton": { en: "Log in", hi: "लॉग इन करें" },
+  "login.methodPassword": { en: "Login ID and password", hi: "लॉगिन आईडी और पासवर्ड" },
+  "login.methodOtp": { en: "Mobile OTP", hi: "मोबाइल OTP" },
+  "login.invalidMobile": { en: "Enter a valid 10-digit mobile number", hi: "सही 10 अंकों का मोबाइल नंबर डालें" },
+  "login.demoOtp": { en: "Demo mode — no SMS is sent. Your OTP is", hi: "डेमो मोड — कोई SMS नहीं भेजा गया। आपका OTP है" },
+  "login.noStaffLogin": { en: "No staff login with this mobile. Ask your office.", hi: "इस मोबाइल से कोई स्टाफ़ लॉगिन नहीं है। अपने ऑफ़िस से पूछें।" },
+  "login.otpSwitchHint": { en: "Signing in with OTP lets you switch straight between businesses you work for.", hi: "OTP से लॉगिन करने पर आप जिन व्यवसायों के लिए काम करते हैं, उनके बीच सीधे बदल सकते हैं।" },
+  "login.switchFailed": { en: "Could not switch business:", hi: "व्यवसाय नहीं बदल सका:" },
+  "login.wait": { en: "Please wait…", hi: "कृपया रुकें…" },
+  "login.error": { en: "Something went wrong", hi: "कुछ गलत हो गया" },
 
   // Order status
   "status.PLACED": { en: "Order placed", hi: "ऑर्डर प्लेस हुआ" },

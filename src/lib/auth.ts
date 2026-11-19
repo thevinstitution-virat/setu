@@ -5,7 +5,7 @@ import { getTenant } from "@/lib/tenant";
 
 const SESSION_COOKIE = "setu_session";
 
-function sessionSecret() {
+export function sessionSecret() {
   const s = process.env.SESSION_SECRET;
   if (!s && process.env.NODE_ENV === "production") {
     throw new Error("SESSION_SECRET must be set in production");
@@ -18,6 +18,10 @@ export type SessionPayload = {
   tenantId: string;
   role: Role;
   name: string;
+  /** How this session was opened. Only OTP / handoff sessions may hop to another business (Phase 6 multi-distributor). */
+  via?: "password" | "otp" | "handoff";
+  /** Verified phone (OTP / handoff sessions). */
+  phone?: string;
 };
 
 export async function createSessionCookie(payload: SessionPayload) {
@@ -72,6 +76,8 @@ export function roleHome(role: Role): string {
       return "/sales";
     case "DELIVERY_AGENT":
       return "/delivery";
+    case "SUPERVISOR":
+      return "/team";
     default:
       return "/login";
   }

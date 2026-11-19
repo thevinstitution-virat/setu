@@ -7,6 +7,7 @@ import { cartSettings, parseCartSettings } from "@/lib/cart-settings";
 import { invoiceSettings, parseInvoiceSettings } from "@/lib/invoice-settings";
 import { deliverySettings, parseDeliverySettings } from "@/lib/delivery-settings";
 import { inventorySettings, parseInventorySettings } from "@/lib/inventory-settings";
+import { fieldSettings, parseFieldSettings } from "@/lib/field-settings";
 import { isStateCode, normaliseGstin, validGstin } from "@/lib/gst";
 import { invalidateTenantCache } from "@/lib/tenant";
 
@@ -22,7 +23,7 @@ export async function GET() {
   if (!auth.ok) return auth.res;
   const t = await asPlatform((tx) => tx.tenant.findUniqueOrThrow({ where: { id: auth.tenant.id }, select: { settings: true, ...BUSINESS } }));
   const { settings, ...business } = t;
-  return NextResponse.json({ money: moneySettings(settings), cart: cartSettings(settings), invoice: invoiceSettings(settings), delivery: deliverySettings(settings), inventory: inventorySettings(settings), business });
+  return NextResponse.json({ money: moneySettings(settings), cart: cartSettings(settings), invoice: invoiceSettings(settings), delivery: deliverySettings(settings), inventory: inventorySettings(settings), field: fieldSettings(settings), business });
 }
 
 const SECTIONS = {
@@ -31,6 +32,7 @@ const SECTIONS = {
   invoice: { read: invoiceSettings, parse: (i: Record<string, unknown>, s: unknown) => parseInvoiceSettings(i, invoiceSettings(s)) },
   delivery: { read: deliverySettings, parse: (i: Record<string, unknown>) => parseDeliverySettings(i) },
   inventory: { read: inventorySettings, parse: (i: Record<string, unknown>) => parseInventorySettings(i) },
+  field: { read: fieldSettings, parse: (i: Record<string, unknown>) => parseFieldSettings(i) },
 } as const;
 
 function parseBusiness(b: Record<string, unknown>) {

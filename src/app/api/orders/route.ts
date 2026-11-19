@@ -23,7 +23,12 @@ export async function GET() {
   } else if (session.role === "SALES_AGENT") {
     const agent = await db.salesAgentProfile.findUnique({ where: { userId: session.userId } });
     if (!agent) return NextResponse.json({ orders: [] });
-    where = { retailer: { salesAgentId: agent.id } };
+    // Their book, plus orders they placed for other shops (off-beat).
+    where = { OR: [{ retailer: { salesAgentId: agent.id } }, { placedById: session.userId }] };
+  } else if (session.role === "SUPERVISOR") {
+    const team = await db.user.findMany({ where: { supervisorId: session.userId }, select: { id: true } });
+    const ids = [session.userId, ...team.map((u) => u.id)];
+    where = { OR: [{ placedById: { in: ids } }, { retailer: { salesAgent: { userId: { in: ids } } } }] };
   } else if (session.role === "DELIVERY_AGENT") {
     const agent = await db.deliveryAgentProfile.findUnique({ where: { userId: session.userId } });
     if (!agent) return NextResponse.json({ orders: [] });

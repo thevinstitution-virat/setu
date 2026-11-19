@@ -11,6 +11,8 @@ import type { DeliverySettings as DeliveryRules } from "@/lib/delivery-settings"
 import DeliverySettings from "@/components/admin/DeliverySettings";
 import type { InventorySettings } from "@/lib/inventory-settings";
 import StockSettings from "@/components/admin/StockSettings";
+import type { FieldSettings as FieldRules } from "@/lib/field-settings";
+import FieldSettings from "@/components/admin/FieldSettings";
 
 type Mode = "PREPAID" | "POSTPAID";
 
@@ -218,6 +220,7 @@ export default function SettingsPage() {
   const [gst, setGst] = useState<{ invoice: InvoiceSettings; business: Business } | null>(null);
   const [delivery, setDelivery] = useState<DeliveryRules | null>(null);
   const [inventory, setInventory] = useState<InventorySettings | null>(null);
+  const [field, setField] = useState<FieldRules | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/settings")
@@ -234,12 +237,13 @@ export default function SettingsPage() {
         setGst({ invoice: data.invoice, business: data.business });
         setDelivery(data.delivery);
         setInventory(data.inventory);
+        setField(data.field);
       })
       .catch((e) => setLoadError(e instanceof Error ? e.message : "Could not load settings"));
   }, []);
 
   if (loadError) return <p className="text-sm text-[#a8281e]">{loadError}</p>;
-  if (!form || !saved || !cart || !cartSaved || !cartRaw || !gst || !delivery || !inventory) return <p className="text-sm text-[var(--muted)]">Loading…</p>;
+  if (!form || !saved || !cart || !cartSaved || !cartRaw || !gst || !delivery || !inventory || !field) return <p className="text-sm text-[var(--muted)]">Loading…</p>;
 
   const moneyDirty = JSON.stringify(form) !== JSON.stringify(saved);
   const cartDirty = JSON.stringify(cart) !== JSON.stringify(cartSaved);
@@ -310,7 +314,7 @@ export default function SettingsPage() {
       <form onSubmit={save} className="space-y-5">
         <div>
           <p className="page-kick">Settings</p>
-          <h1 className="page-title">Money, cart, GST, delivery and stock rules</h1>
+          <h1 className="page-title">Money, cart, GST, delivery, stock and field rules</h1>
           <p className="page-sub">
             Defaults for new retailers, how payments work, what an order needs, and how invoices are made. You can change terms for one retailer
             from their khata.
@@ -330,6 +334,9 @@ export default function SettingsPage() {
             </a>
             <a href="#stock" className="chip">
               Stock
+            </a>
+            <a href="#field" className="chip">
+              Field team
             </a>
           </div>
         </div>
@@ -656,6 +663,7 @@ export default function SettingsPage() {
       <GstSettings invoice={gst.invoice} business={gst.business} />
       <DeliverySettings delivery={delivery} />
       <StockSettings inventory={inventory} />
+      <FieldSettings field={field} />
     </div>
   );
 }

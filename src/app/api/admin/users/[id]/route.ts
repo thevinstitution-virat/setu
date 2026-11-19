@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { audit, requestIp } from "@/lib/audit";
+import { checkStaffFields } from "@/lib/staff";
 
+/** Body: { active?, name?, phone?, supervisorId? } — only the keys sent change. */
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -10,14 +12,23 @@ export async function PATCH(
   if (!auth.ok) return auth.res;
   const { session, db } = auth;
   const { id } = await params;
-  const body = await req.json().catch(() => ({}));
+  const body = (await req.json().catch(() => null)) ?? {};
 
-  const user = await db.user.update({
-    where: { id },
-    data: { active: body.active },
-  });
+  const target = await db.user.findUnique({ where: { id }, select: { role: true } });
+  if (!target || target.role === "RETAILER") return NextResponse.json({ error: "Staff member not found" }, { status: 404 });
+  if (id === session.userId && body.active === false) return NextResponse.json({ error: "You can't deactivate yourself" }, { status: 400 });
 
-  await audit(db, { actorId: session.userId, action: "user.active", entity: "User", entityId: id, after: { active: user.active }, ip: requestIp(req) });
+  const extra = await checkStaffFields(db, id, body);
+  if ("error" in extra) return NextResponse.json({ error: extra.error }, { status: 400 });
+  const data: { active?: boolean; name?: string; phone?: string | null; supervisorId?: string | null } = { ...extra.data };
+  if (typeof body.active === "boolean") data.active = body.active;
+  if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim().slice(0, 80);
 
-  return NextResponse.json({ user: { id: user.id, active: user.active } });
+  const user = await db.user.update({ where: { id }, data });
+  // A supervisor who is switched off leaves their team without a supervisor.
+  if (target.role === "SUPERVISOR" && data.active === false) await db.user.updateMany({ where: { supervisorId: id }, data: { supervisorId: null } });
+
+  await audit(db, { actorId: session.userId, action: "user.update", entity: "User", entityId: id, after: data, ip: requestIp(req) });
+
+  return NextResponse.json({ user: { id: user.id, active: user.active, name: user.name, phone: user.phone, supervisorId: user.supervisorId } });
 }

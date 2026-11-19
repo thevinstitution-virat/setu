@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "This account has been deactivated" }, { status: 403 });
   }
 
-  await createSessionCookie({ userId: user.id, tenantId: tenant.id, role: user.role, name: user.name });
+  await createSessionCookie({ userId: user.id, tenantId: tenant.id, role: user.role, name: user.name, via: "password" });
 
   return NextResponse.json({ ok: true, redirect: roleHome(user.role) });
 }

@@ -16,6 +16,8 @@ export const QUEUES = {
   "retailer.registered": "A new retailer signed up",
   "import.completed": "A bulk import finished",
   "otp.cleanup": "Delete expired OTP challenges (daily)",
+  "pings.cleanup": "Delete field-staff positions older than each business keeps them (daily)",
+  "handoff.cleanup": "Delete used business-switch tokens older than a day (daily)",
   "einvoice.generate": "Get the IRN for a B2B invoice or note",
   "trip.started": "A trip left: tell each retailer (Phase 7 notifications)",
 } as const;

@@ -26,6 +26,8 @@ enum Role {
   RETAILER
   SALES_AGENT
   DELIVERY_AGENT
+  /// Leads a team of field staff (sales agents, drivers): attendance, beats, leave, targets, reports.
+  SUPERVISOR
 }
 
 enum OrderStatus {
@@ -127,6 +129,13 @@ model Tenant {
   poLines           PurchaseOrderLine[]
   purchases         Purchase[]
   purchaseLines     PurchaseLine[]
+  beatRetailers     BeatRetailer[]
+  beatPlans         BeatPlan[]
+  locationPings     LocationPing[]
+  leaveRequests     LeaveRequest[]
+  storeLeads        StoreLead[]
+  targets           Target[]
+  handoffUses       HandoffUse[]
 }
 
 /// Custom domains a tenant has verified (e.g. order.agencyname.in).
@@ -153,6 +162,10 @@ model User {
   role         Role
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
+  /// The supervisor this person reports to (field staff). Supervisors see and manage their team.
+  supervisorId String?
+  supervisor   User?    @relation("Team", fields: [supervisorId], references: [id])
+  team         User[]   @relation("Team")
 
   retailerProfile      RetailerProfile?
   salesAgentProfile    SalesAgentProfile?
@@ -162,11 +175,20 @@ model User {
   auditLogs         AuditLog[]
   paymentsCollected Payment[]          @relation("PaymentCollectedBy")
   handoversGiven    CashHandover[]     @relation("HandoverStaff")
+  attendance        Attendance[]
+  locationPings     LocationPing[]
+  leaveRequests     LeaveRequest[]     @relation("LeaveOf")
+  leaveDecisions    LeaveRequest[]     @relation("LeaveDecidedBy")
+  storeLeads        StoreLead[]        @relation("LeadBy")
+  leadDecisions     StoreLead[]        @relation("LeadDecidedBy")
+  targets           Target[]
+  beatPlansMade     BeatPlan[]         @relation("BeatPlanBy")
 
   @@unique([tenantId, phone])
   @@unique([tenantId, email])
   @@unique([tenantId, loginId])
   @@index([tenantId, role])
+  @@index([tenantId, supervisorId])
 }
 
 model Region {
@@ -189,6 +211,7 @@ model Area {
 
   retailers RetailerProfile[]
   beats     Beat[]
+  leads     StoreLead[]
 
   @@unique([regionId, name])
   @@index([tenantId])
@@ -233,6 +256,10 @@ model RetailerProfile {
   deliveryPref DeliveryPref?
   /// Free-text note for the driver ("back gate after 2 PM").
   deliveryNote String?
+  /// Food licence number (FSSAI, 14 digits), when the shop has one.
+  fssai        String?
+  /// Shop front photo (storage key), e.g. from the field store form.
+  photoKey     String?
 
   orders          Order[]
   invoices        Invoice[]
@@ -243,6 +270,8 @@ model RetailerProfile {
   payments        Payment[]
   accounts        LedgerAccount[]
   returnableMoves ReturnableMove[]
+  beats           BeatRetailer[]
+  lead            StoreLead?
 
   @@index([tenantId, areaId])
   @@index([tenantId, salesAgentId])
@@ -255,14 +284,16 @@ model SalesAgentProfile {
   userId   String @unique
   user     User   @relation(fields: [userId], references: [id])
 
-  beats      Beat[]
-  retailers  RetailerProfile[]
-  visits     Visit[]
-  attendance Attendance[]
+  beats     Beat[]
+  retailers RetailerProfile[]
+  visits    Visit[]
+  beatPlans BeatPlan[]
+  leads     StoreLead[]
 
   @@index([tenantId])
 }
 
+/// A route of shops a sales agent covers, usually on fixed weekdays.
 model Beat {
   id           String            @id @default(cuid())
   tenantId     String            @default(dbgenerated("current_setting('app.tenant_id'::text)"))
@@ -272,8 +303,53 @@ model Beat {
   salesAgent   SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
   areaId       String
   area         Area              @relation(fields: [areaId], references: [id])
+  /// Usual days, 0 = Sunday … 6 = Saturday. A dated plan for a day overrides these.
+  weekdays     Int[]             @default([])
+  active       Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+
+  shops BeatRetailer[]
+  plans BeatPlan[]
 
   @@index([tenantId])
+  @@index([tenantId, salesAgentId])
+}
+
+/// A shop on a beat, in visiting order.
+model BeatRetailer {
+  id         String          @id @default(cuid())
+  tenantId   String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant          @relation(fields: [tenantId], references: [id])
+  beatId     String
+  beat       Beat            @relation(fields: [beatId], references: [id], onDelete: Cascade)
+  retailerId String
+  retailer   RetailerProfile @relation(fields: [retailerId], references: [id])
+  seq        Int             @default(0)
+
+  @@unique([beatId, retailerId])
+  @@index([tenantId, retailerId])
+}
+
+/// The beat an agent works on a given day (overrides the beat's usual weekdays).
+model BeatPlan {
+  id           String            @id @default(cuid())
+  tenantId     String            @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
+  salesAgentId String
+  salesAgent   SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
+  /// IST day, YYYY-MM-DD.
+  date         String
+  /// null = no beat that day (e.g. office day).
+  beatId       String?
+  beat         Beat?             @relation(fields: [beatId], references: [id])
+  note         String?
+  createdById  String?
+  createdBy    User?             @relation("BeatPlanBy", fields: [createdById], references: [id])
+  createdAt    DateTime          @default(now())
+  visits       Visit[]
+
+  @@unique([tenantId, salesAgentId, date])
+  @@index([tenantId, date])
 }
 
 model DeliveryAgentProfile {
@@ -449,38 +525,214 @@ model OrderStatusEvent {
 }
 
 model Visit {
-  id           String            @id @default(cuid())
-  tenantId     String            @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant       Tenant            @relation(fields: [tenantId], references: [id])
-  salesAgentId String
-  salesAgent   SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
-  retailerId   String
-  retailer     RetailerProfile   @relation(fields: [retailerId], references: [id])
-  checkInAt    DateTime          @default(now())
-  checkInLat   Float?
-  checkInLng   Float?
-  checkOutAt   DateTime?
-  notes        String?
-  orderId      String?           @unique
-  order        Order?            @relation(fields: [orderId], references: [id])
+  id              String            @id @default(cuid())
+  tenantId        String            @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant          Tenant            @relation(fields: [tenantId], references: [id])
+  salesAgentId    String
+  salesAgent      SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
+  retailerId      String
+  retailer        RetailerProfile   @relation(fields: [retailerId], references: [id])
+  checkInAt       DateTime          @default(now())
+  checkInLat      Float?
+  checkInLng      Float?
+  checkOutAt      DateTime?
+  notes           String?
+  orderId         String?           @unique
+  order           Order?            @relation(fields: [orderId], references: [id])
+  checkInAccuracy Int?
+  /// Metres from the shop's map pin at check-in (null when either has no position).
+  distanceM       Int?
+  checkOutLat     Float?
+  checkOutLng     Float?
+  /// Set at check-out: an order was taken, or why not.
+  outcome         VisitOutcome?
+  /// Key from NO_ORDER_REASONS (src/lib/field-settings.ts).
+  noOrderReason   String?
+  /// The shop is not on the agent's list or today's beat.
+  offBeat         Boolean           @default(false)
+  beatPlanId      String?
+  beatPlan        BeatPlan?         @relation(fields: [beatPlanId], references: [id])
+  photoKey        String?
 
   @@index([tenantId, salesAgentId, checkInAt])
+  @@index([tenantId, retailerId, checkInAt])
 }
 
-model Attendance {
-  id           String            @id @default(cuid())
-  tenantId     String            @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant       Tenant            @relation(fields: [tenantId], references: [id])
-  salesAgentId String
-  salesAgent   SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
-  date         String
-  checkInAt    DateTime?
-  checkInLat   Float?
-  checkInLng   Float?
-  checkOutAt   DateTime?
+enum VisitOutcome {
+  ORDER
+  NO_ORDER
+}
 
-  @@unique([salesAgentId, date])
-  @@index([tenantId])
+/// One working day of a field person (sales agent, driver, supervisor): check in and out with selfie and position.
+model Attendance {
+  id               String    @id @default(cuid())
+  tenantId         String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+  userId           String
+  user             User      @relation(fields: [userId], references: [id])
+  /// IST day, YYYY-MM-DD.
+  date             String
+  checkInAt        DateTime?
+  checkInLat       Float?
+  checkInLng       Float?
+  checkInAccuracy  Int?
+  /// Storage key of the check-in selfie.
+  checkInSelfie    String?
+  checkOutAt       DateTime?
+  checkOutLat      Float?
+  checkOutLng      Float?
+  checkOutAccuracy Int?
+  checkOutSelfie   String?
+  /// Worked minutes, set at check-out.
+  minutes          Int?
+  /// Distance travelled from location pings (metres), set at check-out.
+  distanceM        Int?
+  /// Checked in after the work start time (settings.field.workStart).
+  late             Boolean   @default(false)
+  note             String?
+
+  @@unique([tenantId, userId, date])
+  @@index([tenantId, date])
+}
+
+/// A position sent while a field person is on duty (never off duty). Purged after settings.field.pingRetentionDays.
+model LocationPing {
+  id       String   @id @default(cuid())
+  tenantId String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  userId   String
+  user     User     @relation(fields: [userId], references: [id])
+  at       DateTime
+  lat      Float
+  lng      Float
+  accuracy Int?
+  /// "app" (foreground PWA) or "android" (background, wrapper).
+  source   String   @default("app")
+  battery  Int?
+
+  @@index([tenantId, userId, at])
+  @@index([tenantId, at])
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model LeaveRequest {
+  id           String      @id @default(cuid())
+  tenantId     String      @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+  userId       String
+  user         User        @relation("LeaveOf", fields: [userId], references: [id])
+  /// IST days, inclusive.
+  fromDate     String
+  toDate       String
+  days         Int
+  /// Key from LEAVE_TYPES.
+  type         String
+  reason       String?
+  status       LeaveStatus @default(PENDING)
+  decidedById  String?
+  decidedBy    User?       @relation("LeaveDecidedBy", fields: [decidedById], references: [id])
+  decidedAt    DateTime?
+  decisionNote String?
+  createdAt    DateTime    @default(now())
+
+  @@index([tenantId, userId, fromDate])
+  @@index([tenantId, status])
+}
+
+enum LeadStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// A new shop proposed from the field, waiting for the office to approve (creates the retailer).
+model StoreLead {
+  id           String             @id @default(cuid())
+  tenantId     String             @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant             @relation(fields: [tenantId], references: [id])
+  outletName   String
+  ownerName    String
+  phone        String
+  gstin        String?
+  fssai        String?
+  shopNumber   String
+  complexName  String
+  pinCode      String
+  areaId       String
+  area         Area               @relation(fields: [areaId], references: [id])
+  lat          Float?
+  lng          Float?
+  accuracy     Int?
+  photoKey     String?
+  note         String?
+  status       LeadStatus         @default(PENDING)
+  createdById  String
+  createdBy    User               @relation("LeadBy", fields: [createdById], references: [id])
+  /// Sales agent the shop goes to when approved (defaults to the proposer when an agent).
+  salesAgentId String?
+  salesAgent   SalesAgentProfile? @relation(fields: [salesAgentId], references: [id])
+  decidedById  String?
+  decidedBy    User?              @relation("LeadDecidedBy", fields: [decidedById], references: [id])
+  decidedAt    DateTime?
+  decisionNote String?
+  retailerId   String?            @unique
+  retailer     RetailerProfile?   @relation(fields: [retailerId], references: [id])
+  createdAt    DateTime           @default(now())
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdById, createdAt])
+}
+
+enum TargetMetric {
+  /// Order value booked (paise, before cancellations).
+  VALUE
+  /// Units ordered (optionally of one product or brand).
+  VOLUME
+  /// New shops approved from this person's proposals.
+  NEW_OUTLETS
+  /// Payments collected (paise).
+  COLLECTION
+}
+
+/// A monthly goal for one person, with an incentive paid on achievement.
+model Target {
+  id        String       @id @default(cuid())
+  tenantId  String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant       @relation(fields: [tenantId], references: [id])
+  userId    String
+  user      User         @relation(fields: [userId], references: [id])
+  /// YYYY-MM.
+  period    String
+  metric    TargetMetric
+  goal      Int
+  productId String?
+  brandId   String?
+  /// Paid at 100 % (paise); pro rata from minPct, capped at capPct.
+  incentive Int          @default(0)
+  minPct    Int          @default(80)
+  capPct    Int          @default(120)
+  note      String?
+  createdAt DateTime     @default(now())
+
+  @@index([tenantId, period])
+  @@index([tenantId, userId, period])
+}
+
+/// One-time switch tokens used to move between businesses (multi-distributor staff). Replays are refused.
+model HandoffUse {
+  id       String   @id
+  tenantId String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  userId   String
+  usedAt   DateTime @default(now())
+
+  @@index([tenantId, usedAt])
 }
 
 model Delivery {

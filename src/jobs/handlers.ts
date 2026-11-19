@@ -3,6 +3,8 @@ import { asPlatform, tenantDb } from "@/lib/db";
 import type { JobData, QueueName } from "@/lib/jobs";
 import { generateEInvoice } from "@/lib/einvoice";
 import { MoneyError } from "@/lib/money-error";
+import { withMoney } from "@/lib/ledger";
+import { purgePings } from "@/lib/field";
 
 /**
  * Worker-side handlers. Phase 0 keeps them small (logging, housekeeping);
@@ -45,8 +47,22 @@ export const handlers: Partial<Record<QueueName, Handler>> = {
     const res = await asPlatform((tx) => tx.otpChallenge.deleteMany({ where: { createdAt: { lt: cutoff } } }));
     console.log(`[job] otp.cleanup removed ${res.count}`);
   },
+  "pings.cleanup": async () => {
+    // Each business keeps positions for its own retention period (Settings -> Field team).
+    const tenants = await asPlatform((tx) => tx.tenant.findMany({ select: { id: true } }));
+    let total = 0;
+    for (const t of tenants) total += await withMoney(t.id, null, (ctx) => purgePings(ctx));
+    console.log(`[job] pings.cleanup removed ${total}`);
+  },
+  "handoff.cleanup": async () => {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const res = await asPlatform((tx) => tx.handoffUse.deleteMany({ where: { usedAt: { lt: cutoff } } }));
+    console.log(`[job] handoff.cleanup removed ${res.count}`);
+  },
 };
 
 export const schedules: { name: QueueName; cron: string }[] = [
   { name: "otp.cleanup", cron: "30 3 * * *" }, // 03:30 IST daily
+  { name: "pings.cleanup", cron: "45 3 * * *" },
+  { name: "handoff.cleanup", cron: "50 3 * * *" },
 ];

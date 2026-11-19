@@ -1,4 +1,5 @@
 import { MoneyError, cashInHand, type Ctx } from "@/lib/ledger";
+import { checkIn } from "@/lib/field";
 import { docNumber, fyCode, istDate } from "@/lib/gst";
 import { nextSequence } from "@/lib/orders";
 import { deliverySettings } from "@/lib/delivery-settings";
@@ -222,6 +223,7 @@ export async function startTrip(ctx: Ctx, tripId: string, now = new Date(), opts
   const driver = await ctx.tx.deliveryAgentProfile.findUniqueOrThrow({ where: { id: trip.driverId }, select: { userId: true } });
   const onDuty = await ctx.tx.dutyShift.findFirst({ where: { userId: driver.userId, endAt: null } });
   if (!onDuty) await ctx.tx.dutyShift.create({ data: { userId: driver.userId, startAt: now } });
+  await checkIn(ctx, driver.userId, { now }, { auto: true });
   return { docs, orderIds: stops.map((s) => s.orderId) };
 }
 

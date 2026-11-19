@@ -3,6 +3,7 @@ import { getTenant } from "@/lib/tenant";
 import { tenantDb } from "@/lib/db";
 import { verifyOtp, consumeVerifiedPhone, OtpError } from "@/lib/otp";
 import { createSessionCookie, roleHome } from "@/lib/auth";
+import { isFieldRole } from "@/lib/field-settings";
 
 export async function POST(req: Request) {
   const tenant = await getTenant();
@@ -25,9 +26,14 @@ export async function POST(req: Request) {
     throw e;
   }
 
-  const existing = await db.user.findFirst({ where: { phone }, include: { retailerProfile: true } });
+  // Shops and field staff sign in with OTP. Field staff with this phone win
+  // (a phone can be both a shop and a staff member only by mistake).
+  const users = await db.user.findMany({ where: { phone }, include: { retailerProfile: true } });
+  // The staff form sends as: "staff" so a shop's mobile typed there never signs in as the shop.
+  const staffOnly = body?.as === "staff";
+  const existing = users.find((u) => isFieldRole(u.role)) ?? (staffOnly ? null : users.find((u) => u.retailerProfile)) ?? null;
 
-  if (existing && existing.retailerProfile) {
+  if (existing) {
     if (!existing.active) {
       return NextResponse.json({ error: "This account has been deactivated" }, { status: 403 });
     }
@@ -37,6 +43,8 @@ export async function POST(req: Request) {
       tenantId: tenant.id,
       role: existing.role,
       name: existing.name,
+      via: "otp",
+      phone,
     });
     return NextResponse.json({ status: "login", redirect: roleHome(existing.role) });
   }

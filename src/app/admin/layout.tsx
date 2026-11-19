@@ -15,6 +15,7 @@ const nav: NavItem[] = [
   { href: "/admin/pricing", labelKey: "nav.pricing", icon: "rupee" },
   { href: "/admin/schemes", labelKey: "nav.schemes", icon: "percent" },
   { href: "/admin/team", labelKey: "nav.team", icon: "users" },
+  { href: "/team", labelKey: "nav.field", icon: "pin" },
   { href: "/admin/regions", labelKey: "nav.regions", icon: "map" },
   { href: "/admin/import", labelKey: "nav.import", icon: "upload" },
   { href: "/admin/settings", labelKey: "nav.settings", icon: "settings" },

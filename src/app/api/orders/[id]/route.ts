@@ -30,9 +30,14 @@ export async function GET(
     }
   } else if (session.role === "SALES_AGENT") {
     const agent = await db.salesAgentProfile.findUnique({ where: { userId: session.userId } });
-    if (!agent || order.retailer.salesAgentId !== agent.id) {
+    if (!agent || (order.retailer.salesAgentId !== agent.id && order.placedById !== session.userId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+  } else if (session.role === "SUPERVISOR") {
+    const placer = order.placedById ? await db.user.findUnique({ where: { id: order.placedById }, select: { id: true, supervisorId: true } }) : null;
+    const agentUser = order.retailer.salesAgentId ? await db.salesAgentProfile.findUnique({ where: { id: order.retailer.salesAgentId }, select: { user: { select: { id: true, supervisorId: true } } } }) : null;
+    const mine = (u: { id: string; supervisorId: string | null } | null | undefined) => !!u && (u.id === session.userId || u.supervisorId === session.userId);
+    if (!mine(placer) && !mine(agentUser?.user)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   } else if (session.role === "DELIVERY_AGENT") {
     const agent = await db.deliveryAgentProfile.findUnique({ where: { userId: session.userId } });
     if (!agent || order.delivery?.deliveryAgentId !== agent.id) {
