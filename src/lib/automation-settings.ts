@@ -25,6 +25,14 @@ export type AutomationSettings = {
    * and the next-day load sheet (topUp: load up to the usual for that weekday).
    */
   forecast: { on: boolean; coverDays: number; serviceLevel: number; topUp: boolean };
+  /**
+   * A1: shops and agents type, paste or speak an order and it becomes a cart
+   * to check; whatsapp: orders sent to the business's WhatsApp number become
+   * drafts the shop confirms in the app.
+   */
+  orderText: { on: boolean; whatsapp: boolean };
+  /** A11: the owner asks questions about the business in Hindi or English. */
+  ask: { on: boolean };
 };
 
 export const AUTOMATION_DEFAULTS: AutomationSettings = {
@@ -35,6 +43,8 @@ export const AUTOMATION_DEFAULTS: AutomationSettings = {
   usualOrder: { on: true },
   tripPlan: { on: true, maxDrops: 25 },
   forecast: { on: true, coverDays: 7, serviceLevel: 90, topUp: true },
+  orderText: { on: true, whatsapp: true },
+  ask: { on: true },
 };
 
 export type AutomationKey = keyof AutomationSettings;

@@ -23,6 +23,7 @@ import { runBilling } from "@/lib/billing";
 import { runExport, runLifecycle } from "@/lib/tenant-data";
 import { runDailySummaries } from "@/lib/daily-summary";
 import { runAutomations } from "@/lib/automation";
+import { readDraft } from "@/lib/order-drafts";
 
 /**
  * Worker-side handlers. Phase 0 keeps them small (logging, housekeeping);
@@ -158,6 +159,10 @@ export const handlers: Partial<Record<QueueName, Handler>> = {
   },
   "automation.weekly": async () => {
     console.log(`[job] automation.weekly`, JSON.stringify(await runAutomations(new Date(), { weekly: true })));
+  },
+  "order.message": async (job) => {
+    const { tenantId, draftId } = job.data as JobData & { draftId: string };
+    await readDraft(tenantId, draftId);
   },
   "reports.daily_summary": async () => {
     const r = await runDailySummaries();

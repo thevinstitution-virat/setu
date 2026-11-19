@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { spendDraft } from "@/lib/order-drafts";
 import { guard } from "@/lib/guard";
 import { emit } from "@/lib/jobs";
 import { withMoney } from "@/lib/ledger";
@@ -63,8 +64,8 @@ export async function POST(req: Request) {
   // retailer short of balance gets a 402; a scheme that just ran out a 409).
   let order;
   try {
-    ({ order } = await withMoney(tenant.id, session.userId, (ctx) =>
-      placeOrder(ctx, {
+    ({ order } = await withMoney(tenant.id, session.userId, async (ctx) => {
+      const placed = await placeOrder(ctx, {
         retailerId: who.retailerId,
         placedById: session.userId,
         items: body.items,
@@ -72,8 +73,10 @@ export async function POST(req: Request) {
         deliveryDate: body.deliveryDate,
         notes: body.notes,
         visitId: body.visitId,
-      })
-    ));
+      });
+      if (body.draftId) await spendDraft(ctx.tx, who.retailerId, body.draftId, placed.order.id);
+      return placed;
+    }));
   } catch (e) {
     return moneyFail(e);
   }

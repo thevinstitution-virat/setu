@@ -20,6 +20,7 @@ import { automationSettings, type AutomationSettings } from "@/lib/automation-se
 import { suggest, type NewSuggestion } from "@/lib/suggest";
 import { applyReorder, reviewReorder } from "@/lib/forecast";
 import { applyCatalogue, type CatalogueEdit } from "@/lib/catalogue-assist";
+import { expireDrafts } from "@/lib/order-drafts";
 import {
   ANOMALY_LABEL,
   CREDIT_BAND_LABEL,
@@ -674,7 +675,8 @@ export async function runFeature(tenantId: string, feature: Feature, trigger: "s
         if (feature === "checks") return runChecks(ctx, addDay(day, -1), s);
         if (feature === "credit") return reviewCredit(ctx, now, s);
         if (feature === "reorder") return reviewReorder(ctx, now, s);
-        return (await tx.suggestion.updateMany({ where: { status: "OPEN", expiresAt: { lte: now } }, data: { status: "EXPIRED" } })).count;
+        const old = (await tx.suggestion.updateMany({ where: { status: "OPEN", expiresAt: { lte: now } }, data: { status: "EXPIRED" } })).count;
+        return old + (await expireDrafts(tx, now));
       },
       { timeout: 120_000 }
     );

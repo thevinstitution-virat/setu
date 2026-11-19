@@ -172,6 +172,7 @@ model Tenant {
   visitTasks         VisitTask[]
   automationRuns     AutomationRun[]
   aiCosts            AiCostLog[]
+  orderDrafts        OrderDraft[]
   platformInvoices   PlatformInvoice[]
   supportSessions    SupportSession[]
   exports            TenantExport[]
@@ -331,6 +332,7 @@ model RetailerProfile {
   invoices        Invoice[]
   visits          Visit[]
   visitTasks      VisitTask[]
+  orderDrafts     OrderDraft[]
   groups          RetailerGroupMember[]
   prices          RetailerPrice[]
   bills           Bill[]
@@ -2717,4 +2719,42 @@ model AiCostLog {
   createdAt    DateTime @default(now())
 
   @@index([tenantId, createdAt])
+}
+
+/// A1: an order a shop sent as a message (WhatsApp), read into lines by the
+/// rules or AI. The shop opens it in the app, checks it and places the order;
+/// nothing is ordered from the message alone.
+model OrderDraft {
+  id         String           @id @default(cuid())
+  tenantId   String           @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant           @relation(fields: [tenantId], references: [id])
+  retailerId String
+  retailer   RetailerProfile  @relation(fields: [retailerId], references: [id])
+  /// whatsapp
+  channel    String           @default("whatsapp")
+  /// The message as sent (trimmed to 2,000 characters).
+  text       String
+  /// ParsedLine[] (lib/order-text.ts)
+  lines      Json             @default("[]")
+  /// ai | rules
+  source     String?
+  status     OrderDraftStatus @default(READING)
+  /// Provider message id: the same message is never read twice.
+  messageId  String?
+  /// The order placed from it.
+  orderId    String?
+  /// What we answered on WhatsApp (sent, logged without a provider, or the error).
+  reply      String?
+  createdAt  DateTime         @default(now())
+  expiresAt  DateTime
+
+  @@unique([tenantId, messageId])
+  @@index([tenantId, retailerId, status])
+}
+
+enum OrderDraftStatus {
+  READING
+  OPEN
+  USED
+  EXPIRED
 }

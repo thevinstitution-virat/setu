@@ -59,5 +59,7 @@ export function parseCartBody(body: unknown) {
     notes: typeof b.notes === "string" ? b.notes.slice(0, 500) : null,
     retailerId: b.retailerId,
     visitId: typeof b.visitId === "string" ? b.visitId : null,
+    /** A WhatsApp order draft this cart came from (A1): used up when the order is placed. */
+    draftId: typeof b.draftId === "string" ? b.draftId : null,
   };
 }

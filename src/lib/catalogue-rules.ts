@@ -11,7 +11,7 @@
  *   GST "18%" → "18", HSN digits only, category names matched to existing
  *   ones, and likely duplicates (in the sheet and in the catalogue).
  */
-import { soundKey } from "@/lib/translit";
+import { plainKey, soundKey } from "@/lib/translit";
 
 // ---------- Hindi names ----------
 
@@ -96,6 +96,25 @@ export function latinToDevanagari(word: string): string {
     i += c[0].length;
   }
   return out;
+}
+
+let groups: Map<string, string[]> | null = null;
+
+/**
+ * Words that name the same thing, as plain Latin keys: "chai" → tea, chai,
+ * chaay (चाय). From the Hindi word list; empty when the word isn't in it.
+ */
+export function sameWords(word: string): string[] {
+  if (!groups) {
+    const byHindi = new Map<string, string[]>();
+    for (const [en, hi] of Object.entries(WORDS)) byHindi.set(hi, [...(byHindi.get(hi) ?? []), en]);
+    groups = new Map();
+    for (const [hi, ens] of byHindi) {
+      const all = [...new Set([...ens, ...plainKey(hi).split(" ")])].filter((w) => w.length > 1);
+      for (const w of all) groups.set(w, [...new Set([...(groups.get(w) ?? []), ...all])]);
+    }
+  }
+  return groups.get(plainKey(word)) ?? [];
 }
 
 /** Hindi name by the rules: known words translated, sizes in Hindi units, the rest spelt by sound. */

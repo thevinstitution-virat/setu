@@ -14,6 +14,7 @@ const TABS = [
   { href: "/admin/reports/schemes", label: "Schemes", kind: "schemes" },
   { href: "/admin/reports/routes", label: "Routes", kind: "routes" },
   { href: "/admin/reports/returns", label: "Returns", kind: "returns" },
+  { href: "/admin/reports/ask", label: "Ask", kind: "ask" },
 ] as const;
 
 const SHOWN: Preset[] = ["today", "7d", "30d", "mtd", "last_month", "90d", "fy"];
@@ -61,6 +62,7 @@ export default function ReportNav() {
           );
         })}
       </nav>
+      {tab.kind !== "ask" && (
       <div className="flex flex-wrap items-center gap-1.5">
         {SHOWN.map((p) => (
           <button
@@ -83,7 +85,8 @@ export default function ReportNav() {
           </a>
         )}
       </div>
-      {open && (
+      )}
+      {open && tab.kind !== "ask" && (
         <form
           className="flex flex-wrap items-end gap-2"
           onSubmit={(e) => {

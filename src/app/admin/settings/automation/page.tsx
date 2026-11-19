@@ -239,6 +239,33 @@ export default function AutomationSettingsPage() {
             <NumberSetting label="Order enough to last" hint="After the supplier's delivery time" value={s.forecast.coverDays} min={1} max={60} unit="days" disabled={busy || !s.forecast.on} onSave={(v) => save("forecast", { coverDays: v })} />
             <NumberSetting label="Stock should last" hint="Higher keeps more safety stock" value={s.forecast.serviceLevel} min={50} max={99} unit="% of days" disabled={busy || !s.forecast.on} onSave={(v) => save("forecast", { serviceLevel: v })} />
           </section>
+
+          <section className="card p-4 space-y-3">
+            <h2 className="font-heading font-bold">Orders by text and voice</h2>
+            <p className="text-xs text-[var(--muted)]">
+              Shops and agents type, paste or speak an order the way they&apos;d say it (&ldquo;5 peti nimbu, 2 jeera&rdquo;). It is matched to your products and becomes a cart they check before placing. Works without AI; with AI it reads messier messages.
+            </p>
+            <Toggle checked={s.orderText.on} disabled={busy} onChange={(v) => save("orderText", { on: v })} label="Type or speak your order" />
+            <Toggle
+              checked={s.orderText.whatsapp}
+              disabled={busy || !s.orderText.on}
+              onChange={(v) => save("orderText", { whatsapp: v })}
+              label="Orders sent on WhatsApp"
+              hint="A shop's message to the WhatsApp order number comes back as a link to check and place it. Nothing is ordered without the shop."
+            />
+          </section>
+
+          <section className="card p-4 space-y-3">
+            <h2 className="font-heading font-bold">Ask your business</h2>
+            <p className="text-xs text-[var(--muted)]">
+              On{" "}
+              <Link href="/admin/reports/ask" className="font-bold text-[var(--kesar-text)]">
+                Reports → Ask
+              </Link>
+              , ask in Hindi or English: &ldquo;who owes more than 20,000 for over 30 days?&rdquo;. Answers come from your reports, never made up.
+            </p>
+            <Toggle checked={s.ask.on} disabled={busy} onChange={(v) => save("ask", { on: v })} label="Allow questions" />
+          </section>
         </div>
       )}
 
