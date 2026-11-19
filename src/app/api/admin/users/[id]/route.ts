@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { audit, requestIp } from "@/lib/audit";
 import { checkStaffFields } from "@/lib/staff";
+import { checkLimit, LimitError } from "@/lib/plans";
 
 /** Body: { active?, name?, phone?, supervisorId? } — only the keys sent change. */
 export async function PATCH(
@@ -14,7 +15,7 @@ export async function PATCH(
   const { id } = await params;
   const body = (await req.json().catch(() => null)) ?? {};
 
-  const target = await db.user.findUnique({ where: { id }, select: { role: true } });
+  const target = await db.user.findUnique({ where: { id }, select: { role: true, active: true } });
   if (!target || target.role === "RETAILER") return NextResponse.json({ error: "Staff member not found" }, { status: 404 });
   if (id === session.userId && body.active === false) return NextResponse.json({ error: "You can't deactivate yourself" }, { status: 400 });
 
@@ -23,6 +24,15 @@ export async function PATCH(
   const data: { active?: boolean; name?: string; phone?: string | null; supervisorId?: string | null } = { ...extra.data };
   if (typeof body.active === "boolean") data.active = body.active;
   if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim().slice(0, 80);
+
+  if (data.active === true && !target.active) {
+    try {
+      await checkLimit(db, auth.tenant.id, "staff");
+    } catch (e) {
+      if (e instanceof LimitError) return NextResponse.json({ error: e.message, code: "limit" }, { status: 402 });
+      throw e;
+    }
+  }
 
   const user = await db.user.update({ where: { id }, data });
   // A supervisor who is switched off leaves their team without a supervisor.

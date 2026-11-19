@@ -9,6 +9,10 @@ export async function POST(req: Request) {
   const tenant = await getTenant();
   if (!tenant) return NextResponse.json({ error: "Unknown business address" }, { status: 404 });
   const db = tenantDb(tenant.id);
+  // OTP sign-in is for shops and field staff; a paused business takes neither.
+  if (tenant.status === "SUSPENDED") {
+    return NextResponse.json({ error: "This business is paused. Please contact the office.", code: "paused" }, { status: 423 });
+  }
 
   const body = await req.json().catch(() => null);
   const phone = body?.phone?.trim();
@@ -28,7 +32,7 @@ export async function POST(req: Request) {
 
   // Shops and field staff sign in with OTP. Field staff with this phone win
   // (a phone can be both a shop and a staff member only by mistake).
-  const users = await db.user.findMany({ where: { phone }, include: { retailerProfile: true } });
+  const users = await db.user.findMany({ where: { phone, isSupport: false }, include: { retailerProfile: true } });
   // The staff form sends as: "staff" so a shop's mobile typed there never signs in as the shop.
   const staffOnly = body?.as === "staff";
   const existing = users.find((u) => isFieldRole(u.role)) ?? (staffOnly ? null : users.find((u) => u.retailerProfile)) ?? null;

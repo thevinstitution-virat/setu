@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { pageSession } from "@/lib/guard";
 import { can } from "@/lib/permissions";
 import AppShell, { type NavItem } from "@/components/AppShell";
+import { layoutChrome } from "@/lib/chrome";
 import DutyTracker from "@/components/field/DutyTracker";
 
 const nav: NavItem[] = [
@@ -23,8 +24,10 @@ export default async function TeamLayout({ children }: { children: React.ReactNo
     ? [...nav, { href: "/team/me", labelKey: "nav.attendance", icon: "user" }]
     : [{ href: "/admin", labelKey: "nav.pipeline", icon: "home" }, ...nav];
 
+  const chrome = await layoutChrome(session, items);
+
   return (
-    <AppShell nav={items} userName={session.name} roleKey={supervisor ? "role.supervisor" : "role.admin"}>
+    <AppShell chrome={chrome} nav={items} userName={session.name} roleKey={supervisor ? "role.supervisor" : "role.admin"}>
       {supervisor && <DutyTracker />}
       {children}
     </AppShell>

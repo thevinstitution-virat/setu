@@ -1,3 +1,4 @@
+import { publicTenantUrl } from "@/lib/redirect";
 /**
  * Multi-distributor agents (Phase 6): one person selling for several
  * businesses has a login in each, linked by the same verified phone.
@@ -73,7 +74,6 @@ export async function consumeHandoff(token: string, tenantId: string) {
 }
 
 /** Address of another business, on the same scheme and port as this request. */
-export function workspaceUrl(reqUrl: string, slug: string, path: string) {
-  const u = new URL(reqUrl);
-  return `${u.protocol}//${slug}.${platformDomain()}${u.port ? `:${u.port}` : ""}${path}`;
+export function workspaceUrl(_reqUrl: string, slug: string, path: string) {
+  return publicTenantUrl(slug, platformDomain(), path);
 }

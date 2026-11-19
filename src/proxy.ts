@@ -21,31 +21,43 @@ const protectedPrefixes: Record<string, string> = {
   "/delivery": "DELIVERY_AGENT",
 };
 
+/**
+ * 1. Passes the path and method on to the app (x-setu-path / x-setu-method),
+ *    so guard() and layouts can check the plan's modules and read-only
+ *    support sessions in one place. Any such header sent by a client is
+ *    overwritten here.
+ * 2. Sends signed-out visitors of the role areas to /login.
+ */
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const headers = new Headers(request.headers);
+  headers.set("x-setu-path", pathname);
+  headers.set("x-setu-method", request.method);
+  const next = () => NextResponse.next({ request: { headers } });
+  // Relative Location: stay on the visitor's own address (request.url can carry the server's host).
+  const to = (path: string) => new NextResponse(null, { status: 307, headers: { Location: path } });
 
-  const matchedPrefix = Object.keys(protectedPrefixes).find((p) =>
-    pathname.startsWith(p)
-  );
-  if (!matchedPrefix) return NextResponse.next();
+  const matchedPrefix = Object.keys(protectedPrefixes).find((p) => pathname === p || pathname.startsWith(`${p}/`));
+  if (!matchedPrefix) return next();
 
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   if (!token) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return to("/login");
   }
 
   try {
     const { payload } = await jwtVerify(token, secret);
     const role = payload.role as string;
     if (role !== protectedPrefixes[matchedPrefix]) {
-      return NextResponse.redirect(new URL(roleHomes[role] ?? "/login", request.url));
+      return to(roleHomes[role] ?? "/login");
     }
-    return NextResponse.next();
+    return next();
   } catch {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return to("/login");
   }
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/retailer/:path*", "/sales/:path*", "/delivery/:path*"],
+  // Everything except Next's own files and static assets.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon-192.png|icon-512.png|sw.js).*)"],
 };

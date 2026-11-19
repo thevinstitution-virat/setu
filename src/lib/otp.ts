@@ -33,7 +33,7 @@ export class OtpError extends Error {
 }
 
 /** Provider hook. Wire the chosen SMS / WhatsApp provider here. */
-async function sendOtpSms(phone: string, code: string, tenantName: string): Promise<void> {
+export async function sendOtpSms(phone: string, code: string, tenantName: string): Promise<void> {
   if (!process.env.SMS_PROVIDER) {
     if (otpDevMode()) return;
     throw new OtpError("SMS is not configured yet. Please contact support.", 503);

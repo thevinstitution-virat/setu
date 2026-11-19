@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { withTenantTx } from "@/lib/db";
+import { countRetailers, entitlements } from "@/lib/plans";
 import { audit, requestIp } from "@/lib/audit";
 import { emit } from "@/lib/jobs";
 import { MoneyError, openingBalance } from "@/lib/ledger";
@@ -32,7 +33,7 @@ class Rollback extends Error {
   }
 }
 
-async function importRetailers(tx: Tx, rows: RetailerRow[]): Promise<Summary> {
+async function importRetailers(tx: Tx, rows: RetailerRow[], tenantId: string): Promise<Summary> {
   const s: Summary = { created: 0, updated: 0, newRegions: 0, newAreas: 0, errors: [] };
 
   const regions = new Map(
@@ -109,6 +110,12 @@ async function importRetailers(tx: Tx, rows: RetailerRow[]): Promise<Summary> {
       });
       s.created++;
     }
+  }
+  // The plan's shop limit, counted with the new shops inside this transaction.
+  const limit = (await entitlements(tenantId)).limits.retailers;
+  if (limit !== undefined && s.created) {
+    const n = await countRetailers(tx);
+    if (n > limit) s.errors.push({ row: 0, message: `Your plan allows ${limit} shops; this file would make ${n}. Move to a bigger plan under Billing, or import fewer.` });
   }
   return s;
 }
@@ -297,7 +304,7 @@ export async function POST(req: Request) {
       async (tx) => {
         const s =
           type === "retailers"
-            ? await importRetailers(tx, checked.valid as RetailerRow[])
+            ? await importRetailers(tx, checked.valid as RetailerRow[], tenant.id)
             : type === "products"
               ? await importProducts(tx, checked.valid as ProductRow[])
               : type === "prices"

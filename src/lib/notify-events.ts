@@ -185,6 +185,14 @@ export const EVENTS = {
     en: { title: "{title}", body: "{body}" },
     hi: { title: "{title}", body: "{body}" },
   },
+  "staff.billing": {
+    label: "Plan and billing (owner)",
+    audience: "staff",
+    channels: ["push"],
+    vars: ["title", "body"],
+    en: { title: "{title}", body: "{body}" },
+    hi: { title: "{title}", body: "{body}" },
+  },
 } as const satisfies Record<string, EventDef>;
 
 export type EventKey = keyof typeof EVENTS;

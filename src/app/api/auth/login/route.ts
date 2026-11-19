@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   }
 
   const user = await db.user.findFirst({
-    where: { OR: [{ loginId }, { email: loginId }] },
+    where: { OR: [{ loginId }, { email: loginId }], isSupport: false },
     omit: { passwordHash: false },
   });
 
@@ -28,6 +28,10 @@ export async function POST(req: Request) {
 
   if (!user.active) {
     return NextResponse.json({ error: "This account has been deactivated" }, { status: 403 });
+  }
+
+  if (tenant.status === "SUSPENDED" && user.role !== "ADMIN") {
+    return NextResponse.json({ error: "This business is paused. Please contact the office.", code: "paused" }, { status: 423 });
   }
 
   await createSessionCookie({ userId: user.id, tenantId: tenant.id, role: user.role, name: user.name, via: "password" });

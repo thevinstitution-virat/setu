@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import Icon from "@/components/Icon";
 import { formatINR, toPaise } from "@/lib/money";
 import type { CartSettings } from "@/lib/cart-settings";
@@ -357,6 +358,17 @@ export default function SettingsPage() {
             <a href="#referral" className="chip">
               Refer &amp; earn
             </a>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            <Link href="/admin/settings/brand" className="chip chip-kesar">
+              Brand <Icon name="arrow" className="h-3.5 w-3.5" />
+            </Link>
+            <Link href="/admin/settings/domains" className="chip chip-kesar">
+              Web address <Icon name="arrow" className="h-3.5 w-3.5" />
+            </Link>
+            <Link href="/admin/account" className="chip chip-kesar">
+              Your data <Icon name="arrow" className="h-3.5 w-3.5" />
+            </Link>
           </div>
         </div>
 

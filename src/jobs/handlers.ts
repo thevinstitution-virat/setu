@@ -19,6 +19,8 @@ import { lapseReferrals, qualifyReferral } from "@/lib/referrals";
 import { syncOpen } from "@/lib/gateway";
 import { flushAllWebhooks, flushWebhooks, orderWebhook, retailerWebhook } from "@/lib/webhooks";
 import { locateShops } from "@/lib/maps";
+import { runBilling } from "@/lib/billing";
+import { runExport, runLifecycle } from "@/lib/tenant-data";
 
 /**
  * Worker-side handlers. Phase 0 keeps them small (logging, housekeeping);
@@ -140,6 +142,15 @@ export const handlers: Partial<Record<QueueName, Handler>> = {
     const res = await asPlatform((tx) => tx.handoffUse.deleteMany({ where: { usedAt: { lt: cutoff } } }));
     console.log(`[job] handoff.cleanup removed ${res.count}`);
   },
+  "tenant.export": async (job) => {
+    const r = await runExport(job.data.tenantId, String(job.data.exportId));
+    console.log(`[job] tenant.export ${job.data.exportId}: ${r ? `${r.rows} rows` : "already done"}`);
+  },
+  "billing.daily": async () => {
+    const b = await runBilling();
+    const l = await runLifecycle();
+    console.log(`[job] billing.daily`, JSON.stringify({ ...b, purged: l.purged.length, exportsExpired: l.exportsExpired }));
+  },
 };
 
 async function tenants() {
@@ -157,4 +168,5 @@ export const schedules: { name: QueueName; cron: string }[] = [
   { name: "otp.cleanup", cron: "30 3 * * *" }, // 03:30 IST daily
   { name: "pings.cleanup", cron: "45 3 * * *" },
   { name: "handoff.cleanup", cron: "50 3 * * *" },
+  { name: "billing.daily", cron: "0 6 * * *" }, // 06:00 IST
 ];

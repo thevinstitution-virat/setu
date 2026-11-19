@@ -19,16 +19,18 @@ export type SessionPayload = {
   role: Role;
   name: string;
   /** How this session was opened. Only OTP / handoff sessions may hop to another business (Phase 6 multi-distributor). */
-  via?: "password" | "otp" | "handoff";
+  via?: "password" | "otp" | "handoff" | "welcome" | "support";
+  /** Support sessions (Phase 9): the SupportSession id; checked on every request. */
+  supportId?: string;
   /** Verified phone (OTP / handoff sessions). */
   phone?: string;
 };
 
-export async function createSessionCookie(payload: SessionPayload) {
+export async function createSessionCookie(payload: SessionPayload, maxAgeSec = 60 * 60 * 24 * 30) {
   const token = await new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("30d")
+    .setExpirationTime(Math.floor(Date.now() / 1000) + maxAgeSec)
     .sign(sessionSecret());
 
   // Host-only cookie: never shared between tenant subdomains.
@@ -38,7 +40,7 @@ export async function createSessionCookie(payload: SessionPayload) {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: maxAgeSec,
   });
 }
 

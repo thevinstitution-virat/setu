@@ -19,6 +19,7 @@ import { adjustStock, draftReorderPos, receiveGoods, setPoStatus } from "../src/
 import { seedField } from "./seed-field";
 import { seedEngage } from "./seed-engage";
 import { seedPayments } from "./seed-payments";
+import { seedSaas } from "./seed-saas";
 
 /** Made-up GSTIN with a valid check digit (test data only). */
 const testGstin = (first14: string) => `${first14}${gstinCheckDigit(first14)}`;
@@ -61,6 +62,8 @@ async function wipe() {
       "AuditLog", "Counter", "OtpChallenge", "Delivery", "Visit", "Attendance",
       "OrderStatusEvent", "OrderItem", "Order", "Product", "Beat",
       "RetailerProfile", "SalesAgentProfile", "DeliveryAgentProfile", "Area", "Region", "User",
+      "PlatformAudit", "PlatformAnnouncement", "SupportSession", "PlatformUser", "TenantExport", "SignupChallenge",
+      "PlatformInvoice", "PlatformCounter", "UsageCounter", "Subscription", "Plan",
       "TenantDomain", "Tenant",
     ].map((t) => `"${t}"`).join(", ")} CASCADE`
   );
@@ -706,6 +709,7 @@ async function main() {
   await wipe();
   await seedDemo();
   await seedSecond();
+  const saas = await seedSaas(prisma);
   console.log("Seed complete.");
   console.log("Tenant 'demo'   → http://demo.localhost:3100");
   console.log("  Admin: admin / admin123 · Sales: 'Test agent' / 123456789 · Delivery: deliveryagent@gmail.com / 123456789");
@@ -713,6 +717,8 @@ async function main() {
   console.log("  Supervisor: supervisor / 123456789 · Second agent: ravi / 123456789 · Field OTP phones: 9000000001 (supervisor), 9000000002 (Test Agent)");
   console.log("Tenant 'second' → http://second.localhost:3100");
   console.log("  Admin: admin / second123 · Retailer OTP phone: 9876543210 · Test Agent: agent / 123456789 (same phone 9000000002)");
+  console.log("Platform console → http://platform.localhost:3100/platform");
+  console.log(`  owner@setu.local / platform123 (owner) · support@setu.local / platform123 (support) · demo invoice ${saas.invoice ?? "none"}`);
 }
 
 main()

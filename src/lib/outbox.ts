@@ -1,4 +1,5 @@
 import webpush from "web-push";
+import { meter } from "@/lib/billing";
 import type { MessageLog } from "@/generated/prisma/client";
 import { asPlatform, withTenantTx } from "@/lib/db";
 
@@ -134,12 +135,14 @@ export async function flushTenant(tenantId: string, limit = 200, now = new Date(
     if (!claimed.count) continue;
     const out = await deliver(tenantId, m);
     tally[out.status]++;
-    await withTenantTx(tenantId, (tx) =>
-      tx.messageLog.update({
+    await withTenantTx(tenantId, async (tx) => {
+      await tx.messageLog.update({
         where: { id: m.id },
         data: { status: out.status, provider: out.provider ?? null, providerId: out.providerId ?? null, error: out.error ?? null, sentAt: new Date() },
-      })
-    );
+      });
+      // Paid channels count toward the business's usage (platform cost view).
+      if (out.status === "SENT" && m.channel !== "PUSH") await meter(tx, tenantId, "messages");
+    });
   }
   return tally;
 }

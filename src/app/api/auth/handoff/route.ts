@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { localRedirect } from "@/lib/redirect";
 import { guard } from "@/lib/guard";
 import { audit, requestIp } from "@/lib/audit";
 import { createSessionCookie, roleHome } from "@/lib/auth";
@@ -32,15 +33,13 @@ export async function GET(req: Request) {
   const tenant = await getTenant();
   if (!tenant) return NextResponse.json({ error: "Unknown business address" }, { status: 404 });
   const token = new URL(req.url).searchParams.get("t") ?? "";
-  const login = new URL("/login", req.url);
   try {
     const { user, phone } = await consumeHandoff(token, tenant.id);
     await createSessionCookie({ userId: user.id, tenantId: tenant.id, role: user.role, name: user.name, via: "handoff", phone });
     await audit(tenantDb(tenant.id), { actorId: user.id, action: "auth.handoff_in", entity: "User", entityId: user.id, ip: requestIp(req) });
-    return NextResponse.redirect(new URL(roleHome(user.role), req.url), 303);
+    return localRedirect(roleHome(user.role), 303);
   } catch (e) {
     if (!(e instanceof HandoffError)) throw e;
-    login.searchParams.set("error", e.message);
-    return NextResponse.redirect(login, 303);
+    return localRedirect(`/login?error=${encodeURIComponent(e.message)}`, 303);
   }
 }

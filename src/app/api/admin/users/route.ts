@@ -3,6 +3,7 @@ import { guard } from "@/lib/guard";
 import { hashPassword } from "@/lib/password";
 import { audit, requestIp } from "@/lib/audit";
 import { checkStaffFields } from "@/lib/staff";
+import { checkLimit, LimitError } from "@/lib/plans";
 
 export async function GET() {
   const auth = await guard("team.view");
@@ -42,6 +43,13 @@ export async function POST(req: Request) {
   const existing = await db.user.findFirst({ where: { loginId } });
   if (existing) {
     return NextResponse.json({ error: "That login ID is already in use" }, { status: 400 });
+  }
+
+  try {
+    await checkLimit(db, auth.tenant.id, "staff");
+  } catch (e) {
+    if (e instanceof LimitError) return NextResponse.json({ error: e.message, code: "limit" }, { status: 402 });
+    throw e;
   }
 
   const user = await db.user.create({

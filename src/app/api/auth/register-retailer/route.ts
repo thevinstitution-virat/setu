@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkLimit, LimitError } from "@/lib/plans";
 import { getTenant } from "@/lib/tenant";
 import { tenantDb } from "@/lib/db";
 import { isPhoneVerified, consumeVerifiedPhone } from "@/lib/otp";
@@ -43,6 +44,14 @@ export async function POST(req: Request) {
       if (e instanceof MoneyError) return NextResponse.json({ error: e.message }, { status: e.status });
       throw e;
     }
+  }
+
+  if (tenant.status === "SUSPENDED") return NextResponse.json({ error: "This business is not taking new shops right now", code: "paused" }, { status: 423 });
+  try {
+    await checkLimit(db, tenant.id, "retailers");
+  } catch (e) {
+    if (e instanceof LimitError) return NextResponse.json({ error: "This business is not taking new shops online right now. Please call the office.", code: "limit" }, { status: 402 });
+    throw e;
   }
 
   const user = await db.user.create({

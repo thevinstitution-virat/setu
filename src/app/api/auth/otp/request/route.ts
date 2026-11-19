@@ -6,6 +6,8 @@ import { issueOtp, OtpError } from "@/lib/otp";
 export async function POST(req: Request) {
   const tenant = await getTenant();
   if (!tenant) return NextResponse.json({ error: "Unknown business address" }, { status: 404 });
+  // A paused business: shops and staff can't sign in, so don't spend an SMS on a code.
+  if (tenant.status === "SUSPENDED") return NextResponse.json({ error: "This business is paused. The owner can sign in to see why." }, { status: 423 });
 
   const body = await req.json().catch(() => null);
   const phone = body?.phone?.trim();

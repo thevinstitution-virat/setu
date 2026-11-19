@@ -44,6 +44,7 @@ import {
 } from "@/lib/field-math";
 import { emit } from "@/lib/jobs";
 import { retailerWebhook } from "@/lib/webhooks";
+import { checkLimit, LimitError } from "@/lib/plans";
 
 const fail = (msg: string, status = 400, extra?: Record<string, unknown>) => new MoneyError(msg, status, extra);
 
@@ -580,6 +581,12 @@ export async function decideLead(ctx: Ctx, deciderId: string, id: string, input:
   if (clashes.length) throw fail(clashes[0], 409, { clashes });
   const salesAgentId = input.salesAgentId === undefined ? lead.salesAgentId : input.salesAgentId;
   if (salesAgentId && !(await ctx.tx.salesAgentProfile.findUnique({ where: { id: salesAgentId }, select: { id: true } }))) throw fail("Pick a sales agent");
+  try {
+    await checkLimit(ctx.tx, ctx.tenantId, "retailers");
+  } catch (e) {
+    if (e instanceof LimitError) throw fail(e.message, 402);
+    throw e;
+  }
   const user = await ctx.tx.user.create({
     data: {
       name: lead.ownerName,

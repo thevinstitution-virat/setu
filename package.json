@@ -11,6 +11,8 @@
     "db:seed": "prisma db seed",
     "worker": "tsx scripts/worker.ts",
     "tenant:create": "tsx scripts/tenant-create.ts",
+    "platform:user": "tsx scripts/platform-user.ts",
+    "android:config": "tsx scripts/android-config.ts",
     "typecheck": "next typegen && tsc --noEmit --incremental false"
   },
   "dependencies": {
