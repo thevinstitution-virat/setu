@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { audit, requestIp } from "@/lib/audit";
 import { emit } from "@/lib/jobs";
+import { MoneyError, onOrderDispatched, withMoney } from "@/lib/ledger";
+import { moneyFail } from "@/lib/money-api";
+import { queueEInvoice } from "@/lib/einvoice-queue";
 
 export async function POST(
   req: Request,
@@ -35,21 +38,30 @@ export async function POST(
     );
   }
 
-  await db.delivery.upsert({
-    where: { orderId: id },
-    update: { deliveryAgentId },
-    create: { orderId: id, deliveryAgentId },
-  });
-
-  const updated = await db.order.update({
-    where: { id },
-    data: {
-      status: "OUT_FOR_DELIVERY",
-      statusEvents: {
-        create: { status: "OUT_FOR_DELIVERY", actorId: session.userId, note: "Assigned for delivery" },
-      },
-    },
-  });
+  // Assign, move to out-for-delivery and (when invoicing at dispatch) issue the
+  // invoice and book the sale — all or nothing.
+  let updated, invoice;
+  try {
+    ({ updated, invoice } = await withMoney(auth.tenant.id, session.userId, async (ctx) => {
+      const fresh = await ctx.tx.order.findUniqueOrThrow({ where: { id } });
+      if (fresh.status === "DELIVERED" || fresh.status === "CANCELLED") throw new MoneyError("Order can no longer be assigned");
+      await ctx.tx.delivery.upsert({
+        where: { orderId: id },
+        update: { deliveryAgentId },
+        create: { orderId: id, deliveryAgentId },
+      });
+      const statusChange =
+        fresh.status === "OUT_FOR_DELIVERY"
+          ? {}
+          : { status: "OUT_FOR_DELIVERY" as const, statusEvents: { create: { status: "OUT_FOR_DELIVERY" as const, actorId: session.userId, note: "Assigned for delivery" } } };
+      const updated = await ctx.tx.order.update({ where: { id }, data: statusChange });
+      const invoice = await onOrderDispatched(ctx, id);
+      return { updated, invoice };
+    }));
+  } catch (e) {
+    return moneyFail(e);
+  }
+  if (invoice) await queueEInvoice(auth.tenant.id, invoice);
 
   await audit(db, { actorId: session.userId, action: "order.assign", entity: "Order", entityId: id, before: { status: order.status, deliveryAgentId: order.delivery?.deliveryAgentId ?? null }, after: { status: "OUT_FOR_DELIVERY", deliveryAgentId }, ip: requestIp(req) });
   await emit("order.status", { tenantId: auth.tenant.id, orderId: id, from: order.status, to: "OUT_FOR_DELIVERY" });

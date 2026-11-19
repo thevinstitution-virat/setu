@@ -112,6 +112,8 @@ model Tenant {
   schemes           Scheme[]
   redemptions       SchemeRedemption[]
   banners           Banner[]
+  invoices          Invoice[]
+  invoiceLines      InvoiceLine[]
 }
 
 /// Custom domains a tenant has verified (e.g. order.agencyname.in).
@@ -204,7 +206,15 @@ model RetailerProfile {
   priceListId String?
   priceList   PriceList? @relation(fields: [priceListId], references: [id])
 
+  /// GST registration of the shop (B2B invoices). null = unregistered (B2C).
+  gstin     String?
+  /// Legal name as on the GST certificate; null = outlet name.
+  legalName String?
+  /// GST state code of the shop (place of supply); null = the tenant's state.
+  stateCode String?
+
   orders   Order[]
+  invoices Invoice[]
   visits   Visit[]
   groups   RetailerGroupMember[]
   prices   RetailerPrice[]
@@ -318,6 +328,8 @@ model Order {
   grossAmount      Int             @default(0)
   discountAmount   Int             @default(0)
   deliveryCharge   Int             @default(0)
+  /// GST % on the delivery charge at order time.
+  deliveryGstRate  Float           @default(0)
   couponCode       String?
   /// Delivery day chosen or assigned at order time (IST date).
   deliveryDate     DateTime?       @db.Date
@@ -338,6 +350,7 @@ model Order {
 
   items        OrderItem[]
   bill         Bill?
+  invoices     Invoice[]
   statusEvents OrderStatusEvent[]
   delivery     Delivery?
   visit        Visit?
@@ -960,4 +973,126 @@ model Banner {
   createdAt DateTime  @default(now())
 
   @@index([tenantId, active])
+}
+
+// ───────────────────────────── Invoicing and GST (Phase 3) ─────────────────────────────
+//
+// One table for every GST document: tax invoices, bills of supply, credit
+// notes and debit notes. Issued documents are immutable (a database trigger
+// refuses changes to numbers, parties and amounts, and any delete); mistakes
+// are corrected with credit / debit notes. Only the e-invoice / e-way bill
+// fields are filled in later.
+
+enum InvoiceType {
+  TAX_INVOICE
+  BILL_OF_SUPPLY
+  CREDIT_NOTE
+  DEBIT_NOTE
+}
+
+enum EInvoiceStatus {
+  NOT_REQUIRED
+  PENDING
+  GENERATED
+  FAILED
+  CANCELLED
+}
+
+model Invoice {
+  id            String          @id @default(cuid())
+  tenantId      String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant          @relation(fields: [tenantId], references: [id])
+  type          InvoiceType
+  /// e.g. INV2627-00042: per tenant, per type, per financial year, gap-free.
+  number        String
+  /// Financial year code, e.g. "2627".
+  fy            String
+  date          DateTime
+  orderId       String?
+  order         Order?          @relation(fields: [orderId], references: [id])
+  retailerId    String
+  retailer      RetailerProfile @relation(fields: [retailerId], references: [id])
+  /// Credit / debit note: the invoice it adjusts.
+  originalId    String?
+  original      Invoice?        @relation("NoteOf", fields: [originalId], references: [id])
+  notes         Invoice[]       @relation("NoteOf")
+  /// Credit / debit note: "return" (goods back), "value" (rate or discount change) or "cancel" (whole order cancelled).
+  noteKind      String?
+  reason        String?
+  /// Snapshots at issue time: { legalName, tradeName, gstin, stateCode, address, city, pinCode, phone }.
+  seller        Json
+  buyer         Json
+  /// Buyer has a GSTIN.
+  b2b           Boolean
+  /// GST state code of the place of supply.
+  placeOfSupply String
+  interState    Boolean
+  /// Paise.
+  taxable       Int
+  cgst          Int
+  sgst          Int
+  igst          Int
+  total         Int
+  /// The ledger entry this document posted.
+  entryId       String?
+  createdById   String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  einvStatus      EInvoiceStatus @default(NOT_REQUIRED)
+  irn             String?
+  ackNo           String?
+  ackDate         DateTime?
+  signedQr        String?
+  einvError       String?
+  einvAttempts    Int            @default(0)
+  einvCancelledAt DateTime?
+  ewbNo           String?
+  ewbDate         DateTime?
+  ewbValidUntil   DateTime?
+  ewbVehicle      String?
+  ewbDistanceKm   Int?
+
+  lines InvoiceLine[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, date])
+  @@index([tenantId, retailerId, date])
+  @@index([tenantId, orderId])
+  @@index([tenantId, originalId])
+  @@index([tenantId, einvStatus])
+}
+
+model InvoiceLine {
+  id             String  @id @default(cuid())
+  tenantId       String  @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant         Tenant  @relation(fields: [tenantId], references: [id])
+  invoiceId      String
+  invoice        Invoice @relation(fields: [invoiceId], references: [id])
+  sl             Int
+  productId      String?
+  orderItemId    String?
+  /// Credit / debit note line: the invoice line it adjusts.
+  originalLineId String?
+  description    String
+  hsnCode        String?
+  isService      Boolean @default(false)
+  /// GST unit code (UQC), e.g. PCS, KGS, BOX.
+  unit           String
+  /// Units on this line; freeQty of them are free goods (no value).
+  quantity       Int
+  freeQty        Int     @default(0)
+  /// Paise per unit before GST.
+  rate           Int
+  gross          Int
+  discount       Int
+  taxable        Int
+  gstRate        Float
+  cgst           Int
+  sgst           Int
+  igst           Int
+  total          Int
+
+  @@index([tenantId, invoiceId])
+  @@index([tenantId, originalLineId])
 }

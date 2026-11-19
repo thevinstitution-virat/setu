@@ -6,6 +6,7 @@ import { keyBelongsTo } from "@/lib/storage";
 import { can } from "@/lib/permissions";
 import { MoneyError, onOrderDelivered, withMoney } from "@/lib/ledger";
 import { moneyFail, parseCollect } from "@/lib/money-api";
+import { queueEInvoice } from "@/lib/einvoice-queue";
 
 /**
  * Mark an order delivered. Books the sale and its bill, settles a prepaid
@@ -96,12 +97,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           },
         },
       });
-      const { payment } = await onOrderDelivered(
+      const { payment, invoice } = await onOrderDelivered(
         ctx,
         fresh,
         collect ? { ...collect, collectorId: session.userId, atOffice: office } : null
       );
-      return { order, payment };
+      return { order, payment, invoice };
     });
   } catch (e) {
     return moneyFail(e);
@@ -117,6 +118,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     ip: requestIp(req),
   });
   await emit("order.delivered", { tenantId: tenant.id, orderId: id, paymentMethod: deliveryPaymentMethod, codAmount: cashAmount });
+  if (out.invoice) await queueEInvoice(tenant.id, out.invoice);
 
   return NextResponse.json(out);
 }

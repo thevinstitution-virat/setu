@@ -6,6 +6,7 @@ const nav: NavItem[] = [
   { href: "/admin", labelKey: "nav.pipeline", icon: "chart" },
   { href: "/admin/orders", labelKey: "nav.orders", icon: "box" },
   { href: "/admin/khata", labelKey: "nav.khata", icon: "book" },
+  { href: "/admin/invoices", labelKey: "nav.invoices", icon: "receipt" },
   { href: "/admin/payments", labelKey: "nav.payments", icon: "card" },
   { href: "/admin/cash", labelKey: "nav.cash", icon: "cash" },
   { href: "/admin/products", labelKey: "nav.products", icon: "tag" },

@@ -39,6 +39,7 @@ export async function placeOrder(
       grossAmount: quote.grossAmount,
       discountAmount: quote.discountAmount,
       deliveryCharge: quote.deliveryCharge,
+      deliveryGstRate: quote.deliveryCharge > 0 ? quote.deliveryGstRate : 0,
       subtotal: quote.subtotal,
       gstAmount: quote.gstAmount,
       totalAmount: quote.totalAmount,

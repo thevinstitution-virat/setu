@@ -32,6 +32,8 @@ export const PERMISSIONS = {
   "cash.handover": "Receive cash from staff and write off shortages",
   "cheques.manage": "Deposit, clear and bounce cheques",
   "settings.manage": "Change business settings",
+  "invoices.view": "See invoices, notes and GST reports",
+  "invoices.manage": "Issue credit and debit notes, e-invoices and e-way bills",
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;

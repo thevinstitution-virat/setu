@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Invoice PDFs read Geist TTFs from assets/fonts at runtime; keep them in traced output.
+  outputFileTracingIncludes: {
+    "/api/invoices/*": ["./assets/fonts/**"],
+    "/api/public/invoices/*": ["./assets/fonts/**"],
+  },
   turbopack: {
     rules: {
       "*.css": {

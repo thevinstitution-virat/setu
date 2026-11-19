@@ -1,7 +1,10 @@
 import { PrismaClient } from "@/generated/prisma/client";
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+/** Password hashes never leave the database unless a query asks for them (login only). */
+const makeClient = () => new PrismaClient({ omit: { user: { passwordHash: true } } });
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient();
+const globalForPrisma = globalThis as unknown as { prisma?: ReturnType<typeof makeClient> };
+
+export const prisma = globalForPrisma.prisma ?? makeClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;

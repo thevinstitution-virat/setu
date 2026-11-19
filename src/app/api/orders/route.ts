@@ -6,6 +6,9 @@ import { placeOrder } from "@/lib/order-place";
 import { cartRetailer, parseCartBody } from "@/lib/cart-api";
 import { moneyFail } from "@/lib/money-api";
 
+/** Never send password hashes or other account internals to the browser. */
+const USER = { id: true, name: true, phone: true } as const;
+
 export async function GET() {
   const auth = await guard();
   if (!auth.ok) return auth.res;
@@ -30,9 +33,9 @@ export async function GET() {
   const orders = await db.order.findMany({
     where,
     include: {
-      retailer: { include: { user: true } },
+      retailer: { include: { user: { select: USER } } },
       items: { include: { product: true } },
-      delivery: { include: { deliveryAgent: { include: { user: true } } } },
+      delivery: { include: { deliveryAgent: { include: { user: { select: USER } } } } },
     },
     orderBy: { createdAt: "desc" },
   });

@@ -11,7 +11,12 @@ import { PrismaClient } from "../src/generated/prisma/client";
 import { hashPassword } from "../src/lib/password";
 import { nextOrderNumber, priceBreakup } from "../src/lib/orders";
 import { toPaise } from "../src/lib/money";
-import { onOrderDelivered, onOrderPlaced, openingBalance, recordPayment, withMoney } from "../src/lib/ledger";
+import { issueCreditNote, onOrderDelivered, onOrderPlaced, openingBalance, recordPayment, withMoney } from "../src/lib/ledger";
+import { generateEInvoice } from "../src/lib/einvoice";
+import { gstinCheckDigit } from "../src/lib/gst";
+
+/** Made-up GSTIN with a valid check digit (test data only). */
+const testGstin = (first14: string) => `${first14}${gstinCheckDigit(first14)}`;
 
 const prisma = new PrismaClient();
 
@@ -39,6 +44,7 @@ async function wipe() {
   if (process.env.NODE_ENV === "production") throw new Error("Refusing to wipe a production database");
   await prisma.$executeRawUnsafe(
     `TRUNCATE ${[
+      "InvoiceLine", "Invoice",
       "SchemeRedemption", "Scheme", "Banner", "RetailerPrice", "PriceListItem", "PriceList",
       "RetailerGroupMember", "RetailerGroup", "HsnCode", "Brand", "Category",
       "PaymentAllocation", "Cheque", "CashHandover", "Payment", "Bill", "LedgerLine", "JournalEntry", "LedgerAccount",
@@ -90,7 +96,16 @@ async function seedProducts(db: Db, rows: ProductRow[], extras: Record<string, E
 
 async function seedDemo() {
   const tenant = await prisma.tenant.create({
-    data: { slug: "demo", name: "Setu Demo Distributors", status: "ACTIVE", plan: "growth", stateCode: "27" },
+    data: {
+      slug: "demo",
+      name: "Setu Demo Distributors",
+      legalName: "Setu Demo Distributors (Demo)",
+      gstin: testGstin("27ZZDEM0001A1Z"),
+      address: "Unit 4, Demo Industrial Estate, Andheri East",
+      status: "ACTIVE",
+      plan: "growth",
+      stateCode: "27",
+    },
   });
   const db = scoped(tenant.id);
 
@@ -175,6 +190,7 @@ async function seedDemo() {
           shopNumber: "G-12",
           complexName: "Shree Complex",
           pinCode: "400058",
+          gstin: testGstin("27ZZAGR0001B1Z"),
           areaId: mumbai.areas[0].id,
           salesAgentId: salesUser.salesAgentProfile!.id,
         },
@@ -266,6 +282,8 @@ async function seedDemo() {
           shopNumber: "1",
           complexName: "Station Road",
           pinCode: "400014",
+          gstin: testGstin("27ZZSAI0001C1Z"),
+          legalName: "Sai Retail Enterprises",
           areaId: mumbai.areas[2].id,
           salesAgentId: salesUser.salesAgentProfile!.id,
         },
@@ -413,6 +431,8 @@ async function seedMoney(
       settings: {
         ...((t.settings ?? {}) as object),
         money: { upiVpa: "setudemo@okaxis", upiPayeeName: "Setu Demo Distributors", chequeBouncePenalty: toPaise(250) },
+        // Invoices at dispatch; e-invoicing on with the local sandbox (test IRNs).
+        invoice: { issueAt: "dispatch", city: "Mumbai", pinCode: "400093", einvoice: { enabled: true, provider: "sandbox" } },
       },
     },
   });
@@ -433,7 +453,7 @@ async function seedMoney(
       retailerId: ids.agarwal,
       amount: toPaise(1000),
       method: "CHEQUE",
-      cheque: { number: "004512", bank: "HDFC Bank", date: days(0) },
+      cheque: { number: "004512", bank: "Demo Bank", date: days(0) },
       collectorId: ids.salesUserId,
     })
   );
@@ -463,11 +483,22 @@ async function seedMoney(
     const order = await ctx.tx.order.findUniqueOrThrow({ where: { id: ids.placedOrderId } });
     await onOrderPlaced(ctx, order);
   });
+
+  // Phase 3: one box came back damaged from Agarwal's delivered order → credit note.
+  const note = await withMoney(tenantId, ids.adminId, async (ctx) => {
+    const inv = await ctx.tx.invoice.findFirstOrThrow({ where: { orderId: ids.deliveredOrderId }, include: { lines: { orderBy: { sl: "asc" } } } });
+    return issueCreditNote(ctx, { invoiceId: inv.id, kind: "return", reason: "1 unit damaged in transit", lines: [{ lineId: inv.lines[0].id, quantity: 1 }] });
+  });
+  // e-Invoices (sandbox) for the B2B documents, as the worker would.
+  for (const d of await scoped(tenantId).invoice.findMany({ where: { einvStatus: "PENDING" }, orderBy: { createdAt: "asc" }, select: { id: true } })) {
+    await generateEInvoice(tenantId, d.id).catch((e) => console.warn("e-invoice:", e.message));
+  }
+  void note;
 }
 
 async function seedSecond() {
   const tenant = await prisma.tenant.create({
-    data: { slug: "second", name: "Second Agencies", status: "TRIAL", stateCode: "09" },
+    data: { slug: "second", name: "Second Agencies", status: "TRIAL", stateCode: "09", gstin: testGstin("09ZZSEC0001D1Z") },
   });
   const db = scoped(tenant.id);
 

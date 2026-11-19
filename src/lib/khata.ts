@@ -39,7 +39,8 @@ export async function khataSummary(ctx: Ctx, retailerId: string) {
   ]);
   // Same exposure the credit check uses: what they owe + orders not yet delivered.
   const openOrders = await ctx.tx.order.aggregate({
-    where: { retailerId, status: { notIn: ["DELIVERED", "CANCELLED"] } },
+    // Orders invoiced at dispatch are already in the receivable, so leave them out.
+    where: { retailerId, status: { notIn: ["DELIVERED", "CANCELLED"] }, invoices: { none: { type: { in: ["TAX_INVOICE", "BILL_OF_SUPPLY"] } } } },
     _sum: { totalAmount: true },
   });
   const openOrderTotal = Number(openOrders._sum.totalAmount ?? 0);

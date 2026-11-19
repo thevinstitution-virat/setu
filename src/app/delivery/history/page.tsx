@@ -1,6 +1,7 @@
 import { formatINR } from "@/lib/money";
 import { getSession } from "@/lib/auth";
 import { getDb } from "@/lib/tenant";
+import Link from "next/link";
 
 export default async function DeliveryHistory() {
   const db = await getDb();
@@ -20,7 +21,7 @@ export default async function DeliveryHistory() {
       <h1 className="page-title">Delivery history</h1>
       <div className="space-y-3">
         {deliveries.map((d) => (
-          <div key={d.id} className="card p-4 flex items-center justify-between">
+          <Link key={d.id} href={`/delivery/orders/${d.order.id}`} className="card p-4 flex items-center justify-between gap-3">
             <div>
               <p className="font-medium text-sm">{d.order.retailer.outletName}</p>
               <p className="text-xs text-foreground/50">
@@ -30,7 +31,7 @@ export default async function DeliveryHistory() {
             <span className="text-xs text-foreground/50">
               {d.deliveredAt && new Date(d.deliveredAt).toLocaleString()}
             </span>
-          </div>
+          </Link>
         ))}
         {deliveries.length === 0 && (
           <p className="text-sm text-foreground/50">No deliveries completed yet.</p>

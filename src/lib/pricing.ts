@@ -3,6 +3,7 @@ import type { Scheme } from "@/generated/prisma/client";
 import { formatINR, gstOn } from "@/lib/money";
 import { applySchemes, describeScheme, type AppliedScheme, type EngineLine, type EngineScheme, type SchemeParams } from "@/lib/schemes";
 import { cartSettings, deliveryChargeFor, deliveryDays } from "@/lib/cart-settings";
+import { invoiceSettings } from "@/lib/invoice-settings";
 import { searchText } from "@/lib/translit";
 
 /**
@@ -311,6 +312,9 @@ export async function quoteCart(
 ): Promise<Quote> {
   const problems: string[] = [];
   const cart = cartSettings(tenantSettings);
+  // A composition dealer can't charge GST: bills of supply, every rate 0.
+  const taxRate = (rate: number) => (invoiceSettings(tenantSettings).scheme === "composition" ? 0 : rate);
+  const deliveryGstRate = taxRate(cart.deliveryGstRate);
 
   // Merge repeated products; cases → base units.
   const wanted = new Map<string, { quantity: number; cases: number | null }>();
@@ -365,7 +369,7 @@ export async function quoteCart(
     const gross = l.p.price * l.quantity;
     const discount = result.discounts[i];
     const taxable = gross - discount;
-    const gst = gstOn(taxable, l.p.gstRate);
+    const gst = gstOn(taxable, taxRate(l.p.gstRate));
     return {
       productId: l.p.id,
       name: l.p.name,
@@ -376,7 +380,7 @@ export async function quoteCart(
       caseUnit: l.p.caseUnit,
       price: l.p.price,
       mrp: l.p.mrp,
-      gstRate: l.p.gstRate,
+      gstRate: taxRate(l.p.gstRate),
       priceSource: l.p.priceSource,
       gross,
       discount,
@@ -399,7 +403,7 @@ export async function quoteCart(
       schemeName: byScheme.get(g.schemeId)!.name,
       value: g.quantity * g.unitPrice,
       mrp: p.mrp,
-      gstRate: p.gstRate,
+      gstRate: taxRate(p.gstRate),
     };
   });
 
@@ -407,7 +411,7 @@ export async function quoteCart(
   const discountAmount = lines.reduce((a, l) => a + l.discount, 0);
   const goodsValue = grossAmount - discountAmount;
   const deliveryCharge = lines.length ? deliveryChargeFor(cart, goodsValue) : 0;
-  const gstAmount = lines.reduce((a, l) => a + l.gst, 0) + gstOn(deliveryCharge, cart.deliveryGstRate);
+  const gstAmount = lines.reduce((a, l) => a + l.gst, 0) + gstOn(deliveryCharge, deliveryGstRate);
   const subtotal = goodsValue + deliveryCharge;
   const shortBy = lines.length && cart.minOrderValue > goodsValue ? cart.minOrderValue - goodsValue : 0;
   if (!lines.length && !problems.length) problems.push("Add at least one product");
@@ -439,7 +443,7 @@ export async function quoteCart(
     discountAmount,
     goodsValue,
     deliveryCharge,
-    deliveryGstRate: cart.deliveryGstRate,
+    deliveryGstRate,
     subtotal,
     gstAmount,
     totalAmount: subtotal + gstAmount,

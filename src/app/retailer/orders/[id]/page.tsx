@@ -5,6 +5,16 @@ import { STATUS_COLOR } from "@/lib/orders";
 import { getServerLang, tr } from "@/lib/i18n/server";
 import OrderTimeline from "@/components/OrderTimeline";
 import OrderLines from "@/components/store/OrderLines";
+import Link from "next/link";
+import Icon from "@/components/Icon";
+import { formatINR } from "@/lib/money";
+
+const DOC_LABEL = {
+  TAX_INVOICE: "Invoice",
+  BILL_OF_SUPPLY: "Bill of supply",
+  CREDIT_NOTE: "Credit note",
+  DEBIT_NOTE: "Debit note",
+} as const;
 
 export default async function RetailerOrderDetail({
   params,
@@ -28,6 +38,12 @@ export default async function RetailerOrderDetail({
 
   if (!order || order.retailerId !== profile?.id) notFound();
 
+  const invoices = await db.invoice.findMany({
+    where: { orderId: order.id },
+    orderBy: { date: "asc" },
+    select: { id: true, type: true, number: true, total: true },
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -41,6 +57,41 @@ export default async function RetailerOrderDetail({
           {tr(`status.${order.status}`, lang)}
         </span>
       </div>
+
+      {invoices.length > 0 && (
+        <div className="card p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold">Invoice</p>
+            <Link href="/retailer/invoices" className="text-xs font-semibold text-[var(--kesar-text)]">
+              All invoices
+            </Link>
+          </div>
+          <ul className="divide-y divide-[var(--line)]">
+            {invoices.map((inv) => {
+              const note = inv.type === "CREDIT_NOTE" || inv.type === "DEBIT_NOTE";
+              return (
+                <li key={inv.id} className="py-2 flex items-center justify-between gap-3">
+                  <Link href={`/retailer/invoices/${inv.id}`} className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold break-all">{inv.number}</p>
+                    <p className="text-xs text-[var(--muted)]">
+                      {DOC_LABEL[inv.type]} · {inv.type === "CREDIT_NOTE" ? "− " : ""}
+                      {formatINR(inv.total)}
+                    </p>
+                  </Link>
+                  <a
+                    href={`/api/invoices/${inv.id}/pdf`}
+                    target="_blank"
+                    rel="noopener"
+                    className={`btn btn-sm shrink-0 ${note ? "btn-outline" : "btn-primary"}`}
+                  >
+                    <Icon name="file" className="h-4 w-4" /> Open PDF
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
 
       {order.delivery?.deliveryAgent && (
         <div className="card p-4">

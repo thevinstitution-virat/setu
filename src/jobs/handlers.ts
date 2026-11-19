@@ -1,6 +1,8 @@
 import type PgBoss from "pg-boss";
 import { asPlatform, tenantDb } from "@/lib/db";
 import type { JobData, QueueName } from "@/lib/jobs";
+import { generateEInvoice } from "@/lib/einvoice";
+import { MoneyError } from "@/lib/money-error";
 
 /**
  * Worker-side handlers. Phase 0 keeps them small (logging, housekeeping);
@@ -28,6 +30,16 @@ export const handlers: Partial<Record<QueueName, Handler>> = {
   "order.delivered": logEvent,
   "retailer.registered": logEvent,
   "import.completed": logEvent,
+  "einvoice.generate": async (job) => {
+    const { tenantId, invoiceId } = job.data as JobData & { invoiceId: string };
+    try {
+      await generateEInvoice(tenantId, invoiceId);
+    } catch (e) {
+      // Data problems (missing PIN, HSN …) won't fix themselves: stored on the invoice, no retry.
+      if (e instanceof MoneyError && e.status < 500) return;
+      throw e;
+    }
+  },
   "otp.cleanup": async () => {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const res = await asPlatform((tx) => tx.otpChallenge.deleteMany({ where: { createdAt: { lt: cutoff } } }));

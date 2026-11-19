@@ -17,5 +17,10 @@ export async function GET(req: Request) {
     ...(await khataSummary(ctx, profile.id)),
     statement: range ? { ...range, ...(await statement(ctx, profile.id, range.from, range.to)) } : null,
   }));
-  return NextResponse.json(data);
+  // A sale invoice's / debit note's bill carries the document number: link the two.
+  const docs = data.openBills.length
+    ? await db.invoice.findMany({ where: { retailerId: profile.id, number: { in: data.openBills.map((b) => b.number) } }, select: { id: true, number: true } })
+    : [];
+  const invoiceOf = new Map(docs.map((d) => [d.number, d.id]));
+  return NextResponse.json({ ...data, openBills: data.openBills.map((b) => ({ ...b, invoiceId: invoiceOf.get(b.number) ?? null })) });
 }

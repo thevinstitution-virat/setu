@@ -19,6 +19,7 @@ export async function POST(req: Request) {
 
   const user = await db.user.findFirst({
     where: { OR: [{ loginId }, { email: loginId }] },
+    omit: { passwordHash: false },
   });
 
   if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {
