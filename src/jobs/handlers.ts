@@ -22,6 +22,7 @@ import { locateShops } from "@/lib/maps";
 import { runBilling } from "@/lib/billing";
 import { runExport, runLifecycle } from "@/lib/tenant-data";
 import { runDailySummaries } from "@/lib/daily-summary";
+import { runAutomations } from "@/lib/automation";
 
 /**
  * Worker-side handlers. Phase 0 keeps them small (logging, housekeeping);
@@ -152,6 +153,12 @@ export const handlers: Partial<Record<QueueName, Handler>> = {
     const l = await runLifecycle();
     console.log(`[job] billing.daily`, JSON.stringify({ ...b, purged: l.purged.length, exportsExpired: l.exportsExpired }));
   },
+  "automation.daily": async () => {
+    console.log(`[job] automation.daily`, JSON.stringify(await runAutomations(new Date())));
+  },
+  "automation.weekly": async () => {
+    console.log(`[job] automation.weekly`, JSON.stringify(await runAutomations(new Date(), { weekly: true })));
+  },
   "reports.daily_summary": async () => {
     const r = await runDailySummaries();
     if (r.sent) console.log(`[job] reports.daily_summary`, JSON.stringify(r));
@@ -175,4 +182,6 @@ export const schedules: { name: QueueName; cron: string }[] = [
   { name: "handoff.cleanup", cron: "50 3 * * *" },
   { name: "billing.daily", cron: "0 6 * * *" }, // 06:00 IST
   { name: "reports.daily_summary", cron: "0 * * * *" }, // hourly; each business picks its hour (default 21:00 IST)
+  { name: "automation.daily", cron: "0 6 * * *" },
+  { name: "automation.weekly", cron: "30 6 * * 1" },
 ];

@@ -36,6 +36,8 @@ export type CatalogueData = {
   banners: Banner[];
   offers: Offer[];
   buyAgain: string[];
+  /** The shop's usual order (A2): products in at least half of its recent orders, at the usual quantity (units). */
+  usual?: { basedOn: number; lines: { productId: string; qty: number; times: number; of: number }[] };
   cart: CartRules;
 };
 export type QuoteJson = Omit<Quote, "offers"> & { offers: Offer[] };

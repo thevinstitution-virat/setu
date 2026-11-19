@@ -282,6 +282,14 @@ export default function Storefront({
   const unitCount = cartIds.length;
   const sheetProduct = openProduct ? (byId.get(openProduct) ?? null) : null;
   const buyAgain = data.buyAgain.map((id) => byId.get(id)).filter((p): p is StoreProduct => !!p);
+  const usual = (data.usual?.lines ?? []).flatMap((l) => {
+    const p = byId.get(l.productId);
+    return p && p.stock !== "out" ? [{ ...l, product: p }] : [];
+  });
+  const usualMissing = usual.filter((u) => !cart[u.productId]);
+  function addUsual() {
+    for (const u of usualMissing) setEntry(u.productId, { qty: u.qty, mode: "units" });
+  }
 
   return (
     <div className="space-y-4">
@@ -345,6 +353,36 @@ export default function Storefront({
               {!isScoped(schemeOffer) && " · on everything in the catalogue"}
             </p>
           )}
+        </section>
+      )}
+
+      {/* Usual order (A2) */}
+      {!filtering && usual.length > 0 && (
+        <section className="card p-3.5 space-y-2.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="page-kick">Usual order</p>
+              <p className="text-xs text-[var(--muted)] mt-0.5">
+                What this shop buys most times, from its last {data.usual!.basedOn} orders
+              </p>
+            </div>
+            <button type="button" className="btn btn-primary btn-sm shrink-0" disabled={!usualMissing.length} onClick={addUsual}>
+              {usualMissing.length ? `Add ${usualMissing.length} to cart` : "All in cart"}
+            </button>
+          </div>
+          <ul className="text-sm divide-y divide-[var(--line)]">
+            {usual.map((u) => (
+              <li key={u.productId} className="flex items-center justify-between gap-3 py-1.5">
+                <button type="button" className="min-w-0 truncate text-left" onClick={() => setOpenProduct(u.productId)}>
+                  {u.product.name}
+                </button>
+                <span className="shrink-0 tabular-nums text-[var(--muted)]">
+                  {u.qty} {u.product.unit}
+                  {cart[u.productId] && <span className="ml-1.5 text-[var(--mint-text)] font-semibold">✓</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

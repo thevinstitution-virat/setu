@@ -357,6 +357,20 @@ export async function beatForDay(tx: Tx, tenantId: string, salesAgentId: string,
 }
 
 /** Today's route for an agent: the beat's shops in order with today's visit, plus coverage. */
+const retailerSelect = {
+  select: {
+    id: true,
+    outletName: true,
+    shopNumber: true,
+    complexName: true,
+    pinCode: true,
+    lat: true,
+    lng: true,
+    area: { select: { name: true } },
+    user: { select: { phone: true, name: true } },
+  },
+} as const;
+
 export async function dayRoute(tx: Tx, tenantId: string, salesAgentId: string, date: string) {
   const { plan, beat, source } = await beatForDay(tx, tenantId, salesAgentId, date);
   const { from, to } = istDayRange(date);
@@ -366,19 +380,7 @@ export async function dayRoute(tx: Tx, tenantId: string, salesAgentId: string, d
         orderBy: { seq: "asc" },
         select: {
           seq: true,
-          retailer: {
-            select: {
-              id: true,
-              outletName: true,
-              shopNumber: true,
-              complexName: true,
-              pinCode: true,
-              lat: true,
-              lng: true,
-              area: { select: { name: true } },
-              user: { select: { phone: true, name: true } },
-            },
-          },
+          retailer: retailerSelect,
         },
       })
     : [];
@@ -389,18 +391,29 @@ export async function dayRoute(tx: Tx, tenantId: string, salesAgentId: string, d
   });
   const byShop = new Map<string, (typeof visits)[number]>();
   for (const v of visits) byShop.set(v.retailerId, v);
-  const route = shops.map((s) => ({ seq: s.seq, retailer: s.retailer, visit: byShop.get(s.retailer.id) ?? null }));
+  // Shops added to the day by an accepted visit plan (or by hand), with the reasons.
+  const tasks = await tx.visitTask.findMany({
+    where: { salesAgentId, date },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, reasons: true, note: true, retailer: retailerSelect },
+  });
+  const taskByShop = new Map(tasks.map((t) => [t.retailer.id, t]));
+  const route = shops.map((s) => ({ seq: s.seq, retailer: s.retailer, visit: byShop.get(s.retailer.id) ?? null, reasons: taskByShop.get(s.retailer.id)?.reasons ?? [] }));
   const onRoute = new Set(route.map((r) => r.retailer.id));
+  const extra = tasks.filter((t) => !onRoute.has(t.retailer.id)).map((t) => ({ taskId: t.id, retailer: t.retailer, reasons: t.reasons, note: t.note, visit: byShop.get(t.retailer.id) ?? null }));
+  const inPlan = new Set([...onRoute, ...extra.map((e) => e.retailer.id)]);
   return {
     date,
     source,
     plan: plan ? { id: plan.id, note: plan.note } : null,
     beat: beat ? { id: beat.id, name: beat.name } : null,
     route,
-    offRoute: visits.filter((v) => !onRoute.has(v.retailerId)),
+    extra,
+    offRoute: visits.filter((v) => !inPlan.has(v.retailerId)),
     planned: route.length,
     covered: route.filter((r) => r.visit).length,
     ordered: route.filter((r) => r.visit?.outcome === "ORDER" || r.visit?.orderId).length,
+    extraCovered: extra.filter((e) => e.visit).length,
   };
 }
 

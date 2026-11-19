@@ -53,6 +53,7 @@ export const dictionary = {
   "nav.leave": { en: "Leave", hi: "छुट्टी" },
   "nav.beats": { en: "Beats", hi: "बीट" },
   "nav.reports": { en: "Reports", hi: "रिपोर्ट" },
+  "nav.suggestions": { en: "Suggestions", hi: "सुझाव" },
   "nav.help": { en: "Help", hi: "मदद" },
   "nav.complaints": { en: "Complaints", hi: "शिकायतें" },
   "nav.engage": { en: "Engage", hi: "जुड़ाव" },

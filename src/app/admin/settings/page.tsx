@@ -369,6 +369,9 @@ export default function SettingsPage() {
             <Link href="/admin/account" className="chip chip-kesar">
               Your data <Icon name="arrow" className="h-3.5 w-3.5" />
             </Link>
+            <Link href="/admin/settings/automation" className="chip chip-kesar">
+              Automation <Icon name="arrow" className="h-3.5 w-3.5" />
+            </Link>
           </div>
         </div>
 

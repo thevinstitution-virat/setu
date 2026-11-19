@@ -5,6 +5,8 @@ import { catalogueFor, inWindow, retailerPricingCtx, schemesFor, targets } from 
 import { cartSettings, deliveryDays } from "@/lib/cart-settings";
 import { cartRetailer } from "@/lib/cart-api";
 import { stockBadges } from "@/lib/stock";
+import { automationSettings } from "@/lib/automation-settings";
+import { usualOrderFor } from "@/lib/automation";
 
 /**
  * The storefront for one retailer: products they can see at their rates,
@@ -46,6 +48,8 @@ export async function GET(req: Request) {
     const freq = new Map<string, number>();
     for (const i of recent) if (visible.has(i.productId)) freq.set(i.productId, (freq.get(i.productId) ?? 0) + 1);
     const buyAgain = [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([id]) => id);
+    // A2: the shop's usual order (products in at least half of its recent orders, at the usual quantity).
+    const usual = automationSettings(t.settings).usualOrder.on ? await usualOrderFor(tx, r.id, now) : { lines: [], basedOn: 0 };
 
     // Only categories / brands that have something to show (and the parents of those categories).
     const usedCats = new Set(products.flatMap((p) => p.categoryPath));
@@ -61,6 +65,7 @@ export async function GET(req: Request) {
         .map((b) => ({ id: b.id, title: b.title, subtitle: b.subtitle, imageKey: b.imageKey, linkType: b.linkType, linkId: b.linkId })),
       offers,
       buyAgain,
+      usual: { basedOn: usual.basedOn, lines: usual.lines.filter((l) => visible.has(l.productId)).map((l) => ({ productId: l.productId, qty: l.qty, times: l.times, of: l.of })) },
       cart: {
         minOrderValue: cart.minOrderValue,
         deliveryCharge: cart.deliveryCharge,

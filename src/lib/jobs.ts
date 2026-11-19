@@ -32,6 +32,8 @@ export const QUEUES = {
   "tenant.export": "Make a full copy of a business's data (DPDP export)",
   "billing.daily": "Platform: trials, subscription invoices, reminders and pauses; deletions due; old exports (daily 06:00)",
   "reports.daily_summary": "The owner's daily summary, at each business's chosen hour (checked hourly)",
+  "automation.daily": "Visit plans, collections, checks and expiry of old suggestions (06:00 IST)",
+  "automation.weekly": "Credit review: risk scores and credit-limit suggestions (Mondays 06:30 IST)",
 } as const;
 
 export type QueueName = keyof typeof QUEUES;
