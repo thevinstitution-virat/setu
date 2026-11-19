@@ -43,6 +43,7 @@ const PATHS = {
   search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM20 20l-4-4",
   chevronLeft: "M15 6l-6 6 6 6",
   chevronRight: "M9 6l6 6-6 6",
+  phone: "M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z",
 } as const;
 
 export type IconName = keyof typeof PATHS;

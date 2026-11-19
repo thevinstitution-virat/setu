@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { audit, requestIp } from "@/lib/audit";
 import { emit } from "@/lib/jobs";
-import { MoneyError, onOrderDispatched, withMoney } from "@/lib/ledger";
+import { MoneyError, withMoney } from "@/lib/ledger";
+import { dispatchOrder } from "@/lib/delivery";
 import { moneyFail } from "@/lib/money-api";
 import { queueEInvoice } from "@/lib/einvoice-queue";
 
@@ -26,8 +27,11 @@ export async function POST(
     return NextResponse.json({ error: "Delivery agent not found" }, { status: 404 });
   }
 
-  const order = await db.order.findUnique({ where: { id }, include: { delivery: true } });
+  const order = await db.order.findUnique({ where: { id }, include: { delivery: { include: { trip: { select: { number: true, status: true } } } } } });
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (order.delivery?.trip && order.delivery.trip.status !== "CLOSED") {
+    return NextResponse.json({ error: `This order is on trip ${order.delivery.trip.number}. Change it on the dispatch board.` }, { status: 409 });
+  }
   if (order.status === "DELIVERED" || order.status === "CANCELLED") {
     return NextResponse.json({ error: "Order can no longer be assigned" }, { status: 400 });
   }
@@ -47,15 +51,12 @@ export async function POST(
       if (fresh.status === "DELIVERED" || fresh.status === "CANCELLED") throw new MoneyError("Order can no longer be assigned");
       await ctx.tx.delivery.upsert({
         where: { orderId: id },
-        update: { deliveryAgentId },
-        create: { orderId: id, deliveryAgentId },
+        // A fresh assignment without a trip (old flow); clears an earlier failed attempt's trip.
+        update: { deliveryAgentId, tripId: null, seq: 1, state: "ASSIGNED", deliveredAt: null, failReason: null, failNote: null, failedAt: null },
+        create: { orderId: id, deliveryAgentId, seq: 1 },
       });
-      const statusChange =
-        fresh.status === "OUT_FOR_DELIVERY"
-          ? {}
-          : { status: "OUT_FOR_DELIVERY" as const, statusEvents: { create: { status: "OUT_FOR_DELIVERY" as const, actorId: session.userId, note: "Assigned for delivery" } } };
-      const updated = await ctx.tx.order.update({ where: { id }, data: statusChange });
-      const invoice = await onOrderDispatched(ctx, id);
+      const invoice = await dispatchOrder(ctx, id, "Assigned for delivery");
+      const updated = await ctx.tx.order.findUniqueOrThrow({ where: { id } });
       return { updated, invoice };
     }));
   } catch (e) {

@@ -17,6 +17,7 @@ export const QUEUES = {
   "import.completed": "A bulk import finished",
   "otp.cleanup": "Delete expired OTP challenges (daily)",
   "einvoice.generate": "Get the IRN for a B2B invoice or note",
+  "trip.started": "A trip left: tell each retailer (Phase 7 notifications)",
 } as const;
 
 export type QueueName = keyof typeof QUEUES;

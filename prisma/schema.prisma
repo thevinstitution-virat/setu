@@ -114,6 +114,11 @@ model Tenant {
   banners           Banner[]
   invoices          Invoice[]
   invoiceLines      InvoiceLine[]
+  vehicles          Vehicle[]
+  trips             Trip[]
+  returnables       Returnable[]
+  returnableMoves   ReturnableMove[]
+  dutyShifts        DutyShift[]
 }
 
 /// Custom domains a tenant has verified (e.g. order.agencyname.in).
@@ -213,14 +218,23 @@ model RetailerProfile {
   /// GST state code of the shop (place of supply); null = the tenant's state.
   stateCode String?
 
-  orders   Order[]
-  invoices Invoice[]
-  visits   Visit[]
-  groups   RetailerGroupMember[]
-  prices   RetailerPrice[]
-  bills    Bill[]
-  payments Payment[]
-  accounts LedgerAccount[]
+  /// Shop location, captured from the first delivery (or set by the office); used for route order.
+  lat          Float?
+  lng          Float?
+  /// How the shop wants goods handed over; shown to the driver.
+  deliveryPref DeliveryPref?
+  /// Free-text note for the driver ("back gate after 2 PM").
+  deliveryNote String?
+
+  orders          Order[]
+  invoices        Invoice[]
+  visits          Visit[]
+  groups          RetailerGroupMember[]
+  prices          RetailerPrice[]
+  bills           Bill[]
+  payments        Payment[]
+  accounts        LedgerAccount[]
+  returnableMoves ReturnableMove[]
 
   @@index([tenantId, areaId])
   @@index([tenantId, salesAgentId])
@@ -262,6 +276,7 @@ model DeliveryAgentProfile {
   user     User   @relation(fields: [userId], references: [id])
 
   deliveries Delivery[]
+  trips      Trip[]
 
   @@index([tenantId])
 }
@@ -345,6 +360,8 @@ model Order {
   creditApprovedAt DateTime?
   /// Prepaid: amount reserved from the wallet when the order was placed (paise).
   walletHold       Int             @default(0)
+  /// Total as ordered, kept when delivery cut the order short before invoicing (invoice at delivery).
+  orderedTotal     Int?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
@@ -381,6 +398,12 @@ model OrderItem {
   caseSize     Int?
   /// Free goods line given by this scheme (price 0).
   freeSchemeId String?
+  /// Quantity as ordered, kept when delivery changed the billed quantity (invoice at delivery). null = quantity.
+  orderedQty   Int?
+  /// Quantity handed over at delivery. null = not delivered yet (or delivered before line-level delivery).
+  deliveredQty Int?
+  /// Why less than ordered was delivered.
+  shortReason  String?
 
   @@index([tenantId, orderId])
 }
@@ -456,7 +479,24 @@ model Delivery {
   /// Cash collected on delivery, in paise.
   codAmount        Int                  @default(0)
 
+  tripId       String?
+  trip         Trip?         @relation(fields: [tripId], references: [id])
+  /// Stop number on the trip (1, 2, 3 …).
+  seq          Int           @default(0)
+  state        DeliveryState @default(ASSIGNED)
+  /// Last failed attempt: reason key and note.
+  failReason   String?
+  failNote     String?
+  failedAt     DateTime?
+  attempts     Int           @default(0)
+  /// Code the retailer sees in the app and tells the driver (high-value drops).
+  code         String?
+  codeVerified Boolean       @default(false)
+  /// GPS accuracy of lat/lng, in metres.
+  accuracy     Float?
+
   @@index([tenantId, deliveryAgentId])
+  @@index([tenantId, tripId])
 }
 
 /// One-time passwords for phone login. Stored hashed; survives restarts and
@@ -1095,4 +1135,138 @@ model InvoiceLine {
 
   @@index([tenantId, invoiceId])
   @@index([tenantId, originalLineId])
+}
+
+// ───────────────────────────── Delivery operations (Phase 4) ─────────────────────────────
+
+enum DeliveryState {
+  ASSIGNED
+  DELIVERED
+  FAILED
+}
+
+enum DeliveryPref {
+  RING_BELL
+  AT_DOOR
+  IN_HAND
+  KEEP_IN_BAG
+}
+
+enum TripStatus {
+  PLANNED
+  STARTED
+  CLOSED
+}
+
+model Vehicle {
+  id         String   @id @default(cuid())
+  tenantId   String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  /// Registration number, e.g. MH12AB1234.
+  number     String
+  name       String?
+  /// Load capacity in kg (information only).
+  capacityKg Int?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  trips Trip[]
+
+  @@unique([tenantId, number])
+}
+
+/// One run of one vehicle and driver in one slot of one day.
+model Trip {
+  id           String               @id @default(cuid())
+  tenantId     String               @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant               @relation(fields: [tenantId], references: [id])
+  /// TRP2627-00001, per tenant per financial year.
+  number       String
+  date         DateTime             @db.Date
+  /// Slot key from settings.delivery.slots ("morning", "evening" …).
+  slot         String
+  driverId     String
+  driver       DeliveryAgentProfile @relation(fields: [driverId], references: [id])
+  vehicleId    String?
+  vehicle      Vehicle?             @relation(fields: [vehicleId], references: [id])
+  status       TripStatus           @default(PLANNED)
+  note         String?
+  createdById  String?
+  startedAt    DateTime?
+  startedById  String?
+  closedAt     DateTime?
+  closedById   String?
+  /// Day-close figures frozen when the trip is closed (lib/trips.ts TripSummary).
+  closeSummary Json?
+  createdAt    DateTime             @default(now())
+
+  deliveries      Delivery[]
+  returnableMoves ReturnableMove[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, date])
+  @@index([tenantId, driverId, status])
+}
+
+/// Crates, jars, cans … that go out full and come back empty.
+model Returnable {
+  id         String   @id @default(cuid())
+  tenantId   String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  name       String
+  nameHi     String?
+  /// Charged per unit the retailer can't return, in paise. 0 = no charge.
+  unitCharge Int      @default(0)
+  active     Boolean  @default(true)
+  sort       Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  moves ReturnableMove[]
+
+  @@unique([tenantId, name])
+}
+
+/// Append-only. Retailer balance of a returnable = sum(given − taken).
+model ReturnableMove {
+  id           String          @id @default(cuid())
+  tenantId     String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant          @relation(fields: [tenantId], references: [id])
+  returnableId String
+  returnable   Returnable      @relation(fields: [returnableId], references: [id])
+  retailerId   String
+  retailer     RetailerProfile @relation(fields: [retailerId], references: [id])
+  tripId       String?
+  trip         Trip?           @relation(fields: [tripId], references: [id])
+  orderId      String?
+  /// DELIVERY (at a drop), PICKUP (collected without an order), OPENING, ADJUST, CHARGE (short units billed).
+  kind         String
+  /// Full units left at the shop.
+  given        Int             @default(0)
+  /// Empties taken back (or, for CHARGE, units billed instead).
+  taken        Int             @default(0)
+  photoKey     String?
+  note         String?
+  /// Bill raised for a CHARGE.
+  billId       String?
+  actorId      String?
+  createdAt    DateTime        @default(now())
+
+  @@index([tenantId, retailerId, returnableId])
+  @@index([tenantId, tripId])
+}
+
+/// Driver on / off duty. Location is recorded only at the start and end of duty.
+model DutyShift {
+  id       String    @id @default(cuid())
+  tenantId String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  userId   String
+  startAt  DateTime  @default(now())
+  startLat Float?
+  startLng Float?
+  endAt    DateTime?
+  endLat   Float?
+  endLng   Float?
+
+  @@index([tenantId, userId, startAt])
 }

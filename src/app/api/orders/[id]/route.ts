@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
+import { can } from "@/lib/permissions";
 
 export async function GET(
   _req: Request,
@@ -39,5 +40,13 @@ export async function GET(
     }
   }
 
+  // The delivery code proves the retailer received the goods: only the
+  // retailer (and dispatch staff) may see it, never the driver.
+  if (order.delivery) {
+    const showCode = session.role === "RETAILER" || can(session.role, "orders.dispatch");
+    const { code, ...rest } = order.delivery;
+    const delivery = { ...rest, codeNeeded: !!code && !rest.codeVerified, code: showCode ? code : null };
+    return NextResponse.json({ order: { ...order, delivery } });
+  }
   return NextResponse.json({ order });
 }

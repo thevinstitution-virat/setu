@@ -27,7 +27,7 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
     include: {
       retailer: { include: { user: true, area: true } },
-      delivery: { include: { deliveryAgent: { include: { user: true } } } },
+      delivery: { omit: { code: true }, include: { deliveryAgent: { include: { user: true } } } },
     },
   });
 

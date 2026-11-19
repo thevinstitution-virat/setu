@@ -64,6 +64,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         if (cn) docs.push(cn);
         await onOrderCancelled(ctx, order);
         await releaseRedemptions(ctx.tx, order.id);
+        // Take it off its trip: gone from a trip that hasn't left, a closed stop on one that has.
+        const stop = await ctx.tx.delivery.findUnique({ where: { orderId: order.id }, include: { trip: { select: { status: true } } } });
+        if (stop?.state === "ASSIGNED") {
+          if (!stop.trip || stop.trip.status === "PLANNED") await ctx.tx.delivery.delete({ where: { orderId: order.id } });
+          else await ctx.tx.delivery.update({ where: { orderId: order.id }, data: { state: "FAILED", failReason: "other", failNote: "Order cancelled", failedAt: new Date() } });
+        }
       }
       if (to === "OUT_FOR_DELIVERY") {
         const inv = await onOrderDispatched(ctx, order.id);

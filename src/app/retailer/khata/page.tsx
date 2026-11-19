@@ -7,6 +7,7 @@ import { upiLink } from "@/lib/money-settings";
 import { compressImage, uploadFile } from "@/lib/upload-client";
 import Icon from "@/components/Icon";
 import Link from "next/link";
+import CratesCard from "./CratesCard";
 
 type Bill = {
   id: string;
@@ -233,6 +234,8 @@ export default function KhataPage() {
           }}
         />
       )}
+
+      <CratesCard />
 
       {/* ── Open bills ── */}
       <section className="space-y-2 print:hidden">

@@ -24,6 +24,7 @@ export const dictionary = {
   "nav.home": { en: "Home", hi: "होम" },
   "nav.catalogue": { en: "Catalogue", hi: "कैटलॉग" },
   "nav.orders": { en: "Orders", hi: "ऑर्डर" },
+  "nav.dispatch": { en: "Dispatch", hi: "डिस्पैच" },
   "nav.account": { en: "Account", hi: "खाता" },
   "nav.today": { en: "Today", hi: "आज" },
   "nav.beat": { en: "Beat", hi: "बीट" },

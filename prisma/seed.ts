@@ -7,6 +7,7 @@
  * Every tenant's rows are written through tenantDb(), so row-level security
  * stamps and checks tenantId exactly as the app does at runtime.
  */
+import { DELIVERY_DEFAULTS } from "../src/lib/delivery-settings";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { hashPassword } from "../src/lib/password";
 import { nextOrderNumber, priceBreakup } from "../src/lib/orders";
@@ -44,6 +45,7 @@ async function wipe() {
   if (process.env.NODE_ENV === "production") throw new Error("Refusing to wipe a production database");
   await prisma.$executeRawUnsafe(
     `TRUNCATE ${[
+      "ReturnableMove", "Returnable", "DutyShift", "Trip", "Vehicle",
       "InvoiceLine", "Invoice",
       "SchemeRedemption", "Scheme", "Banner", "RetailerPrice", "PriceListItem", "PriceList",
       "RetailerGroupMember", "RetailerGroup", "HsnCode", "Brand", "Category",
@@ -191,6 +193,10 @@ async function seedDemo() {
           complexName: "Shree Complex",
           pinCode: "400058",
           gstin: testGstin("27ZZAGR0001B1Z"),
+          lat: 19.1197,
+          lng: 72.8468,
+          deliveryPref: "IN_HAND",
+          deliveryNote: "Side lane entrance after 11 AM",
           areaId: mumbai.areas[0].id,
           salesAgentId: salesUser.salesAgentProfile!.id,
         },
@@ -210,6 +216,9 @@ async function seedDemo() {
           shopNumber: "14",
           complexName: "Lotus Plaza",
           pinCode: "400050",
+          lat: 19.0544,
+          lng: 72.8402,
+          deliveryPref: "RING_BELL",
           areaId: mumbai.areas[1].id,
           salesAgentId: salesUser.salesAgentProfile!.id,
         },
@@ -248,6 +257,8 @@ async function seedDemo() {
           paymentMethod: "CASH",
           paymentStatus: "COLLECTED",
           codAmount: b1.totalAmount,
+          state: "DELIVERED",
+          seq: 1,
         },
       },
     },
@@ -297,6 +308,25 @@ async function seedDemo() {
     agarwal: retailer1.retailerProfile!.id,
     sai: retailer3.retailerProfile!.id,
     bandraId: mumbai.areas[1].id,
+  });
+
+  // Phase 4: vans and crates. Sai Super Mart has no map pin yet (taken on first delivery).
+  await db.vehicle.createMany({
+    data: [
+      { number: "MH02AB1234", name: "Tata Ace (white)", capacityKg: 750 },
+      { number: "MH04CD5678", name: "Mahindra pickup", capacityKg: 1200 },
+    ],
+  });
+  await db.returnable.createMany({
+    data: [
+      { name: "Crate", nameHi: "क्रेट", unitCharge: 15000, sort: 0 },
+      { name: "20 L jar", nameHi: "20 लीटर जार", unitCharge: 20000, sort: 1 },
+    ],
+  });
+  const tenantRow = await prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { settings: true } });
+  await prisma.tenant.update({
+    where: { id: tenant.id },
+    data: { settings: { ...(tenantRow.settings as object), delivery: { ...DELIVERY_DEFAULTS, depot: { lat: 19.0728, lng: 72.8826 }, codeAbove: 500000 } } },
   });
 
   await seedMoney(tenant.id, {

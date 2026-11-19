@@ -138,7 +138,8 @@ export function orderDrafts(
   },
   s: InvoiceSettings
 ): Draft[] {
-  const drafts: Draft[] = order.items.map((it) => {
+  // Lines cut to nothing at delivery (invoice at delivery) don't appear.
+  const drafts: Draft[] = order.items.filter((it) => it.quantity > 0).map((it) => {
     const free = !!it.freeSchemeId || it.price === 0;
     const gross = free ? 0 : it.price * it.quantity;
     const discount = free ? 0 : it.discount;

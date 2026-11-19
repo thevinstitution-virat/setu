@@ -19,7 +19,7 @@ export async function GET(req: Request) {
     include: {
       retailer: { include: { user: { select: USER }, area: { include: { region: true } } } },
       items: { include: { product: true } },
-      delivery: { include: { deliveryAgent: { include: { user: { select: USER } } } } },
+      delivery: { omit: { code: true }, include: { deliveryAgent: { include: { user: { select: USER } } } } },
       // The sale invoice (tax invoice or bill of supply), once issued.
       invoices: { where: { type: { in: ["TAX_INVOICE", "BILL_OF_SUPPLY"] } }, select: { id: true, number: true }, take: 1 },
     },

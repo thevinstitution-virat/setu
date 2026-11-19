@@ -7,6 +7,8 @@ import type { CartSettings } from "@/lib/cart-settings";
 import type { InvoiceSettings } from "@/lib/invoice-settings";
 import { Field, Toggle } from "@/components/admin/AdminKit";
 import { STATE_NAMES } from "@/components/invoice/InvoiceView";
+import type { DeliverySettings as DeliveryRules } from "@/lib/delivery-settings";
+import DeliverySettings from "@/components/admin/DeliverySettings";
 
 type Mode = "PREPAID" | "POSTPAID";
 
@@ -212,6 +214,7 @@ export default function SettingsPage() {
   const [cart, setCart] = useState<CartForm | null>(null);
   const [holiday, setHoliday] = useState("");
   const [gst, setGst] = useState<{ invoice: InvoiceSettings; business: Business } | null>(null);
+  const [delivery, setDelivery] = useState<DeliveryRules | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/settings")
@@ -226,12 +229,13 @@ export default function SettingsPage() {
         setCartSaved(c);
         setCart(c);
         setGst({ invoice: data.invoice, business: data.business });
+        setDelivery(data.delivery);
       })
       .catch((e) => setLoadError(e instanceof Error ? e.message : "Could not load settings"));
   }, []);
 
   if (loadError) return <p className="text-sm text-[#a8281e]">{loadError}</p>;
-  if (!form || !saved || !cart || !cartSaved || !cartRaw || !gst) return <p className="text-sm text-[var(--muted)]">Loading…</p>;
+  if (!form || !saved || !cart || !cartSaved || !cartRaw || !gst || !delivery) return <p className="text-sm text-[var(--muted)]">Loading…</p>;
 
   const moneyDirty = JSON.stringify(form) !== JSON.stringify(saved);
   const cartDirty = JSON.stringify(cart) !== JSON.stringify(cartSaved);
@@ -302,12 +306,12 @@ export default function SettingsPage() {
       <form onSubmit={save} className="space-y-5">
         <div>
           <p className="page-kick">Settings</p>
-          <h1 className="page-title">Money, cart and GST rules</h1>
+          <h1 className="page-title">Money, cart, GST and delivery rules</h1>
           <p className="page-sub">
             Defaults for new retailers, how payments work, what an order needs, and how invoices are made. You can change terms for one retailer
             from their khata.
           </p>
-          <div className="flex gap-2 mt-3">
+          <div className="flex flex-wrap gap-2 mt-3">
             <a href="#money" className="chip">
               Money
             </a>
@@ -316,6 +320,9 @@ export default function SettingsPage() {
             </a>
             <a href="#gst" className="chip">
               GST &amp; invoices
+            </a>
+            <a href="#delivery" className="chip">
+              Delivery
             </a>
           </div>
         </div>
@@ -640,6 +647,7 @@ export default function SettingsPage() {
         </div>
       </form>
       <GstSettings invoice={gst.invoice} business={gst.business} />
+      <DeliverySettings delivery={delivery} />
     </div>
   );
 }

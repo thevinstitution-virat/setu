@@ -6,6 +6,7 @@ import Icon from "@/components/Icon";
 import PaymentFields, { emptyPayment, paymentError, toCollectBody, type PaymentValue } from "@/components/PaymentFields";
 import { formatINR, toPaise } from "@/lib/money";
 import { STATE_NAMES } from "@/components/invoice/InvoiceView";
+import RetailerDeliveryCards from "@/components/admin/RetailerDeliveryCards";
 
 // ───────────────────────────── types (API JSON) ─────────────────────────────
 
@@ -330,6 +331,7 @@ export default function RetailerKhataPage({ params }: { params: Promise<{ retail
           <RecordPayment retailerId={retailerId} receivable={balances.receivable} onDone={reload} />
           <CreditTerms retailerId={retailerId} terms={terms} override={data.termsOverride} onDone={reload} />
           <GstDetails retailerId={retailerId} onDone={reload} />
+          <RetailerDeliveryCards retailerId={retailerId} onDone={reload} />
           <Adjust retailerId={retailerId} hasOpening={hasOpening} onDone={reload} />
         </div>
       </div>

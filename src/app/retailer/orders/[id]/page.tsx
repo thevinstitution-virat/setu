@@ -8,6 +8,8 @@ import OrderLines from "@/components/store/OrderLines";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import { formatINR } from "@/lib/money";
+import { SHORT_REASONS } from "@/lib/delivery-settings";
+import { qtyLabel } from "@/components/store/format";
 
 const DOC_LABEL = {
   TAX_INVOICE: "Invoice",
@@ -44,6 +46,14 @@ export default async function RetailerOrderDetail({
     select: { id: true, type: true, number: true, total: true },
   });
 
+  // The code the driver asks for on high-value drops (only the retailer sees it).
+  const code = order.status === "OUT_FOR_DELIVERY" && order.delivery?.code && !order.delivery.codeVerified ? order.delivery.code : null;
+  // Delivered line by line: lines where less was handed over than ordered.
+  const shortLines =
+    order.status === "DELIVERED"
+      ? order.items.filter((i) => i.deliveredQty !== null && i.deliveredQty !== (i.orderedQty ?? i.quantity))
+      : [];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -57,6 +67,39 @@ export default async function RetailerOrderDetail({
           {tr(`status.${order.status}`, lang)}
         </span>
       </div>
+
+      {code && (
+        <div className="panel-dark p-5 space-y-2">
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-genda">Delivery code</p>
+          <p className="font-heading font-bold text-5xl tracking-[0.25em]">{code}</p>
+          <p className="text-sm text-white/80">Tell the driver this code when your goods arrive. Don&apos;t share it before.</p>
+        </div>
+      )}
+
+      {shortLines.length > 0 && (
+        <div className="card p-4 space-y-2">
+          <p className="text-sm font-semibold">Delivered less than ordered</p>
+          <ul className="divide-y divide-[var(--line)]">
+            {shortLines.map((i) => {
+              const reason = i.shortReason && i.shortReason in SHORT_REASONS ? SHORT_REASONS[i.shortReason as keyof typeof SHORT_REASONS] : null;
+              return (
+                <li key={i.id} className="py-2 flex items-start justify-between gap-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium break-words">{i.product.name}</p>
+                    {reason && <p className="text-xs text-[var(--muted)]">{reason}</p>}
+                  </div>
+                  <p className="text-xs text-right shrink-0">
+                    <b>{qtyLabel(i.deliveredQty ?? 0, i.product.unit)}</b>
+                    <br />
+                    <span className="text-[var(--muted)]">of {i.orderedQty ?? i.quantity} ordered</span>
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="text-xs text-[var(--muted)]">You pay only for what was delivered.</p>
+        </div>
+      )}
 
       {invoices.length > 0 && (
         <div className="card p-4 space-y-3">

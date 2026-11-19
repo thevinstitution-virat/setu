@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/auth";
 import { getDb } from "@/lib/tenant";
+import DeliveryPrefsCard from "./DeliveryPrefsCard";
 
 export default async function RetailerAccount() {
   const db = await getDb();
@@ -33,6 +34,7 @@ export default async function RetailerAccount() {
           </div>
         ))}
       </div>
+      <DeliveryPrefsCard pref={profile.deliveryPref} note={profile.deliveryNote} />
     </div>
   );
 }

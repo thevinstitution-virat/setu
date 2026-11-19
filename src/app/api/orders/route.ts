@@ -35,7 +35,7 @@ export async function GET() {
     include: {
       retailer: { include: { user: { select: USER } } },
       items: { include: { product: true } },
-      delivery: { include: { deliveryAgent: { include: { user: { select: USER } } } } },
+      delivery: { omit: { code: session.role !== "RETAILER" }, include: { deliveryAgent: { include: { user: { select: USER } } } } },
     },
     orderBy: { createdAt: "desc" },
   });
