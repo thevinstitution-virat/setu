@@ -21,6 +21,7 @@ import { flushAllWebhooks, flushWebhooks, orderWebhook, retailerWebhook } from "
 import { locateShops } from "@/lib/maps";
 import { runBilling } from "@/lib/billing";
 import { runExport, runLifecycle } from "@/lib/tenant-data";
+import { runDailySummaries } from "@/lib/daily-summary";
 
 /**
  * Worker-side handlers. Phase 0 keeps them small (logging, housekeeping);
@@ -151,6 +152,10 @@ export const handlers: Partial<Record<QueueName, Handler>> = {
     const l = await runLifecycle();
     console.log(`[job] billing.daily`, JSON.stringify({ ...b, purged: l.purged.length, exportsExpired: l.exportsExpired }));
   },
+  "reports.daily_summary": async () => {
+    const r = await runDailySummaries();
+    if (r.sent) console.log(`[job] reports.daily_summary`, JSON.stringify(r));
+  },
 };
 
 async function tenants() {
@@ -169,4 +174,5 @@ export const schedules: { name: QueueName; cron: string }[] = [
   { name: "pings.cleanup", cron: "45 3 * * *" },
   { name: "handoff.cleanup", cron: "50 3 * * *" },
   { name: "billing.daily", cron: "0 6 * * *" }, // 06:00 IST
+  { name: "reports.daily_summary", cron: "0 * * * *" }, // hourly; each business picks its hour (default 21:00 IST)
 ];

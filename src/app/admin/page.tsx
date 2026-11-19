@@ -46,9 +46,14 @@ export default async function AdminPipeline() {
           <h1 className="page-title">Pipeline overview</h1>
           <p className="page-sub">Every order at every stage, without a phone call.</p>
         </div>
-        <Link href="/admin/orders" className="btn btn-kesar btn-sm">
-          Manage orders <Icon name="arrow" className="h-4 w-4" />
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/admin/reports" className="btn btn-outline btn-sm">
+            Reports
+          </Link>
+          <Link href="/admin/orders" className="btn btn-kesar btn-sm">
+            Manage orders <Icon name="arrow" className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
 
       <div className="card p-3 sm:p-4">

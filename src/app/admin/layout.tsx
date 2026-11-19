@@ -5,6 +5,7 @@ import { layoutChrome } from "@/lib/chrome";
 
 const nav: NavItem[] = [
   { href: "/admin", labelKey: "nav.pipeline", icon: "chart" },
+  { href: "/admin/reports", labelKey: "nav.reports", icon: "layers" },
   { href: "/admin/orders", labelKey: "nav.orders", icon: "box" },
   { href: "/admin/dispatch", labelKey: "nav.dispatch", icon: "truck" },
   { href: "/admin/stock", labelKey: "nav.stock", icon: "stock" },

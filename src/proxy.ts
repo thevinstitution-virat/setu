@@ -34,8 +34,12 @@ export async function proxy(request: NextRequest) {
   headers.set("x-setu-path", pathname);
   headers.set("x-setu-method", request.method);
   const next = () => NextResponse.next({ request: { headers } });
-  // Relative Location: stay on the visitor's own address (request.url can carry the server's host).
-  const to = (path: string) => new NextResponse(null, { status: 307, headers: { Location: path } });
+  // Stay on the visitor's own address: build it from the Host header (request.url can carry the
+  // server's own host under `next start` / a proxy). The proxy layer refuses a relative Location
+  // ("Invalid URL"), so this must be absolute.
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const proto = (request.headers.get("x-forwarded-proto") ?? request.nextUrl.protocol.replace(":", "")).split(",")[0].trim();
+  const to = (path: string) => NextResponse.redirect(new URL(path, host ? `${proto}://${host}` : request.url), 307);
 
   const matchedPrefix = Object.keys(protectedPrefixes).find((p) => pathname === p || pathname.startsWith(`${p}/`));
   if (!matchedPrefix) return next();
