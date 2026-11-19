@@ -24,6 +24,7 @@ import { runExport, runLifecycle } from "@/lib/tenant-data";
 import { runDailySummaries } from "@/lib/daily-summary";
 import { runAutomations } from "@/lib/automation";
 import { readDraft } from "@/lib/order-drafts";
+import { sweepAllPhotos, sweepPhotos } from "@/lib/photo-checks";
 
 /**
  * Worker-side handlers. Phase 0 keeps them small (logging, housekeeping);
@@ -164,6 +165,11 @@ export const handlers: Partial<Record<QueueName, Handler>> = {
     const { tenantId, draftId } = job.data as JobData & { draftId: string };
     await readDraft(tenantId, draftId);
   },
+  "photos.check": async (job) => {
+    const { tenantId } = job.data;
+    const r = tenantId && tenantId !== "platform" ? await sweepPhotos(tenantId) : await sweepAllPhotos();
+    if (r.checked) console.log(`[job] photos.check ${tenantId ?? "all"}`, JSON.stringify(r));
+  },
   "reports.daily_summary": async () => {
     const r = await runDailySummaries();
     if (r.sent) console.log(`[job] reports.daily_summary`, JSON.stringify(r));
@@ -189,4 +195,5 @@ export const schedules: { name: QueueName; cron: string }[] = [
   { name: "reports.daily_summary", cron: "0 * * * *" }, // hourly; each business picks its hour (default 21:00 IST)
   { name: "automation.daily", cron: "0 6 * * *" },
   { name: "automation.weekly", cron: "30 6 * * 1" },
+  { name: "photos.check", cron: "*/5 * * * *" }, // sweep: photos not checked yet
 ];

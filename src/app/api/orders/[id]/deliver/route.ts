@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { audit, requestIp } from "@/lib/audit";
-import { emit } from "@/lib/jobs";
+import { emit, kickPhotos } from "@/lib/jobs";
 import { keyBelongsTo } from "@/lib/storage";
 import { can } from "@/lib/permissions";
 import { withMoney } from "@/lib/ledger";
@@ -135,6 +135,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   await emit("order.delivered", { tenantId: tenant.id, orderId: id, paymentMethod: collect?.method ?? "CREDIT", codAmount: cashAmount });
   if (out.invoice) await queueEInvoice(tenant.id, out.invoice);
   if (out.creditNote) await queueEInvoice(tenant.id, out.creditNote);
+  if (pod.photo || collect?.proofKey) await kickPhotos(tenant.id);
 
   return NextResponse.json({ order: out.order, payment: out.payment, invoice: out.invoice, creditNote: out.creditNote, total: out.totalAmount });
 }

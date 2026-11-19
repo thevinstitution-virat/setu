@@ -173,6 +173,8 @@ model Tenant {
   automationRuns     AutomationRun[]
   aiCosts            AiCostLog[]
   orderDrafts        OrderDraft[]
+  photoChecks        PhotoCheck[]
+  shelfAudits        ShelfAudit[]
   platformInvoices   PlatformInvoice[]
   supportSessions    SupportSession[]
   exports            TenantExport[]
@@ -232,6 +234,7 @@ model User {
   storeLeads        StoreLead[]        @relation("LeadBy")
   leadDecisions     StoreLead[]        @relation("LeadDecidedBy")
   targets           Target[]
+  shelfAuditsBy     ShelfAudit[]       @relation("ShelfAuditBy")
   beatPlansMade     BeatPlan[]         @relation("BeatPlanBy")
   /// Language for messages sent to this person (en | hi); follows the language toggle.
   lang              String             @default("en")
@@ -333,6 +336,7 @@ model RetailerProfile {
   visits          Visit[]
   visitTasks      VisitTask[]
   orderDrafts     OrderDraft[]
+  shelfAudits     ShelfAudit[]
   groups          RetailerGroupMember[]
   prices          RetailerPrice[]
   bills           Bill[]
@@ -2547,15 +2551,15 @@ model SupportSession {
 
 /// Everything a platform user did in the console.
 model PlatformAudit {
-  id        String        @id @default(cuid())
-  actorId   String?
-  actor     PlatformUser? @relation(fields: [actorId], references: [id])
-  action    String
+  id             String        @id @default(cuid())
+  actorId        String?
+  actor          PlatformUser? @relation(fields: [actorId], references: [id])
+  action         String
   /// The business it was about (ours, not the business's: no row-level security, kept after a purge).
   targetTenantId String?
-  detail    Json?
-  ip        String?
-  createdAt DateTime      @default(now())
+  detail         Json?
+  ip             String?
+  createdAt      DateTime      @default(now())
 
   @@index([targetTenantId, createdAt])
   @@index([createdAt])
@@ -2757,4 +2761,60 @@ enum OrderDraftStatus {
   OPEN
   USED
   EXPIRED
+}
+
+/// A3 / A8 / A10: a photo looked at once (payment proof, delivery photo,
+/// crate pickup, shelf). The same photo used for two things is caught by its
+/// hash; what the AI read (when there is one) is kept, never acted on alone.
+model PhotoCheck {
+  id          String   @id @default(cuid())
+  tenantId    String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  /// payment | delivery | pickup | shelf
+  subjectType String
+  subjectId   String
+  fileKey     String
+  /// SHA-256 of the file's bytes.
+  hash        String
+  /// rules | ai
+  source      String
+  /// ok | warn | bad
+  verdict     String
+  /// Short keys: reused, reference_reused, amount_differs, unclear, crates_differ …
+  flags       String[] @default([])
+  /// What was read (amounts, references, counts, notes) and what it was compared with.
+  result      Json     @default("{}")
+  credits     Int      @default(0)
+  checkedAt   DateTime @default(now())
+
+  @@unique([tenantId, subjectType, subjectId, fileKey])
+  @@index([tenantId, hash])
+}
+
+/// A10: a shelf photo at a shop with our facings, other brands' facings and
+/// empty slots, counted by the AI and checked (or typed) by the field person.
+model ShelfAudit {
+  id         String          @id @default(cuid())
+  tenantId   String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant          @relation(fields: [tenantId], references: [id])
+  retailerId String
+  retailer   RetailerProfile @relation(fields: [retailerId], references: [id])
+  visitId    String?
+  byId       String
+  by         User            @relation("ShelfAuditBy", fields: [byId], references: [id])
+  photoKey   String
+  ours       Int
+  others     Int
+  empty      Int
+  /// Our products seen on the shelf (product ids).
+  seen       String[]        @default([])
+  /// manual | ai | ai_edited
+  source     String          @default("manual")
+  /// What the AI counted, before any edit.
+  read       Json?
+  note       String?
+  createdAt  DateTime        @default(now())
+
+  @@index([tenantId, retailerId, createdAt])
+  @@index([tenantId, createdAt])
 }

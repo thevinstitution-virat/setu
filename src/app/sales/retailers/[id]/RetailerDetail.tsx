@@ -14,6 +14,7 @@ import { NoOrderSheet, endVisit, startVisit } from "@/components/field/VisitKit"
 import { clock, type VisitsToday } from "@/components/field/kit";
 import ComplaintSheet from "@/components/engage/ComplaintSheet";
 import PayLinkCard from "./PayLinkCard";
+import ShelfAuditCard from "@/components/field/ShelfAuditCard";
 
 const daysOld = (s: string) => Math.max(0, Math.floor((Date.now() - new Date(s).getTime()) / 86_400_000));
 
@@ -313,6 +314,8 @@ export default function RetailerDetail({ id, invoices }: { id: string; invoices?
       >
         Capture order
       </button>
+
+      <ShelfAuditCard retailerId={id} visitId={openVisit?.id ?? null} />
 
       <div className="card p-4 space-y-2">
         <div className="flex items-center justify-between gap-3">

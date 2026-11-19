@@ -35,6 +35,7 @@ export const QUEUES = {
   "automation.daily": "Visit plans, collections, checks and expiry of old suggestions (06:00 IST)",
   "automation.weekly": "Credit review: risk scores and credit-limit suggestions (Mondays 06:30 IST)",
   "order.message": "Read an order a shop sent on WhatsApp and reply with a link to check it",
+  "photos.check": "Check new payment, delivery, pickup and shelf photos: reuse, and what the AI reads (after an upload, and every 5 minutes)",
 } as const;
 
 export type QueueName = keyof typeof QUEUES;
@@ -80,4 +81,9 @@ export async function emit(name: QueueName, data: JobData, options?: PgBoss.Send
 /** Wake the message sender for one business soon (at most one waiting job per business). */
 export function kickMessages(tenantId: string) {
   return emit("messages.flush", { tenantId }, { singletonKey: `flush:${tenantId}`, singletonSeconds: 3, retryLimit: 2 });
+}
+
+/** Check a business's new payment, delivery, pickup or shelf photos soon (at most one waiting job per business). */
+export function kickPhotos(tenantId: string) {
+  return emit("photos.check", { tenantId }, { singletonKey: `photos:${tenantId}`, singletonSeconds: 5, retryLimit: 2 });
 }

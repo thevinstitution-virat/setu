@@ -8,7 +8,7 @@ export default function ReportsLayout({ children }: { children: ReactNode }) {
         <div>
           <p className="page-kick">Owner&apos;s reports</p>
           <h1 className="page-title">How the business is doing</h1>
-          <p className="page-sub">Sales, money, stock, delivery, team, shops, schemes, routes and returns, compared with the period before.</p>
+          <p className="page-sub">Sales, money, stock, delivery, team, shops, schemes, routes, returns and shelves, compared with the period before.</p>
         </div>
       </div>
       <Suspense fallback={<div className="h-20" />}>
