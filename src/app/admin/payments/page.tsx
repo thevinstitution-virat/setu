@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Icon from "@/components/Icon";
 import { formatINR } from "@/lib/money";
 
-type Method = "CASH" | "UPI" | "CHEQUE" | "BANK" | "WALLET" | "CREDIT_NOTE";
+type Method = "CASH" | "UPI" | "CHEQUE" | "BANK" | "ONLINE" | "WALLET" | "CREDIT_NOTE";
 type State = "PENDING_VERIFICATION" | "CONFIRMED" | "REJECTED" | "REVERSED";
 type ChequeStatus = "RECEIVED" | "DEPOSITED" | "CLEARED" | "BOUNCED";
 
@@ -60,6 +60,7 @@ const METHOD_LABEL: Record<Method, string> = {
   UPI: "UPI",
   CHEQUE: "Cheque",
   BANK: "Bank transfer",
+  ONLINE: "Online (gateway)",
   WALLET: "Wallet",
   CREDIT_NOTE: "Credit note",
 };

@@ -29,7 +29,7 @@ export async function GET(req: Request) {
   const state = sp.get("state") as PaymentState | null;
   if (state && ["PENDING_VERIFICATION", "CONFIRMED", "REJECTED", "REVERSED"].includes(state)) where.state = state;
   const method = sp.get("method") as PayMethod | null;
-  if (method && ["CASH", "UPI", "CHEQUE", "BANK", "WALLET", "CREDIT_NOTE"].includes(method)) where.method = method;
+  if (method && ["CASH", "UPI", "CHEQUE", "BANK", "ONLINE", "WALLET", "CREDIT_NOTE"].includes(method)) where.method = method;
   const range = parseRange(sp);
   if (range) where.collectedAt = { gte: range.from, lte: range.to };
 

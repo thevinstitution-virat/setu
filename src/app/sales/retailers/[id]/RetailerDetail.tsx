@@ -13,6 +13,7 @@ import { errText } from "@/components/admin/AdminKit";
 import { NoOrderSheet, endVisit, startVisit } from "@/components/field/VisitKit";
 import { clock, type VisitsToday } from "@/components/field/kit";
 import ComplaintSheet from "@/components/engage/ComplaintSheet";
+import PayLinkCard from "./PayLinkCard";
 
 const daysOld = (s: string) => Math.max(0, Math.floor((Date.now() - new Date(s).getTime()) / 86_400_000));
 
@@ -292,6 +293,16 @@ export default function RetailerDetail({ id, invoices }: { id: string; invoices?
             <button className="btn btn-outline w-full" onClick={openCollect}>
               Collect payment
             </button>
+          )}
+
+          {!collecting && (
+            <PayLinkCard
+              retailerId={id}
+              outletName={retailer.outletName}
+              phone={retailer.user.phone}
+              dues={Math.max(0, dues.balances.receivable)}
+              onPaidAction={load}
+            />
           )}
         </div>
       )}

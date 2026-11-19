@@ -11,6 +11,7 @@ const nav: NavItem[] = [
   { href: "/admin/invoices", labelKey: "nav.invoices", icon: "receipt" },
   { href: "/admin/payments", labelKey: "nav.payments", icon: "card" },
   { href: "/admin/cash", labelKey: "nav.cash", icon: "cash" },
+  { href: "/admin/bank", labelKey: "nav.bank", icon: "wallet" },
   { href: "/admin/products", labelKey: "nav.products", icon: "tag" },
   { href: "/admin/pricing", labelKey: "nav.pricing", icon: "rupee" },
   { href: "/admin/schemes", labelKey: "nav.schemes", icon: "percent" },
@@ -20,6 +21,7 @@ const nav: NavItem[] = [
   { href: "/admin/import", labelKey: "nav.import", icon: "upload" },
   { href: "/admin/complaints", labelKey: "nav.complaints", icon: "chat" },
   { href: "/admin/engage", labelKey: "nav.engage", icon: "megaphone" },
+  { href: "/admin/integrations", labelKey: "nav.integrations", icon: "share" },
   { href: "/admin/settings", labelKey: "nav.settings", icon: "settings" },
 ];
 

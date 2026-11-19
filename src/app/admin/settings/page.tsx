@@ -17,6 +17,7 @@ import type { NotifySettings, ReferralSettings as ReferralRules, SupportSettings
 import MessageSettings, { type ChannelStatus } from "@/components/admin/MessageSettings";
 import SupportSettings from "@/components/admin/SupportSettings";
 import ReferralSettings from "@/components/admin/ReferralSettings";
+import GatewaySettings from "@/components/admin/GatewaySettings";
 
 type Mode = "PREPAID" | "POSTPAID";
 
@@ -331,6 +332,9 @@ export default function SettingsPage() {
             </a>
             <a href="#cart" className="chip">
               Cart rules
+            </a>
+            <a href="#online" className="chip">
+              Online payments
             </a>
             <a href="#gst" className="chip">
               GST &amp; invoices
@@ -675,6 +679,7 @@ export default function SettingsPage() {
           </div>
         </div>
       </form>
+      <GatewaySettings />
       <GstSettings invoice={gst.invoice} business={gst.business} />
       <DeliverySettings delivery={delivery} />
       <StockSettings inventory={inventory} />

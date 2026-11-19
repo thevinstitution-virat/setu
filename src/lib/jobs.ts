@@ -26,6 +26,9 @@ export const QUEUES = {
   "tickets.sla": "Tell the office about complaints past their time (every 15 minutes)",
   "engage.daily": "Close resolved complaints, lapse old referrals, trim old notifications (daily)",
   "feedback.given": "A retailer rated a delivery",
+  "gateway.sync": "Ask the gateway about open payment requests, in case a webhook was lost (every 10 minutes)",
+  "webhooks.flush": "Send queued webhooks to the business's own software (after a change, and every minute)",
+  "geo.locate": "Find map pins for shops from their address (after sign-up, and on request)",
 } as const;
 
 export type QueueName = keyof typeof QUEUES;

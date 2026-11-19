@@ -179,13 +179,15 @@ export async function deliverOrder(ctx: Ctx, input: DeliverInput, now = new Date
   }
 
   const cashAmount = input.collect?.method === "CASH" ? input.collect.amount : 0;
+  // Paid by the delivery QR (or a link) before handing over: online, collected.
+  const paidOnline = !input.collect && (await ctx.tx.payment.count({ where: { orderId: order.id, method: "ONLINE", state: "CONFIRMED" } })) > 0;
   const deliveryData = {
     deliveredAt: now,
     state: "DELIVERED" as const,
     podPhotoUrl: input.pod.photo,
     podSignatureData: input.pod.signature,
-    paymentMethod: !input.collect ? ("CREDIT" as const) : input.collect.method === "CASH" ? ("CASH" as const) : ("ONLINE" as const),
-    paymentStatus: input.collect ? ("COLLECTED" as const) : ("PENDING" as const),
+    paymentMethod: paidOnline ? ("ONLINE" as const) : !input.collect ? ("CREDIT" as const) : input.collect.method === "CASH" ? ("CASH" as const) : ("ONLINE" as const),
+    paymentStatus: input.collect || paidOnline ? ("COLLECTED" as const) : ("PENDING" as const),
     codAmount: cashAmount,
     lat: input.pod.lat,
     lng: input.pod.lng,

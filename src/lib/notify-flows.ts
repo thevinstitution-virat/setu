@@ -133,7 +133,7 @@ export async function invoiceIssuedNotify(tx: Tx, tenantId: string, orderId: str
   });
 }
 
-const METHOD: Record<string, string> = { CASH: "cash", UPI: "UPI", CHEQUE: "cheque", BANK: "bank transfer", WALLET: "wallet", CREDIT_NOTE: "credit note" };
+const METHOD: Record<string, string> = { CASH: "cash", UPI: "UPI", CHEQUE: "cheque", BANK: "bank transfer", ONLINE: "online payment", WALLET: "wallet", CREDIT_NOTE: "credit note" };
 
 /** A confirmed payment from the retailer (not wallet settlements or credit notes). */
 export async function paymentReceivedNotify(tx: Tx, tenantId: string, paymentId: string) {

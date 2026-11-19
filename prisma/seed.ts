@@ -18,6 +18,7 @@ import { gstinCheckDigit } from "../src/lib/gst";
 import { adjustStock, draftReorderPos, receiveGoods, setPoStatus } from "../src/lib/stock";
 import { seedField } from "./seed-field";
 import { seedEngage } from "./seed-engage";
+import { seedPayments } from "./seed-payments";
 
 /** Made-up GSTIN with a valid check digit (test data only). */
 const testGstin = (first14: string) => `${first14}${gstinCheckDigit(first14)}`;
@@ -53,6 +54,7 @@ async function wipe() {
       "InvoiceLine", "Invoice",
       "SchemeRedemption", "Scheme", "Banner", "RetailerPrice", "PriceListItem", "PriceList",
       "RetailerGroupMember", "RetailerGroup", "HsnCode", "Brand", "Category",
+      "WebhookDelivery", "WebhookEndpoint", "ApiKey", "BankLine", "BankStatement", "GatewaySettlement", "GatewayEvent", "PaymentIntent", "GeoCache",
       "PaymentAllocation", "Cheque", "CashHandover", "Payment", "Bill", "LedgerLine", "JournalEntry", "LedgerAccount",
       "DeliveryFeedback", "TicketMessage", "Ticket", "Referral", "Announcement", "MessageTemplate", "PushSubscription", "MessageLog", "Notification",
       "HandoffUse", "Target", "StoreLead", "LeaveRequest", "LocationPing", "BeatPlan", "BeatRetailer",
@@ -363,6 +365,12 @@ async function seedDemo() {
     shops: { agarwal: retailer1.retailerProfile!.id, patel: retailer2.retailerProfile!.id, sai: retailer3.retailerProfile!.id },
     deliveredOrderId: deliveredOrder.id,
     areas: mumbai.areas.map((a) => a.id),
+  });
+  await seedPayments(db, prisma, {
+    tenantId: tenant.id,
+    adminId: (await db.user.findFirstOrThrow({ where: { loginId: "admin" } })).id,
+    shops: { agarwal: retailer1.retailerProfile!.id, patel: retailer2.retailerProfile!.id, sai: retailer3.retailerProfile!.id },
+    saiUserId: retailer3.id,
   });
   // Location tracking on for the demo so the team map has positions (off by default for real businesses).
   const tr = await prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { settings: true } });

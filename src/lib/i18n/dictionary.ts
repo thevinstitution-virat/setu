@@ -44,6 +44,7 @@ export const dictionary = {
   "nav.invoices": { en: "Invoices", hi: "बिल" },
   "nav.payments": { en: "Payments", hi: "भुगतान" },
   "nav.cash": { en: "Cash", hi: "नकद" },
+  "nav.bank": { en: "Bank", hi: "बैंक" },
   "nav.settings": { en: "Settings", hi: "सेटिंग्स" },
   "nav.field": { en: "Field team", hi: "फ़ील्ड टीम" },
   "nav.teamToday": { en: "Team today", hi: "टीम आज" },
@@ -55,6 +56,7 @@ export const dictionary = {
   "nav.help": { en: "Help", hi: "मदद" },
   "nav.complaints": { en: "Complaints", hi: "शिकायतें" },
   "nav.engage": { en: "Engage", hi: "जुड़ाव" },
+  "nav.integrations": { en: "Integrations", hi: "इंटीग्रेशन" },
   "nav.notifications": { en: "Notifications", hi: "सूचनाएँ" },
   "nav.refer": { en: "Refer & earn", hi: "रेफ़र करें, कमाएँ" },
 

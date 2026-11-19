@@ -42,6 +42,8 @@ import {
   validMobile,
   weekday,
 } from "@/lib/field-math";
+import { emit } from "@/lib/jobs";
+import { retailerWebhook } from "@/lib/webhooks";
 
 const fail = (msg: string, status = 400, extra?: Record<string, unknown>) => new MoneyError(msg, status, extra);
 
@@ -602,6 +604,8 @@ export async function decideLead(ctx: Ctx, deciderId: string, id: string, input:
     },
     include: { retailerProfile: true },
   });
+  await retailerWebhook(ctx.tx, ctx.tenantId, user.retailerProfile!.id);
+  if (lead.lat == null) await emit("geo.locate", { tenantId: ctx.tenantId, retailerIds: [user.retailerProfile!.id] }, { startAfter: 5 });
   return ctx.tx.storeLead.update({
     where: { id },
     data: { status: "APPROVED", decidedById: deciderId, decidedAt: now, decisionNote: input.note ?? null, retailerId: user.retailerProfile!.id, salesAgentId: salesAgentId ?? null },
