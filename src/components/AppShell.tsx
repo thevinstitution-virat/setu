@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
@@ -7,6 +8,7 @@ import type { DictKey } from "@/lib/i18n/dictionary";
 import LanguageToggle from "@/components/LanguageToggle";
 import { BrandLockup } from "@/components/BrandMark";
 import Icon, { type IconName } from "@/components/Icon";
+import { NOTIFY_EVENT } from "@/components/engage/kit";
 
 export type NavItem = { href: string; labelKey: DictKey; icon: IconName };
 
@@ -62,6 +64,7 @@ export default function AppShell({
           </nav>
 
           <span className="flex-1" />
+          <Bell href={`${nav[0]?.href ?? ""}/notifications`} active={pathname.endsWith("/notifications")} />
           <LanguageToggle />
           <span className="text-sm font-semibold text-[var(--ink-2)] hidden lg:inline max-w-[160px] truncate">
             {userName}
@@ -89,6 +92,58 @@ export default function AppShell({
         ))}
       </nav>
     </div>
+  );
+}
+
+/** Header bell: unread count, refreshed every minute, on focus, on page change and after reading here. */
+function Bell({ href, active }: { href: string; active: boolean }) {
+  const { t } = useLanguage();
+  const pathname = usePathname();
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let live = true;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/notifications/unread", { cache: "no-store" });
+        const d = await res.json();
+        if (live && typeof d.count === "number") setCount(d.count);
+      } catch {
+        // Offline: keep the last count.
+      }
+    };
+    load();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 60_000);
+    window.addEventListener("focus", load);
+    window.addEventListener(NOTIFY_EVENT, load);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", load);
+      window.removeEventListener(NOTIFY_EVENT, load);
+    };
+  }, [pathname]);
+
+  const label = count ? `${t("nav.notifications")}: ${count} unread` : t("nav.notifications");
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      title={label}
+      aria-current={active ? "page" : undefined}
+      className={`relative grid place-items-center h-10 w-10 shrink-0 rounded-xl transition ${
+        active ? "bg-[var(--kesar-tint)] text-[var(--kesar-text)]" : "text-[var(--ink-2)] hover:bg-ink/5"
+      }`}
+    >
+      <Icon name="bell" className="h-5 w-5" />
+      {count > 0 && (
+        <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#a8281e] text-white text-[10.5px] font-bold leading-[18px] text-center">
+          {count > 99 ? "99+" : count}
+        </span>
+      )}
+    </Link>
   );
 }
 

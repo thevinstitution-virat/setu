@@ -52,6 +52,11 @@ export const dictionary = {
   "nav.leave": { en: "Leave", hi: "छुट्टी" },
   "nav.beats": { en: "Beats", hi: "बीट" },
   "nav.reports": { en: "Reports", hi: "रिपोर्ट" },
+  "nav.help": { en: "Help", hi: "मदद" },
+  "nav.complaints": { en: "Complaints", hi: "शिकायतें" },
+  "nav.engage": { en: "Engage", hi: "जुड़ाव" },
+  "nav.notifications": { en: "Notifications", hi: "सूचनाएँ" },
+  "nav.refer": { en: "Refer & earn", hi: "रेफ़र करें, कमाएँ" },
 
   // Roles
   "role.retailer": { en: "Retailer", hi: "रिटेलर" },

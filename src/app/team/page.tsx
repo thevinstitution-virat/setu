@@ -6,6 +6,7 @@ import Icon from "@/components/Icon";
 import { ErrorBox, Thumb, useFetch } from "@/components/admin/AdminKit";
 import { istDay } from "@/lib/field-math";
 import TeamMap, { type MapPoint } from "@/components/team/TeamMap";
+import AnnouncementCards from "@/components/engage/AnnouncementCards";
 import {
   Bar,
   DayPicker,
@@ -86,6 +87,8 @@ export default function TeamTodayPage({ searchParams }: { searchParams: Promise<
           Refresh
         </button>
       </div>
+
+      <AnnouncementCards />
 
       <DayPicker date={date} today={today} onChange={goTo} noFuture />
 

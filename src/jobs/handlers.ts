@@ -1,10 +1,21 @@
 import type PgBoss from "pg-boss";
-import { asPlatform, tenantDb } from "@/lib/db";
+import { asPlatform } from "@/lib/db";
 import type { JobData, QueueName } from "@/lib/jobs";
 import { generateEInvoice } from "@/lib/einvoice";
 import { MoneyError } from "@/lib/money-error";
 import { withMoney } from "@/lib/ledger";
 import { purgePings } from "@/lib/field";
+import { kickMessages } from "@/lib/jobs";
+import { flushAll, flushTenant } from "@/lib/outbox";
+import {
+  duesReminders,
+  monthlyStatements,
+  onOrderDeliveredNotify,
+  onOrderPlacedNotify,
+  onOrderStatusNotify,
+} from "@/lib/notify-flows";
+import { autoClose, slaSweep } from "@/lib/tickets";
+import { lapseReferrals, qualifyReferral } from "@/lib/referrals";
 
 /**
  * Worker-side handlers. Phase 0 keeps them small (logging, housekeeping);
@@ -21,15 +32,19 @@ const logEvent: Handler = async (job) => {
 export const handlers: Partial<Record<QueueName, Handler>> = {
   "order.placed": async (job) => {
     const { tenantId, orderId } = job.data as JobData & { orderId: string };
-    const order = await tenantDb(tenantId).order.findUnique({
-      where: { id: orderId },
-      select: { orderNumber: true, totalAmount: true, retailer: { select: { outletName: true } } },
-    });
-    // Phase 7: WhatsApp / push confirmation to the retailer and the owner.
-    console.log(`[event] order.placed ${order?.orderNumber} ${order?.retailer.outletName} ${order?.totalAmount}p`);
+    await withMoney(tenantId, null, (ctx) => onOrderPlacedNotify(ctx.tx, tenantId, orderId));
   },
-  "order.status": logEvent,
-  "order.delivered": logEvent,
+  "order.status": async (job) => {
+    const { tenantId, orderId, from, to } = job.data as JobData & { orderId: string; from: string; to: string };
+    await withMoney(tenantId, null, (ctx) => onOrderStatusNotify(ctx.tx, tenantId, orderId, from, to));
+  },
+  "order.delivered": async (job) => {
+    const { tenantId, orderId } = job.data as JobData & { orderId: string };
+    await withMoney(tenantId, null, async (ctx) => {
+      await onOrderDeliveredNotify(ctx.tx, tenantId, orderId);
+      await qualifyReferral(ctx, orderId);
+    });
+  },
   "retailer.registered": logEvent,
   "import.completed": logEvent,
   "einvoice.generate": async (job) => {
@@ -54,6 +69,36 @@ export const handlers: Partial<Record<QueueName, Handler>> = {
     for (const t of tenants) total += await withMoney(t.id, null, (ctx) => purgePings(ctx));
     console.log(`[job] pings.cleanup removed ${total}`);
   },
+  "messages.flush": async (job) => {
+    const { tenantId } = job.data;
+    const r = tenantId && tenantId !== "platform" ? await flushTenant(tenantId) : await flushAll();
+    if (r.SENT + r.FAILED + r.LOGGED + r.SKIPPED) console.log(`[job] messages.flush ${tenantId}`, JSON.stringify(r));
+  },
+  "dues.reminders": async () => {
+    for (const t of await tenants()) {
+      const n = await withMoney(t, null, (ctx) => duesReminders(ctx.tx, t));
+      if (n) console.log(`[job] dues.reminders ${t}: ${n}`);
+    }
+  },
+  "statements.monthly": async () => {
+    for (const t of await tenants()) await withMoney(t, null, (ctx) => monthlyStatements(ctx.tx, t));
+  },
+  "tickets.sla": async () => {
+    for (const t of await tenants()) await withMoney(t, null, (ctx) => slaSweep(ctx.tx, t));
+  },
+  "engage.daily": async () => {
+    const old = new Date(Date.now() - 90 * 24 * 3600_000);
+    for (const t of await tenants()) {
+      await withMoney(t, null, async (ctx) => {
+        await autoClose(ctx.tx, t);
+        await lapseReferrals(ctx.tx);
+        // Read notifications go after 90 days; the message log keeps a year.
+        await ctx.tx.notification.deleteMany({ where: { readAt: { lt: old } } });
+        await ctx.tx.messageLog.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 365 * 24 * 3600_000) } } });
+      });
+      await kickMessages(t);
+    }
+  },
   "handoff.cleanup": async () => {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const res = await asPlatform((tx) => tx.handoffUse.deleteMany({ where: { usedAt: { lt: cutoff } } }));
@@ -61,7 +106,16 @@ export const handlers: Partial<Record<QueueName, Handler>> = {
   },
 };
 
+async function tenants() {
+  return (await asPlatform((tx) => tx.tenant.findMany({ select: { id: true } }))).map((t) => t.id);
+}
+
 export const schedules: { name: QueueName; cron: string }[] = [
+  { name: "messages.flush", cron: "* * * * *" }, // sweep: anything queued or worth retrying
+  { name: "tickets.sla", cron: "*/15 * * * *" },
+  { name: "dues.reminders", cron: "0 10 * * *" }, // 10:00 IST
+  { name: "statements.monthly", cron: "0 9 1 * *" }, // 09:00 IST on the 1st
+  { name: "engage.daily", cron: "15 4 * * *" },
   { name: "otp.cleanup", cron: "30 3 * * *" }, // 03:30 IST daily
   { name: "pings.cleanup", cron: "45 3 * * *" },
   { name: "handoff.cleanup", cron: "50 3 * * *" },

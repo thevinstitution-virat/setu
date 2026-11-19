@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import LanguageToggle from "@/components/LanguageToggle";
@@ -34,17 +34,30 @@ export default function LoginPage() {
 /**
  * ?phone=XXXXXXXXXX opens the staff tab in OTP mode with the phone filled in
  * (switching business from a password session). ?error=... shows why a business
- * switch link failed.
+ * switch link failed. ?ref=CODE (a shop's refer-and-earn link) fills the
+ * referral code on the retailer sign-up form.
  */
 function LoginFromQuery() {
   const params = useSearchParams();
   const raw = (params.get("phone") ?? "").replace(/\D/g, "");
   const phone = /^\d{10}$/.test(raw) ? raw : "";
   const error = (params.get("error") ?? "").trim().slice(0, 200) || null;
-  return <LoginCard initialPhone={phone} linkError={error} />;
+  const ref = normaliseRef(params.get("ref"));
+  return <LoginCard initialPhone={phone} linkError={error} initialRef={ref} />;
 }
 
-function LoginCard({ initialPhone = "", linkError = null }: { initialPhone?: string; linkError?: string | null }) {
+/** Same rule as lib/referrals normaliseCode: capitals and digits, 12 at most. */
+const normaliseRef = (v: string | null) => (v ?? "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
+
+function LoginCard({
+  initialPhone = "",
+  linkError = null,
+  initialRef = "",
+}: {
+  initialPhone?: string;
+  linkError?: string | null;
+  initialRef?: string;
+}) {
   const [mode, setMode] = useState<"retailer" | "team">(initialPhone || linkError ? "team" : "retailer");
   const { t } = useLanguage();
 
@@ -87,14 +100,14 @@ function LoginCard({ initialPhone = "", linkError = null }: { initialPhone?: str
             ))}
           </div>
 
-          {mode === "retailer" ? <RetailerLogin /> : <TeamLogin initialPhone={initialPhone} />}
+          {mode === "retailer" ? <RetailerLogin initialRef={initialRef} /> : <TeamLogin initialPhone={initialPhone} />}
         </div>
       </div>
     </div>
   );
 }
 
-function RetailerLogin() {
+function RetailerLogin({ initialRef = "" }: { initialRef?: string }) {
   const router = useRouter();
   const { t } = useLanguage();
   const [step, setStep] = useState<"phone" | "otp" | "register">("phone");
@@ -113,6 +126,8 @@ function RetailerLogin() {
     regionId: "",
     areaId: "",
   });
+  const [referralCode, setReferralCode] = useState(initialRef);
+  const referral = useReferralCheck(step === "register", referralCode);
 
   async function sendOtp() {
     setError(null);
@@ -170,12 +185,18 @@ function RetailerLogin() {
       setError("Please fill in every field");
       return;
     }
+    // A code that is not valid would stop the sign-up: fix it or clear it first.
+    const sendCode = referralCode.trim() !== "" && referral.state !== "off";
+    if (sendCode && referral.state !== "ok") {
+      setError(referral.state === "checking" ? "Checking the referral code. Try again in a moment." : "Fix or clear the referral code");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/register-retailer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, ...form }),
+        body: JSON.stringify({ phone, ...form, ...(sendCode ? { referralCode } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -294,6 +315,31 @@ function RetailerLogin() {
               }
             />
           </Field>
+          {(referral.state !== "off" || initialRef) && (
+            <Field label="Referral code (optional)">
+              <input
+                className="input uppercase tracking-[0.12em]"
+                autoCapitalize="characters"
+                autoComplete="off"
+                maxLength={12}
+                placeholder="From a shop that invited you"
+                value={referralCode}
+                onChange={(e) => setReferralCode(normaliseRef(e.target.value))}
+              />
+              {referralCode && referral.state === "checking" && (
+                <span className="block text-xs text-[var(--muted)] mt-1">Checking…</span>
+              )}
+              {referralCode && referral.state === "ok" && (
+                <span className="block text-xs font-semibold text-[var(--mint-text)] mt-1">Code from {referral.shop}</span>
+              )}
+              {referralCode && (referral.state === "error" || referral.state === "off") && (
+                <span className={`block text-xs mt-1 ${referralCode.length < 5 && referral.state === "error" ? "text-[var(--muted)]" : "text-[#a8281e]"}`}>
+                  {referral.message}
+                  {referral.state === "off" ? ". You can still sign up." : ""}
+                </span>
+              )}
+            </Field>
+          )}
           <Button onClick={register} loading={loading}>
             {t("login.createAccount")}
           </Button>
@@ -303,6 +349,49 @@ function RetailerLogin() {
       {error && <p className="text-sm text-[#a8281e]">{error}</p>}
     </div>
   );
+}
+
+type ReferralCheck =
+  | { state: "idle" | "checking" }
+  | { state: "ok"; shop: string }
+  | { state: "error" | "off"; message: string };
+
+/**
+ * Live check of the sign-up referral code (no sign-in needed). With no code
+ * it still asks once, to learn whether refer-and-earn is on at all ("off"
+ * hides the field).
+ */
+function useReferralCheck(active: boolean, code: string): ReferralCheck {
+  const [result, setResult] = useState<ReferralCheck & { code: string | null }>({ state: "idle", code: null });
+  // Too short to be a code: only learn whether the feature is on.
+  const query = code.length >= 5 ? code : "";
+
+  useEffect(() => {
+    if (!active) return;
+    let live = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/referrals/check?code=${encodeURIComponent(query)}`);
+        const d = await res.json().catch(() => ({}));
+        if (!live) return;
+        if (res.ok) setResult({ state: "ok", shop: String(d.shop ?? ""), code: query });
+        else if (res.status === 409) setResult({ state: "off", message: d.error ?? "Refer and earn is not on", code: query });
+        else setResult({ state: "error", message: d.error ?? "This code is not valid", code: query });
+      } catch {
+        if (live) setResult({ state: "idle", code: null });
+      }
+    }, query ? 400 : 0);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [active, query]);
+
+  if (result.state === "off") return result;
+  if (!code) return { state: "idle" };
+  if (!query) return { state: "error", message: "Enter the full code your friend shared" };
+  if (result.code !== query) return { state: "checking" };
+  return result;
 }
 
 function TeamLogin({ initialPhone = "" }: { initialPhone?: string }) {

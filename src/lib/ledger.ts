@@ -13,6 +13,9 @@ import { fyLabel, nextSequence } from "@/lib/orders";
 import { formatINR } from "@/lib/money";
 import { moneySettings, termsFor, type MoneySettings } from "@/lib/money-settings";
 import { invoiceSettings } from "@/lib/invoice-settings";
+import { queuedMessages } from "@/lib/notify";
+import { kickMessages } from "@/lib/jobs";
+import { paymentReceivedNotify } from "@/lib/notify-flows";
 
 /**
  * The money engine. Everything here runs inside withTenantTx(), so a money
@@ -27,8 +30,19 @@ import { invoiceSettings } from "@/lib/invoice-settings";
 export type Ctx = { tx: Tx; tenantId: string; actorId: string | null };
 
 /** Run a money operation atomically inside one tenant. */
-export function withMoney<T>(tenantId: string, actorId: string | null, fn: (ctx: Ctx) => Promise<T>) {
-  return withTenantTx(tenantId, (tx) => fn({ tx, tenantId, actorId }), { timeout: 20_000 });
+export async function withMoney<T>(tenantId: string, actorId: string | null, fn: (ctx: Ctx) => Promise<T>) {
+  let used: object | null = null;
+  const out = await withTenantTx(
+    tenantId,
+    (tx) => {
+      used = tx;
+      return fn({ tx, tenantId, actorId });
+    },
+    { timeout: 20_000 }
+  );
+  // Messages queued in this transaction are now committed: send them soon.
+  if (used && queuedMessages(used)) void kickMessages(tenantId);
+  return out;
 }
 
 export { MoneyError };
@@ -66,6 +80,7 @@ const NAMES: Record<AccountType, string> = {
   DISCOUNT: "Discounts and write-offs",
   PENALTY_INCOME: "Penalties",
   CASH_SHORTAGE: "Cash shortages",
+  PROMOTIONS: "Promotions and rewards",
 };
 
 // Per-transaction cache: an account created in a transaction that rolls back
@@ -412,6 +427,8 @@ async function postPayment(ctx: Ctx, paymentId: string, p: PaymentInput) {
   });
   await ctx.tx.payment.update({ where: { id: paymentId }, data: { entryId: entry.id } });
   if (purpose === "DUES") await allocateRetailer(ctx, p.retailerId);
+  // Receipt to the retailer (skips wallet settlements and credit notes).
+  if (!p.fromHold) await paymentReceivedNotify(ctx.tx, ctx.tenantId, paymentId);
 }
 
 /** Staff confirms a retailer-reported payment (e.g. UPI with UTR). */

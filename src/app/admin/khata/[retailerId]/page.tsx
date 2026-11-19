@@ -319,6 +319,8 @@ export default function RetailerKhataPage({ params }: { params: Promise<{ retail
             <Payments payments={data.payments} onDone={reload} />
           </div>
           <Statement
+            retailerId={retailerId}
+            onDone={reload}
             outletName={data.retailer.outletName}
             statement={data.statement}
             draft={rangeDraft}
@@ -605,15 +607,52 @@ function Payments({ payments, onDone }: { payments: Payment[]; onDone: (msg?: st
 
 // ───────────────────────────── statement ─────────────────────────────
 
+/** Send the shop its balance and khata link now (in the app, and WhatsApp / SMS per settings). */
+function SendStatement({ retailerId, outletName, onDone }: { retailerId: string; outletName: string; onDone: (msg?: string) => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function go() {
+    if (!window.confirm(`Send ${outletName} their balance and a link to their khata now? It goes in the app, and on WhatsApp or SMS if those are on in Settings.`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await send(`/api/admin/khata/${retailerId}/statement`, "POST", {});
+      await onDone(`Statement sent to ${outletName}`);
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button className="btn btn-outline btn-xs" onClick={go} disabled={busy}>
+        <Icon name="share" className="h-4 w-4" /> {busy ? "Sending…" : "Send statement"}
+      </button>
+      {error && (
+        <p className="basis-full text-xs text-[#a8281e]" role="alert">
+          {error}
+        </p>
+      )}
+    </>
+  );
+}
+
 type Range = { from: string; to: string };
 
 function Statement({
+  retailerId,
+  onDone,
   outletName,
   statement,
   draft,
   setDraft,
   apply,
 }: {
+  retailerId: string;
+  onDone: (msg?: string) => Promise<void>;
   outletName: string;
   statement: Khata["statement"];
   draft: Range;
@@ -660,9 +699,12 @@ function Statement({
 
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3.5 border-b border-[var(--line)] print:hidden">
         <h2 className="font-heading font-bold">Statement</h2>
-        <button className="btn btn-outline btn-xs" onClick={() => window.print()} disabled={!statement}>
-          <Icon name="receipt" className="h-4 w-4" /> Print
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <SendStatement retailerId={retailerId} outletName={outletName} onDone={onDone} />
+          <button className="btn btn-outline btn-xs" onClick={() => window.print()} disabled={!statement}>
+            <Icon name="receipt" className="h-4 w-4" /> Print
+          </button>
+        </div>
       </div>
 
       <div className="px-4 py-3 space-y-2 border-b border-[var(--line)] print:hidden">

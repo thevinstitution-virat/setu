@@ -18,6 +18,8 @@ const nav: NavItem[] = [
   { href: "/team", labelKey: "nav.field", icon: "pin" },
   { href: "/admin/regions", labelKey: "nav.regions", icon: "map" },
   { href: "/admin/import", labelKey: "nav.import", icon: "upload" },
+  { href: "/admin/complaints", labelKey: "nav.complaints", icon: "chat" },
+  { href: "/admin/engage", labelKey: "nav.engage", icon: "megaphone" },
   { href: "/admin/settings", labelKey: "nav.settings", icon: "settings" },
 ];
 

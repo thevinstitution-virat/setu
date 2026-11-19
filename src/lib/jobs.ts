@@ -19,7 +19,13 @@ export const QUEUES = {
   "pings.cleanup": "Delete field-staff positions older than each business keeps them (daily)",
   "handoff.cleanup": "Delete used business-switch tokens older than a day (daily)",
   "einvoice.generate": "Get the IRN for a B2B invoice or note",
-  "trip.started": "A trip left: tell each retailer (Phase 7 notifications)",
+  "trip.started": "A trip left (retailers are told through order.status)",
+  "messages.flush": "Send queued SMS / WhatsApp / push messages (after a change, and every minute)",
+  "dues.reminders": "Payment reminders for overdue bills (daily 10:00)",
+  "statements.monthly": "Monthly statements on the 1st (when turned on)",
+  "tickets.sla": "Tell the office about complaints past their time (every 15 minutes)",
+  "engage.daily": "Close resolved complaints, lapse old referrals, trim old notifications (daily)",
+  "feedback.given": "A retailer rated a delivery",
 } as const;
 
 export type QueueName = keyof typeof QUEUES;
@@ -60,4 +66,9 @@ export async function emit(name: QueueName, data: JobData, options?: PgBoss.Send
     console.error(`[jobs] could not enqueue ${name}`, e);
     return null;
   }
+}
+
+/** Wake the message sender for one business soon (at most one waiting job per business). */
+export function kickMessages(tenantId: string) {
+  return emit("messages.flush", { tenantId }, { singletonKey: `flush:${tenantId}`, singletonSeconds: 3, retryLimit: 2 });
 }

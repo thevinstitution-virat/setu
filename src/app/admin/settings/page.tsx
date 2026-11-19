@@ -13,6 +13,10 @@ import type { InventorySettings } from "@/lib/inventory-settings";
 import StockSettings from "@/components/admin/StockSettings";
 import type { FieldSettings as FieldRules } from "@/lib/field-settings";
 import FieldSettings from "@/components/admin/FieldSettings";
+import type { NotifySettings, ReferralSettings as ReferralRules, SupportSettings as SupportRules } from "@/lib/engage-settings";
+import MessageSettings, { type ChannelStatus } from "@/components/admin/MessageSettings";
+import SupportSettings from "@/components/admin/SupportSettings";
+import ReferralSettings from "@/components/admin/ReferralSettings";
 
 type Mode = "PREPAID" | "POSTPAID";
 
@@ -221,6 +225,7 @@ export default function SettingsPage() {
   const [delivery, setDelivery] = useState<DeliveryRules | null>(null);
   const [inventory, setInventory] = useState<InventorySettings | null>(null);
   const [field, setField] = useState<FieldRules | null>(null);
+  const [engage, setEngage] = useState<{ notify: NotifySettings; channels: ChannelStatus; support: SupportRules; referral: ReferralRules } | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/settings")
@@ -238,12 +243,13 @@ export default function SettingsPage() {
         setDelivery(data.delivery);
         setInventory(data.inventory);
         setField(data.field);
+        setEngage({ notify: data.notify, channels: data.channels, support: data.support, referral: data.referral });
       })
       .catch((e) => setLoadError(e instanceof Error ? e.message : "Could not load settings"));
   }, []);
 
   if (loadError) return <p className="text-sm text-[#a8281e]">{loadError}</p>;
-  if (!form || !saved || !cart || !cartSaved || !cartRaw || !gst || !delivery || !inventory || !field) return <p className="text-sm text-[var(--muted)]">Loading…</p>;
+  if (!form || !saved || !cart || !cartSaved || !cartRaw || !gst || !delivery || !inventory || !field || !engage) return <p className="text-sm text-[var(--muted)]">Loading…</p>;
 
   const moneyDirty = JSON.stringify(form) !== JSON.stringify(saved);
   const cartDirty = JSON.stringify(cart) !== JSON.stringify(cartSaved);
@@ -314,10 +320,10 @@ export default function SettingsPage() {
       <form onSubmit={save} className="space-y-5">
         <div>
           <p className="page-kick">Settings</p>
-          <h1 className="page-title">Money, cart, GST, delivery, stock and field rules</h1>
+          <h1 className="page-title">Business settings</h1>
           <p className="page-sub">
-            Defaults for new retailers, how payments work, what an order needs, and how invoices are made. You can change terms for one retailer
-            from their khata.
+            Defaults for new retailers, how payments work, what an order needs, how invoices are made, and which messages go out. You can change
+            terms for one retailer from their khata.
           </p>
           <div className="flex flex-wrap gap-2 mt-3">
             <a href="#money" className="chip">
@@ -337,6 +343,15 @@ export default function SettingsPage() {
             </a>
             <a href="#field" className="chip">
               Field team
+            </a>
+            <a href="#messages" className="chip">
+              Messages
+            </a>
+            <a href="#complaints" className="chip">
+              Complaints
+            </a>
+            <a href="#referral" className="chip">
+              Refer &amp; earn
             </a>
           </div>
         </div>
@@ -664,6 +679,9 @@ export default function SettingsPage() {
       <DeliverySettings delivery={delivery} />
       <StockSettings inventory={inventory} />
       <FieldSettings field={field} />
+      <MessageSettings notify={engage.notify} channels={engage.channels} />
+      <SupportSettings support={engage.support} />
+      <ReferralSettings referral={engage.referral} />
     </div>
   );
 }

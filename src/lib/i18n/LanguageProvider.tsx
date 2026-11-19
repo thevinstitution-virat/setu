@@ -37,6 +37,12 @@ export function LanguageProvider({
       localStorage.setItem("setu-lang", l);
       document.cookie = `setu-lang=${l}; path=/; max-age=31536000`;
     } catch {}
+    // Messages (WhatsApp, SMS, push) follow the language picked here. Signed out: nothing to save.
+    fetch("/api/notifications/prefs", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lang: l }),
+    }).catch(() => {});
     router.refresh();
   }
 

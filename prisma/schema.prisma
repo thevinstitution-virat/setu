@@ -136,6 +136,15 @@ model Tenant {
   storeLeads        StoreLead[]
   targets           Target[]
   handoffUses       HandoffUse[]
+  notifications     Notification[]
+  messages          MessageLog[]
+  pushSubscriptions PushSubscription[]
+  messageTemplates  MessageTemplate[]
+  tickets           Ticket[]
+  ticketMessages    TicketMessage[]
+  feedback          DeliveryFeedback[]
+  referrals         Referral[]
+  announcements     Announcement[]
 }
 
 /// Custom domains a tenant has verified (e.g. order.agencyname.in).
@@ -183,6 +192,16 @@ model User {
   leadDecisions     StoreLead[]        @relation("LeadDecidedBy")
   targets           Target[]
   beatPlansMade     BeatPlan[]         @relation("BeatPlanBy")
+  /// Language for messages sent to this person (en | hi); follows the language toggle.
+  lang              String             @default("en")
+  /// What this person turned off: channels (sms, whatsapp, push) and topics (reminders, promo).
+  mutes             String[]           @default([])
+  notifications     Notification[]
+  pushSubscriptions PushSubscription[]
+  ticketsRaised     Ticket[]           @relation("TicketBy")
+  ticketsAssigned   Ticket[]           @relation("TicketAssignee")
+  ticketMessages    TicketMessage[]
+  announcementsMade Announcement[]
 
   @@unique([tenantId, phone])
   @@unique([tenantId, email])
@@ -268,11 +287,18 @@ model RetailerProfile {
   prices          RetailerPrice[]
   bills           Bill[]
   payments        Payment[]
+  tickets         Ticket[]
+  feedback        DeliveryFeedback[]
+  /// Code other shops enter when they sign up (refer and earn). Made on first use.
+  referralCode    String?
+  referralsMade   Referral[]            @relation("Referrer")
+  referredBy      Referral?             @relation("Referee")
   accounts        LedgerAccount[]
   returnableMoves ReturnableMove[]
   beats           BeatRetailer[]
   lead            StoreLead?
 
+  @@unique([tenantId, referralCode])
   @@index([tenantId, areaId])
   @@index([tenantId, salesAgentId])
 }
@@ -470,6 +496,8 @@ model Order {
   bill         Bill?
   invoices     Invoice[]
   statusEvents OrderStatusEvent[]
+  tickets      Ticket[]
+  feedback     DeliveryFeedback?
   delivery     Delivery?
   visit        Visit?
 
@@ -853,6 +881,7 @@ enum AccountType {
   DISCOUNT
   PENALTY_INCOME
   CASH_SHORTAGE
+  PROMOTIONS // rewards we give away (refer and earn)
 }
 
 enum EntryKind {
@@ -871,6 +900,7 @@ enum EntryKind {
   HANDOVER
   SHORTAGE_WRITEOFF
   REVERSAL
+  REWARD
 }
 
 enum PayMethod {
@@ -1774,4 +1804,261 @@ model PurchaseLine {
   lotId      String?
 
   @@index([tenantId, purchaseId])
+}
+
+// ───────────────────────────── Phase 7: communication and engagement ─────────────────────────────
+
+/// In-app notification (the bell). Every event lands here; SMS / WhatsApp / push copies go through MessageLog.
+model Notification {
+  id        String    @id @default(cuid())
+  tenantId  String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  event     String
+  title     String
+  body      String
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  /// Stops the same event reaching the same person twice (job retries).
+  dedupeKey String?
+
+  @@unique([tenantId, dedupeKey])
+  @@index([tenantId, userId, createdAt])
+  @@index([tenantId, userId, readAt])
+}
+
+enum MessageChannel {
+  SMS
+  WHATSAPP
+  PUSH
+}
+
+enum MessageStatus {
+  /// Waiting for the sender job.
+  QUEUED
+  SENT
+  FAILED
+  /// No provider set up: kept so the office can see what would have gone out.
+  LOGGED
+  /// Not sent: the person turned the channel off, has no number, or no phone subscribed.
+  SKIPPED
+}
+
+/// Outbox: one row per message per channel, written in the same transaction as the business change.
+model MessageLog {
+  id         String         @id @default(cuid())
+  tenantId   String         @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant         @relation(fields: [tenantId], references: [id])
+  userId     String?
+  channel    MessageChannel
+  /// Phone number (SMS / WhatsApp) or "push".
+  to         String
+  event      String
+  lang       String
+  title      String?
+  body       String
+  link       String?
+  /// WhatsApp: approved template name and its body parameters, in order.
+  waTemplate String?
+  params     Json?
+  /// WhatsApp: a document (invoice PDF) sent as the header.
+  docUrl     String?
+  status     MessageStatus  @default(QUEUED)
+  provider   String?
+  providerId String?
+  error      String?
+  attempts   Int            @default(0)
+  dedupeKey  String?
+  createdAt  DateTime       @default(now())
+  sentAt     DateTime?
+
+  @@unique([tenantId, dedupeKey])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, userId, createdAt])
+}
+
+/// A browser or phone that accepted web push for a person.
+model PushSubscription {
+  id         String    @id @default(cuid())
+  tenantId   String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  endpoint   String
+  p256dh     String
+  auth       String
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  @@unique([tenantId, endpoint])
+  @@index([tenantId, userId])
+}
+
+/// A business's own wording for one event in one language (the built-in wording is used otherwise).
+model MessageTemplate {
+  id         String   @id @default(cuid())
+  tenantId   String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  event      String
+  lang       String
+  title      String
+  body       String
+  /// WhatsApp template name approved for this business (body parameters follow the {placeholders} in order).
+  waTemplate String?
+  /// SMS DLT template id registered for this wording.
+  dltId      String?
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantId, event, lang])
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  /// Waiting for the retailer to answer.
+  WAITING
+  RESOLVED
+  CLOSED
+}
+
+/// A complaint from a retailer (damaged goods, missing items, billing ...) with an SLA.
+model Ticket {
+  id              String          @id @default(cuid())
+  tenantId        String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant          Tenant          @relation(fields: [tenantId], references: [id])
+  number          String
+  retailerId      String
+  retailer        RetailerProfile @relation(fields: [retailerId], references: [id])
+  orderId         String?
+  order           Order?          @relation(fields: [orderId], references: [id])
+  category        String
+  subject         String
+  status          TicketStatus    @default(OPEN)
+  /// normal | high
+  priority        String          @default("normal")
+  assignedToId    String?
+  assignedTo      User?           @relation("TicketAssignee", fields: [assignedToId], references: [id])
+  createdById     String
+  createdBy       User            @relation("TicketBy", fields: [createdById], references: [id])
+  slaDueAt        DateTime
+  slaNotifiedAt   DateTime?
+  firstResponseAt DateTime?
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  messages        TicketMessage[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status, slaDueAt])
+  @@index([tenantId, retailerId, createdAt])
+}
+
+model TicketMessage {
+  id        String   @id @default(cuid())
+  tenantId  String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id])
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  body      String
+  photoKeys String[] @default([])
+  /// Office-only note: never shown to the retailer.
+  internal  Boolean  @default(false)
+  /// Status change made with this message, e.g. "OPEN>RESOLVED".
+  change    String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, ticketId, createdAt])
+}
+
+/// The retailer's rating of one delivered order.
+model DeliveryFeedback {
+  id           String          @id @default(cuid())
+  tenantId     String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant          @relation(fields: [tenantId], references: [id])
+  orderId      String          @unique
+  order        Order           @relation(fields: [orderId], references: [id])
+  retailerId   String
+  retailer     RetailerProfile @relation(fields: [retailerId], references: [id])
+  /// Driver who delivered it (for per-driver averages).
+  driverUserId String?
+  rating       Int
+  tags         String[]        @default([])
+  comment      String?
+  createdAt    DateTime        @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, driverUserId])
+}
+
+enum ReferralStatus {
+  /// Signed up with the code; waiting for a first delivered order.
+  PENDING
+  REWARDED
+  /// Did not qualify in time, or cancelled by the office.
+  LAPSED
+}
+
+/// Refer and earn: shop A's code used by shop B at sign-up.
+model Referral {
+  id             String          @id @default(cuid())
+  tenantId       String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  referrerId     String
+  referrer       RetailerProfile @relation("Referrer", fields: [referrerId], references: [id])
+  refereeId      String          @unique
+  referee        RetailerProfile @relation("Referee", fields: [refereeId], references: [id])
+  code           String
+  status         ReferralStatus  @default(PENDING)
+  /// Rewards in paise, fixed when the shop signed up (later setting changes do not move them).
+  referrerReward Int
+  refereeReward  Int             @default(0)
+  minOrder       Int
+  expiresAt      DateTime
+  orderId        String?
+  rewardedAt     DateTime?
+  note           String?
+  createdAt      DateTime        @default(now())
+
+  @@index([tenantId, referrerId, createdAt])
+  @@index([tenantId, status])
+}
+
+enum AnnouncementAudience {
+  RETAILERS
+  STAFF
+  ALL
+}
+
+/// A notice to retailers (by area or group) or staff (by role), shown in the app and optionally sent out once.
+model Announcement {
+  id          String               @id @default(cuid())
+  tenantId    String               @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant               @relation(fields: [tenantId], references: [id])
+  title       String
+  body        String
+  audience    AnnouncementAudience @default(RETAILERS)
+  areaIds     String[]             @default([])
+  groupIds    String[]             @default([])
+  roles       String[]             @default([])
+  link        String?
+  imageKey    String?
+  pinned      Boolean              @default(false)
+  startsAt    DateTime             @default(now())
+  endsAt      DateTime?
+  /// Channels to send it on once, when published (in-app is always on).
+  channels    String[]             @default([])
+  publishedAt DateTime?
+  sentCount   Int                  @default(0)
+  createdById String
+  createdBy   User                 @relation(fields: [createdById], references: [id])
+  createdAt   DateTime             @default(now())
+
+  @@index([tenantId, publishedAt])
 }

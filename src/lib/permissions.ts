@@ -43,6 +43,10 @@ export const PERMISSIONS = {
   "team.supervise": "See their team's day, map, coverage and reports; approve their leave",
   "targets.manage": "Set monthly targets and incentives",
   "field.offbeat": "Visit and order for any shop, not only their own beat",
+  "messages.manage": "Message settings and wording, and the log of messages sent",
+  "tickets.raise": "Raise a complaint (retailers for their shop, field staff for shops they serve)",
+  "tickets.manage": "Answer, assign and resolve complaints; see delivery ratings",
+  "promotions.manage": "Announcements and refer and earn",
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
@@ -51,11 +55,11 @@ const ALL = Object.keys(PERMISSIONS) as Permission[];
 
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   ADMIN: ALL,
-  RETAILER: ["orders.place", "payments.report"],
-  SALES_AGENT: ["orders.place", "field.work", "payments.collect", "attendance.mark", "stores.propose"],
+  RETAILER: ["orders.place", "payments.report", "tickets.raise"],
+  SALES_AGENT: ["orders.place", "field.work", "payments.collect", "attendance.mark", "stores.propose", "tickets.raise"],
   DELIVERY_AGENT: ["delivery.work", "payments.collect", "stock.spot_sell", "attendance.mark", "stores.propose"],
   // No team.view: supervisors see their own team through /api/team/*, never the full staff list.
-  SUPERVISOR: ["orders.place", "attendance.mark", "stores.propose", "team.supervise", "field.offbeat"],
+  SUPERVISOR: ["orders.place", "attendance.mark", "stores.propose", "team.supervise", "field.offbeat", "tickets.raise"],
 };
 
 export function can(role: Role, perm: Permission | Permission[]): boolean {

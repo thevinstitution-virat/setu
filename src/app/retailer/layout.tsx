@@ -7,6 +7,7 @@ const nav: NavItem[] = [
   { href: "/retailer/catalogue", labelKey: "nav.catalogue", icon: "cart" },
   { href: "/retailer/orders", labelKey: "nav.orders", icon: "box" },
   { href: "/retailer/khata", labelKey: "nav.khata", icon: "book" },
+  { href: "/retailer/help", labelKey: "nav.help", icon: "chat" },
   { href: "/retailer/account", labelKey: "nav.account", icon: "user" },
 ];
 

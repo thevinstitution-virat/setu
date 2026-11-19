@@ -11,6 +11,7 @@ import type { Role, TargetMetric } from "@/generated/prisma/client";
 import type { Ctx } from "@/lib/ledger";
 import type { Tx } from "@/lib/db";
 import { MoneyError } from "@/lib/money-error";
+import { notify, staffWith } from "@/lib/notify";
 import { can } from "@/lib/permissions";
 import { validGstin } from "@/lib/gst";
 import {
@@ -249,7 +250,18 @@ export async function requestLeave(ctx: Ctx, userId: string, input: { fromDate: 
     select: { fromDate: true, toDate: true },
   });
   if (clash) throw fail(`You already asked for leave from ${clash.fromDate} to ${clash.toDate}`, 409);
-  return ctx.tx.leaveRequest.create({ data: { userId, fromDate, toDate, days, type, reason: input.reason?.trim() || null } });
+  const leave = await ctx.tx.leaveRequest.create({ data: { userId, fromDate, toDate, days, type, reason: input.reason?.trim() || null } });
+  // Tell whoever can approve it: their supervisor, and the people who manage staff.
+  const me = await ctx.tx.user.findUnique({ where: { id: userId }, select: { name: true, supervisorId: true } });
+  const to = [...new Set([...(me?.supervisorId ? [me.supervisorId] : []), ...(await staffWith(ctx.tx, "team.manage"))])].filter((id) => id !== userId);
+  await notify(ctx.tx, ctx.tenantId, {
+    event: "staff.leave",
+    to,
+    vars: { name: me?.name ?? "Someone", days: days === 1 ? "1 day" : `${days} days`, from: fromDate },
+    link: "/team/leave",
+    key: `staff.leave:${leave.id}`,
+  });
+  return leave;
 }
 
 /** Approve / reject (supervisor of that person, or admin), or cancel (the person, or a decider). */
@@ -522,7 +534,7 @@ export async function proposeLead(ctx: Ctx, who: Who, input: LeadInput) {
   const clashes = await leadClashes(ctx.tx, phone, gstin);
   if (clashes.length) throw fail(clashes[0], 409, { clashes });
   const agent = await ctx.tx.salesAgentProfile.findUnique({ where: { userId: who.userId }, select: { id: true } });
-  return ctx.tx.storeLead.create({
+  const lead = await ctx.tx.storeLead.create({
     data: {
       outletName,
       ownerName,
@@ -542,6 +554,15 @@ export async function proposeLead(ctx: Ctx, who: Who, input: LeadInput) {
       salesAgentId: agent?.id ?? null,
     },
   });
+  const by = await ctx.tx.user.findUnique({ where: { id: who.userId }, select: { name: true } });
+  await notify(ctx.tx, ctx.tenantId, {
+    event: "staff.lead",
+    to: (await staffWith(ctx.tx, "stores.approve")).filter((id) => id !== who.userId),
+    vars: { outlet: outletName, by: by?.name ?? "Field staff" },
+    link: "/team/stores",
+    key: `staff.lead:${lead.id}`,
+  });
+  return lead;
 }
 
 /** Approve (creates the retailer account and shop) or reject a proposed shop. */

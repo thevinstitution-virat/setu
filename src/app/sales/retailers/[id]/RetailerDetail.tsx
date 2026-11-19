@@ -12,6 +12,7 @@ import Link from "next/link";
 import { errText } from "@/components/admin/AdminKit";
 import { NoOrderSheet, endVisit, startVisit } from "@/components/field/VisitKit";
 import { clock, type VisitsToday } from "@/components/field/kit";
+import ComplaintSheet from "@/components/engage/ComplaintSheet";
 
 const daysOld = (s: string) => Math.max(0, Math.floor((Date.now() - new Date(s).getTime()) / 86_400_000));
 
@@ -60,6 +61,8 @@ export default function RetailerDetail({ id, invoices }: { id: string; invoices?
   const [payError, setPayError] = useState<string | null>(null);
   const [paySaving, setPaySaving] = useState(false);
   const [payDone, setPayDone] = useState<string | null>(null);
+  const [complaint, setComplaint] = useState(false);
+  const [raised, setRaised] = useState<string | null>(null);
 
   async function load() {
     const d = await fetch(`/api/sales/retailers/${id}`).then((r) => r.json());
@@ -299,6 +302,32 @@ export default function RetailerDetail({ id, invoices }: { id: string; invoices?
       >
         Capture order
       </button>
+
+      <div className="card p-4 space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Problem at this shop?</p>
+            <p className="text-xs text-[var(--muted)]">Damaged or missing goods, bill problems. The office follows up.</p>
+          </div>
+          <button type="button" className="btn btn-quiet btn-sm shrink-0" onClick={() => setComplaint(true)}>
+            Raise complaint
+          </button>
+        </div>
+        {raised && <p className="text-sm font-semibold text-[var(--mint-text)]">{raised}</p>}
+      </div>
+
+      {complaint && (
+        <ComplaintSheet
+          retailerId={id}
+          shopName={retailer.outletName}
+          orders={retailer.orders.slice(0, 20).map((o) => ({ id: o.id, orderNumber: o.orderNumber, totalAmount: o.totalAmount, createdAt: o.createdAt }))}
+          onClose={() => setComplaint(false)}
+          onRaised={(t) => {
+            setComplaint(false);
+            setRaised(`Complaint ${t.number} raised. The office will take it up.`);
+          }}
+        />
+      )}
 
       <div>
         <p className="text-sm font-semibold mb-2">Recent orders</p>
