@@ -25,9 +25,12 @@ export type CartRules = {
   cutoffTime: string;
   deliveryDates: string[];
 };
+/** Stock badge from GET /api/catalogue (null = nothing to say, or stock isn't tracked). */
+export type StockBadge = "out" | "low" | null;
+export type StoreProduct = CatalogueProduct & { stock?: StockBadge };
 export type CatalogueData = {
   retailer: { id: string; outletName: string; area: string; priceList: string | null };
-  products: CatalogueProduct[];
+  products: StoreProduct[];
   categories: Category[];
   brands: Brand[];
   banners: Banner[];
@@ -93,6 +96,15 @@ function tintFor(s: string) {
 }
 
 // ───────────── small components ─────────────
+
+/** "Out of stock" / "Few left" chip. Ordering stays open: the business may only warn. */
+export function StockChip({ stock, className = "" }: { stock: StockBadge | undefined; className?: string }) {
+  if (stock === "out") {
+    return <span className={`chip !py-0.5 !text-[11.5px] !bg-[#fde4e1] !text-[#a8281e] !border-transparent ${className}`}>Out of stock</span>;
+  }
+  if (stock === "low") return <span className={`chip chip-genda !py-0.5 !text-[11.5px] ${className}`}>Few left</span>;
+  return null;
+}
 
 export function ProductThumb({ name, imageKey, className = "h-16 w-16" }: { name: string; imageKey?: string | null; className?: string }) {
   if (imageKey) {

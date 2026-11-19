@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { formatINR } from "@/lib/money";
 import { directionsUrl, type TripStop } from "@/lib/trip-api";
 import Icon from "@/components/Icon";
@@ -56,8 +57,24 @@ function Progress({ stops }: { stops: TripStop[] }) {
   );
 }
 
+/** Van stock (and Spot sale while running), only when stock is tracked and the trip has a van. */
+function VanLinks({ sell }: { sell: boolean }) {
+  return (
+    <div className={`grid gap-2 ${sell ? "grid-cols-2" : "grid-cols-1"}`}>
+      <Link href="/delivery/van" className="btn btn-outline">
+        <Icon name="stock" className="h-4 w-4" /> Van stock
+      </Link>
+      {sell && (
+        <Link href="/delivery/spot-sale" className="btn btn-soft">
+          <Icon name="cart" className="h-4 w-4" /> Spot sale
+        </Link>
+      )}
+    </div>
+  );
+}
+
 /** A trip that hasn't left: its stops and the big Start button. */
-function PlannedTrip({ trip }: { trip: DriverTrip }) {
+function PlannedTrip({ trip, stock }: { trip: DriverTrip; stock: boolean }) {
   return (
     <section className="card p-4 space-y-4">
       <TripHead trip={trip} />
@@ -67,6 +84,7 @@ function PlannedTrip({ trip }: { trip: DriverTrip }) {
         ))}
       </ul>
       {trip.stops.length > 1 && <SortStopsButton tripId={trip.id} />}
+      {stock && trip.vehicle && <VanLinks sell={false} />}
       {trip.stops.length > 0 ? (
         <StartTripButton tripId={trip.id} stops={trip.stops.length} />
       ) : (
@@ -77,7 +95,7 @@ function PlannedTrip({ trip }: { trip: DriverTrip }) {
 }
 
 /** A running trip: progress, route, then one card per stop in route order. */
-function RunningTrip({ trip }: { trip: DriverTrip }) {
+function RunningTrip({ trip, stock }: { trip: DriverTrip; stock: boolean }) {
   const open = trip.stops.filter((s) => s.state === "ASSIGNED");
   const route = directionsUrl(open.map((s) => s.retailer));
   return (
@@ -103,6 +121,7 @@ function RunningTrip({ trip }: { trip: DriverTrip }) {
             {trip.cash > 0 ? ` Hand over ${formatINR(trip.cash)} cash at the office.` : ""}
           </p>
         )}
+        {stock && trip.vehicle && <VanLinks sell={trip.status === "STARTED"} />}
       </div>
       {trip.stops.map((s) => (
         <StopCard key={s.orderId} stop={s} />
@@ -111,8 +130,9 @@ function RunningTrip({ trip }: { trip: DriverTrip }) {
   );
 }
 
-export default function TripCard({ trip }: { trip: DriverTrip }) {
-  return trip.status === "PLANNED" ? <PlannedTrip trip={trip} /> : <RunningTrip trip={trip} />;
+/** `stock`: the business tracks stock (van stock and spot sales are shown for trips with a van). */
+export default function TripCard({ trip, stock = false }: { trip: DriverTrip; stock?: boolean }) {
+  return trip.status === "PLANNED" ? <PlannedTrip trip={trip} stock={stock} /> : <RunningTrip trip={trip} stock={stock} />;
 }
 
 /** A closed trip of today, kept short and grey. */

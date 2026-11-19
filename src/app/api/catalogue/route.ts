@@ -4,6 +4,7 @@ import { withTenantTx } from "@/lib/db";
 import { catalogueFor, inWindow, retailerPricingCtx, schemesFor, targets } from "@/lib/pricing";
 import { cartSettings, deliveryDays } from "@/lib/cart-settings";
 import { cartRetailer } from "@/lib/cart-api";
+import { stockBadges } from "@/lib/stock";
 
 /**
  * The storefront for one retailer: products they can see at their rates,
@@ -39,6 +40,8 @@ export async function GET(req: Request) {
       tx.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { settings: true } }),
     ]);
 
+    // Stock (Phase 5): "out" / "low" badge when the business tracks stock and checks orders.
+    const badges = await stockBadges(tx, t.settings, products.map((p) => p.id));
     const visible = new Set(products.map((p) => p.id));
     const freq = new Map<string, number>();
     for (const i of recent) if (visible.has(i.productId)) freq.set(i.productId, (freq.get(i.productId) ?? 0) + 1);
@@ -50,7 +53,7 @@ export async function GET(req: Request) {
     const cart = cartSettings(t.settings);
     return {
       retailer: { id: retailer.id, outletName: retailer.outletName, area: retailer.area.name, priceList: retailer.priceList?.name ?? null },
-      products,
+      products: products.map((p) => ({ ...p, stock: badges.get(p.id) ?? null })),
       categories: cats.filter((c) => usedCats.has(c.id)),
       brands: brands.filter((b) => usedBrands.has(b.id)),
       banners: banners

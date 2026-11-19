@@ -3,6 +3,7 @@ import { docNumber, fyCode, istDate } from "@/lib/gst";
 import { nextSequence } from "@/lib/orders";
 import { deliverySettings } from "@/lib/delivery-settings";
 import { dispatchOrder, failDelivery } from "@/lib/delivery";
+import { ensureLoaded } from "@/lib/stock";
 
 /**
  * Trips (Phase 4): one vehicle + driver + slot + day, with ordered stops.
@@ -58,7 +59,10 @@ export async function updateTrip(ctx: Ctx, tripId: string, p: { driverId?: strin
   const trip = await openTrip(ctx, tripId);
   const data: Record<string, unknown> = {};
   if (p.note !== undefined) data.note = p.note?.trim().slice(0, 200) || null;
-  if (p.vehicleId !== undefined) {
+  if (p.vehicleId !== undefined && p.vehicleId !== trip.vehicleId) {
+    // Stock (Phase 5): the goods are on the old van.
+    const loaded = await ctx.tx.stockMove.count({ where: { tripId, kind: "LOAD" } });
+    if (loaded) throw new MoneyError("Goods are already loaded on this van. Unload them before changing the van.");
     if (p.vehicleId) {
       const v = await ctx.tx.vehicle.findUnique({ where: { id: p.vehicleId } });
       if (!v || !v.active) throw new MoneyError("Vehicle not found", 404);
@@ -87,7 +91,7 @@ export async function updateTrip(ctx: Ctx, tripId: string, p: { driverId?: strin
 }
 
 /** Put orders on a trip. On a trip that has already left they go out at once. Returns invoices issued. */
-export async function addOrders(ctx: Ctx, tripId: string, orderIds: string[]) {
+export async function addOrders(ctx: Ctx, tripId: string, orderIds: string[], opts: { stockOverride?: boolean } = {}) {
   const trip = await openTrip(ctx, tripId);
   if (!orderIds.length) throw new MoneyError("Pick at least one order");
   const last = await ctx.tx.delivery.aggregate({ where: { tripId }, _max: { seq: true } });
@@ -113,6 +117,8 @@ export async function addOrders(ctx: Ctx, tripId: string, orderIds: string[]) {
       if (inv) docs.push(inv);
     }
   }
+  // Stock (Phase 5): orders added to a trip that has left go on the van too.
+  if (trip.status === "STARTED") await ensureLoaded(ctx, tripId, { override: opts.stockOverride });
   return docs;
 }
 
@@ -199,11 +205,13 @@ export async function autoSequence(ctx: Ctx, tripId: string) {
 }
 
 /** The trip leaves: every stop goes out for delivery. Returns invoices issued (for e-invoicing). */
-export async function startTrip(ctx: Ctx, tripId: string, now = new Date()) {
+export async function startTrip(ctx: Ctx, tripId: string, now = new Date(), opts: { stockOverride?: boolean } = {}) {
   const trip = await openTrip(ctx, tripId);
   if (trip.status !== "PLANNED") throw new MoneyError("This trip has already left");
   const stops = await ctx.tx.delivery.findMany({ where: { tripId, state: "ASSIGNED" }, orderBy: { seq: "asc" }, select: { orderId: true } });
   if (!stops.length) throw new MoneyError("Add orders to the trip first");
+  // Stock (Phase 5): the van must carry every order (loads what is missing; refuses when the warehouse is short).
+  await ensureLoaded(ctx, tripId, { override: opts.stockOverride });
   const docs: { id: string; einvStatus: string }[] = [];
   for (const s of stops) {
     const inv = await dispatchOrder(ctx, s.orderId, `Out for delivery on trip ${trip.number}`);

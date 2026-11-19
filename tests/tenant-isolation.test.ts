@@ -95,4 +95,16 @@ describe("row-level security", () => {
     const n = await asPlatform((tx) => tx.product.count({ where: seeded }));
     expect(n).toBe(12);
   });
+
+  it("every table with a tenantId has forced row-level security and a policy", async () => {
+    const rows = await prisma.$queryRaw<{ table: string; rls: boolean; forced: boolean; policies: number }[]>`
+      SELECT c.relname AS "table", c.relrowsecurity AS rls, c.relforcerowsecurity AS forced,
+             (SELECT count(*)::int FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = c.relname) AS policies
+      FROM information_schema.columns col
+      JOIN pg_class c ON c.relname = col.table_name
+      JOIN pg_namespace ns ON ns.oid = c.relnamespace AND ns.nspname = 'public'
+      WHERE col.table_schema = 'public' AND col.column_name = 'tenantId' AND c.relname <> 'TenantDomain'`;
+    expect(rows.length).toBeGreaterThan(40);
+    expect(rows.filter((r) => !r.rls || !r.forced || r.policies < 1).map((r) => r.table)).toEqual([]);
+  });
 });

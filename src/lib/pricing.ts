@@ -5,6 +5,7 @@ import { applySchemes, describeScheme, type AppliedScheme, type EngineLine, type
 import { cartSettings, deliveryChargeFor, deliveryDays } from "@/lib/cart-settings";
 import { invoiceSettings } from "@/lib/invoice-settings";
 import { searchText } from "@/lib/translit";
+import { orderStockShort } from "@/lib/stock";
 
 /**
  * Prices, visibility and the cart quote (Phase 2). The same quoteCart() runs
@@ -296,6 +297,10 @@ export type Quote = {
   coupon: { code: string; valid: boolean; message: string } | null;
   /** Reasons the order can't be placed as it stands (empty = OK). */
   problems: string[];
+  /** Things to know that don't stop the order (stock short when the business only warns). */
+  warnings: string[];
+  /** Products asked for beyond available stock: productId → units available. */
+  stockShort: Record<string, number>;
   priceListId: string | null;
   /** Schemes for this retailer right now (to show "add 2 more for …"). */
   offers: OfferedScheme[];
@@ -307,7 +312,7 @@ export async function quoteCart(
   tx: Tx,
   tenantSettings: unknown,
   r: RetailerCtx,
-  input: { items: CartItemInput[]; coupon?: string | null; deliveryDate?: string | null },
+  input: { items: CartItemInput[]; coupon?: string | null; deliveryDate?: string | null; skipStockCheck?: boolean },
   now = new Date()
 ): Promise<Quote> {
   const problems: string[] = [];
@@ -424,6 +429,20 @@ export async function quoteCart(
     else problems.push("That delivery day isn't available. Pick another.");
   }
 
+  // Stock (Phase 5): warn or refuse when an order asks for more than is available.
+  const warnings: string[] = [];
+  const stockShort: Record<string, number> = {};
+  const need = new Map<string, number>();
+  for (const l of lines) need.set(l.productId, (need.get(l.productId) ?? 0) + l.quantity);
+  for (const f of free) need.set(f.productId, (need.get(f.productId) ?? 0) + f.quantity);
+  const stock = input.skipStockCheck ? { mode: "off" as const, short: [] } : await orderStockShort(tx, tenantSettings, need);
+  for (const x of stock.short) {
+    const p = products.get(x.productId)!;
+    stockShort[x.productId] = x.available;
+    const msg = x.available > 0 ? `${p.name}: only ${x.available} ${p.unit} in stock` : `${p.name} is out of stock`;
+    (stock.mode === "block" ? problems : warnings).push(msg);
+  }
+
   let coupon: Quote["coupon"] = null;
   if (code) {
     const used = couponScheme ? result.applied.find((a) => a.schemeId === couponScheme.id) : null;
@@ -453,6 +472,8 @@ export async function quoteCart(
     deliveryDate,
     coupon,
     problems,
+    warnings,
+    stockShort,
     priceListId: r.priceListId,
     offers: offers.filter((o) => !o.coupon || o.id === couponScheme?.id),
   };

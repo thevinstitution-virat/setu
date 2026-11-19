@@ -44,6 +44,12 @@ const PATHS = {
   chevronLeft: "M15 6l-6 6 6 6",
   chevronRight: "M9 6l6 6-6 6",
   phone: "M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z",
+  /** Stock: a warehouse rack. */
+  stock: "M3 21V8l9-5 9 5v13M7 21v-8h10v8M7 17h10",
+  /** Layers (batches). */
+  layers: "M12 3 2 8l10 5 10-5-10-5ZM2 13l10 5 10-5M2 18l10 5 10-5",
+  /** Clipboard (purchase orders, counts). */
+  clipboard: "M9 4h6v3H9zM8 5H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2M9 12h6M9 16h4",
 } as const;
 
 export type IconName = keyof typeof PATHS;

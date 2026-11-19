@@ -6,6 +6,7 @@ import { moneySettings, parseMoneySettings } from "@/lib/money-settings";
 import { cartSettings, parseCartSettings } from "@/lib/cart-settings";
 import { invoiceSettings, parseInvoiceSettings } from "@/lib/invoice-settings";
 import { deliverySettings, parseDeliverySettings } from "@/lib/delivery-settings";
+import { inventorySettings, parseInventorySettings } from "@/lib/inventory-settings";
 import { isStateCode, normaliseGstin, validGstin } from "@/lib/gst";
 import { invalidateTenantCache } from "@/lib/tenant";
 
@@ -13,7 +14,7 @@ const BUSINESS = { name: true, legalName: true, gstin: true, stateCode: true, ad
 
 /**
  * Business settings: money rules (settings.money), cart rules (settings.cart),
- * invoice / GST rules (settings.invoice), delivery rules (settings.delivery) and the business's legal identity
+ * invoice / GST rules (settings.invoice), delivery rules (settings.delivery), stock rules (settings.inventory) and the business's legal identity
  * (Tenant columns: legal name, GSTIN, state, address, phone).
  */
 export async function GET() {
@@ -21,7 +22,7 @@ export async function GET() {
   if (!auth.ok) return auth.res;
   const t = await asPlatform((tx) => tx.tenant.findUniqueOrThrow({ where: { id: auth.tenant.id }, select: { settings: true, ...BUSINESS } }));
   const { settings, ...business } = t;
-  return NextResponse.json({ money: moneySettings(settings), cart: cartSettings(settings), invoice: invoiceSettings(settings), delivery: deliverySettings(settings), business });
+  return NextResponse.json({ money: moneySettings(settings), cart: cartSettings(settings), invoice: invoiceSettings(settings), delivery: deliverySettings(settings), inventory: inventorySettings(settings), business });
 }
 
 const SECTIONS = {
@@ -29,6 +30,7 @@ const SECTIONS = {
   cart: { read: cartSettings, parse: (i: Record<string, unknown>) => parseCartSettings(i) },
   invoice: { read: invoiceSettings, parse: (i: Record<string, unknown>, s: unknown) => parseInvoiceSettings(i, invoiceSettings(s)) },
   delivery: { read: deliverySettings, parse: (i: Record<string, unknown>) => parseDeliverySettings(i) },
+  inventory: { read: inventorySettings, parse: (i: Record<string, unknown>) => parseInventorySettings(i) },
 } as const;
 
 function parseBusiness(b: Record<string, unknown>) {
@@ -55,7 +57,7 @@ function parseBusiness(b: Record<string, unknown>) {
   return out;
 }
 
-/** Body: { money?, cart?, invoice?, delivery?, business? } — only the fields sent change. */
+/** Body: { money?, cart?, invoice?, delivery?, inventory?, business? } — only the fields sent change. */
 export async function PATCH(req: Request) {
   const auth = await guard("settings.manage");
   if (!auth.ok) return auth.res;

@@ -6,6 +6,7 @@ import { withMoney } from "@/lib/ledger";
 import { tripDay, tripSummary } from "@/lib/trips";
 import { tripStops } from "@/lib/trip-api";
 import { deliverySettings, slotLabel } from "@/lib/delivery-settings";
+import { inventorySettings } from "@/lib/inventory-settings";
 import Icon from "@/components/Icon";
 import DutySwitch from "./DutySwitch";
 import TripCard, { ClosedTripRow, type DriverTrip } from "./TripCard";
@@ -68,6 +69,8 @@ export default async function DeliveryHome() {
     active.reduce((n, t) => n + t.stops.filter((s) => s.state === "ASSIGNED").length, 0) + loose.length;
   const cash = trips.filter((t) => t.status === "STARTED").reduce((n, t) => n + t.cash, 0);
   const running = trips.some((t) => t.status === "STARTED");
+  // Stock tracked: trips with a van get "Van stock" (and "Spot sale" while running).
+  const stock = inventorySettings(tenant.settings).enabled;
 
   return (
     <div className="space-y-6">
@@ -95,7 +98,7 @@ export default async function DeliveryHome() {
       </div>
 
       {active.map((t) => (
-        <TripCard key={t.id} trip={t} />
+        <TripCard key={t.id} trip={t} stock={stock} />
       ))}
 
       {loose.length > 0 && (

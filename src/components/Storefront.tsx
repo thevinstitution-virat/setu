@@ -14,6 +14,7 @@ import {
   offerCovers,
   ProductThumb,
   QtyControl,
+  StockChip,
   type Banner,
   type Cart,
   type CartEntry,
@@ -21,6 +22,7 @@ import {
   type PlacedOrder,
   type QuoteJson,
   type StoreFilters,
+  type StoreProduct,
 } from "@/components/store/shared";
 
 export type { PlacedOrder, StoreFilters } from "@/components/store/shared";
@@ -240,7 +242,7 @@ export default function Storefront({
 
   const groups = useMemo(() => {
     const order = new Map(categories.map((c, i) => [c.id, i]));
-    const m = new Map<string, { name: string; items: CatalogueProduct[] }>();
+    const m = new Map<string, { name: string; items: StoreProduct[] }>();
     for (const p of visible) {
       const g = m.get(p.category.id) ?? { name: p.category.name, items: [] };
       g.items.push(p);
@@ -279,7 +281,7 @@ export default function Storefront({
   const cartIds = Object.keys(cart);
   const unitCount = cartIds.length;
   const sheetProduct = openProduct ? (byId.get(openProduct) ?? null) : null;
-  const buyAgain = data.buyAgain.map((id) => byId.get(id)).filter((p): p is CatalogueProduct => !!p);
+  const buyAgain = data.buyAgain.map((id) => byId.get(id)).filter((p): p is StoreProduct => !!p);
 
   return (
     <div className="space-y-4">
@@ -354,11 +356,12 @@ export default function Storefront({
             {buyAgain.map((p) => (
               <div key={p.id} className="card shrink-0 w-[148px] p-2.5 flex flex-col gap-2">
                 <button type="button" onClick={() => setOpenProduct(p.id)} className="text-left space-y-1.5 min-w-0">
-                  <ProductThumb name={p.name} imageKey={p.images[0]} className="h-12 w-12" />
+                  <ProductThumb name={p.name} imageKey={p.images[0]} className={`h-12 w-12 ${p.stock === "out" ? "opacity-60" : ""}`} />
                   <span className="block text-xs font-semibold leading-snug line-clamp-2">{p.name}</span>
                   <span className="block text-xs text-[var(--muted)]">
                     {formatINR(p.price)} / {p.unit}
                   </span>
+                  <StockChip stock={p.stock} />
                 </button>
                 <div className="mt-auto flex justify-end">
                   <QtyControl product={p} entry={cart[p.id]} onChangeAction={(e) => setEntry(p.id, e)} compact />

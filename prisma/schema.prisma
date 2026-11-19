@@ -119,6 +119,14 @@ model Tenant {
   returnables       Returnable[]
   returnableMoves   ReturnableMove[]
   dutyShifts        DutyShift[]
+  stockLocations    StockLocation[]
+  stockLots         StockLot[]
+  stockMoves        StockMove[]
+  suppliers         Supplier[]
+  purchaseOrders    PurchaseOrder[]
+  poLines           PurchaseOrderLine[]
+  purchases         Purchase[]
+  purchaseLines     PurchaseLine[]
 }
 
 /// Custom domains a tenant has verified (e.g. order.agencyname.in).
@@ -282,9 +290,9 @@ model DeliveryAgentProfile {
 }
 
 model Product {
-  id              String   @id @default(cuid())
-  tenantId        String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  id              String    @id @default(cuid())
+  tenantId        String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
   name            String
   /// Hindi name (Devanagari) — shown in Hindi and used for search.
   nameHi          String?
@@ -293,9 +301,9 @@ model Product {
   description     String?
   sku             String
   categoryId      String
-  category        Category @relation(fields: [categoryId], references: [id])
+  category        Category  @relation(fields: [categoryId], references: [id])
   brandId         String?
-  brand           Brand?   @relation(fields: [brandId], references: [id])
+  brand           Brand?    @relation(fields: [brandId], references: [id])
   hsnCode         String?
   /// Base selling unit (piece, pack, kg …). Prices and quantities are per base unit.
   unit            String
@@ -303,26 +311,41 @@ model Product {
   caseUnit        String?
   caseSize        Int?
   /// Minimum order quantity in base units.
-  moq             Int      @default(1)
+  moq             Int       @default(1)
   /// Default selling rate before GST, in paise (price lists and retailer prices override it).
   price           Int
   /// Maximum retail price, in paise.
   mrp             Int
   /// GST %. Kept in sync with the HSN code's rate when one is set.
-  gstRate         Float    @default(0)
+  gstRate         Float     @default(0)
   specialOffer    String?
   /// Storage keys of product photos; the first is the main one.
-  images          String[] @default([])
+  images          String[]  @default([])
   /// Empty = visible to every area / group.
-  visibleAreaIds  String[] @default([])
-  visibleGroupIds String[] @default([])
-  sort            Int      @default(0)
-  active          Boolean  @default(true)
-  createdAt       DateTime @default(now())
+  visibleAreaIds  String[]  @default([])
+  visibleGroupIds String[]  @default([])
+  sort            Int       @default(0)
+  active          Boolean   @default(true)
+  /// Stock (Phase 5): alert and suggest a purchase order when available stock falls to this level (base units).
+  reorderLevel    Int?
+  /// Quantity to order when reordering (base units). null = enough to reach twice the reorder level.
+  reorderQty      Int?
+  /// Usual supplier (principal company) for purchase orders.
+  supplierId      String?
+  supplier        Supplier? @relation(fields: [supplierId], references: [id])
+  /// Batch expiry date is required when goods are received.
+  trackExpiry     Boolean   @default(false)
+  /// Last purchase cost per base unit before GST, in paise.
+  lastCost        Int?
+  createdAt       DateTime  @default(now())
 
   orderItems     OrderItem[]
   priceListItems PriceListItem[]
   retailerPrices RetailerPrice[]
+  stockLots      StockLot[]
+  stockMoves     StockMove[]
+  poLines        PurchaseOrderLine[]
+  purchaseLines  PurchaseLine[]
 
   @@unique([tenantId, sku])
   @@index([tenantId, active])
@@ -360,6 +383,8 @@ model Order {
   creditApprovedAt DateTime?
   /// Prepaid: amount reserved from the wallet when the order was placed (paise).
   walletHold       Int             @default(0)
+  /// Spot sale: sold by the driver from van stock and delivered on the spot.
+  spot             Boolean         @default(false)
   /// Total as ordered, kept when delivery cut the order short before invoicing (invoice at delivery).
   orderedTotal     Int?
   createdAt        DateTime        @default(now())
@@ -1170,7 +1195,8 @@ model Vehicle {
   active     Boolean  @default(true)
   createdAt  DateTime @default(now())
 
-  trips Trip[]
+  trips         Trip[]
+  stockLocation StockLocation?
 
   @@unique([tenantId, number])
 }
@@ -1269,4 +1295,231 @@ model DutyShift {
   endLng   Float?
 
   @@index([tenantId, userId, startAt])
+}
+
+// ───────────────────────────── Inventory (Phase 5) ─────────────────────────────
+
+enum StockPlace {
+  WAREHOUSE
+  VAN
+  /// Damaged and expired goods waiting to be written off or sent back to the supplier.
+  DAMAGED
+}
+
+enum StockMoveKind {
+  OPENING
+  PURCHASE
+  /// Between two warehouses.
+  TRANSFER
+  /// Warehouse to van.
+  LOAD
+  /// Van back to the warehouse (or the damaged bin) after a trip.
+  UNLOAD
+  SALE
+  /// Goods a retailer sent back on a credit note.
+  RETURN
+  /// Into the damaged bin.
+  DAMAGE
+  WRITE_OFF
+  SUPPLIER_RETURN
+  ADJUST
+}
+
+enum PoStatus {
+  DRAFT
+  SENT
+  PARTLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+/// Where stock sits: a warehouse, a van (one per vehicle) or the damaged bin.
+model StockLocation {
+  id        String     @id @default(cuid())
+  tenantId  String     @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  kind      StockPlace
+  name      String
+  vehicleId String?    @unique
+  vehicle   Vehicle?   @relation(fields: [vehicleId], references: [id])
+  address   String?
+  /// The warehouse vans load from and office deliveries sell from.
+  isDefault Boolean    @default(false)
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+
+  lots      StockLot[]
+  purchases Purchase[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, kind])
+}
+
+/// Stock of one product, batch and expiry at one place. qty is kept by lib/stock.ts next to an append-only StockMove.
+model StockLot {
+  id         String        @id @default(cuid())
+  tenantId   String        @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant        @relation(fields: [tenantId], references: [id])
+  productId  String
+  product    Product       @relation(fields: [productId], references: [id])
+  locationId String
+  location   StockLocation @relation(fields: [locationId], references: [id])
+  /// "" = no batch number.
+  batch      String        @default("")
+  expiry     DateTime?     @db.Date
+  mfgDate    DateTime?     @db.Date
+  /// On hand, in base units. Never below 0 (check constraint).
+  qty        Int           @default(0)
+  /// Cost per base unit before GST, in paise.
+  unitCost   Int?
+  receivedAt DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  moves StockMove[]
+
+  @@index([tenantId, productId, locationId])
+  @@index([tenantId, locationId])
+}
+
+/// Append-only stock history (a trigger refuses edits and deletes).
+model StockMove {
+  id          String        @id @default(cuid())
+  tenantId    String        @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  kind        StockMoveKind
+  productId   String
+  product     Product       @relation(fields: [productId], references: [id])
+  /// The lot the goods left (or, for goods coming in, the lot they went into).
+  lotId       String?
+  lot         StockLot?     @relation(fields: [lotId], references: [id])
+  /// For moves between places: the lot the goods went into.
+  toLotId     String?
+  fromId      String?
+  toId        String?
+  /// Base units, always above 0; fromId / toId give the direction.
+  qty         Int
+  /// Reason key (ADJUST_REASONS, return condition …).
+  reason      String?
+  note        String?
+  unitCost    Int?
+  orderId     String?
+  orderItemId String?
+  tripId      String?
+  purchaseId  String?
+  /// Credit note (RETURN) or purchase order.
+  docId       String?
+  actorId     String?
+  createdAt   DateTime      @default(now())
+
+  @@index([tenantId, productId, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, orderId])
+  @@index([tenantId, tripId])
+}
+
+/// Principal company / supplier we buy from.
+model Supplier {
+  id          String   @id @default(cuid())
+  tenantId    String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  gstin       String?
+  address     String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  products       Product[]
+  purchaseOrders PurchaseOrder[]
+  purchases      Purchase[]
+
+  @@unique([tenantId, name])
+}
+
+model PurchaseOrder {
+  id           String    @id @default(cuid())
+  tenantId     String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  /// PO2627-00001, per tenant per financial year.
+  number       String
+  supplierId   String
+  supplier     Supplier  @relation(fields: [supplierId], references: [id])
+  status       PoStatus  @default(DRAFT)
+  expectedDate DateTime? @db.Date
+  note         String?
+  createdById  String?
+  sentAt       DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  lines    PurchaseOrderLine[]
+  receipts Purchase[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status])
+}
+
+model PurchaseOrderLine {
+  id          String        @id @default(cuid())
+  tenantId    String        @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  poId        String
+  po          PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product       @relation(fields: [productId], references: [id])
+  /// Base units.
+  quantity    Int
+  /// Expected cost per base unit before GST, in paise.
+  unitCost    Int?
+  receivedQty Int           @default(0)
+
+  @@index([tenantId, poId])
+}
+
+/// Goods received (GRN): stock in from a supplier.
+model Purchase {
+  id          String         @id @default(cuid())
+  tenantId    String         @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant         @relation(fields: [tenantId], references: [id])
+  /// GRN2627-00001, per tenant per financial year.
+  number      String
+  supplierId  String
+  supplier    Supplier       @relation(fields: [supplierId], references: [id])
+  locationId  String
+  location    StockLocation  @relation(fields: [locationId], references: [id])
+  poId        String?
+  po          PurchaseOrder? @relation(fields: [poId], references: [id])
+  /// The supplier's bill number and date.
+  billNo      String?
+  billDate    DateTime?      @db.Date
+  /// Cost of the goods before GST, in paise.
+  total       Int            @default(0)
+  note        String?
+  createdById String?
+  createdAt   DateTime       @default(now())
+
+  lines PurchaseLine[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, createdAt])
+}
+
+model PurchaseLine {
+  id         String    @id @default(cuid())
+  tenantId   String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  purchaseId String
+  purchase   Purchase  @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product   @relation(fields: [productId], references: [id])
+  quantity   Int
+  batch      String    @default("")
+  expiry     DateTime? @db.Date
+  mfgDate    DateTime? @db.Date
+  unitCost   Int?
+  lotId      String?
+
+  @@index([tenantId, purchaseId])
 }

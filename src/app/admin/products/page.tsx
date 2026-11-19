@@ -62,6 +62,10 @@ type Product = {
   visibleGroupIds: string[];
   sort: number;
   active: boolean;
+  reorderLevel?: number | null;
+  reorderQty?: number | null;
+  supplierId?: string | null;
+  trackExpiry?: boolean;
 };
 
 type Category = { id: string; name: string; parentId: string | null; imageKey: string | null; sort: number; active: boolean; _count: { products: number } };
@@ -388,6 +392,10 @@ type PForm = {
   visibleGroupIds: string[];
   sort: string;
   active: boolean;
+  reorderLevel: string;
+  reorderQty: string;
+  supplierId: string;
+  trackExpiry: boolean;
 };
 
 function toPForm(p: Product | null, firstCategory: string): PForm {
@@ -413,6 +421,10 @@ function toPForm(p: Product | null, firstCategory: string): PForm {
     visibleGroupIds: p?.visibleGroupIds ?? [],
     sort: String(p?.sort ?? 0),
     active: p?.active ?? true,
+    reorderLevel: p?.reorderLevel != null ? String(p.reorderLevel) : "",
+    reorderQty: p?.reorderQty != null ? String(p.reorderQty) : "",
+    supplierId: p?.supplierId ?? "",
+    trackExpiry: p?.trackExpiry ?? false,
   };
 }
 
@@ -469,6 +481,10 @@ function ProductForm({
     if (moq === null || moq === "bad") return "Minimum order quantity must be at least 1";
     const sort = readInt(f.sort);
     if (sort === "bad") return "Sort must be a whole number";
+    const reorderLevel = readInt(f.reorderLevel);
+    if (reorderLevel === "bad") return "Reorder level must be a whole number";
+    const reorderQty = readInt(f.reorderQty, 1);
+    if (reorderQty === "bad") return "Reorder quantity must be a whole number above 0";
     return {
       name: f.name.trim(),
       nameHi: f.nameHi,
@@ -492,6 +508,10 @@ function ProductForm({
       visibleGroupIds: f.visibleGroupIds,
       sort: sort ?? 0,
       active: f.active,
+      reorderLevel,
+      reorderQty,
+      supplierId: f.supplierId || null,
+      trackExpiry: f.trackExpiry,
     };
   }
 
@@ -623,6 +643,8 @@ function ProductForm({
         <p className="text-xs text-[var(--muted)]">Fill both case fields or leave both empty.</p>
       </section>
 
+      <StockFields f={f} set={set} supplierId={product?.supplierId ?? null} />
+
       <section className="space-y-3">
         <Field label="Special offer text (optional)" hint="Shown as a tag on the product, e.g. “Free tray on 2 boxes”.">
           <input className="input" value={f.specialOffer} maxLength={120} onChange={(e) => set("specialOffer", e.target.value)} />
@@ -662,6 +684,54 @@ function ProductForm({
         </div>
       </section>
     </Sheet>
+  );
+}
+
+/** Stock group of the product form: reorder level / quantity, usual supplier, expiry on receiving. */
+function StockFields({
+  f,
+  set,
+  supplierId,
+}: {
+  f: PForm;
+  set: <K extends keyof PForm>(k: K, v: PForm[K]) => void;
+  supplierId: string | null;
+}) {
+  const suppliers = useFetch<{ suppliers: { id: string; name: string; active: boolean }[] }>("/api/suppliers");
+  const list = (suppliers.data?.suppliers ?? []).filter((s) => s.active || s.id === supplierId);
+  const unit = f.unit.trim() || "units";
+  return (
+    <section className="card p-4 space-y-3">
+      <div>
+        <p className="font-heading font-bold">Stock</p>
+        <p className="text-xs text-[var(--muted)]">Used when stock tracking is on.</p>
+      </div>
+      <div className="grid gap-3 grid-cols-2">
+        <Field label="Reorder level" hint={`Flag it at or below this many ${unit}. Blank = never.`}>
+          <input className="input" inputMode="numeric" value={f.reorderLevel} onChange={(e) => set("reorderLevel", e.target.value.replace(/\D/g, ""))} />
+        </Field>
+        <Field label="Reorder quantity" hint={`${unit} to order. Blank = up to twice the level.`}>
+          <input className="input" inputMode="numeric" value={f.reorderQty} onChange={(e) => set("reorderQty", e.target.value.replace(/\D/g, ""))} />
+        </Field>
+      </div>
+      <Field label="Usual supplier" hint={suppliers.error ? "Couldn't load suppliers." : undefined}>
+        <select className="input" value={f.supplierId} disabled={!suppliers.data} onChange={(e) => set("supplierId", e.target.value)}>
+          <option value="">{suppliers.data ? "No usual supplier" : suppliers.error ? "Not available" : "Loading…"}</option>
+          {list.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+              {s.active ? "" : " (off)"}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Toggle
+        checked={f.trackExpiry}
+        onChange={(v) => set("trackExpiry", v)}
+        label="Expiry date needed when receiving"
+        hint="For goods with a shelf life: each batch received needs its expiry date."
+      />
+    </section>
   );
 }
 

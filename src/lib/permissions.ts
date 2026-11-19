@@ -34,6 +34,9 @@ export const PERMISSIONS = {
   "settings.manage": "Change business settings",
   "invoices.view": "See invoices, notes and GST reports",
   "invoices.manage": "Issue credit and debit notes, e-invoices and e-way bills",
+  "stock.view": "See stock, batches and stock history",
+  "stock.manage": "Receive goods, adjust stock, load and unload vans, suppliers and purchase orders",
+  "stock.spot_sell": "Sell from van stock on the spot (drivers)",
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
@@ -44,7 +47,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   ADMIN: ALL,
   RETAILER: ["orders.place", "payments.report"],
   SALES_AGENT: ["orders.place", "field.work", "payments.collect"],
-  DELIVERY_AGENT: ["delivery.work", "payments.collect"],
+  DELIVERY_AGENT: ["delivery.work", "payments.collect", "stock.spot_sell"],
 };
 
 export function can(role: Role, perm: Permission | Permission[]): boolean {

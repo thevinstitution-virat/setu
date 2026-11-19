@@ -5,7 +5,7 @@ import type { PayMethod } from "@/generated/prisma/client";
 
 /** Turn a MoneyError into a JSON response; rethrow anything else. */
 export function moneyFail(e: unknown) {
-  if (e instanceof MoneyError) return NextResponse.json({ error: e.message }, { status: e.status });
+  if (e instanceof MoneyError) return NextResponse.json({ error: e.message, ...(e.extra ?? {}) }, { status: e.status });
   throw e;
 }
 

@@ -5,6 +5,7 @@ import { STATUS_COLOR, STATUS_TILE } from "@/lib/orders";
 import { getServerLang, tr } from "@/lib/i18n/server";
 import type { OrderStatus } from "@/generated/prisma/client";
 import Icon, { type IconName } from "@/components/Icon";
+import StockAlertStrip from "@/components/stock/overview/StockAlertStrip";
 
 const STATUSES: OrderStatus[] = [
   "PLACED",
@@ -60,6 +61,8 @@ export default async function AdminPipeline() {
           ))}
         </div>
       </div>
+
+      <StockAlertStrip />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard icon="users" tint="kesar" label="Retailers" value={retailerCount} />

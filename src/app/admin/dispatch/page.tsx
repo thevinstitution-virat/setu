@@ -7,6 +7,7 @@ import { formatINR } from "@/lib/money";
 import { ErrorBox, errText, send, useFetch } from "@/components/admin/AdminKit";
 import ReadyOrders from "@/components/dispatch/ReadyOrders";
 import NewTripSheet from "@/components/dispatch/NewTripSheet";
+import { ShortList, stockShortOf, type StockShort } from "@/components/dispatch/VanLoad";
 import { StatusChip, addDays, dayLabel, plural, timeLabel, vehicleText, type Board, type BoardTrip } from "@/components/dispatch/kit";
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
@@ -260,18 +261,23 @@ function AddBar({
   const target = open.find((t) => t.id === tripId) ?? (open.length === 1 ? open[0] : null);
   const value = board.ready.filter((o) => selected.has(o.id)).reduce((s, o) => s + o.total, 0);
 
-  async function add() {
+  const [short, setShort] = useState<StockShort[] | null>(null);
+
+  async function add(stockOverride = false) {
     if (!target) return setError("Pick a trip");
     setBusy(true);
     setError(null);
+    setShort(null);
     try {
-      await send(`/api/trips/${target.id}/orders`, "POST", { orderIds: [...selected] });
+      await send(`/api/trips/${target.id}/orders`, "POST", { orderIds: [...selected], ...(stockOverride ? { stockOverride: true } : {}) });
       onAdded(
         `${plural(selected.size, "order")} added to ${target.number}${target.status === "STARTED" ? " and sent out for delivery" : ""}.`,
         `/admin/dispatch/${target.id}`
       );
     } catch (e) {
-      setError(errText(e));
+      const s = stockShortOf(e);
+      if (s) setShort(s);
+      else setError(errText(e));
     } finally {
       setBusy(false);
     }
@@ -300,7 +306,7 @@ function AddBar({
               ))}
             </select>
             <div className="flex gap-2">
-              <button type="button" className="btn btn-kesar flex-1 sm:flex-none" disabled={busy || !target} onClick={add}>
+              <button type="button" className="btn btn-kesar flex-1 sm:flex-none" disabled={busy || !target} onClick={() => add()}>
                 {busy ? "Adding…" : "Add to trip"}
               </button>
               <button type="button" className="btn btn-outline flex-1 sm:flex-none" disabled={busy} onClick={onNew}>
@@ -314,6 +320,14 @@ function AddBar({
           </button>
         )}
         {target?.status === "STARTED" && <p className="text-xs text-[var(--muted)]">This trip has left: the orders go out for delivery at once.</p>}
+        {short && (
+          <div className="space-y-2 rounded-2xl bg-[var(--genda-tint)] p-3">
+            <ShortList rows={short} />
+            <button type="button" className="btn btn-kesar btn-sm !min-h-[44px] w-full" disabled={busy} onClick={() => add(true)}>
+              Add anyway (the goods are there)
+            </button>
+          </div>
+        )}
         {error && <p className="text-sm text-[#a8281e]">{error}</p>}
       </div>
     </div>

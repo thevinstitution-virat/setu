@@ -25,6 +25,8 @@ export const dictionary = {
   "nav.catalogue": { en: "Catalogue", hi: "कैटलॉग" },
   "nav.orders": { en: "Orders", hi: "ऑर्डर" },
   "nav.dispatch": { en: "Dispatch", hi: "डिस्पैच" },
+  "nav.stock": { en: "Stock", hi: "स्टॉक" },
+  "nav.van": { en: "Van", hi: "गाड़ी" },
   "nav.account": { en: "Account", hi: "खाता" },
   "nav.today": { en: "Today", hi: "आज" },
   "nav.beat": { en: "Beat", hi: "बीट" },
