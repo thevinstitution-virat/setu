@@ -266,6 +266,40 @@ export default function AutomationSettingsPage() {
             </p>
             <Toggle checked={s.ask.on} disabled={busy} onChange={(v) => save("ask", { on: v })} label="Allow questions" />
           </section>
+
+          <section className="card p-4 space-y-3">
+            <h2 className="font-heading font-bold">Photo checks</h2>
+            <p className="text-xs text-[var(--muted)]">
+              The same photo used twice and the same UTR on two payments are always caught, without AI. With AI, photos are also read: payment screenshots and cheques are compared with what was entered, and delivery and crate photos are looked at. Results are notes and checks; a person still verifies every payment.
+            </p>
+            <Toggle checked={s.photos.on} disabled={busy} onChange={(v) => save("photos", { on: v })} label="Read photos with AI" hint="Photos are sent to the AI provider. Names and phone numbers are never asked for." />
+            <Toggle
+              checked={s.photos.payments}
+              disabled={busy || !s.photos.on}
+              onChange={(v) => save("photos", { payments: v })}
+              label="UPI screenshots and cheques"
+              hint="Amount, UTR, date and status, shown in Payments → To verify."
+            />
+            <Toggle
+              checked={s.photos.delivery}
+              disabled={busy || !s.photos.on}
+              onChange={(v) => save("photos", { delivery: v })}
+              label="Delivery and crate pickup photos"
+              hint="Blank photos or no shop or goods in them, and crate counts that differ, come to Suggestions → Checks."
+            />
+          </section>
+
+          <section className="card p-4 space-y-3">
+            <h2 className="font-heading font-bold">Shelf audits</h2>
+            <p className="text-xs text-[var(--muted)]">
+              At a visit, sales agents photograph the shop&apos;s shelf and save our facings, other brands&apos; and empty slots. With AI the counts are filled from the photo for the agent to check. See{" "}
+              <Link href="/admin/reports/shelf" className="font-bold text-[var(--kesar-text)]">
+                Reports → Shelf
+              </Link>
+              .
+            </p>
+            <Toggle checked={s.shelf.on} disabled={busy} onChange={(v) => save("shelf", { on: v })} label="Shelf audits at visits" />
+          </section>
         </div>
       )}
 

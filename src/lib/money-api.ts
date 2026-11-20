@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { MoneyError, type PaymentInput } from "@/lib/ledger";
 import { keyBelongsTo } from "@/lib/storage";
 import type { PayMethod } from "@/generated/prisma/client";
+import type { TenantDb } from "@/lib/db";
+import { moneySettings } from "@/lib/money-settings";
 
 /** Turn a MoneyError into a JSON response; rethrow anything else. */
 export function moneyFail(e: unknown) {
@@ -22,6 +24,22 @@ export function parseRange(sp: URLSearchParams): { from: Date; to: Date } | null
 }
 
 const COLLECT_METHODS: PayMethod[] = ["CASH", "UPI", "CHEQUE", "BANK"];
+
+/**
+ * UPI or bank money taken by field staff can't be seen by them landing, so
+ * (unless the business turned it off) it waits in "To verify" for the office,
+ * like a payment a shop reports itself. Cash and cheques have their own
+ * checks (handover, deposit).
+ */
+export function fieldNeedsCheck(method: PayMethod, office: boolean, tenantSettings: unknown) {
+  return !office && (method === "UPI" || method === "BANK") && moneySettings(tenantSettings).checkFieldDigital;
+}
+
+/** A UTR or bank reference already used on a payment that wasn't rejected. */
+export async function referenceUsed(db: TenantDb, reference: string | null | undefined) {
+  if (!reference) return null;
+  return db.payment.findFirst({ where: { reference, method: { in: ["UPI", "BANK"] }, state: { in: ["PENDING_VERIFICATION", "CONFIRMED"] } }, select: { number: true } });
+}
 
 /**
  * Validate the money part of a request body. Amounts are paise. Returns an

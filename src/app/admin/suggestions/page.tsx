@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import { formatINR } from "@/lib/money";
-import { ErrorBox, TabBar, errText, send, shortDate, useFetch } from "@/components/admin/AdminKit";
+import { ErrorBox, TabBar, errText, fileUrl, send, shortDate, useFetch } from "@/components/admin/AdminKit";
 import { VISIT_REASON, type VisitReason } from "@/lib/automation-math";
 
 type Kind = "visit_plan" | "credit_limit" | "credit_stop" | "credit_restore" | "check" | "trip_plan" | "reorder";
@@ -159,6 +159,13 @@ function SuggestionCard({ s, onDone }: { s: Item; onDone: () => void }) {
             </li>
           ))}
         </ul>
+      )}
+
+      {s.kind === "check" && typeof s.payload.photoKey === "string" && (
+        <a href={fileUrl(s.payload.photoKey)} target="_blank" rel="noopener noreferrer" className="inline-block h-24 w-24 overflow-hidden rounded-xl border border-[var(--line)] bg-white" aria-label="Open the photo">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={fileUrl(s.payload.photoKey)} alt="" className="h-full w-full object-cover" loading="lazy" />
+        </a>
       )}
 
       {s.kind === "visit_plan" && (

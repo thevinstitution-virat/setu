@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { noticeCode } from "@/lib/login-notices";
 import { getTenant } from "@/lib/tenant";
 import { localRedirect } from "@/lib/redirect";
 import { createSessionCookie } from "@/lib/auth";
@@ -17,7 +18,7 @@ export async function GET(req: Request) {
     await audit(tenantDb(tenant.id), { actorId: user.id, action: "auth.welcome", entity: "User", entityId: user.id, ip: requestIp(req) });
     return localRedirect("/admin/setup");
   } catch (e) {
-    if (e instanceof SignupError) return localRedirect(`/login?notice=${encodeURIComponent(e.message)}`);
+    if (e instanceof SignupError) return localRedirect(`/login?notice=${noticeCode(e.message, "welcome")}`);
     throw e;
   }
 }

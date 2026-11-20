@@ -173,6 +173,8 @@ model Tenant {
   automationRuns     AutomationRun[]
   aiCosts            AiCostLog[]
   orderDrafts        OrderDraft[]
+  photoChecks        PhotoCheck[]
+  shelfAudits        ShelfAudit[]
   platformInvoices   PlatformInvoice[]
   supportSessions    SupportSession[]
   exports            TenantExport[]
@@ -183,7 +185,11 @@ model TenantDomain {
   id         String    @id @default(cuid())
   tenantId   String
   tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  host       String    @unique
+  /// Several businesses may claim the same address while unverified (each gets its own
+  /// token), so nobody can squat it; the first to prove it in DNS wins (verifiedHost).
+  host       String
+  /// = host once verified, else null. Unique: one business per live address.
+  verifiedHost String?  @unique
   /// Value the owner puts in a TXT record at _setu-verify.<host>.
   token      String    @default(cuid())
   verifiedAt DateTime?
@@ -193,7 +199,9 @@ model TenantDomain {
   tlsStatus  String?
   createdAt  DateTime  @default(now())
 
+  @@unique([tenantId, host])
   @@index([tenantId])
+  @@index([host])
 }
 
 // ───────────────────────────── Tenant tables ─────────────────────────────
@@ -211,6 +219,8 @@ model User {
   active       Boolean  @default(true)
   /// The hidden login platform support uses inside this business (audited support sessions). Not a seat, never listed.
   isSupport    Boolean  @default(false)
+  /// Bumped to end every signed-in session of this person ("sign out everywhere"); sessions carry it as sv.
+  sessionVersion Int    @default(0)
   createdAt    DateTime @default(now())
   /// The supervisor this person reports to (field staff). Supervisors see and manage their team.
   supervisorId String?
@@ -232,6 +242,7 @@ model User {
   storeLeads        StoreLead[]        @relation("LeadBy")
   leadDecisions     StoreLead[]        @relation("LeadDecidedBy")
   targets           Target[]
+  shelfAuditsBy     ShelfAudit[]       @relation("ShelfAuditBy")
   beatPlansMade     BeatPlan[]         @relation("BeatPlanBy")
   /// Language for messages sent to this person (en | hi); follows the language toggle.
   lang              String             @default("en")
@@ -333,6 +344,7 @@ model RetailerProfile {
   visits          Visit[]
   visitTasks      VisitTask[]
   orderDrafts     OrderDraft[]
+  shelfAudits     ShelfAudit[]
   groups          RetailerGroupMember[]
   prices          RetailerPrice[]
   bills           Bill[]
@@ -848,6 +860,8 @@ model Delivery {
   failNote     String?
   failedAt     DateTime?
   attempts     Int           @default(0)
+  /// Delivery-code tries by the driver (5 at most; counted atomically before comparing).
+  codeTries    Int           @default(0)
   /// Code the retailer sees in the app and tells the driver (high-value drops).
   code         String?
   codeVerified Boolean       @default(false)
@@ -1458,6 +1472,8 @@ model Invoice {
   signedQr        String?
   einvError       String?
   einvAttempts    Int            @default(0)
+  /// Bumped by "Stop old links": every share link made before stops working.
+  shareVersion    Int            @default(0)
   einvCancelledAt DateTime?
   ewbNo           String?
   ewbDate         DateTime?
@@ -2546,16 +2562,27 @@ model SupportSession {
 }
 
 /// Everything a platform user did in the console.
+/// Gateway events on our own platform account, kept so a repeat (or a replay) is done once.
+model PlatformWebhookEvent {
+  id        String   @id @default(cuid())
+  provider  String
+  eventId   String
+  event     String
+  createdAt DateTime @default(now())
+
+  @@unique([provider, eventId])
+}
+
 model PlatformAudit {
-  id        String        @id @default(cuid())
-  actorId   String?
-  actor     PlatformUser? @relation(fields: [actorId], references: [id])
-  action    String
+  id             String        @id @default(cuid())
+  actorId        String?
+  actor          PlatformUser? @relation(fields: [actorId], references: [id])
+  action         String
   /// The business it was about (ours, not the business's: no row-level security, kept after a purge).
   targetTenantId String?
-  detail    Json?
-  ip        String?
-  createdAt DateTime      @default(now())
+  detail         Json?
+  ip             String?
+  createdAt      DateTime      @default(now())
 
   @@index([targetTenantId, createdAt])
   @@index([createdAt])
@@ -2757,4 +2784,77 @@ enum OrderDraftStatus {
   OPEN
   USED
   EXPIRED
+}
+
+/// A3 / A8 / A10: a photo looked at once (payment proof, delivery photo,
+/// crate pickup, shelf). The same photo used for two things is caught by its
+/// hash; what the AI read (when there is one) is kept, never acted on alone.
+model PhotoCheck {
+  id          String   @id @default(cuid())
+  tenantId    String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  /// payment | delivery | pickup | shelf
+  subjectType String
+  subjectId   String
+  fileKey     String
+  /// SHA-256 of the file's bytes.
+  hash        String
+  /// rules | ai
+  source      String
+  /// ok | warn | bad
+  verdict     String
+  /// Short keys: reused, reference_reused, amount_differs, unclear, crates_differ …
+  flags       String[] @default([])
+  /// What was read (amounts, references, counts, notes) and what it was compared with.
+  result      Json     @default("{}")
+  credits     Int      @default(0)
+  checkedAt   DateTime @default(now())
+
+  @@unique([tenantId, subjectType, subjectId, fileKey])
+  @@index([tenantId, hash])
+}
+
+/// A10: a shelf photo at a shop with our facings, other brands' facings and
+/// empty slots, counted by the AI and checked (or typed) by the field person.
+model ShelfAudit {
+  id         String          @id @default(cuid())
+  tenantId   String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant          @relation(fields: [tenantId], references: [id])
+  retailerId String
+  retailer   RetailerProfile @relation(fields: [retailerId], references: [id])
+  visitId    String?
+  byId       String
+  by         User            @relation("ShelfAuditBy", fields: [byId], references: [id])
+  photoKey   String
+  ours       Int
+  others     Int
+  empty      Int
+  /// Our products seen on the shelf (product ids).
+  seen       String[]        @default([])
+  /// manual | ai | ai_edited
+  source     String          @default("manual")
+  /// What the AI counted, before any edit.
+  read       Json?
+  note       String?
+  createdAt  DateTime        @default(now())
+
+  @@index([tenantId, retailerId, createdAt])
+  @@index([tenantId, createdAt])
+}
+
+/// Sign-in tries with a password (platform table, no tenant scope): five wrong
+/// tries for one login in 15 minutes, or 30 from one address, lock it for a while.
+/// Rows older than a day are deleted by otp.cleanup.
+model AuthAttempt {
+  id        String   @id @default(cuid())
+  /// The business id, or "platform" for the console.
+  scope     String
+  /// The login id or email, lower case.
+  key       String
+  ip        String?
+  ok        Boolean
+  createdAt DateTime @default(now())
+
+  @@index([scope, key, createdAt])
+  @@index([ip, createdAt])
 }

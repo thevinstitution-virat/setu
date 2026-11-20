@@ -4,6 +4,7 @@ import { audit, requestIp } from "@/lib/audit";
 import { decryptSecret } from "@/lib/secrets";
 import { checkWebhookUrl, newWebhookSecret, parseEvents, sealSecret, sendTest } from "@/lib/webhooks";
 import type { DeliveryStatus } from "@/generated/prisma/client";
+import { HOUR, limited } from "@/lib/rate-limit";
 
 type P = { params: Promise<{ id: string }> };
 
@@ -64,6 +65,10 @@ export async function POST(req: Request, { params }: P) {
   if (!e) return NextResponse.json({ error: "Webhook not found" }, { status: 404 });
   switch (body?.action) {
     case "test":
+      // Each test is an outbound call from our servers: a few an hour is plenty.
+      if (await limited(`webhook-test:${tenant.id}`, id, 20, HOUR)) {
+        return NextResponse.json({ error: "Many tests this hour. Try again later." }, { status: 429 });
+      }
       return NextResponse.json(await sendTest(tenant.id, id));
     case "reveal":
       await audit(db, { actorId: session.userId, action: "webhook.reveal", entity: "WebhookEndpoint", entityId: id, ip: requestIp(req) });

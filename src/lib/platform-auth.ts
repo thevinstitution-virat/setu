@@ -3,7 +3,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { PlatformRole, Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import { sessionSecret } from "@/lib/auth";
+import { platformSecret } from "@/lib/auth";
 import { getTenant } from "@/lib/tenant";
 
 /**
@@ -18,7 +18,7 @@ const AUD = "setu-platform";
 export type PlatformSession = { platformUserId: string; name: string; role: PlatformRole };
 
 export async function createPlatformCookie(s: PlatformSession) {
-  const token = await new SignJWT({ ...s }).setProtectedHeader({ alg: "HS256" }).setAudience(AUD).setIssuedAt().setExpirationTime("12h").sign(sessionSecret());
+  const token = await new SignJWT({ ...s }).setProtectedHeader({ alg: "HS256" }).setAudience(AUD).setIssuedAt().setExpirationTime("12h").sign(platformSecret());
   (await cookies()).set(COOKIE, token, { httpOnly: true, sameSite: "strict", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 12 * 3600 });
 }
 
@@ -32,7 +32,7 @@ export async function getPlatformSession(): Promise<PlatformSession | null> {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, sessionSecret(), { audience: AUD });
+    const { payload } = await jwtVerify(token, platformSecret(), { audience: AUD, algorithms: ["HS256"] });
     const id = payload.platformUserId;
     if (typeof id !== "string") return null;
     const u = await prisma.platformUser.findUnique({ where: { id }, select: { id: true, name: true, role: true, active: true } });

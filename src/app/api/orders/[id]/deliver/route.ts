@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { audit, requestIp } from "@/lib/audit";
-import { emit } from "@/lib/jobs";
+import { emit, kickPhotos } from "@/lib/jobs";
 import { keyBelongsTo } from "@/lib/storage";
 import { can } from "@/lib/permissions";
 import { withMoney } from "@/lib/ledger";
-import { moneyFail, parseCollect } from "@/lib/money-api";
+import { fieldNeedsCheck, moneyFail, parseCollect, referenceUsed } from "@/lib/money-api";
 import { queueEInvoice } from "@/lib/einvoice-queue";
 import { deliverOrder, type LineInput, type ReturnableInput } from "@/lib/delivery";
 
@@ -74,6 +74,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (body?.collect) {
     const parsed = parseCollect(body.collect, tenant.id);
     if (typeof parsed === "string") return NextResponse.json({ error: parsed }, { status: 400 });
+    const used = parsed.method === "UPI" || parsed.method === "BANK" ? await referenceUsed(db, parsed.reference) : null;
+    if (used) return NextResponse.json({ error: `This reference was already used (${used.number})` }, { status: 409 });
     collect = parsed;
   } else if (body?.paymentMethod === "CASH" && order0.walletHold === 0 && !lines) {
     collect = { amount: order0.totalAmount, method: "CASH", reference: null, proofKey: null, note: null, cheque: null };
@@ -81,11 +83,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   // The delivery code is 4 digits: stop guessing after a few wrong tries.
   const code = typeof body?.code === "string" ? body.code : null;
+  // The try is claimed in one statement before the code is compared, so
+  // parallel guesses can't all slip under the limit.
   if (code !== null && !office) {
-    const wrong = await db.auditLog.count({
-      where: { entity: "Order", entityId: id, action: "delivery.code_wrong", createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) } },
-    });
-    if (wrong >= 5) {
+    const claimed = await db.delivery.updateMany({ where: { orderId: id, codeTries: { lt: 5 } }, data: { codeTries: { increment: 1 } } });
+    if (claimed.count === 0 && (await db.delivery.count({ where: { orderId: id } })) > 0) {
       return NextResponse.json({ error: "Too many wrong codes. Call the office: they can deliver it from their side." }, { status: 429 });
     }
   }
@@ -101,7 +103,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         code,
         returnables,
         pod,
-        collect: collect ? { ...collect, collectorId: session.userId, atOffice: office } : null,
+        collect: collect ? { ...collect, collectorId: session.userId, atOffice: office, needsVerification: fieldNeedsCheck(collect.method, office, tenant.settings) } : null,
       })
     );
   } catch (e) {
@@ -135,6 +137,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   await emit("order.delivered", { tenantId: tenant.id, orderId: id, paymentMethod: collect?.method ?? "CREDIT", codAmount: cashAmount });
   if (out.invoice) await queueEInvoice(tenant.id, out.invoice);
   if (out.creditNote) await queueEInvoice(tenant.id, out.creditNote);
+  if (pod.photo || collect?.proofKey) await kickPhotos(tenant.id);
 
   return NextResponse.json({ order: out.order, payment: out.payment, invoice: out.invoice, creditNote: out.creditNote, total: out.totalAmount });
 }

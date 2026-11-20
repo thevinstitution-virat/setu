@@ -3,7 +3,7 @@ import { guard } from "@/lib/guard";
 import { hashPassword } from "@/lib/password";
 import { audit, requestIp } from "@/lib/audit";
 import { checkStaffFields } from "@/lib/staff";
-import { checkLimit, LimitError } from "@/lib/plans";
+import { checkLimit, entitlements, LimitError } from "@/lib/plans";
 
 export async function GET() {
   const auth = await guard("team.view");
@@ -36,6 +36,9 @@ export async function POST(req: Request) {
 
   if (!name || !loginId || !password || !["SALES_AGENT", "DELIVERY_AGENT", "SUPERVISOR"].includes(role)) {
     return NextResponse.json({ error: "name, loginId, password and a valid role are required" }, { status: 400 });
+  }
+  if (role === "SUPERVISOR" && !(await entitlements(auth.tenant.id)).features.has("field")) {
+    return NextResponse.json({ error: "Supervisors come with the Field team module. Move to a plan that has it under Billing.", code: "upgrade", feature: "field" }, { status: 402 });
   }
   const extra = await checkStaffFields(db, null, body);
   if ("error" in extra) return NextResponse.json({ error: extra.error }, { status: 400 });

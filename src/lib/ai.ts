@@ -100,7 +100,13 @@ export async function aiStatus(tenantId: string, now = new Date()): Promise<AiSt
   return { available: true, model: cfg.model, used, cap };
 }
 
-type FakeHandler = (o: { feature: string; system: string; prompt: string }) => { data: unknown; inputTokens?: number; outputTokens?: number } | { refuse: true };
+/** A photo sent with a prompt (JPEG, PNG or WebP; the app shrinks photos to 1280 px before upload). */
+export type AiImage = { bytes: Buffer; contentType: string };
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+/** Largest photo we send (the provider's limit is 5 MB per image). */
+export const MAX_AI_IMAGE_BYTES = 4_500_000;
+
+type FakeHandler = (o: { feature: string; system: string; prompt: string; images: number }) => { data: unknown; inputTokens?: number; outputTokens?: number } | { refuse: true };
 let fake: FakeHandler | null = null;
 /** Tests: what the "fake" provider answers. */
 export function setFakeAi(h: FakeHandler | null) {
@@ -116,8 +122,13 @@ let client: Anthropic | null = null;
  * Returns ok: false (never throws for AI trouble) so the caller can fall
  * back to its rules.
  */
-export async function aiJson<T>(o: { tenantId: string; actorId?: string | null; feature: string; system: string; prompt: string; schema: z.ZodType<T>; maxTokens?: number; now?: Date }): Promise<AiResult<T>> {
+export async function aiJson<T>(o: { tenantId: string; actorId?: string | null; feature: string; system: string; prompt: string; schema: z.ZodType<T>; maxTokens?: number; now?: Date; images?: AiImage[] }): Promise<AiResult<T>> {
   const now = o.now ?? new Date();
+  const images = o.images ?? [];
+  for (const im of images) {
+    if (!(IMAGE_TYPES as readonly string[]).includes(im.contentType)) return { ok: false, reason: "error", message: "Only JPEG, PNG or WebP photos can be read" };
+    if (im.bytes.length > MAX_AI_IMAGE_BYTES) return { ok: false, reason: "error", message: "The photo is too large to read" };
+  }
   const status = await aiStatus(o.tenantId, now);
   if (!status.available) return { ok: false, reason: status.reason, message: status.message };
   const cfg = aiConfig();
@@ -131,7 +142,7 @@ export async function aiJson<T>(o: { tenantId: string; actorId?: string | null; 
 
   if (cfg.provider === "fake") {
     if (!fake) return { ok: false, reason: "error", message: "No fake AI handler set" };
-    const r = fake({ feature: o.feature, system: o.system, prompt });
+    const r = fake({ feature: o.feature, system: o.system, prompt, images: images.length });
     if ("refuse" in r) {
       await log(cfg.model, 100, 0);
       return { ok: false, reason: "refused", message: "The AI declined this request" };
@@ -151,7 +162,18 @@ export async function aiJson<T>(o: { tenantId: string; actorId?: string | null; 
         betas: ["server-side-fallback-2026-07-01"],
         fallbacks: "default",
         system: o.system,
-        messages: [{ role: "user", content: prompt }],
+        messages: [
+          {
+            role: "user",
+            content: images.length
+              ? [
+                  // Photos first, then the question (works best for reading images).
+                  ...images.map((im) => ({ type: "image" as const, source: { type: "base64" as const, media_type: im.contentType as (typeof IMAGE_TYPES)[number], data: im.bytes.toString("base64") } })),
+                  { type: "text" as const, text: prompt },
+                ]
+              : prompt,
+          },
+        ],
         output_config: { format: zodOutputFormat(o.schema), effort: "low" },
       },
       { timeout: 90_000 }

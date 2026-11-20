@@ -56,7 +56,7 @@ export class HandoffError extends Error {}
 export async function consumeHandoff(token: string, tenantId: string) {
   let claims: { jti?: string; phone?: unknown; to?: unknown };
   try {
-    ({ payload: claims } = await jwtVerify(token, sessionSecret(), { audience: AUD }));
+    ({ payload: claims } = await jwtVerify(token, sessionSecret(), { audience: AUD, algorithms: ["HS256"] }));
   } catch {
     throw new HandoffError("This link has expired. Switch again from the other business.");
   }
