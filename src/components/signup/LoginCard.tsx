@@ -76,12 +76,12 @@ export default function LoginCard({
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-between gap-3 mb-8">
           <Link href="/" aria-label={name} className="min-w-0">
-            <BrandLockup name={brand.business ? brand.appName : undefined} logoUrl={brand.logoUrl} />
+            <BrandLockup name={brand.business ? brand.appName : undefined} logoUrl={brand.logoUrl} tagline />
           </Link>
           <LanguageToggle />
         </div>
 
-        <div className="card p-6 sm:p-7">
+        <div className="card card-deco p-6 sm:p-7">
           <p className="page-kick">{mode === "retailer" ? t("login.retailerTab") : t("login.teamTab")}</p>
           <h1 className="page-title">{t("login.title")}</h1>
           <p className="page-sub mb-6">{brand.tagline || t("brand.tagline")}</p>

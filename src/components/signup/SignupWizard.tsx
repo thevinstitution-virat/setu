@@ -372,7 +372,7 @@ export default function SignupWizard({ domain }: { domain: string }) {
   if (made) {
     return (
       <Shell>
-        <div className="card p-6 sm:p-7 text-center">
+        <div className="card card-deco p-6 sm:p-7 text-center">
           <span className="mx-auto grid place-items-center h-12 w-12 rounded-full bg-[var(--mint-tint)] text-[var(--mint-text)]">
             <Icon name="check" className="h-6 w-6" />
           </span>
@@ -389,7 +389,7 @@ export default function SignupWizard({ domain }: { domain: string }) {
 
   return (
     <Shell>
-      <div className="card p-5 sm:p-7">
+      <div className="card card-deco p-5 sm:p-7">
         <p className="page-kick">{trialDays}-day free trial · no card needed</p>
         <h1 className="page-title">Start your business on VBiz Pro</h1>
         <div className="mt-5 mb-6">
@@ -785,7 +785,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <div className="w-full max-w-lg">
         <div className="flex items-center justify-between gap-3 mb-6">
           <Link href="/" aria-label="VBiz Pro home" className="min-w-0">
-            <BrandLockup />
+            <BrandLockup tagline />
           </Link>
         </div>
         {children}

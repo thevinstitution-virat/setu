@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import { landingContent } from "@/lib/i18n/landing-content";
 import { proContent } from "@/lib/i18n/landing-pro-content";
-import { BrandGlyph } from "@/components/BrandMark";
+import { Logo } from "@/components/BrandMark";
 import { useInView, useReducedMotion } from "../use-landing";
 import { Arrow, Check, Icon } from "./Icon";
+import { CartSun, Coin, Dot, Parcel, RiseArrow } from "./Deco";
 
 const TICK = 6500;
 
@@ -18,6 +19,13 @@ export default function ProHero() {
   return (
     <header className="vp-hero" id="top-hero">
       <div className="vp-hero-bg" aria-hidden="true" />
+      <div className="vp-hero-deco" aria-hidden="true">
+        <CartSun className="d1" />
+        <RiseArrow className="d2" />
+        <Coin className="d3" />
+        <Parcel className="d4" />
+        <Dot className="d5" />
+      </div>
       <div className="vp-hero-copy">
         <span className="vp-eyebrow ls-in" style={{ "--i": 0 } as React.CSSProperties}>
           {p.hero.eyebrow}
@@ -187,7 +195,7 @@ function AppShell({ active, title, children }: { active: number; title: string; 
     <div className="vp-app">
       <aside className="vp-side" aria-hidden="true">
         <span className="vp-side-logo">
-          <BrandGlyph />
+          <Logo kind="mark" height={22} />
         </span>
         {m.menu.map((x, k) => (
           <span key={x} className={k === active ? "on" : ""}>

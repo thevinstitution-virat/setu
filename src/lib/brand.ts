@@ -1,5 +1,4 @@
 export const APP_NAME = "VBiz Pro";
-export const APP_NAME_HI = "वीबिज़ प्रो";
 export const APP_SHORT_NAME = "VBiz";
 
 /**

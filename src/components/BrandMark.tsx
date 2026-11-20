@@ -1,50 +1,88 @@
-import { APP_NAME, APP_NAME_HI } from "@/lib/brand";
+import Image from "next/image";
+import { APP_NAME } from "@/lib/brand";
 
-/** The VBiz Pro glyph: a "V" whose right arm rises into an arrow (growth). */
-export function BrandGlyph({ size, className }: { size?: number; className?: string }) {
+/**
+ * VBiz Pro logo files (public/brand), cut from the master artwork:
+ * - vbiz-logo.png          cart + "VbIZ PRO", no tagline (headers, 653×192)
+ * - vbiz-logo-tagline.png  same with "Uttiṣṭhata ✻ Jāgrata ✻ Prāpya" (sign-in pages, 759×240)
+ * - vbiz-logo-stacked.png  cart above the name, with tagline (footer, 597×400)
+ * - vbiz-mark.png          the "V" with its dot, for small square spots (234×256)
+ */
+export const LOGO = {
+  wide: { src: "/brand/vbiz-logo.png", w: 653, h: 192 },
+  tagline: { src: "/brand/vbiz-logo-tagline.png", w: 759, h: 240 },
+  stacked: { src: "/brand/vbiz-logo-stacked.png", w: 597, h: 400 },
+  mark: { src: "/brand/vbiz-mark.png", w: 234, h: 256 },
+} as const;
+
+type LogoKind = keyof typeof LOGO;
+
+/** One of the logo files at a given height (width follows the artwork). */
+export function Logo({ kind = "wide", height, className, priority }: { kind?: LogoKind; height: number; className?: string; priority?: boolean }) {
+  const f = LOGO[kind];
+  const width = Math.round((f.w / f.h) * height);
   return (
-    <svg
-      viewBox="0 0 24 24"
+    <Image
+      src={f.src}
+      alt={APP_NAME}
+      width={width}
+      height={height}
+      priority={priority}
       className={className}
-      style={size ? { width: size, height: size } : undefined}
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 6.5l6.2 11.5L18.6 4" />
-      <path d="M13.6 4h5v5" />
-    </svg>
+      style={{ width, height, maxWidth: "100%", objectFit: "contain" }}
+    />
   );
 }
 
-/** The VBiz Pro mark on a Mor tile — same mark as the landing nav. */
+/** The "V" mark on a white tile, for square spots (console, avatars). */
 export function BrandMark({ size = 36 }: { size?: number }) {
   return (
     <span
-      className="inline-grid place-items-center shrink-0 text-genda"
+      className="inline-grid place-items-center shrink-0 bg-white"
       style={{
         width: size,
         height: size,
         borderRadius: size * 0.28,
-        background: "linear-gradient(150deg, var(--mor), var(--mor-mid) 60%, var(--mor-dark))",
-        boxShadow: "0 1px 0 rgba(255,255,255,.14) inset, 0 10px 20px -12px rgba(8,38,37,.9)",
+        border: "1px solid var(--line)",
+        boxShadow: "0 8px 18px -12px rgba(15,42,42,.45)",
       }}
     >
-      <BrandGlyph size={size * 0.58} />
+      <Image src={LOGO.mark.src} alt="" width={Math.round(size * 0.62)} height={Math.round(size * 0.68)} style={{ width: "auto", height: size * 0.68 }} />
     </span>
   );
 }
 
 /**
- * Mark + English name + Devanagari name, as on the landing page. With a
- * business's own name (white label, Phase 9) it shows that name and its logo
- * instead; the Devanagari line is only for our own name.
+ * Our own logo, or — for a business on its own brand (white label, Phase 9) —
+ * that business's logo and name. `sub` is a small label beside our logo (the
+ * signed-in role); `tagline` uses the logo with the tagline line.
  */
-export function BrandLockup({ size = 36, sub, name, logoUrl }: { size?: number; sub?: string; name?: string; logoUrl?: string | null }) {
+export function BrandLockup({
+  size = 36,
+  sub,
+  name,
+  logoUrl,
+  tagline,
+}: {
+  size?: number;
+  sub?: string;
+  name?: string;
+  logoUrl?: string | null;
+  tagline?: boolean;
+}) {
   const own = !name || name === APP_NAME;
+  if (own && !logoUrl) {
+    return (
+      <span className="flex items-center gap-3 min-w-0">
+        <Logo kind={tagline ? "tagline" : "wide"} height={tagline ? Math.round(size * 1.45) : Math.round(size * 1.05)} priority />
+        {sub && (
+          <span className="hidden sm:block border-l border-[var(--line)] pl-3 text-[12px] font-bold leading-tight text-[var(--muted)] whitespace-nowrap">
+            {sub}
+          </span>
+        )}
+      </span>
+    );
+  }
   return (
     <span className="flex items-center gap-2.5 min-w-0">
       {logoUrl ? (
@@ -54,13 +92,8 @@ export function BrandLockup({ size = 36, sub, name, logoUrl }: { size?: number; 
         <BrandMark size={size} />
       )}
       <span className="min-w-0">
-        <span className="block font-heading font-bold text-[16px] leading-none whitespace-nowrap text-ink truncate max-w-[220px]">
-          {own ? APP_NAME : name}
-        </span>
-        <span className="block text-[11.5px] font-bold leading-none mt-1 text-[var(--kesar-text)] whitespace-nowrap">
-          {own ? APP_NAME_HI : null}
-          {sub && <span className="text-[var(--muted)] font-semibold">{own ? " · " : ""}{sub}</span>}
-        </span>
+        <span className="block font-heading font-bold text-[16px] leading-none whitespace-nowrap text-ink truncate max-w-[220px]">{own ? APP_NAME : name}</span>
+        {sub && <span className="block text-[11.5px] font-semibold leading-none mt-1 text-[var(--muted)] whitespace-nowrap">{sub}</span>}
       </span>
     </span>
   );

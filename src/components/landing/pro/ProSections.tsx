@@ -11,6 +11,7 @@ import { BeatVisual, BillVisual, InventoryVisual, MapVisual, OrderVisual } from 
 import { Arrow, Check, Icon } from "./Icon";
 import { ProLogo } from "./ProNav";
 import { Phone, RetailerScreen, Toast } from "./ProHero";
+import { CartSun, Coin, Dot, Parcel, RiseArrow, TrendLine } from "./Deco";
 
 const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
 const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL;
@@ -95,6 +96,8 @@ export function ProblemsSection() {
             </Link>
           </div>
           <div className="vp-pvis">
+            <Coin className="vp-pvis-coin" />
+            <Dot className="vp-pvis-dot" />
             <Visual />
           </div>
         </div>
@@ -111,6 +114,8 @@ export function RetailSection() {
     <section className="vp-sec" id="retailers">
       <div className="vp-wrap vp-split">
         <div className="vp-retail-vis ls-rv">
+          <CartSun className="vp-retail-sun" />
+          <Parcel className="vp-retail-parcel" />
           <Phone>
             <RetailerScreen />
           </Phone>
@@ -144,10 +149,12 @@ export function StatsBand() {
   const { lang } = useLanguage();
   const c = landingContent[lang];
   return (
-    <section className="vp-stats" aria-label={proContent[lang].statsKick}>
+    <section className="vp-stats ls-rv" aria-label={proContent[lang].statsKick}>
+      <TrendLine className="vp-stats-trend" />
+      <CartSun className="vp-stats-cart" />
       <div className="vp-wrap vp-stats-grid">
         {c.stats.map((s, i) => (
-          <div className="vp-stat ls-rv" key={i} style={{ "--i": i } as React.CSSProperties}>
+          <div className="vp-stat" key={i} style={{ "--i": i } as React.CSSProperties}>
             <CountUp to={s.n} from={s.from} suffix={s.suffix} className="vp-stat-n" duration={s.n > 10 ? 1600 : 1100} />
             <span className="vp-stat-l">{s.label}</span>
           </div>
@@ -170,7 +177,8 @@ export function FeatureGrid() {
         </div>
         <div className="vp-grid ls-rv">
           {g.items.map((it, k) => (
-            <article className="vp-gcard" key={it.t} style={{ "--i": k } as React.CSSProperties}>
+            <article className="vp-gcard" key={it.t} data-tone={k % 4} style={{ "--i": k } as React.CSSProperties}>
+              <Icon name={it.icon} className="vp-gcard-wm" />
               <span className="vp-gicon">
                 <Icon name={it.icon} />
               </span>
@@ -204,6 +212,9 @@ export function StepsSection() {
           {steps.map((st, i) => (
             <li key={i} style={{ "--i": i } as React.CSSProperties}>
               <span className="vp-step-n">{i + 1}</span>
+              <span className="vp-step-wm" aria-hidden="true">
+                0{i + 1}
+              </span>
               <h3>{st.t}</h3>
               <p>{st.d}</p>
             </li>
@@ -250,6 +261,9 @@ export function CtaBand() {
   return (
     <section className="vp-cta" id="demo">
       <div className="vp-cta-in ls-rv">
+        <CartSun className="vp-cta-cart" />
+        <RiseArrow className="vp-cta-rise" />
+        <Dot className="vp-cta-dot" />
         <h2 className="vp-h2">{k.title}</h2>
         <p className="vp-sub">{k.sub}</p>
         <div className="vp-hero-cta">
@@ -280,7 +294,7 @@ export function ProFooter() {
     <footer className="vp-foot">
       <div className="vp-wrap vp-foot-grid">
         <div className="vp-foot-brand">
-          <ProLogo />
+          <ProLogo stacked />
           <p>{c.footTag}</p>
           <LanguageToggle />
         </div>

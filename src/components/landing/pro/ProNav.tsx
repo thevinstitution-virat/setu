@@ -6,22 +6,14 @@ import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import { landingContent } from "@/lib/i18n/landing-content";
 import { proContent } from "@/lib/i18n/landing-pro-content";
 import LanguageToggle from "@/components/LanguageToggle";
-import { BrandGlyph } from "@/components/BrandMark";
-import { APP_NAME, APP_NAME_HI } from "@/lib/brand";
+import { Logo } from "@/components/BrandMark";
+import { APP_NAME } from "@/lib/brand";
 import { Arrow } from "./Icon";
 
-export function ProLogo() {
+export function ProLogo({ stacked }: { stacked?: boolean }) {
   return (
-    <a className="vp-logo" href="#top" aria-label={APP_NAME}>
-      <span className="vp-logo-tile">
-        <BrandGlyph />
-      </span>
-      <span className="vp-logo-txt">
-        <span className="vp-logo-name">
-          VBiz <em>Pro</em>
-        </span>
-        <span className="vp-logo-hi">{APP_NAME_HI}</span>
-      </span>
+    <a className={`vp-logo ${stacked ? "stacked" : ""}`} href="#top" aria-label={APP_NAME}>
+      {stacked ? <Logo kind="stacked" height={112} /> : <Logo kind="wide" height={56} priority />}
     </a>
   );
 }
