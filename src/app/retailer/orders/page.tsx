@@ -6,6 +6,7 @@ import { STATUS_COLOR } from "@/lib/orders";
 import { getServerLang, tr } from "@/lib/i18n/server";
 import { formatDay } from "@/components/store/format";
 import { isFreeLine } from "@/components/store/OrderLines";
+import Icon from "@/components/Icon";
 
 export default async function RetailerOrders() {
   const db = await getDb();
@@ -22,7 +23,12 @@ export default async function RetailerOrders() {
 
   return (
     <div className="space-y-4">
-      <h1 className="page-title">Your orders</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="page-title">Your orders</h1>
+        <Link href="/retailer/invoices" className="btn btn-quiet btn-sm shrink-0">
+          <Icon name="file" className="h-4 w-4" /> My invoices
+        </Link>
+      </div>
       {orders.length === 0 && (
         <p className="text-sm text-foreground/50">No orders placed yet.</p>
       )}

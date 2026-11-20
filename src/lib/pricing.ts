@@ -3,7 +3,9 @@ import type { Scheme } from "@/generated/prisma/client";
 import { formatINR, gstOn } from "@/lib/money";
 import { applySchemes, describeScheme, type AppliedScheme, type EngineLine, type EngineScheme, type SchemeParams } from "@/lib/schemes";
 import { cartSettings, deliveryChargeFor, deliveryDays } from "@/lib/cart-settings";
+import { invoiceSettings } from "@/lib/invoice-settings";
 import { searchText } from "@/lib/translit";
+import { orderStockShort } from "@/lib/stock";
 
 /**
  * Prices, visibility and the cart quote (Phase 2). The same quoteCart() runs
@@ -295,6 +297,10 @@ export type Quote = {
   coupon: { code: string; valid: boolean; message: string } | null;
   /** Reasons the order can't be placed as it stands (empty = OK). */
   problems: string[];
+  /** Things to know that don't stop the order (stock short when the business only warns). */
+  warnings: string[];
+  /** Products asked for beyond available stock: productId → units available. */
+  stockShort: Record<string, number>;
   priceListId: string | null;
   /** Schemes for this retailer right now (to show "add 2 more for …"). */
   offers: OfferedScheme[];
@@ -306,11 +312,14 @@ export async function quoteCart(
   tx: Tx,
   tenantSettings: unknown,
   r: RetailerCtx,
-  input: { items: CartItemInput[]; coupon?: string | null; deliveryDate?: string | null },
+  input: { items: CartItemInput[]; coupon?: string | null; deliveryDate?: string | null; skipStockCheck?: boolean },
   now = new Date()
 ): Promise<Quote> {
   const problems: string[] = [];
   const cart = cartSettings(tenantSettings);
+  // A composition dealer can't charge GST: bills of supply, every rate 0.
+  const taxRate = (rate: number) => (invoiceSettings(tenantSettings).scheme === "composition" ? 0 : rate);
+  const deliveryGstRate = taxRate(cart.deliveryGstRate);
 
   // Merge repeated products; cases → base units.
   const wanted = new Map<string, { quantity: number; cases: number | null }>();
@@ -334,6 +343,10 @@ export async function quoteCart(
       continue;
     }
     const w = wanted.get(p.id) ?? { quantity: 0, cases: 0 };
+    if (w.quantity + qty > MAX_QTY) {
+      problems.push(`${p.name}: quantity must be a whole number of at least 1`);
+      continue;
+    }
     w.quantity += qty;
     w.cases = cases !== null && w.cases !== null ? w.cases + cases : null;
     wanted.set(p.id, w);
@@ -365,7 +378,7 @@ export async function quoteCart(
     const gross = l.p.price * l.quantity;
     const discount = result.discounts[i];
     const taxable = gross - discount;
-    const gst = gstOn(taxable, l.p.gstRate);
+    const gst = gstOn(taxable, taxRate(l.p.gstRate));
     return {
       productId: l.p.id,
       name: l.p.name,
@@ -376,7 +389,7 @@ export async function quoteCart(
       caseUnit: l.p.caseUnit,
       price: l.p.price,
       mrp: l.p.mrp,
-      gstRate: l.p.gstRate,
+      gstRate: taxRate(l.p.gstRate),
       priceSource: l.p.priceSource,
       gross,
       discount,
@@ -399,7 +412,7 @@ export async function quoteCart(
       schemeName: byScheme.get(g.schemeId)!.name,
       value: g.quantity * g.unitPrice,
       mrp: p.mrp,
-      gstRate: p.gstRate,
+      gstRate: taxRate(p.gstRate),
     };
   });
 
@@ -407,7 +420,7 @@ export async function quoteCart(
   const discountAmount = lines.reduce((a, l) => a + l.discount, 0);
   const goodsValue = grossAmount - discountAmount;
   const deliveryCharge = lines.length ? deliveryChargeFor(cart, goodsValue) : 0;
-  const gstAmount = lines.reduce((a, l) => a + l.gst, 0) + gstOn(deliveryCharge, cart.deliveryGstRate);
+  const gstAmount = lines.reduce((a, l) => a + l.gst, 0) + gstOn(deliveryCharge, deliveryGstRate);
   const subtotal = goodsValue + deliveryCharge;
   const shortBy = lines.length && cart.minOrderValue > goodsValue ? cart.minOrderValue - goodsValue : 0;
   if (!lines.length && !problems.length) problems.push("Add at least one product");
@@ -418,6 +431,20 @@ export async function quoteCart(
   if (input.deliveryDate) {
     if (dates.includes(input.deliveryDate)) deliveryDate = input.deliveryDate;
     else problems.push("That delivery day isn't available. Pick another.");
+  }
+
+  // Stock (Phase 5): warn or refuse when an order asks for more than is available.
+  const warnings: string[] = [];
+  const stockShort: Record<string, number> = {};
+  const need = new Map<string, number>();
+  for (const l of lines) need.set(l.productId, (need.get(l.productId) ?? 0) + l.quantity);
+  for (const f of free) need.set(f.productId, (need.get(f.productId) ?? 0) + f.quantity);
+  const stock = input.skipStockCheck ? { mode: "off" as const, short: [] } : await orderStockShort(tx, tenantSettings, need);
+  for (const x of stock.short) {
+    const p = products.get(x.productId)!;
+    stockShort[x.productId] = x.available;
+    const msg = x.available > 0 ? `${p.name}: only ${x.available} ${p.unit} in stock` : `${p.name} is out of stock`;
+    (stock.mode === "block" ? problems : warnings).push(msg);
   }
 
   let coupon: Quote["coupon"] = null;
@@ -439,7 +466,7 @@ export async function quoteCart(
     discountAmount,
     goodsValue,
     deliveryCharge,
-    deliveryGstRate: cart.deliveryGstRate,
+    deliveryGstRate,
     subtotal,
     gstAmount,
     totalAmount: subtotal + gstAmount,
@@ -449,6 +476,8 @@ export async function quoteCart(
     deliveryDate,
     coupon,
     problems,
+    warnings,
+    stockShort,
     priceListId: r.priceListId,
     offers: offers.filter((o) => !o.coupon || o.id === couponScheme?.id),
   };

@@ -256,7 +256,7 @@ function Editor({
         )}
       </div>
 
-      <div className="sticky bottom-3 z-10">
+      <div className="sticky bottom-[5.5rem] z-10 md:bottom-3">
         <div className="card p-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm min-w-0">
             {error ? (

@@ -7,9 +7,16 @@ import type {
   PaymentMode,
 } from "@/generated/prisma/client";
 import { withTenantTx, type Tx } from "@/lib/db";
+import { MoneyError } from "@/lib/money-error";
+import { issueNoteDoc, issueSaleInvoice, type NoteInput } from "@/lib/invoice";
 import { fyLabel, nextSequence } from "@/lib/orders";
 import { formatINR } from "@/lib/money";
 import { moneySettings, termsFor, type MoneySettings } from "@/lib/money-settings";
+import { invoiceSettings } from "@/lib/invoice-settings";
+import { queuedMessages } from "@/lib/notify";
+import { kickMessages } from "@/lib/jobs";
+import { paymentReceivedNotify } from "@/lib/notify-flows";
+import { paymentWebhook } from "@/lib/webhooks";
 
 /**
  * The money engine. Everything here runs inside withTenantTx(), so a money
@@ -24,15 +31,22 @@ import { moneySettings, termsFor, type MoneySettings } from "@/lib/money-setting
 export type Ctx = { tx: Tx; tenantId: string; actorId: string | null };
 
 /** Run a money operation atomically inside one tenant. */
-export function withMoney<T>(tenantId: string, actorId: string | null, fn: (ctx: Ctx) => Promise<T>) {
-  return withTenantTx(tenantId, (tx) => fn({ tx, tenantId, actorId }), { timeout: 20_000 });
+export async function withMoney<T>(tenantId: string, actorId: string | null, fn: (ctx: Ctx) => Promise<T>) {
+  let used: object | null = null;
+  const out = await withTenantTx(
+    tenantId,
+    (tx) => {
+      used = tx;
+      return fn({ tx, tenantId, actorId });
+    },
+    { timeout: 20_000 }
+  );
+  // Messages queued in this transaction are now committed: send them soon.
+  if (used && queuedMessages(used)) void kickMessages(tenantId);
+  return out;
 }
 
-export class MoneyError extends Error {
-  constructor(message: string, public status = 400) {
-    super(message);
-  }
-}
+export { MoneyError };
 
 // ───────────────────────────── accounts & entries ─────────────────────────────
 
@@ -67,6 +81,9 @@ const NAMES: Record<AccountType, string> = {
   DISCOUNT: "Discounts and write-offs",
   PENALTY_INCOME: "Penalties",
   CASH_SHORTAGE: "Cash shortages",
+  PROMOTIONS: "Promotions and rewards",
+  GATEWAY_CLEARING: "Online payments to be settled",
+  GATEWAY_FEES: "Payment gateway fees",
 };
 
 // Per-transaction cache: an account created in a transaction that rolls back
@@ -323,6 +340,9 @@ function debitAccountFor(method: PayMethod, retailerId: string, collector: { use
       return { type: "WALLET", retailerId };
     case "CREDIT_NOTE":
       return { type: "DISCOUNT" };
+    case "ONLINE":
+      // Held by the gateway until it settles to our bank (lib/gateway.ts).
+      return { type: "GATEWAY_CLEARING" };
   }
 }
 
@@ -345,6 +365,8 @@ export type PaymentInput = {
   /** Internal: settle from the wallet reservation made at order time. */
   fromHold?: boolean;
   occurredAt?: Date;
+  /** Paid through the gateway: our request and the gateway's payment id (unique, so never posted twice). */
+  gateway?: { intentId: string | null; paymentId: string } | null;
 };
 
 export async function recordPayment(ctx: Ctx, p: PaymentInput) {
@@ -381,6 +403,7 @@ export async function recordPayment(ctx: Ctx, p: PaymentInput) {
       orderId: p.orderId ?? null,
       collectedById: p.collectorId !== undefined ? p.collectorId : ctx.actorId,
       collectedAt: p.occurredAt ?? new Date(),
+      ...(p.gateway ? { intentId: p.gateway.intentId, gatewayPaymentId: p.gateway.paymentId } : {}),
       ...(p.method === "CHEQUE"
         ? { cheque: { create: { number: p.cheque!.number, bank: p.cheque!.bank, chequeDate: p.cheque!.date } } }
         : {}),
@@ -413,6 +436,11 @@ async function postPayment(ctx: Ctx, paymentId: string, p: PaymentInput) {
   });
   await ctx.tx.payment.update({ where: { id: paymentId }, data: { entryId: entry.id } });
   if (purpose === "DUES") await allocateRetailer(ctx, p.retailerId);
+  // Receipt to the retailer (skips wallet settlements and credit notes).
+  if (!p.fromHold) {
+    await paymentReceivedNotify(ctx.tx, ctx.tenantId, paymentId);
+    await paymentWebhook(ctx.tx, ctx.tenantId, paymentId);
+  }
 }
 
 /** Staff confirms a retailer-reported payment (e.g. UPI with UTR). */
@@ -659,6 +687,8 @@ async function creditHoldReason(
         retailerId: order.retailerId,
         id: { not: order.id },
         status: { notIn: ["DELIVERED", "CANCELLED"] },
+        // Invoiced at dispatch → already in the receivable; don't count it twice.
+        invoices: { none: { type: { in: ["TAX_INVOICE", "BILL_OF_SUPPLY"] } } },
       },
       _sum: { totalAmount: true },
     });
@@ -705,31 +735,8 @@ export async function onOrderDelivered(
   collect: Omit<PaymentInput, "retailerId" | "orderId" | "purpose"> | null
 ) {
   await lockRetailer(ctx, order.retailerId);
-  if (await ctx.tx.bill.findUnique({ where: { orderId: order.id } })) {
-    throw new MoneyError("This order is already billed", 409);
-  }
-  const { terms } = await loadTerms(ctx, order.retailerId);
-
-  const sale = await post(ctx, {
-    kind: "SALE",
-    memo: `Order ${order.orderNumber} delivered`,
-    retailerId: order.retailerId,
-    orderId: order.id,
-    lines: [
-      { account: { type: "RECEIVABLE", retailerId: order.retailerId }, amount: order.totalAmount },
-      { account: { type: "SALES" }, amount: -order.subtotal },
-      { account: { type: "GST_OUTPUT" }, amount: -order.gstAmount },
-    ],
-  });
-  await createBill(ctx, {
-    retailerId: order.retailerId,
-    kind: "ORDER",
-    number: order.orderNumber,
-    orderId: order.id,
-    amount: order.totalAmount,
-    creditDays: terms.mode === "PREPAID" ? 0 : terms.creditDays,
-    entryId: sale.id,
-  });
+  // Already invoiced at dispatch → nothing to book; otherwise invoice now.
+  const { invoice } = await bookSale(ctx, order.id);
 
   if (order.walletHold > 0) {
     const use = Math.min(order.walletHold, order.totalAmount);
@@ -753,7 +760,142 @@ export async function onOrderDelivered(
     payment = await recordPayment(ctx, { ...collect, retailerId: order.retailerId, orderId: order.id, purpose: "DUES" });
   }
   await allocateRetailer(ctx, order.retailerId);
-  return { payment };
+  return { payment, invoice };
+}
+
+// ───────────────────────────── invoices (Phase 3) ─────────────────────────────
+
+/**
+ * Issue the order's GST invoice and book the sale against it: Receivable
+ * (total) = Sales (taxable) + GST output (tax), and a bill numbered as the
+ * invoice. Runs at dispatch or at delivery (settings.invoice.issueAt).
+ * Idempotent: an order that is already billed is left alone.
+ */
+export async function bookSale(ctx: Ctx, orderId: string, now = new Date()) {
+  const order = await ctx.tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { id: true, retailerId: true, orderNumber: true } });
+  await lockRetailer(ctx, order.retailerId);
+  const billed = await ctx.tx.bill.findUnique({ where: { orderId } });
+  if (billed) {
+    const invoice = await ctx.tx.invoice.findFirst({ where: { orderId, type: { in: ["TAX_INVOICE", "BILL_OF_SUPPLY"] } } });
+    return { invoice, booked: false };
+  }
+  const { invoice } = await issueSaleInvoice(ctx, orderId, now);
+  const { terms } = await loadTerms(ctx, order.retailerId);
+  const sale = await post(ctx, {
+    kind: "SALE",
+    memo: `Invoice ${invoice.number} (order ${order.orderNumber})`,
+    retailerId: order.retailerId,
+    orderId,
+    occurredAt: now,
+    lines: [
+      { account: { type: "RECEIVABLE", retailerId: order.retailerId }, amount: invoice.total },
+      { account: { type: "SALES" }, amount: -invoice.taxable },
+      { account: { type: "GST_OUTPUT" }, amount: -(invoice.cgst + invoice.sgst + invoice.igst) },
+    ],
+  });
+  await createBill(ctx, {
+    retailerId: order.retailerId,
+    kind: "ORDER",
+    number: invoice.number,
+    orderId,
+    date: now,
+    amount: invoice.total,
+    creditDays: terms.mode === "PREPAID" ? 0 : terms.creditDays,
+    entryId: sale.id,
+  });
+  const linked = await ctx.tx.invoice.update({ where: { id: invoice.id }, data: { entryId: sale.id } });
+  return { invoice: linked, booked: true };
+}
+
+/**
+ * Credit note: reverses sales and GST for returned goods, a lower rate, or a
+ * cancelled order. The retailer's receivable goes down through a confirmed
+ * CREDIT_NOTE credit that pays the invoice's bill first, then older bills.
+ */
+export async function issueCreditNote(ctx: Ctx, input: Omit<NoteInput, "type">, now = new Date()) {
+  const inv = await ctx.tx.invoice.findUnique({ where: { id: input.invoiceId }, select: { retailerId: true } });
+  if (!inv) throw new MoneyError("Invoice not found", 404);
+  await lockRetailer(ctx, inv.retailerId);
+  const { note, original } = await issueNoteDoc(ctx, { ...input, type: "CREDIT_NOTE" }, now);
+  const entry = await post(ctx, {
+    kind: "CREDIT_NOTE",
+    memo: `Credit note ${note.number} on ${original.number}: ${note.reason}`,
+    retailerId: note.retailerId,
+    orderId: note.orderId ?? undefined,
+    occurredAt: now,
+    lines: [
+      { account: { type: "SALES" }, amount: note.taxable },
+      { account: { type: "GST_OUTPUT" }, amount: note.cgst + note.sgst + note.igst },
+      { account: { type: "RECEIVABLE", retailerId: note.retailerId }, amount: -note.total },
+    ],
+  });
+  await ctx.tx.payment.create({
+    data: {
+      number: note.number,
+      retailerId: note.retailerId,
+      method: "CREDIT_NOTE",
+      state: "CONFIRMED",
+      amount: note.total,
+      note: `Credit note on ${original.number}: ${note.reason}`,
+      orderId: note.orderId,
+      collectedById: ctx.actorId,
+      collectedAt: now,
+      verifiedById: ctx.actorId,
+      verifiedAt: now,
+      entryId: entry.id,
+    },
+  });
+  const linked = await ctx.tx.invoice.update({ where: { id: note.id }, data: { entryId: entry.id } });
+  await allocateRetailer(ctx, note.retailerId);
+  return linked;
+}
+
+/** Debit note: more sales and GST on an invoice (rate raised, short-billed); creates a bill. */
+export async function issueDebitNote(ctx: Ctx, input: Omit<NoteInput, "type" | "kind">, now = new Date()) {
+  const inv = await ctx.tx.invoice.findUnique({ where: { id: input.invoiceId }, select: { retailerId: true } });
+  if (!inv) throw new MoneyError("Invoice not found", 404);
+  await lockRetailer(ctx, inv.retailerId);
+  const { note, original } = await issueNoteDoc(ctx, { ...input, type: "DEBIT_NOTE", kind: "value" }, now);
+  const { terms } = await loadTerms(ctx, note.retailerId);
+  const entry = await post(ctx, {
+    kind: "DEBIT_NOTE",
+    memo: `Debit note ${note.number} on ${original.number}: ${note.reason}`,
+    retailerId: note.retailerId,
+    orderId: note.orderId ?? undefined,
+    occurredAt: now,
+    lines: [
+      { account: { type: "RECEIVABLE", retailerId: note.retailerId }, amount: note.total },
+      { account: { type: "SALES" }, amount: -note.taxable },
+      { account: { type: "GST_OUTPUT" }, amount: -(note.cgst + note.sgst + note.igst) },
+    ],
+  });
+  await createBill(ctx, {
+    retailerId: note.retailerId,
+    kind: "DEBIT_NOTE",
+    number: note.number,
+    date: now,
+    amount: note.total,
+    creditDays: terms.mode === "PREPAID" ? 0 : terms.creditDays,
+    entryId: entry.id,
+    note: `Debit note on ${original.number}: ${note.reason}`,
+  });
+  const linked = await ctx.tx.invoice.update({ where: { id: note.id }, data: { entryId: entry.id } });
+  await allocateRetailer(ctx, note.retailerId);
+  return linked;
+}
+
+/** Order leaves for delivery: invoice it now when the tenant issues invoices at dispatch. */
+export async function onOrderDispatched(ctx: Ctx, orderId: string) {
+  const t = await ctx.tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { settings: true } });
+  if (invoiceSettings(t.settings).issueAt !== "dispatch") return null;
+  return (await bookSale(ctx, orderId)).invoice;
+}
+
+/** An invoiced (dispatched) order is cancelled: credit everything left on its invoice. */
+export async function creditCancelledOrder(ctx: Ctx, orderId: string, reason: string) {
+  const inv = await ctx.tx.invoice.findFirst({ where: { orderId, type: { in: ["TAX_INVOICE", "BILL_OF_SUPPLY"] } } });
+  if (!inv) return null;
+  return issueCreditNote(ctx, { invoiceId: inv.id, kind: "cancel", reason, lines: [] });
 }
 
 // ───────────────────────────── staff cash ─────────────────────────────
@@ -798,6 +940,8 @@ export async function recordHandover(ctx: Ctx, h: { staffUserId: string; counted
 /** Accept a shortage as a loss (removes it from the staff member's cash-in-hand). */
 export async function writeOffShortage(ctx: Ctx, staffUserId: string, amount: number, note: string) {
   if (!Number.isInteger(amount) || amount <= 0) throw new MoneyError("Amount must be more than ₹0");
+  // Same lock as a handover: two write-offs at once can't exceed what is held.
+  await ctx.tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${ctx.tenantId}:cash:${staffUserId}`}))`;
   const held = await cashInHand(ctx, staffUserId);
   if (amount > held) throw new MoneyError(`Only ${formatINR(held)} is outstanding for this person`);
   return post(ctx, {

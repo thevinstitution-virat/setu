@@ -4,7 +4,8 @@ import { emit } from "@/lib/jobs";
 import { audit, requestIp } from "@/lib/audit";
 import { nextStatus } from "@/lib/orders";
 import { can } from "@/lib/permissions";
-import { MoneyError, onOrderCancelled, withMoney } from "@/lib/ledger";
+import { creditCancelledOrder, MoneyError, onOrderCancelled, onOrderDispatched, withMoney } from "@/lib/ledger";
+import { queueEInvoice } from "@/lib/einvoice-queue";
 import { moneyFail } from "@/lib/money-api";
 import { releaseRedemptions } from "@/lib/order-place";
 import type { OrderStatus } from "@/generated/prisma/client";
@@ -27,7 +28,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "You don't have access to this" }, { status: 403 });
   }
 
-  let result: { from: OrderStatus; to: OrderStatus | null; order: unknown };
+  let result: { from: OrderStatus; to: OrderStatus | null; order: unknown; docs?: { id: string; einvStatus: string }[] };
   try {
     result = await withMoney(tenant.id, session.userId, async (ctx) => {
       const order = await ctx.tx.order.findUnique({ where: { id } });
@@ -56,15 +57,29 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       }
       if (!to) throw new MoneyError("No further status transition available");
 
+      const docs: { id: string; einvStatus: string }[] = [];
       if (to === "CANCELLED") {
+        // Already invoiced (at dispatch): a credit note cancels the sale.
+        const cn = await creditCancelledOrder(ctx, order.id, note || "Order cancelled");
+        if (cn) docs.push(cn);
         await onOrderCancelled(ctx, order);
         await releaseRedemptions(ctx.tx, order.id);
+        // Take it off its trip: gone from a trip that hasn't left, a closed stop on one that has.
+        const stop = await ctx.tx.delivery.findUnique({ where: { orderId: order.id }, include: { trip: { select: { status: true } } } });
+        if (stop?.state === "ASSIGNED") {
+          if (!stop.trip || stop.trip.status === "PLANNED") await ctx.tx.delivery.delete({ where: { orderId: order.id } });
+          else await ctx.tx.delivery.update({ where: { orderId: order.id }, data: { state: "FAILED", failReason: "other", failNote: "Order cancelled", failedAt: new Date() } });
+        }
+      }
+      if (to === "OUT_FOR_DELIVERY") {
+        const inv = await onOrderDispatched(ctx, order.id);
+        if (inv) docs.push(inv);
       }
       const updated = await ctx.tx.order.update({
         where: { id },
         data: { status: to, statusEvents: { create: { status: to, actorId: session.userId, note } } },
       });
-      return { from: order.status, to, order: updated };
+      return { from: order.status, to, order: updated, docs };
     });
   } catch (e) {
     return moneyFail(e);
@@ -75,6 +90,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   } else {
     await audit(db, { actorId: session.userId, action: "order.status", entity: "Order", entityId: id, before: { status: result.from }, after: { status: result.to, note }, ip: requestIp(req) });
     await emit("order.status", { tenantId: tenant.id, orderId: id, from: result.from, to: result.to });
+    for (const d of result.docs ?? []) await queueEInvoice(tenant.id, d);
   }
   return NextResponse.json({ order: result.order });
 }

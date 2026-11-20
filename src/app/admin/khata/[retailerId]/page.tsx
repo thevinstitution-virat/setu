@@ -5,6 +5,9 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import PaymentFields, { emptyPayment, paymentError, toCollectBody, type PaymentValue } from "@/components/PaymentFields";
 import { formatINR, toPaise } from "@/lib/money";
+import { STATE_NAMES } from "@/components/invoice/InvoiceView";
+import RetailerDeliveryCards from "@/components/admin/RetailerDeliveryCards";
+import PaymentLinkCard from "@/components/admin/PaymentLinkCard";
 
 // ───────────────────────────── types (API JSON) ─────────────────────────────
 
@@ -29,7 +32,7 @@ type Payment = {
   id: string;
   number: string;
   purpose: "DUES" | "WALLET";
-  method: "CASH" | "UPI" | "CHEQUE" | "BANK" | "WALLET" | "CREDIT_NOTE";
+  method: "CASH" | "UPI" | "CHEQUE" | "BANK" | "ONLINE" | "WALLET" | "CREDIT_NOTE";
   state: "PENDING_VERIFICATION" | "CONFIRMED" | "REJECTED" | "REVERSED";
   amount: number;
   reference: string | null;
@@ -73,6 +76,7 @@ const METHOD: Record<Payment["method"], string> = {
   UPI: "UPI",
   CHEQUE: "Cheque",
   BANK: "Bank",
+  ONLINE: "Online",
   WALLET: "Wallet",
   CREDIT_NOTE: "Credit note",
 };
@@ -317,6 +321,8 @@ export default function RetailerKhataPage({ params }: { params: Promise<{ retail
             <Payments payments={data.payments} onDone={reload} />
           </div>
           <Statement
+            retailerId={retailerId}
+            onDone={reload}
             outletName={data.retailer.outletName}
             statement={data.statement}
             draft={rangeDraft}
@@ -327,7 +333,10 @@ export default function RetailerKhataPage({ params }: { params: Promise<{ retail
 
         <div className="space-y-5 print:hidden">
           <RecordPayment retailerId={retailerId} receivable={balances.receivable} onDone={reload} />
+          <PaymentLinkCard retailerId={retailerId} outletName={data.retailer.outletName} receivable={balances.receivable} onDone={reload} />
           <CreditTerms retailerId={retailerId} terms={terms} override={data.termsOverride} onDone={reload} />
+          <GstDetails retailerId={retailerId} onDone={reload} />
+          <RetailerDeliveryCards retailerId={retailerId} onDone={reload} />
           <Adjust retailerId={retailerId} hasOpening={hasOpening} onDone={reload} />
         </div>
       </div>
@@ -601,15 +610,52 @@ function Payments({ payments, onDone }: { payments: Payment[]; onDone: (msg?: st
 
 // ───────────────────────────── statement ─────────────────────────────
 
+/** Send the shop its balance and khata link now (in the app, and WhatsApp / SMS per settings). */
+function SendStatement({ retailerId, outletName, onDone }: { retailerId: string; outletName: string; onDone: (msg?: string) => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function go() {
+    if (!window.confirm(`Send ${outletName} their balance and a link to their khata now? It goes in the app, and on WhatsApp or SMS if those are on in Settings.`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await send(`/api/admin/khata/${retailerId}/statement`, "POST", {});
+      await onDone(`Statement sent to ${outletName}`);
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button className="btn btn-outline btn-xs" onClick={go} disabled={busy}>
+        <Icon name="share" className="h-4 w-4" /> {busy ? "Sending…" : "Send statement"}
+      </button>
+      {error && (
+        <p className="basis-full text-xs text-[#a8281e]" role="alert">
+          {error}
+        </p>
+      )}
+    </>
+  );
+}
+
 type Range = { from: string; to: string };
 
 function Statement({
+  retailerId,
+  onDone,
   outletName,
   statement,
   draft,
   setDraft,
   apply,
 }: {
+  retailerId: string;
+  onDone: (msg?: string) => Promise<void>;
   outletName: string;
   statement: Khata["statement"];
   draft: Range;
@@ -656,9 +702,12 @@ function Statement({
 
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3.5 border-b border-[var(--line)] print:hidden">
         <h2 className="font-heading font-bold">Statement</h2>
-        <button className="btn btn-outline btn-xs" onClick={() => window.print()} disabled={!statement}>
-          <Icon name="receipt" className="h-4 w-4" /> Print
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <SendStatement retailerId={retailerId} outletName={outletName} onDone={onDone} />
+          <button className="btn btn-outline btn-xs" onClick={() => window.print()} disabled={!statement}>
+            <Icon name="receipt" className="h-4 w-4" /> Print
+          </button>
+        </div>
       </div>
 
       <div className="px-4 py-3 space-y-2 border-b border-[var(--line)] print:hidden">
@@ -981,6 +1030,135 @@ function CreditTerms({
         <button className="btn btn-mor btn-sm w-full" disabled={busy} onClick={save}>
           {busy ? "Saving…" : "Save terms"}
         </button>
+      </div>
+    </Section>
+  );
+}
+
+// ───────────────────────────── GST details ─────────────────────────────
+
+type GstInfo = { gstin: string | null; legalName: string | null; stateCode: string | null };
+const STATE_OPTIONS = Object.entries(STATE_NAMES).sort((a, b) => a[1].localeCompare(b[1]));
+
+function GstDetails({ retailerId, onDone }: { retailerId: string; onDone: (msg?: string) => Promise<void> }) {
+  const [saved, setSaved] = useState<GstInfo | null>(null);
+  const [gstin, setGstin] = useState("");
+  const [legalName, setLegalName] = useState("");
+  const [stateCode, setStateCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fill = useCallback((r: GstInfo) => {
+    setSaved(r);
+    setGstin(r.gstin ?? "");
+    setLegalName(r.legalName ?? "");
+    setStateCode(r.stateCode ?? "");
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/admin/retailers/${retailerId}/gst`)
+      .then(async (res) => {
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(d.error ?? "Could not load GST details");
+        if (live) fill(d.retailer);
+      })
+      .catch((e) => live && setError(errText(e)));
+    return () => {
+      live = false;
+    };
+  }, [retailerId, fill]);
+
+  const code = gstin.slice(0, 2);
+  const gstinState = gstin.length >= 2 && STATE_NAMES[code] ? code : null;
+  const dirty = !!saved && (gstin !== (saved.gstin ?? "") || legalName.trim() !== (saved.legalName ?? "") || stateCode !== (saved.stateCode ?? ""));
+
+  async function save() {
+    if (gstin && gstin.length !== 15) return setError("A GSTIN has 15 characters");
+    setBusy(true);
+    setError(null);
+    try {
+      const body: Record<string, string | null> = { gstin: gstin || null, legalName: legalName.trim() || null };
+      if (!gstin) body.stateCode = stateCode || null;
+      const d = await send(`/api/admin/retailers/${retailerId}/gst`, "PATCH", body);
+      fill(d.retailer);
+      await onDone("GST details saved");
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Section title="GST details">
+      <div className="p-4 space-y-3">
+        {!saved && !error && <p className="text-sm text-[var(--muted)]">Loading…</p>}
+        {saved && (
+          <>
+            <p className="text-xs text-[var(--ink-2)]">
+              {saved.gstin ? "Registered: gets tax invoices with their GSTIN." : "No GSTIN: bills show them as unregistered."}
+            </p>
+            <label className="block">
+              <span className="text-xs font-semibold text-[var(--ink-2)]">GSTIN</span>
+              <input
+                className="input mt-1 uppercase"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="Not registered"
+                value={gstin}
+                onChange={(e) => {
+                  const g = e.target.value.replace(/\s/g, "").toUpperCase().slice(0, 15);
+                  setGstin(g);
+                  const c = g.slice(0, 2);
+                  if (g.length >= 2 && STATE_NAMES[c]) setStateCode(c);
+                  setError(null);
+                }}
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-[var(--ink-2)]">Legal name</span>
+              <input
+                className="input mt-1"
+                maxLength={100}
+                placeholder="As on their GST certificate"
+                value={legalName}
+                onChange={(e) => {
+                  setLegalName(e.target.value);
+                  setError(null);
+                }}
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-[var(--ink-2)]">State</span>
+              <select
+                className="input mt-1"
+                value={gstinState ?? stateCode}
+                disabled={!!gstinState}
+                onChange={(e) => {
+                  setStateCode(e.target.value);
+                  setError(null);
+                }}
+              >
+                <option value="">Same as yours</option>
+                {STATE_OPTIONS.map(([c, name]) => (
+                  <option key={c} value={c}>
+                    {name} ({c})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="text-[11px] text-[var(--muted)]">
+              A GSTIN sets the state by itself. Invoices already issued keep the old details; new ones use these.
+            </p>
+            {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+            <button className="btn btn-mor btn-sm w-full" disabled={busy || !dirty} onClick={save}>
+              {busy ? "Saving…" : "Save GST details"}
+            </button>
+          </>
+        )}
+        {!saved && error && <p className="text-xs text-[#a8281e]">{error}</p>}
       </div>
     </Section>
   );

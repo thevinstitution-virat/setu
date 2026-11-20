@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
+import Link from "next/link";
+import Icon from "@/components/Icon";
 import { formatINR } from "@/lib/money";
 import { STATUS_COLOR, nextStatus } from "@/lib/orders";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
@@ -18,9 +20,13 @@ type Order = OrderTotals & {
   creditApprovedAt: string | null;
   /** Paise reserved from the retailer's wallet for this order. */
   walletHold: number;
+  /** Sold by a driver from van stock and delivered on the spot. */
+  spot?: boolean;
   retailer: { outletName: string; area: { name: string } };
   items: OrderLineItem[];
   delivery: { deliveryAgent: { id: string; user: { name: string } } } | null;
+  /** The sale invoice, once issued (at most one). */
+  invoices: { id: string; number: string }[];
 };
 
 type Agent = { id: string; user: { name: string } };
@@ -35,8 +41,10 @@ const FILTERS: (OrderStatus | "ALL")[] = [
   "CANCELLED",
 ];
 
-export default function AdminOrdersPage() {
+export default function AdminOrdersPage({ searchParams }: { searchParams: Promise<{ q?: string | string[] }> }) {
+  const { q: initialQ } = use(searchParams);
   const { t } = useLanguage();
+  const [q, setQ] = useState(typeof initialQ === "string" ? initialQ : "");
   const [orders, setOrders] = useState<Order[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("ALL");
@@ -92,6 +100,11 @@ export default function AdminOrdersPage() {
     send(id, `/api/orders/${id}/assign-delivery`, "POST", { deliveryAgentId });
   }
 
+  const needle = q.trim().toLowerCase();
+  const shown = needle
+    ? orders.filter((o) => o.orderNumber.toLowerCase().includes(needle) || o.retailer.outletName.toLowerCase().includes(needle))
+    : orders;
+
   return (
     <div className="space-y-4">
       <h1 className="page-title">Orders</h1>
@@ -110,10 +123,19 @@ export default function AdminOrdersPage() {
         ))}
       </div>
 
+      <input
+        className="input"
+        type="search"
+        placeholder="Search order number or shop"
+        aria-label="Search orders"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
+
       {loadError && <p className="text-sm text-[#a8281e]">{loadError}</p>}
 
       <div className="space-y-3">
-        {orders.map((o) => {
+        {shown.map((o) => {
           const upcoming = nextStatus(o.status);
           const open = o.status !== "DELIVERED" && o.status !== "CANCELLED";
           const held = o.creditHold && !o.creditApprovedAt;
@@ -122,7 +144,10 @@ export default function AdminOrdersPage() {
             <div key={o.id} className="card p-4 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium">{o.retailer.outletName}</p>
+                  <p className="text-sm font-medium flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="break-words min-w-0">{o.retailer.outletName}</span>
+                    {o.spot && <span className="chip chip-genda !py-0.5 !text-[11px]">Spot sale</span>}
+                  </p>
                   <p className="text-xs text-foreground/50">
                     {o.orderNumber} · {o.retailer.area.name} · {o.items.length} items · {formatINR(o.totalAmount)}
                   </p>
@@ -215,10 +240,18 @@ export default function AdminOrdersPage() {
                   Delivery agent: {o.delivery.deliveryAgent.user.name}
                 </p>
               )}
+
+              {o.invoices?.[0] && (
+                <Link href={`/admin/invoices/${o.invoices[0].id}`} className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--kesar-text)]">
+                  <Icon name="receipt" className="h-3.5 w-3.5" /> Invoice {o.invoices[0].number}
+                </Link>
+              )}
             </div>
           );
         })}
-        {orders.length === 0 && !loadError && <p className="text-sm text-foreground/50">No orders in this filter.</p>}
+        {shown.length === 0 && !loadError && (
+          <p className="text-sm text-foreground/50">{needle ? "No orders match this search." : "No orders in this filter."}</p>
+        )}
       </div>
     </div>
   );

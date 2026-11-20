@@ -1,10 +1,9 @@
 "use client";
 
-import type { CatalogueProduct } from "@/lib/pricing";
 import { formatINR } from "@/lib/money";
 import Icon from "@/components/Icon";
 import { fileUrl } from "./format";
-import { endsLabel, ProductThumb, QtyControl, Sheet, unitsOf, type CartEntry, type Offer } from "./shared";
+import { endsLabel, ProductThumb, QtyControl, Sheet, StockChip, unitsOf, type CartEntry, type Offer, type StoreProduct } from "./shared";
 
 /** Product detail: photos, description, rate breakdown and every offer on it. */
 export default function ProductSheet({
@@ -16,7 +15,7 @@ export default function ProductSheet({
   onChangeAction,
   onCloseAction,
 }: {
-  product: CatalogueProduct | null;
+  product: StoreProduct | null;
   /** All offers covering it, store-wide ones included. */
   offers: Offer[];
   entry: CartEntry | undefined;
@@ -73,6 +72,12 @@ export default function ProductSheet({
           <p className="text-sm text-[var(--muted)]">
             {[p.brand?.name, p.category.name, `SKU ${p.sku}`].filter(Boolean).join(" · ")}
           </p>
+          {p.stock && (
+            <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--ink-2)]">
+              <StockChip stock={p.stock} />
+              {p.stock === "out" ? "Not in stock right now." : "Only a few left in stock."}
+            </p>
+          )}
         </div>
 
         <div className="card p-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
