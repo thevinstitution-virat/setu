@@ -3,6 +3,8 @@ import { getTenant } from "@/lib/tenant";
 import { tenantDb } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
 import { createSessionCookie, roleHome } from "@/lib/auth";
+import { requestIp } from "@/lib/audit";
+import { lockedMessage, loginLocked, recordLogin } from "@/lib/login-limit";
 
 export async function POST(req: Request) {
   const tenant = await getTenant();
@@ -17,14 +19,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Login ID and password are required" }, { status: 400 });
   }
 
+  const ip = requestIp(req);
+  const wait = await loginLocked(tenant.id, loginId, ip);
+  if (wait) return NextResponse.json({ error: lockedMessage(wait) }, { status: 429 });
+
   const user = await db.user.findFirst({
     where: { OR: [{ loginId }, { email: loginId }], isSupport: false },
     omit: { passwordHash: false },
   });
 
   if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {
+    await recordLogin(tenant.id, loginId, ip, false);
     return NextResponse.json({ error: "Invalid login ID or password" }, { status: 401 });
   }
+  await recordLogin(tenant.id, loginId, ip, true);
 
   if (!user.active) {
     return NextResponse.json({ error: "This account has been deactivated" }, { status: 403 });

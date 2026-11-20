@@ -1,6 +1,18 @@
 import type { Instrumentation } from "next";
 
 /**
+ * Refuse to start in production with a missing, short or development session
+ * secret: several places (the proxy, OTP and invoice links) would otherwise
+ * fall back to the development value and sign cookies anyone could forge.
+ */
+export async function register() {
+  if (process.env.NODE_ENV !== "production" || process.env.NEXT_PHASE === "phase-production-build") return;
+  const { secretProblem } = await import("@/lib/security");
+  const problem = secretProblem(process.env.SESSION_SECRET);
+  if (problem) throw new Error(`${problem}. Set it in the server's environment (any random string of 32+ characters) and start again.`);
+}
+
+/**
  * Server errors → alert (Telegram when configured). Only the path, method and
  * host are sent — never headers, cookies or bodies, which may hold personal
  * data or session tokens.

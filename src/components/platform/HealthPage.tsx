@@ -12,6 +12,7 @@ type Data = {
   tenants: { tenantId: string; name: string; slug: string; messagesFailed: number; webhooksDead: number; einvoiceFailed: number; overduePaise: number }[];
   deleting: { id: string; name: string; deleteAfter: string }[];
   paused: { id: string; name: string; suspendReason: string | null; suspendedAt: string | null }[];
+  readiness: { checks: { id: string; label: string; status: "ok" | "warn" | "fail"; detail: string }[]; fails: number; warnings: number };
 };
 
 type Tone = "ok" | "warn" | "bad";
@@ -35,6 +36,8 @@ function Light({ tone, title, value, note }: { tone: Tone; title: string; value:
     </div>
   );
 }
+
+const RANK = { fail: 0, warn: 1, ok: 2 } as const;
 
 const bad = (n: number) => (n > 0 ? "text-[#a8281e] font-semibold" : "text-[var(--muted)]");
 
@@ -76,6 +79,28 @@ export default function HealthPage() {
             )}
             <Light tone={problemCount ? "warn" : "ok"} title="Businesses with problems" value={num(problemCount)} note="Failed messages, dead webhooks, failed e-invoices or overdue bills" />
           </div>
+
+          <Section
+            title="Ready for real businesses"
+            sub={`Server settings checked before go-live: ${data.readiness.fails} failing, ${data.readiness.warnings} to look at. The same list: npm run golive:check.`}
+          >
+            <ul className="divide-y divide-[var(--line)]">
+              {[...data.readiness.checks]
+                .sort((a, b) => RANK[a.status] - RANK[b.status])
+                .map((c) => (
+                  <li key={c.id} className="py-2 text-sm flex gap-2 items-start">
+                    <Icon
+                      name={c.status === "ok" ? "check" : "alert"}
+                      className={`h-4 w-4 shrink-0 mt-0.5 ${c.status === "ok" ? "text-[var(--mint-text)]" : c.status === "warn" ? "text-[var(--genda-text)]" : "text-[#a8281e]"}`}
+                    />
+                    <span className="min-w-0">
+                      <span className="font-semibold">{c.label}</span>
+                      <span className="block text-xs text-[var(--muted)] break-words">{c.detail}</span>
+                    </span>
+                  </li>
+                ))}
+            </ul>
+          </Section>
 
           <Section title="Problems by business" sub="Messages and webhooks: last 24 hours. E-invoices: all still failed. Overdue: unpaid past the due date.">
             {data.tenants.length === 0 ? (

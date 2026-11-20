@@ -717,7 +717,17 @@ export default function SignupWizard({ domain }: { domain: string }) {
                     checked={form.acceptTerms}
                     onChange={(e) => set("acceptTerms", e.target.checked)}
                   />
-                  <span>I accept the terms of service and the privacy notice.</span>
+                  <span>
+                    I accept the{" "}
+                    <a href="/legal/terms" target="_blank" rel="noopener" className="font-semibold text-[var(--kesar-text)] underline">
+                      terms of service
+                    </a>{" "}
+                    and the{" "}
+                    <a href="/legal/privacy" target="_blank" rel="noopener" className="font-semibold text-[var(--kesar-text)] underline">
+                      privacy notice
+                    </a>
+                    .
+                  </span>
                 </label>
                 {errors.acceptTerms && (
                   <p id="f-acceptTerms-err" role="alert" className="text-xs font-semibold text-[#a8281e] mt-1">

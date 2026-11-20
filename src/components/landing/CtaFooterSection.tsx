@@ -62,7 +62,8 @@ export default function CtaFooterSection() {
           {c.footProduct} ·{" "}
           <a href="https://vgraphics.in" target="_blank" rel="noopener noreferrer">
             {c.footDesign}
-          </a>
+          </a>{" "}
+          · <a href="/legal/terms">Terms</a> · <a href="/legal/privacy">Privacy</a>
         </span>
       </footer>
     </>

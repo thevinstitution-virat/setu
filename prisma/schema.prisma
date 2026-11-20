@@ -2818,3 +2818,20 @@ model ShelfAudit {
   @@index([tenantId, retailerId, createdAt])
   @@index([tenantId, createdAt])
 }
+
+/// Sign-in tries with a password (platform table, no tenant scope): five wrong
+/// tries for one login in 15 minutes, or 30 from one address, lock it for a while.
+/// Rows older than a day are deleted by otp.cleanup.
+model AuthAttempt {
+  id        String   @id @default(cuid())
+  /// The business id, or "platform" for the console.
+  scope     String
+  /// The login id or email, lower case.
+  key       String
+  ip        String?
+  ok        Boolean
+  createdAt DateTime @default(now())
+
+  @@index([scope, key, createdAt])
+  @@index([ip, createdAt])
+}

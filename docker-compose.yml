@@ -1,0 +1,80 @@
+# Coolify "Docker Compose" deployment of Seller's Setu: web + worker from one image.
+# Postgres runs as its own Coolify service (or managed): point DATABASE_URL at it with the
+# NON-superuser app role (superusers bypass row-level security). Set every variable in
+# Coolify's environment screen; see .env.example and docs/DEPLOY.md.
+services:
+  web:
+    build: &build
+      context: .
+      args:
+        # Inlined into the browser code at build time.
+        NEXT_PUBLIC_WHATSAPP_NUMBER: ${NEXT_PUBLIC_WHATSAPP_NUMBER:-}
+    command: ["npm", "run", "start:prod"]
+    environment: &env
+      DATABASE_URL: ${DATABASE_URL}
+      SESSION_SECRET: ${SESSION_SECRET}
+      SECRETS_KEY: ${SECRETS_KEY}
+      PLATFORM_DOMAIN: ${PLATFORM_DOMAIN}
+      APP_ENV: ${APP_ENV:-prod}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      STORAGE_DIR: /data/storage
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
+      SMS_PROVIDER: ${SMS_PROVIDER:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-}
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_PHONE_ID: ${WHATSAPP_PHONE_ID:-}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+      MAPS_PROVIDER: ${MAPS_PROVIDER:-}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      PLATFORM_LEGAL_NAME: ${PLATFORM_LEGAL_NAME:-}
+      PLATFORM_GSTIN: ${PLATFORM_GSTIN:-}
+      PLATFORM_ADDRESS: ${PLATFORM_ADDRESS:-}
+      GRIEVANCE_CONTACT: ${GRIEVANCE_CONTACT:-}
+      PLATFORM_STATE_CODE: ${PLATFORM_STATE_CODE:-}
+      PLATFORM_RAZORPAY_KEY_ID: ${PLATFORM_RAZORPAY_KEY_ID:-}
+      PLATFORM_RAZORPAY_KEY_SECRET: ${PLATFORM_RAZORPAY_KEY_SECRET:-}
+      PLATFORM_RAZORPAY_WEBHOOK_SECRET: ${PLATFORM_RAZORPAY_WEBHOOK_SECRET:-}
+      TLS_PROVIDER: ${TLS_PROVIDER:-}
+      COOLIFY_API_URL: ${COOLIFY_API_URL:-}
+      COOLIFY_API_TOKEN: ${COOLIFY_API_TOKEN:-}
+      COOLIFY_APP_UUID: ${COOLIFY_APP_UUID:-}
+      AI_PROVIDER: ${AI_PROVIDER:-none}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_USD_PAISE: ${AI_USD_PAISE:-}
+      WHATSAPP_API_VERSION: ${WHATSAPP_API_VERSION:-}
+      PUBLIC_SCHEME: ${PUBLIC_SCHEME:-https}
+      PLATFORM_SAC: ${PLATFORM_SAC:-}
+      ANDROID_APP_ID_PREFIX: ${ANDROID_APP_ID_PREFIX:-}
+    volumes:
+      - setu-files:/data/storage
+    restart: unless-stopped
+
+  worker:
+    build: *build
+    command: ["npm", "run", "worker"]
+    environment:
+      <<: *env
+      # Backups run here (Coolify scheduled task: sh scripts/backup-db.sh); see docs/DEPLOY.md.
+      BACKUP_DATABASE_URL: ${BACKUP_DATABASE_URL:-}
+      BACKUP_KEEP: ${BACKUP_KEEP:-14}
+    volumes:
+      - setu-files:/data/storage
+      - setu-backups:/data/backups
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+
+volumes:
+  setu-files:
+  setu-backups:
