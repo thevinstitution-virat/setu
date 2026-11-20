@@ -4,7 +4,9 @@ import { can } from "@/lib/permissions";
 import { audit, requestIp } from "@/lib/audit";
 import { recordPayment, withMoney } from "@/lib/ledger";
 import { collectScope } from "@/lib/khata";
-import { moneyFail, parseCollect, parseRange } from "@/lib/money-api";
+import { kickPhotos } from "@/lib/jobs";
+import { checksFor } from "@/lib/photo-checks";
+import { fieldNeedsCheck, moneyFail, parseCollect, parseRange, referenceUsed } from "@/lib/money-api";
 import type { PaymentState, PayMethod, Prisma } from "@/generated/prisma/client";
 
 /**
@@ -44,8 +46,10 @@ export async function GET(req: Request) {
     },
   });
   const totals = await db.payment.groupBy({ by: ["method"], where: { ...where, state: "CONFIRMED" }, _sum: { amount: true } });
+  // A3: what the photo check found, for the "To verify" queue.
+  const checks = can(session.role, "payments.verify") ? await checksFor(auth.tenant.id, "payment", payments.map((p) => ({ id: p.id, key: p.proofKey }))) : new Map();
   return NextResponse.json({
-    payments,
+    payments: payments.map((p) => ({ ...p, photoCheck: checks.get(p.id) ?? null })),
     totals: Object.fromEntries(totals.map((t) => [t.method, Number(t._sum.amount ?? 0)])),
   });
 }
@@ -66,6 +70,8 @@ export async function POST(req: Request) {
 
   const parsed = parseCollect(body, tenant.id);
   if (typeof parsed === "string") return NextResponse.json({ error: parsed }, { status: 400 });
+  const used = parsed.method === "UPI" || parsed.method === "BANK" ? await referenceUsed(db, parsed.reference) : null;
+  if (used) return NextResponse.json({ error: `This reference was already used (${used.number})` }, { status: 409 });
   const purpose = body?.purpose === "WALLET" ? "WALLET" : "DUES";
   let orderId: string | null = null;
   if (typeof body?.orderId === "string") {
@@ -84,6 +90,7 @@ export async function POST(req: Request) {
         orderId,
         collectorId: session.userId,
         atOffice: scope.office,
+        needsVerification: fieldNeedsCheck(parsed.method, scope.office, tenant.settings),
       })
     );
   } catch (e) {
@@ -97,5 +104,6 @@ export async function POST(req: Request) {
     after: { number: payment.number, retailerId, amount: payment.amount, method: payment.method, purpose },
     ip: requestIp(req),
   });
+  if (payment.proofKey) await kickPhotos(tenant.id);
   return NextResponse.json({ payment });
 }

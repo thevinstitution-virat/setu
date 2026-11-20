@@ -1,3 +1,4 @@
+import { publicTenantUrl } from "@/lib/redirect";
 /**
  * Multi-distributor agents (Phase 6): one person selling for several
  * businesses has a login in each, linked by the same verified phone.
@@ -55,7 +56,7 @@ export class HandoffError extends Error {}
 export async function consumeHandoff(token: string, tenantId: string) {
   let claims: { jti?: string; phone?: unknown; to?: unknown };
   try {
-    ({ payload: claims } = await jwtVerify(token, sessionSecret(), { audience: AUD }));
+    ({ payload: claims } = await jwtVerify(token, sessionSecret(), { audience: AUD, algorithms: ["HS256"] }));
   } catch {
     throw new HandoffError("This link has expired. Switch again from the other business.");
   }
@@ -73,7 +74,6 @@ export async function consumeHandoff(token: string, tenantId: string) {
 }
 
 /** Address of another business, on the same scheme and port as this request. */
-export function workspaceUrl(reqUrl: string, slug: string, path: string) {
-  const u = new URL(reqUrl);
-  return `${u.protocol}//${slug}.${platformDomain()}${u.port ? `:${u.port}` : ""}${path}`;
+export function workspaceUrl(_reqUrl: string, slug: string, path: string) {
+  return publicTenantUrl(slug, platformDomain(), path);
 }

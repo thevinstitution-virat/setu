@@ -91,6 +91,8 @@ export type RouteShop = {
     user: { phone: string | null; name: string };
   };
   visit: Visit | null;
+  /** Why the office wants this shop seen today (VisitReason keys, from an accepted visit plan). */
+  reasons?: string[];
 };
 
 export type DayRoute = {
@@ -99,6 +101,9 @@ export type DayRoute = {
   plan: { id: string; note: string | null } | null;
   beat: { id: string; name: string } | null;
   route: RouteShop[];
+  /** Shops added to the day by a visit plan that aren't on the beat. */
+  extra?: (Omit<RouteShop, "seq"> & { taskId: string; note: string })[];
+  extraCovered?: number;
   offRoute: Visit[];
   planned: number;
   covered: number;

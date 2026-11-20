@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { pageSession } from "@/lib/guard";
 import AppShell, { type NavItem } from "@/components/AppShell";
+import { layoutChrome } from "@/lib/chrome";
 import DutyTracker from "@/components/field/DutyTracker";
 
 const nav: NavItem[] = [
@@ -16,8 +17,10 @@ export default async function SalesLayout({ children }: { children: React.ReactN
   const session = await pageSession();
   if (!session || session.role !== "SALES_AGENT") redirect("/login");
 
+  const chrome = await layoutChrome(session, nav);
+
   return (
-    <AppShell nav={nav} userName={session.name} roleKey="role.salesAgent">
+    <AppShell chrome={chrome} nav={nav} userName={session.name} roleKey="role.salesAgent">
       <DutyTracker />
       {children}
     </AppShell>

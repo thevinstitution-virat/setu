@@ -3,7 +3,7 @@ import type { Tx } from "@/lib/db";
 import { ROLE_PERMISSIONS, type Permission } from "@/lib/permissions";
 import { platformDomain } from "@/lib/tenant";
 import { CHANNELS, eventOn, notifySettings, type Channel, type NotifySettings } from "@/lib/engage-settings";
-import { EVENTS, placeholders, render, type EventKey, type Lang } from "@/lib/notify-events";
+import { EVENTS, channelAllowed, placeholders, render, type EventKey, type Lang } from "@/lib/notify-events";
 
 /**
  * The notification centre. notify() runs INSIDE the business transaction:
@@ -76,7 +76,7 @@ export async function notify(tx: Tx, tenantId: string, input: NotifyInput) {
     if (topic && u.mutes.includes(topic)) continue;
     const channels = input.channels ?? CHANNELS.filter((c) => eventOn(settings, input.event, c));
     for (const ch of channels) {
-      if (def.audience === "staff" && ch !== "push") continue; // staff: no SMS / WhatsApp cost
+      if (!channelAllowed(input.event, ch)) continue; // staff: no SMS / WhatsApp cost (except the owner's summary)
       if (!settings.channels[ch] || u.mutes.includes(ch)) continue;
       if (ch === "push" && !hasPush.has(u.id)) continue;
       if (ch !== "push" && !u.phone) continue;

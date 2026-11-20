@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/admin/stock/receive", label: "Receive goods" },
   { href: "/admin/stock/purchase-orders", label: "Purchase orders" },
   { href: "/admin/stock/reorder", label: "Reorder" },
+  { href: "/admin/stock/forecast", label: "Forecast" },
   { href: "/admin/stock/purchases", label: "Goods received" },
   { href: "/admin/stock/suppliers", label: "Suppliers" },
   { href: "/admin/stock/history", label: "History" },

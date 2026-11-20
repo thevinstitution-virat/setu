@@ -5,7 +5,8 @@
  *
  * Retailer messages may go out on push, WhatsApp and SMS (per business
  * settings and the person's own choices); staff messages are in-app and push
- * only (no SMS cost). Every message also lands in the in-app bell.
+ * only (no SMS cost), except the owner's daily summary, which may also go on
+ * WhatsApp (ownerWhatsapp). Every message also lands in the in-app bell.
  */
 
 export type Lang = "en" | "hi";
@@ -16,6 +17,8 @@ export type EventDef = {
   channels: ("push" | "whatsapp" | "sms")[];
   /** Topic the person can mute; transactional messages have none. */
   topic?: "reminders" | "promo";
+  /** Staff event that may also go on WhatsApp (sent to admins only, e.g. the daily summary). */
+  ownerWhatsapp?: true;
   vars: readonly string[];
   en: { title: string; body: string };
   hi: { title: string; body: string };
@@ -185,9 +188,39 @@ export const EVENTS = {
     en: { title: "{title}", body: "{body}" },
     hi: { title: "{title}", body: "{body}" },
   },
+  "staff.billing": {
+    label: "Plan and billing (owner)",
+    audience: "staff",
+    channels: ["push"],
+    vars: ["title", "body"],
+    en: { title: "{title}", body: "{body}" },
+    hi: { title: "{title}", body: "{body}" },
+  },
+  "staff.daily_summary": {
+    label: "Daily summary (owner)",
+    audience: "staff",
+    channels: ["push", "whatsapp"],
+    ownerWhatsapp: true,
+    vars: ["day", "sales", "orders", "orderValue", "collected", "cash", "delivered", "failed", "outstanding", "overdue", "waiting"],
+    en: {
+      title: "Your day, {day}: {sales} sales",
+      body: "Invoiced {sales}. New orders: {orders}, worth {orderValue}. Collected {collected} (cash {cash}). Delivered {delivered}, not delivered {failed}. Outstanding {outstanding}, of which {overdue} overdue. Waiting to be confirmed: {waiting}.",
+    },
+    hi: {
+      title: "आज का हिसाब, {day}: {sales} बिक्री",
+      body: "बिल बने {sales}। नए ऑर्डर: {orders}, कुल {orderValue}। वसूली {collected} (नकद {cash})। डिलीवर {delivered}, नहीं हुए {failed}। बकाया {outstanding}, इसमें {overdue} देर वाला। पक्के होने बाकी: {waiting}।",
+    },
+  },
 } as const satisfies Record<string, EventDef>;
 
 export type EventKey = keyof typeof EVENTS;
+
+/** Can this event use this channel at all? Staff events: push, plus WhatsApp for ownerWhatsapp events. */
+export function channelAllowed(event: EventKey, ch: "push" | "whatsapp" | "sms"): boolean {
+  const def: EventDef = EVENTS[event];
+  if (def.audience !== "staff") return true;
+  return ch === "push" || (ch === "whatsapp" && def.ownerWhatsapp === true);
+}
 export const isEventKey = (v: unknown): v is EventKey => typeof v === "string" && v in EVENTS;
 
 /** Placeholders in order of first appearance (WhatsApp template parameters follow this order). */

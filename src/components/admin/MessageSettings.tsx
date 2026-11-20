@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import { CHANNELS, type Channel, type NotifySettings } from "@/lib/engage-settings";
-import { EVENTS, type EventKey } from "@/lib/notify-events";
+import { EVENTS, channelAllowed, type EventKey } from "@/lib/notify-events";
 import { Toggle } from "@/components/admin/AdminKit";
 
 /** GET /api/admin/settings `channels`: "ready", "not set up" or another note per provider. */
@@ -33,7 +33,7 @@ const MAX_DAYS = 6;
 /** Announcements carry their own channels, chosen when each one is sent. */
 const PICKED_PER_SEND: EventKey[] = ["announcement", "staff.announcement"];
 
-const isStaff = (k: EventKey) => EVENTS[k].audience === "staff";
+const blocked = (k: EventKey, ch: Channel) => !channelAllowed(k, ch);
 const byDefault = (k: EventKey, ch: Channel) => (EVENTS[k].channels as readonly string[]).includes(ch);
 
 function toForm(n: NotifySettings): Form {
@@ -42,7 +42,7 @@ function toForm(n: NotifySettings): Form {
     const row = {} as Row;
     for (const ch of CHANNELS) {
       const own = n.events[k]?.[ch];
-      row[ch] = isStaff(k) && ch !== "push" ? false : typeof own === "boolean" ? own : byDefault(k, ch);
+      row[ch] = blocked(k, ch) ? false : typeof own === "boolean" ? own : byDefault(k, ch);
     }
     events[k] = row;
   }
@@ -61,7 +61,7 @@ function eventOverrides(events: Form["events"]): NotifySettings["events"] {
   for (const k of KEYS) {
     const row: Partial<Row> = {};
     for (const ch of CHANNELS) {
-      if (isStaff(k) && ch !== "push") continue;
+      if (blocked(k, ch)) continue;
       if (events[k][ch] !== byDefault(k, ch)) row[ch] = events[k][ch];
     }
     if (Object.keys(row).length) out[k] = row;
@@ -200,7 +200,7 @@ export default function MessageSettings({ notify, channels }: { notify: NotifySe
                 key={ch}
                 label={CHANNEL_INFO[ch].short}
                 checked={f.events[k][ch]}
-                disabled={isStaff(k) && ch !== "push"}
+                disabled={blocked(k, ch)}
                 dim={!f.channels[ch]}
                 onChange={(v) => setEvent(k, ch, v)}
               />
@@ -223,7 +223,7 @@ export default function MessageSettings({ notify, channels }: { notify: NotifySe
         </p>
       </div>
 
-      <section className="card p-5 space-y-4">
+      <section id="messages" className="card p-5 space-y-4 scroll-mt-20">
         <p className="font-heading font-bold">Channels for your business</p>
         <div className="space-y-4">
           {CHANNELS.map((ch) => {

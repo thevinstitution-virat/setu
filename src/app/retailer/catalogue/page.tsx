@@ -30,6 +30,7 @@ function Catalogue() {
     <Storefront
       key={params.toString()}
       initial={initial}
+      draftId={params.get("draft")}
       submitLabel="Place order"
       onPlacedAction={(order) => router.push(`/retailer/orders/${order.id}`)}
     />

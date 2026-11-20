@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation";
 import { pageSession } from "@/lib/guard";
 import AppShell, { type NavItem } from "@/components/AppShell";
+import { layoutChrome } from "@/lib/chrome";
 
 const nav: NavItem[] = [
   { href: "/admin", labelKey: "nav.pipeline", icon: "chart" },
+  { href: "/admin/reports", labelKey: "nav.reports", icon: "layers" },
+  { href: "/admin/suggestions", labelKey: "nav.suggestions", icon: "star" },
   { href: "/admin/orders", labelKey: "nav.orders", icon: "box" },
   { href: "/admin/dispatch", labelKey: "nav.dispatch", icon: "truck" },
   { href: "/admin/stock", labelKey: "nav.stock", icon: "stock" },
@@ -22,6 +25,8 @@ const nav: NavItem[] = [
   { href: "/admin/complaints", labelKey: "nav.complaints", icon: "chat" },
   { href: "/admin/engage", labelKey: "nav.engage", icon: "megaphone" },
   { href: "/admin/integrations", labelKey: "nav.integrations", icon: "share" },
+  { href: "/admin/billing", labelKey: "nav.billing", icon: "receipt" },
+  { href: "/admin/setup", labelKey: "nav.setup", icon: "check" },
   { href: "/admin/settings", labelKey: "nav.settings", icon: "settings" },
 ];
 
@@ -29,8 +34,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const session = await pageSession();
   if (!session || session.role !== "ADMIN") redirect("/login");
 
+  const chrome = await layoutChrome(session, nav);
+
   return (
-    <AppShell nav={nav} userName={session.name} roleKey="role.admin">
+    <AppShell chrome={chrome} nav={nav} userName={session.name} roleKey="role.admin">
       {children}
     </AppShell>
   );

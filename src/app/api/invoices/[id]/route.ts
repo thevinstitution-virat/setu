@@ -25,6 +25,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       einvoice: manage && (doc.einvStatus === "PENDING" || doc.einvStatus === "FAILED"),
       cancelEinvoice: manage && doc.einvStatus === "GENERATED" && !!doc.ackDate && Date.now() - doc.ackDate.getTime() < 86_400_000,
       eway: manage && sale && !doc.ewbNo,
+      stopLinks: manage,
     },
   });
 }
