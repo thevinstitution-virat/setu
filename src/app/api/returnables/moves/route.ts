@@ -3,6 +3,7 @@ import { guard } from "@/lib/guard";
 import { audit, requestIp } from "@/lib/audit";
 import { can } from "@/lib/permissions";
 import { keyBelongsTo } from "@/lib/storage";
+import { kickPhotos } from "@/lib/jobs";
 import { MoneyError, withMoney } from "@/lib/ledger";
 import { moneyFail } from "@/lib/money-api";
 import { chargeReturnables, recordReturnables } from "@/lib/delivery";
@@ -63,5 +64,6 @@ export async function POST(req: Request) {
     return moneyFail(e);
   }
   await audit(db, { actorId: session.userId, action: `returnable.${kind.toLowerCase()}`, entity: "RetailerProfile", entityId: retailerId, after: { rows: body?.rows ?? null, returnableId: body?.returnableId ?? null, units: body?.units ?? null, note }, ip: requestIp(req) });
+  if (photoKey && kind === "PICKUP") await kickPhotos(tenant.id);
   return NextResponse.json({ ok: true, bill });
 }

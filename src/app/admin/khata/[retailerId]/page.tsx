@@ -7,6 +7,7 @@ import PaymentFields, { emptyPayment, paymentError, toCollectBody, type PaymentV
 import { formatINR, toPaise } from "@/lib/money";
 import { STATE_NAMES } from "@/components/invoice/InvoiceView";
 import RetailerDeliveryCards from "@/components/admin/RetailerDeliveryCards";
+import PaymentLinkCard from "@/components/admin/PaymentLinkCard";
 
 // ───────────────────────────── types (API JSON) ─────────────────────────────
 
@@ -31,7 +32,7 @@ type Payment = {
   id: string;
   number: string;
   purpose: "DUES" | "WALLET";
-  method: "CASH" | "UPI" | "CHEQUE" | "BANK" | "WALLET" | "CREDIT_NOTE";
+  method: "CASH" | "UPI" | "CHEQUE" | "BANK" | "ONLINE" | "WALLET" | "CREDIT_NOTE";
   state: "PENDING_VERIFICATION" | "CONFIRMED" | "REJECTED" | "REVERSED";
   amount: number;
   reference: string | null;
@@ -75,6 +76,7 @@ const METHOD: Record<Payment["method"], string> = {
   UPI: "UPI",
   CHEQUE: "Cheque",
   BANK: "Bank",
+  ONLINE: "Online",
   WALLET: "Wallet",
   CREDIT_NOTE: "Credit note",
 };
@@ -331,6 +333,7 @@ export default function RetailerKhataPage({ params }: { params: Promise<{ retail
 
         <div className="space-y-5 print:hidden">
           <RecordPayment retailerId={retailerId} receivable={balances.receivable} onDone={reload} />
+          <PaymentLinkCard retailerId={retailerId} outletName={data.retailer.outletName} receivable={balances.receivable} onDone={reload} />
           <CreditTerms retailerId={retailerId} terms={terms} override={data.termsOverride} onDone={reload} />
           <GstDetails retailerId={retailerId} onDone={reload} />
           <RetailerDeliveryCards retailerId={retailerId} onDone={reload} />

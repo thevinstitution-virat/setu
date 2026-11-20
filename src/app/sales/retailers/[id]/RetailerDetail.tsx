@@ -13,6 +13,8 @@ import { errText } from "@/components/admin/AdminKit";
 import { NoOrderSheet, endVisit, startVisit } from "@/components/field/VisitKit";
 import { clock, type VisitsToday } from "@/components/field/kit";
 import ComplaintSheet from "@/components/engage/ComplaintSheet";
+import PayLinkCard from "./PayLinkCard";
+import ShelfAuditCard from "@/components/field/ShelfAuditCard";
 
 const daysOld = (s: string) => Math.max(0, Math.floor((Date.now() - new Date(s).getTime()) / 86_400_000));
 
@@ -277,7 +279,7 @@ export default function RetailerDetail({ id, invoices }: { id: string; invoices?
           {collecting ? (
             <div className="border-t border-black/5 pt-3 space-y-3">
               <p className="text-sm font-semibold">Collect payment</p>
-              <PaymentFields value={pay} onChangeAction={setPay} methods={["CASH", "UPI", "CHEQUE"]} />
+              <PaymentFields value={pay} onChangeAction={setPay} methods={["CASH", "UPI", "CHEQUE"]} field />
               {payError && <p className="text-sm text-[#a8281e]">{payError}</p>}
               <div className="flex gap-2">
                 <button className="btn btn-quiet flex-1" onClick={() => setCollecting(false)} disabled={paySaving}>
@@ -293,6 +295,16 @@ export default function RetailerDetail({ id, invoices }: { id: string; invoices?
               Collect payment
             </button>
           )}
+
+          {!collecting && (
+            <PayLinkCard
+              retailerId={id}
+              outletName={retailer.outletName}
+              phone={retailer.user.phone}
+              dues={Math.max(0, dues.balances.receivable)}
+              onPaidAction={load}
+            />
+          )}
         </div>
       )}
 
@@ -302,6 +314,8 @@ export default function RetailerDetail({ id, invoices }: { id: string; invoices?
       >
         Capture order
       </button>
+
+      <ShelfAuditCard retailerId={id} visitId={openVisit?.id ?? null} />
 
       <div className="card p-4 space-y-2">
         <div className="flex items-center justify-between gap-3">

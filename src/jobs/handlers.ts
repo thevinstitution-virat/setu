@@ -5,7 +5,7 @@ import { generateEInvoice } from "@/lib/einvoice";
 import { MoneyError } from "@/lib/money-error";
 import { withMoney } from "@/lib/ledger";
 import { purgePings } from "@/lib/field";
-import { kickMessages } from "@/lib/jobs";
+import { emit, kickMessages } from "@/lib/jobs";
 import { flushAll, flushTenant } from "@/lib/outbox";
 import {
   duesReminders,
@@ -16,6 +16,16 @@ import {
 } from "@/lib/notify-flows";
 import { autoClose, slaSweep } from "@/lib/tickets";
 import { lapseReferrals, qualifyReferral } from "@/lib/referrals";
+import { syncOpen } from "@/lib/gateway";
+import { flushAllWebhooks, flushWebhooks, orderWebhook, retailerWebhook } from "@/lib/webhooks";
+import { locateShops } from "@/lib/maps";
+import { runBilling } from "@/lib/billing";
+import { runExport, runLifecycle } from "@/lib/tenant-data";
+import { runDailySummaries } from "@/lib/daily-summary";
+import { runAutomations } from "@/lib/automation";
+import { readDraft } from "@/lib/order-drafts";
+import { sweepAllPhotos, sweepPhotos } from "@/lib/photo-checks";
+import { purgeLoginAttempts } from "@/lib/login-limit";
 
 /**
  * Worker-side handlers. Phase 0 keeps them small (logging, housekeeping);
@@ -32,20 +42,35 @@ const logEvent: Handler = async (job) => {
 export const handlers: Partial<Record<QueueName, Handler>> = {
   "order.placed": async (job) => {
     const { tenantId, orderId } = job.data as JobData & { orderId: string };
-    await withMoney(tenantId, null, (ctx) => onOrderPlacedNotify(ctx.tx, tenantId, orderId));
+    await withMoney(tenantId, null, async (ctx) => {
+      await onOrderPlacedNotify(ctx.tx, tenantId, orderId);
+      await orderWebhook(ctx.tx, tenantId, orderId, "order.placed");
+    });
   },
   "order.status": async (job) => {
     const { tenantId, orderId, from, to } = job.data as JobData & { orderId: string; from: string; to: string };
-    await withMoney(tenantId, null, (ctx) => onOrderStatusNotify(ctx.tx, tenantId, orderId, from, to));
+    await withMoney(tenantId, null, async (ctx) => {
+      await onOrderStatusNotify(ctx.tx, tenantId, orderId, from, to);
+      await orderWebhook(ctx.tx, tenantId, orderId, "order.status_changed", from);
+    });
   },
   "order.delivered": async (job) => {
     const { tenantId, orderId } = job.data as JobData & { orderId: string };
     await withMoney(tenantId, null, async (ctx) => {
       await onOrderDeliveredNotify(ctx.tx, tenantId, orderId);
       await qualifyReferral(ctx, orderId);
+      await orderWebhook(ctx.tx, tenantId, orderId, "order.status_changed", "OUT_FOR_DELIVERY");
     });
   },
-  "retailer.registered": logEvent,
+  "retailer.registered": async (job) => {
+    const { tenantId, userId } = job.data as JobData & { userId: string };
+    const shop = await withMoney(tenantId, null, async (ctx) => {
+      const r = await ctx.tx.retailerProfile.findUnique({ where: { userId }, select: { id: true, lat: true } });
+      if (r) await retailerWebhook(ctx.tx, tenantId, r.id);
+      return r;
+    });
+    if (shop && shop.lat == null) await emit("geo.locate", { tenantId, retailerIds: [shop.id] });
+  },
   "import.completed": logEvent,
   "einvoice.generate": async (job) => {
     const { tenantId, invoiceId } = job.data as JobData & { invoiceId: string };
@@ -60,7 +85,8 @@ export const handlers: Partial<Record<QueueName, Handler>> = {
   "otp.cleanup": async () => {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const res = await asPlatform((tx) => tx.otpChallenge.deleteMany({ where: { createdAt: { lt: cutoff } } }));
-    console.log(`[job] otp.cleanup removed ${res.count}`);
+    const tries = await purgeLoginAttempts();
+    console.log(`[job] otp.cleanup removed ${res.count} codes, ${tries} sign-in tries`);
   },
   "pings.cleanup": async () => {
     // Each business keeps positions for its own retention period (Settings -> Field team).
@@ -99,10 +125,56 @@ export const handlers: Partial<Record<QueueName, Handler>> = {
       await kickMessages(t);
     }
   },
+  "gateway.sync": async () => {
+    for (const t of await tenants()) {
+      const n = await syncOpen(t);
+      if (n) console.log(`[job] gateway.sync ${t}: recorded ${n}`);
+    }
+  },
+  "webhooks.flush": async (job) => {
+    const { tenantId } = job.data;
+    if (tenantId && tenantId !== "platform") {
+      const r = await flushWebhooks(tenantId);
+      if (r.sent + r.failed + r.dead) console.log(`[job] webhooks.flush ${tenantId}`, JSON.stringify(r));
+    } else await flushAllWebhooks();
+  },
+  "geo.locate": async (job) => {
+    const { tenantId, retailerIds } = job.data as JobData & { retailerIds?: string[] };
+    const r = await locateShops(tenantId, Array.isArray(retailerIds) ? retailerIds : undefined);
+    if (r.tried) console.log(`[job] geo.locate ${tenantId}`, JSON.stringify(r));
+  },
   "handoff.cleanup": async () => {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const res = await asPlatform((tx) => tx.handoffUse.deleteMany({ where: { usedAt: { lt: cutoff } } }));
     console.log(`[job] handoff.cleanup removed ${res.count}`);
+  },
+  "tenant.export": async (job) => {
+    const r = await runExport(job.data.tenantId, String(job.data.exportId));
+    console.log(`[job] tenant.export ${job.data.exportId}: ${r ? `${r.rows} rows` : "already done"}`);
+  },
+  "billing.daily": async () => {
+    const b = await runBilling();
+    const l = await runLifecycle();
+    console.log(`[job] billing.daily`, JSON.stringify({ ...b, purged: l.purged.length, exportsExpired: l.exportsExpired }));
+  },
+  "automation.daily": async () => {
+    console.log(`[job] automation.daily`, JSON.stringify(await runAutomations(new Date())));
+  },
+  "automation.weekly": async () => {
+    console.log(`[job] automation.weekly`, JSON.stringify(await runAutomations(new Date(), { weekly: true })));
+  },
+  "order.message": async (job) => {
+    const { tenantId, draftId } = job.data as JobData & { draftId: string };
+    await readDraft(tenantId, draftId);
+  },
+  "photos.check": async (job) => {
+    const { tenantId } = job.data;
+    const r = tenantId && tenantId !== "platform" ? await sweepPhotos(tenantId) : await sweepAllPhotos();
+    if (r.checked) console.log(`[job] photos.check ${tenantId ?? "all"}`, JSON.stringify(r));
+  },
+  "reports.daily_summary": async () => {
+    const r = await runDailySummaries();
+    if (r.sent) console.log(`[job] reports.daily_summary`, JSON.stringify(r));
   },
 };
 
@@ -113,10 +185,17 @@ async function tenants() {
 export const schedules: { name: QueueName; cron: string }[] = [
   { name: "messages.flush", cron: "* * * * *" }, // sweep: anything queued or worth retrying
   { name: "tickets.sla", cron: "*/15 * * * *" },
+  { name: "gateway.sync", cron: "*/10 * * * *" },
+  { name: "webhooks.flush", cron: "* * * * *" }, // sweep: retries that are due
   { name: "dues.reminders", cron: "0 10 * * *" }, // 10:00 IST
   { name: "statements.monthly", cron: "0 9 1 * *" }, // 09:00 IST on the 1st
   { name: "engage.daily", cron: "15 4 * * *" },
   { name: "otp.cleanup", cron: "30 3 * * *" }, // 03:30 IST daily
   { name: "pings.cleanup", cron: "45 3 * * *" },
   { name: "handoff.cleanup", cron: "50 3 * * *" },
+  { name: "billing.daily", cron: "0 6 * * *" }, // 06:00 IST
+  { name: "reports.daily_summary", cron: "0 * * * *" }, // hourly; each business picks its hour (default 21:00 IST)
+  { name: "automation.daily", cron: "0 6 * * *" },
+  { name: "automation.weekly", cron: "30 6 * * 1" },
+  { name: "photos.check", cron: "*/5 * * * *" }, // sweep: photos not checked yet
 ];

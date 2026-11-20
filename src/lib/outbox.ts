@@ -1,6 +1,8 @@
 import webpush from "web-push";
+import { meter } from "@/lib/billing";
 import type { MessageLog } from "@/generated/prisma/client";
 import { asPlatform, withTenantTx } from "@/lib/db";
+import { pushEndpointAllowed } from "@/lib/security";
 
 /**
  * Sends queued outbox rows (MessageLog). Runs in the worker (messages.flush):
@@ -43,6 +45,11 @@ async function sendPush(tenantId: string, m: MessageLog): Promise<Outcome> {
   let sent = 0;
   let lastError = "";
   for (const s of subs) {
+    // Saved before the push-service check existed: never POST anywhere else.
+    if (!pushEndpointAllowed(s.endpoint)) {
+      lastError = "Not a known push service";
+      continue;
+    }
     try {
       await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 24 * 3600 });
       sent++;
@@ -60,6 +67,12 @@ async function sendPush(tenantId: string, m: MessageLog): Promise<Outcome> {
 
 /** Indian 10-digit mobile → international digits for WhatsApp. */
 export const waNumber = (phone: string) => (/^\d{10}$/.test(phone) ? `91${phone}` : phone.replace(/\D/g, ""));
+
+/** A reply to a message the shop just sent (inside WhatsApp's 24-hour window) may be plain text. */
+export const whatsappTextBody = (m: Pick<MessageLog, "to" | "body">) => ({ messaging_product: "whatsapp", to: waNumber(m.to), type: "text", text: { body: m.body.slice(0, 4000), preview_url: true } });
+
+/** Events named reply.* answer a message the shop sent us, so they need no template. */
+export const isReply = (event: string) => event.startsWith("reply.");
 
 /** The Cloud API request body for a template message (exported for tests). */
 export function whatsappBody(m: Pick<MessageLog, "to" | "lang" | "waTemplate" | "params" | "docUrl" | "event">) {
@@ -79,12 +92,12 @@ async function sendWhatsapp(m: MessageLog): Promise<Outcome> {
   const ready = process.env.WHATSAPP_PROVIDER === "meta" && process.env.WHATSAPP_TOKEN && process.env.WHATSAPP_PHONE_ID;
   if (!ready) return { status: "LOGGED", provider: "log" };
   // Messages a business starts must use a template WhatsApp approved for it.
-  if (!m.waTemplate) return { status: "FAILED", provider: "meta", error: "No approved WhatsApp template is set for this message (Settings → Messages → wording)" };
+  if (!m.waTemplate && !isReply(m.event)) return { status: "FAILED", provider: "meta", error: "No approved WhatsApp template is set for this message (Settings → Messages → wording)" };
   const version = process.env.WHATSAPP_API_VERSION ?? "v21.0";
   const res = await fetch(`https://graph.facebook.com/${version}/${process.env.WHATSAPP_PHONE_ID}/messages`, {
     method: "POST",
     headers: { Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`, "Content-Type": "application/json" },
-    body: JSON.stringify(whatsappBody(m)),
+    body: JSON.stringify(!m.waTemplate && isReply(m.event) ? whatsappTextBody(m) : whatsappBody(m)),
     signal: AbortSignal.timeout(15_000),
   });
   const data = (await res.json().catch(() => ({}))) as { messages?: { id: string }[]; error?: { message?: string } };
@@ -134,12 +147,14 @@ export async function flushTenant(tenantId: string, limit = 200, now = new Date(
     if (!claimed.count) continue;
     const out = await deliver(tenantId, m);
     tally[out.status]++;
-    await withTenantTx(tenantId, (tx) =>
-      tx.messageLog.update({
+    await withTenantTx(tenantId, async (tx) => {
+      await tx.messageLog.update({
         where: { id: m.id },
         data: { status: out.status, provider: out.provider ?? null, providerId: out.providerId ?? null, error: out.error ?? null, sentAt: new Date() },
-      })
-    );
+      });
+      // Paid channels count toward the business's usage (platform cost view).
+      if (out.status === "SENT" && m.channel !== "PUSH") await meter(tx, tenantId, "messages");
+    });
   }
   return tally;
 }

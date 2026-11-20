@@ -9,6 +9,8 @@ import LanguageToggle from "@/components/LanguageToggle";
 import { BrandLockup } from "@/components/BrandMark";
 import Icon, { type IconName } from "@/components/Icon";
 import { NOTIFY_EVENT } from "@/components/engage/kit";
+import ShellNotices from "@/components/ShellNotices";
+import type { Chrome } from "@/lib/chrome";
 
 export type NavItem = { href: string; labelKey: DictKey; icon: IconName };
 
@@ -32,16 +34,20 @@ export default function AppShell({
   nav,
   userName,
   roleKey,
+  chrome,
 }: {
   children: React.ReactNode;
   nav: NavItem[];
   userName: string;
   roleKey: DictKey;
+  /** Brand, banners and plan locks for this business (Phase 9). */
+  chrome?: Chrome | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const { t } = useLanguage();
   const current = activeHref(pathname, nav);
+  const locked = new Set(chrome?.locked ?? []);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -51,15 +57,15 @@ export default function AppShell({
 
   return (
     <div className="min-h-screen flex flex-col pb-24 md:pb-0">
-      <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[rgba(246,241,231,0.78)] backdrop-blur-xl backdrop-saturate-150">
+      <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[color-mix(in_srgb,var(--background)_78%,transparent)] backdrop-blur-xl backdrop-saturate-150">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center gap-3">
           <Link href={nav[0]?.href ?? "/"} className="min-w-0" aria-label={t(roleKey)}>
-            <BrandLockup sub={t(roleKey)} />
+            <BrandLockup sub={t(roleKey)} name={chrome?.brand.appName} logoUrl={chrome?.brand.logoUrl} />
           </Link>
 
           <nav className="hidden md:flex items-center gap-1 ml-4 min-w-0 overflow-x-auto" aria-label="Main">
             {nav.map((item) => (
-              <NavLink key={item.href} item={item} active={item.href === current} compact={nav.length > 6} />
+              <NavLink key={item.href} item={item} active={item.href === current} compact={nav.length > 6} locked={locked.has(item.href)} />
             ))}
           </nav>
 
@@ -81,14 +87,22 @@ export default function AppShell({
         </div>
       </header>
 
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-6">{children}</main>
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-6">
+        {chrome ? (
+          <ShellNotices chrome={chrome} isOffice={roleKey === "role.admin"}>
+            {children}
+          </ShellNotices>
+        ) : (
+          children
+        )}
+      </main>
 
       <nav
         className="md:hidden fixed bottom-3 inset-x-3 z-20 flex rounded-2xl glass overflow-x-auto"
         aria-label="Main"
       >
         {nav.map((item) => (
-          <NavLinkMobile key={item.href} item={item} active={item.href === current} />
+          <NavLinkMobile key={item.href} item={item} active={item.href === current} locked={locked.has(item.href)} />
         ))}
       </nav>
     </div>
@@ -148,13 +162,13 @@ function Bell({ href, active }: { href: string; active: boolean }) {
 }
 
 /** compact: long menus (admin) show icons only until the screen is wide enough. */
-function NavLink({ item, active, compact }: { item: NavItem; active: boolean; compact?: boolean }) {
+function NavLink({ item, active, compact, locked }: { item: NavItem; active: boolean; compact?: boolean; locked?: boolean }) {
   const { t } = useLanguage();
   return (
     <Link
       href={item.href}
       aria-current={active ? "page" : undefined}
-      title={compact ? t(item.labelKey) : undefined}
+      title={compact || locked ? `${t(item.labelKey)}${locked ? ` (${t("shell.notInPlan")})` : ""}` : undefined}
       className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold transition ${
         active
           ? "bg-gradient-to-br from-mor to-[#0c3634] text-white shadow-[0_10px_20px_-12px_rgba(8,38,37,.9)]"
@@ -163,11 +177,12 @@ function NavLink({ item, active, compact }: { item: NavItem; active: boolean; co
     >
       <Icon name={item.icon} className={`h-4 w-4 ${active ? "text-genda" : ""}`} />
       <span className={compact ? "hidden xl:inline" : undefined}>{t(item.labelKey)}</span>
+      {locked && <Icon name="lock" className="h-3 w-3 opacity-60" />}
     </Link>
   );
 }
 
-function NavLinkMobile({ item, active }: { item: NavItem; active: boolean }) {
+function NavLinkMobile({ item, active, locked }: { item: NavItem; active: boolean; locked?: boolean }) {
   const { t } = useLanguage();
   return (
     <Link
@@ -182,7 +197,7 @@ function NavLinkMobile({ item, active }: { item: NavItem; active: boolean }) {
           active ? "bg-[var(--kesar-tint)]" : ""
         }`}
       >
-        <Icon name={item.icon} className="h-5 w-5" />
+        <Icon name={locked ? "lock" : item.icon} className="h-5 w-5" />
       </span>
       {t(item.labelKey)}
     </Link>

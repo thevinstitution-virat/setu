@@ -94,6 +94,7 @@ export default function CollectCard({
       <PaymentFields
         value={pay}
         onChangeAction={onPayAction}
+        field
         allowNone
         noneLabel={prepaid ? "Nothing now" : "On credit"}
         hint={

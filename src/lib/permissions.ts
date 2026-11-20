@@ -47,6 +47,10 @@ export const PERMISSIONS = {
   "tickets.raise": "Raise a complaint (retailers for their shop, field staff for shops they serve)",
   "tickets.manage": "Answer, assign and resolve complaints; see delivery ratings",
   "promotions.manage": "Announcements and refer and earn",
+  "gateway.manage": "Online payment (gateway) keys and rules",
+  "bank.reconcile": "Import bank statements and match them to payments",
+  "integrations.manage": "API keys and webhooks for the business's own software; maps",
+  "reports.view": "See business reports: sales, collections, stock, delivery, team, shops, schemes, routes and returns",
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
