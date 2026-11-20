@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { toPaise } from "@/lib/money";
 import { compressImage, uploadFile } from "@/lib/upload-client";
 
@@ -76,6 +77,7 @@ export default function PaymentFields({
   allowNone,
   noneLabel = "Not paid now",
   hint,
+  field,
 }: {
   value: PaymentValue;
   onChangeAction: (v: PaymentValue) => void;
@@ -84,8 +86,19 @@ export default function PaymentFields({
   allowNone?: boolean;
   noneLabel?: string;
   hint?: React.ReactNode;
+  /** Field staff screen: say when UPI / bank waits for the office to check it (Settings → Money). */
+  field?: boolean;
 }) {
   const set = (patch: Partial<PaymentValue>) => onChange({ ...value, ...patch });
+  const digital = value.method === "UPI" || value.method === "BANK";
+  const [officeChecks, setOfficeChecks] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!field || !digital || officeChecks !== null) return;
+    fetch("/api/payments/field-check")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { check?: boolean } | null) => setOfficeChecks(!!j?.check))
+      .catch(() => setOfficeChecks(false));
+  }, [field, digital, officeChecks]);
   const choices: (CollectMethod | null)[] = allowNone ? [...methods, null] : methods;
 
   return (
@@ -172,6 +185,11 @@ export default function PaymentFields({
             </label>
           )}
         </>
+      )}
+      {field && digital && officeChecks && (
+        <p className="text-sm text-[var(--ink-2)]">
+          The office checks this {value.method === "UPI" ? "UPI" : "bank"} payment in the bank before it counts on the khata. Until then it shows as waiting.
+        </p>
       )}
       {hint}
     </div>

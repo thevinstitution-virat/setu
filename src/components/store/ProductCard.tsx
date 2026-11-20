@@ -1,11 +1,13 @@
 "use client";
 
-import type { CatalogueProduct } from "@/lib/pricing";
 import { formatINR } from "@/lib/money";
 import Icon from "@/components/Icon";
-import { ProductThumb, QtyControl, type CartEntry, type Offer } from "./shared";
+import { ProductThumb, QtyControl, StockChip, type CartEntry, type Offer, type StoreProduct } from "./shared";
 
-/** One product in the storefront list. Tapping the photo or name opens the detail sheet. */
+/**
+ * One product in the storefront list. Tapping the photo or name opens the
+ * detail sheet. Out of stock: muted, but still tappable and addable.
+ */
 export default function ProductCard({
   product: p,
   offers,
@@ -13,7 +15,7 @@ export default function ProductCard({
   onChangeAction,
   onOpenAction,
 }: {
-  product: CatalogueProduct;
+  product: StoreProduct;
   /** Offers that name this product, its brand or category (not store-wide ones). */
   offers: Offer[];
   entry: CartEntry | undefined;
@@ -22,7 +24,11 @@ export default function ProductCard({
 }) {
   return (
     <div className={`card p-3 space-y-2.5 ${entry ? "ring-2 ring-[var(--kesar-tint)]" : ""}`}>
-      <button type="button" onClick={onOpenAction} className="flex gap-3 w-full text-left min-w-0">
+      <button
+        type="button"
+        onClick={onOpenAction}
+        className={`flex gap-3 w-full text-left min-w-0 ${p.stock === "out" ? "opacity-60" : ""}`}
+      >
         <ProductThumb name={p.name} imageKey={p.images[0]} />
         <span className="min-w-0 flex-1">
           <span className="block font-semibold text-sm leading-snug break-words">{p.name}</span>
@@ -42,6 +48,7 @@ export default function ProductCard({
       </button>
 
       <div className="flex flex-wrap gap-1.5">
+        <StockChip stock={p.stock} />
         {p.margin !== null && p.margin > 0 && <span className="chip chip-mint !py-0.5 !text-[11.5px]">{p.margin}% margin</span>}
         {p.gstRate > 0 && <span className="chip !py-0.5 !text-[11.5px]">GST {p.gstRate}%</span>}
         {p.caseSize && (

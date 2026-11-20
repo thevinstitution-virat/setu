@@ -5,6 +5,7 @@ import { formatINR, gstOn } from "@/lib/money";
 import { nextSequence } from "@/lib/orders";
 import { invoiceSettings, type InvoiceSettings } from "@/lib/invoice-settings";
 import { amountInWords, creditNoteDeadline, docNumber, fyCode, splitTax, uqc } from "@/lib/gst";
+import { invoiceWebhook } from "@/lib/webhooks";
 
 /**
  * GST documents. This module builds and stores them (numbers, parties, lines,
@@ -241,6 +242,7 @@ export async function issueSaleInvoice(ctx: Ctx, orderId: string, now = new Date
     },
   });
   if (invoice.total !== order.totalAmount) throw new MoneyError("Invoice total doesn't match the order total", 409);
+  await invoiceWebhook(ctx.tx, ctx.tenantId, invoice.id);
   return { invoice, created: true };
 }
 
@@ -383,6 +385,7 @@ export async function issueNoteDoc(ctx: Ctx, input: NoteInput, now = new Date())
       lines: { create: f.lines },
     },
   });
+  await invoiceWebhook(ctx.tx, ctx.tenantId, note.id);
   return { note, original };
 }
 

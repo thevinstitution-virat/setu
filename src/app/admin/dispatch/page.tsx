@@ -7,6 +7,7 @@ import { formatINR } from "@/lib/money";
 import { ErrorBox, errText, send, useFetch } from "@/components/admin/AdminKit";
 import ReadyOrders from "@/components/dispatch/ReadyOrders";
 import NewTripSheet from "@/components/dispatch/NewTripSheet";
+import { ShortList, stockShortOf, type StockShort } from "@/components/dispatch/VanLoad";
 import { StatusChip, addDays, dayLabel, plural, timeLabel, vehicleText, type Board, type BoardTrip } from "@/components/dispatch/kit";
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
@@ -17,7 +18,7 @@ export default function DispatchPage({ searchParams }: { searchParams: Promise<{
   const { data, error, reload } = useFetch<Board>(`/api/trips${date ? `?date=${date}` : ""}`);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newTrip, setNewTrip] = useState(false);
-  const [flash, setFlash] = useState<{ text: string; href?: string } | null>(null);
+  const [flash, setFlash] = useState<{ text: string; href?: string; link?: string } | null>(null);
 
   const board = data && (!date || data.date === date) ? data : null;
 
@@ -62,7 +63,7 @@ export default function DispatchPage({ searchParams }: { searchParams: Promise<{
           <span className="min-w-0">{flash.text}</span>
           {flash.href && (
             <Link href={flash.href} className="font-bold text-[var(--kesar-text)]">
-              Open trip →
+              {flash.link ?? "Open trip →"}
             </Link>
           )}
         </p>
@@ -78,7 +79,12 @@ export default function DispatchPage({ searchParams }: { searchParams: Promise<{
                 <h2 className="font-heading font-bold text-xl">Ready to go</h2>
                 <p className="text-sm text-[var(--muted)]">Due on or before this day and not on an open trip.</p>
               </div>
-              {board.ready.length > 0 && <span className="text-sm text-[var(--muted)]">{plural(board.ready.length, "order")}</span>}
+              {board.ready.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm text-[var(--muted)]">{plural(board.ready.length, "order")}</span>
+                  <PlanTrips board={board} onPlanned={(text) => setFlash({ text, href: "/admin/suggestions", link: "Review the plan →" })} />
+                </div>
+              )}
             </div>
             <ReadyOrders orders={board.ready} date={board.date} selected={selected} onChange={setSelected} />
           </section>
@@ -113,6 +119,48 @@ export default function DispatchPage({ searchParams }: { searchParams: Promise<{
         </>
       )}
     </div>
+  );
+}
+
+// ───────────────────────────── trip plan (A5) ─────────────────────────────
+
+/** Splits the ready orders across the free drivers and opens the plan in Suggestions to accept. */
+function PlanTrips({ board, onPlanned }: { board: Board; onPlanned: (text: string) => void }) {
+  const [slot, setSlot] = useState(board.slots[0]?.key ?? "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  async function plan() {
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await send<{ suggestion: { title: string } | null }>("/api/admin/trip-plan", "POST", { date: board.date, slot });
+      onPlanned(r.suggestion ? `Trip plan ready: ${r.suggestion.title}.` : "Trip plan ready.");
+    } catch (e) {
+      setErr(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      {board.slots.length > 1 && (
+        <select className="input !w-auto !py-1.5 text-sm" value={slot} onChange={(e) => setSlot(e.target.value)} aria-label="Slot to plan">
+          {board.slots.map((x) => (
+            <option key={x.key} value={x.key}>
+              {x.label}
+            </option>
+          ))}
+        </select>
+      )}
+      <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={plan}>
+        <Icon name="route" className="h-4 w-4" /> Plan trips
+      </button>
+      {err && (
+        <span className="w-full text-sm text-[#a8281e]" role="alert">
+          {err}
+        </span>
+      )}
+    </>
   );
 }
 
@@ -260,18 +308,23 @@ function AddBar({
   const target = open.find((t) => t.id === tripId) ?? (open.length === 1 ? open[0] : null);
   const value = board.ready.filter((o) => selected.has(o.id)).reduce((s, o) => s + o.total, 0);
 
-  async function add() {
+  const [short, setShort] = useState<StockShort[] | null>(null);
+
+  async function add(stockOverride = false) {
     if (!target) return setError("Pick a trip");
     setBusy(true);
     setError(null);
+    setShort(null);
     try {
-      await send(`/api/trips/${target.id}/orders`, "POST", { orderIds: [...selected] });
+      await send(`/api/trips/${target.id}/orders`, "POST", { orderIds: [...selected], ...(stockOverride ? { stockOverride: true } : {}) });
       onAdded(
         `${plural(selected.size, "order")} added to ${target.number}${target.status === "STARTED" ? " and sent out for delivery" : ""}.`,
         `/admin/dispatch/${target.id}`
       );
     } catch (e) {
-      setError(errText(e));
+      const s = stockShortOf(e);
+      if (s) setShort(s);
+      else setError(errText(e));
     } finally {
       setBusy(false);
     }
@@ -300,7 +353,7 @@ function AddBar({
               ))}
             </select>
             <div className="flex gap-2">
-              <button type="button" className="btn btn-kesar flex-1 sm:flex-none" disabled={busy || !target} onClick={add}>
+              <button type="button" className="btn btn-kesar flex-1 sm:flex-none" disabled={busy || !target} onClick={() => add()}>
                 {busy ? "Adding…" : "Add to trip"}
               </button>
               <button type="button" className="btn btn-outline flex-1 sm:flex-none" disabled={busy} onClick={onNew}>
@@ -314,6 +367,14 @@ function AddBar({
           </button>
         )}
         {target?.status === "STARTED" && <p className="text-xs text-[var(--muted)]">This trip has left: the orders go out for delivery at once.</p>}
+        {short && (
+          <div className="space-y-2 rounded-2xl bg-[var(--genda-tint)] p-3">
+            <ShortList rows={short} />
+            <button type="button" className="btn btn-kesar btn-sm !min-h-[44px] w-full" disabled={busy} onClick={() => add(true)}>
+              Add anyway (the goods are there)
+            </button>
+          </div>
+        )}
         {error && <p className="text-sm text-[#a8281e]">{error}</p>}
       </div>
     </div>

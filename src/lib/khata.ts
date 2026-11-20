@@ -181,7 +181,13 @@ export async function collectScope(db: TenantDb, session: SessionPayload, retail
     const agent = await db.deliveryAgentProfile.findUnique({ where: { userId: session.userId } });
     if (!agent) return null;
     const has = await db.delivery.findFirst({ where: { deliveryAgentId: agent.id, order: { retailerId } }, select: { id: true } });
-    return has ? { retailer, office: false } : null;
+    if (has) return { retailer, office: false };
+    // Spot sales may go to any shop, so a driver who can spot-sell sees dues while on the road.
+    if (can(session.role, "stock.spot_sell")) {
+      const onRoad = await db.trip.findFirst({ where: { driverId: agent.id, status: "STARTED" }, select: { id: true } });
+      if (onRoad) return { retailer, office: false };
+    }
+    return null;
   }
   return null;
 }

@@ -13,6 +13,10 @@ import { fyLabel, nextSequence } from "@/lib/orders";
 import { formatINR } from "@/lib/money";
 import { moneySettings, termsFor, type MoneySettings } from "@/lib/money-settings";
 import { invoiceSettings } from "@/lib/invoice-settings";
+import { queuedMessages } from "@/lib/notify";
+import { kickMessages } from "@/lib/jobs";
+import { paymentReceivedNotify } from "@/lib/notify-flows";
+import { paymentWebhook } from "@/lib/webhooks";
 
 /**
  * The money engine. Everything here runs inside withTenantTx(), so a money
@@ -27,8 +31,19 @@ import { invoiceSettings } from "@/lib/invoice-settings";
 export type Ctx = { tx: Tx; tenantId: string; actorId: string | null };
 
 /** Run a money operation atomically inside one tenant. */
-export function withMoney<T>(tenantId: string, actorId: string | null, fn: (ctx: Ctx) => Promise<T>) {
-  return withTenantTx(tenantId, (tx) => fn({ tx, tenantId, actorId }), { timeout: 20_000 });
+export async function withMoney<T>(tenantId: string, actorId: string | null, fn: (ctx: Ctx) => Promise<T>) {
+  let used: object | null = null;
+  const out = await withTenantTx(
+    tenantId,
+    (tx) => {
+      used = tx;
+      return fn({ tx, tenantId, actorId });
+    },
+    { timeout: 20_000 }
+  );
+  // Messages queued in this transaction are now committed: send them soon.
+  if (used && queuedMessages(used)) void kickMessages(tenantId);
+  return out;
 }
 
 export { MoneyError };
@@ -66,6 +81,9 @@ const NAMES: Record<AccountType, string> = {
   DISCOUNT: "Discounts and write-offs",
   PENALTY_INCOME: "Penalties",
   CASH_SHORTAGE: "Cash shortages",
+  PROMOTIONS: "Promotions and rewards",
+  GATEWAY_CLEARING: "Online payments to be settled",
+  GATEWAY_FEES: "Payment gateway fees",
 };
 
 // Per-transaction cache: an account created in a transaction that rolls back
@@ -322,6 +340,9 @@ function debitAccountFor(method: PayMethod, retailerId: string, collector: { use
       return { type: "WALLET", retailerId };
     case "CREDIT_NOTE":
       return { type: "DISCOUNT" };
+    case "ONLINE":
+      // Held by the gateway until it settles to our bank (lib/gateway.ts).
+      return { type: "GATEWAY_CLEARING" };
   }
 }
 
@@ -344,6 +365,8 @@ export type PaymentInput = {
   /** Internal: settle from the wallet reservation made at order time. */
   fromHold?: boolean;
   occurredAt?: Date;
+  /** Paid through the gateway: our request and the gateway's payment id (unique, so never posted twice). */
+  gateway?: { intentId: string | null; paymentId: string } | null;
 };
 
 export async function recordPayment(ctx: Ctx, p: PaymentInput) {
@@ -380,6 +403,7 @@ export async function recordPayment(ctx: Ctx, p: PaymentInput) {
       orderId: p.orderId ?? null,
       collectedById: p.collectorId !== undefined ? p.collectorId : ctx.actorId,
       collectedAt: p.occurredAt ?? new Date(),
+      ...(p.gateway ? { intentId: p.gateway.intentId, gatewayPaymentId: p.gateway.paymentId } : {}),
       ...(p.method === "CHEQUE"
         ? { cheque: { create: { number: p.cheque!.number, bank: p.cheque!.bank, chequeDate: p.cheque!.date } } }
         : {}),
@@ -412,6 +436,11 @@ async function postPayment(ctx: Ctx, paymentId: string, p: PaymentInput) {
   });
   await ctx.tx.payment.update({ where: { id: paymentId }, data: { entryId: entry.id } });
   if (purpose === "DUES") await allocateRetailer(ctx, p.retailerId);
+  // Receipt to the retailer (skips wallet settlements and credit notes).
+  if (!p.fromHold) {
+    await paymentReceivedNotify(ctx.tx, ctx.tenantId, paymentId);
+    await paymentWebhook(ctx.tx, ctx.tenantId, paymentId);
+  }
 }
 
 /** Staff confirms a retailer-reported payment (e.g. UPI with UTR). */
@@ -911,6 +940,8 @@ export async function recordHandover(ctx: Ctx, h: { staffUserId: string; counted
 /** Accept a shortage as a loss (removes it from the staff member's cash-in-hand). */
 export async function writeOffShortage(ctx: Ctx, staffUserId: string, amount: number, note: string) {
   if (!Number.isInteger(amount) || amount <= 0) throw new MoneyError("Amount must be more than ₹0");
+  // Same lock as a handover: two write-offs at once can't exceed what is held.
+  await ctx.tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${ctx.tenantId}:cash:${staffUserId}`}))`;
   const held = await cashInHand(ctx, staffUserId);
   if (amount > held) throw new MoneyError(`Only ${formatINR(held)} is outstanding for this person`);
   return post(ctx, {

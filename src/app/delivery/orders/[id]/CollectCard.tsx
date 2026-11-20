@@ -22,6 +22,7 @@ export default function CollectCard({
   pay,
   onPayAction,
   onFollowAction,
+  cashHint = "Count the cash before you mark delivered.",
 }: {
   onHold: boolean;
   holdReason: string | null;
@@ -36,6 +37,8 @@ export default function CollectCard({
   pay: PaymentValue;
   onPayAction: (v: PaymentValue) => void;
   onFollowAction: (target: "order" | "dues") => void;
+  /** Shown under the cash amount. */
+  cashHint?: string;
 }) {
   const prepaid = walletPaid !== null;
   return (
@@ -91,6 +94,7 @@ export default function CollectCard({
       <PaymentFields
         value={pay}
         onChangeAction={onPayAction}
+        field
         allowNone
         noneLabel={prepaid ? "Nothing now" : "On credit"}
         hint={
@@ -99,7 +103,7 @@ export default function CollectCard({
               {prepaid && totalDue === 0 ? "Nothing to collect." : `${formatINR(totalDue)} stays on the khata.`}
             </p>
           ) : pay.method === "CASH" ? (
-            <p className="text-sm text-[var(--ink-2)]">Count the cash before you mark delivered.</p>
+            <p className="text-sm text-[var(--ink-2)]">{cashHint}</p>
           ) : null
         }
       />

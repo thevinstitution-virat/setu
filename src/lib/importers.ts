@@ -99,17 +99,46 @@ function toRows(table: string[][]): Row[] {
   });
 }
 
+/**
+ * Total unpacked size of a .zip (an .xlsx is one), from its central
+ * directory; null when it isn't a readable zip. Checked before ExcelJS
+ * unpacks it all in memory: a 5 MB file can unpack to gigabytes.
+ */
+export function zipUnpackedSize(b: Buffer): number | null {
+  for (let i = b.length - 22; i >= Math.max(0, b.length - 65_557); i--) {
+    if (b.readUInt32LE(i) !== 0x06054b50) continue;
+    const count = b.readUInt16LE(i + 10);
+    let off = b.readUInt32LE(i + 16);
+    let total = 0;
+    for (let n = 0; n < count; n++) {
+      if (off + 46 > b.length || b.readUInt32LE(off) !== 0x02014b50) return null;
+      total += b.readUInt32LE(off + 24);
+      off += 46 + b.readUInt16LE(off + 28) + b.readUInt16LE(off + 30) + b.readUInt16LE(off + 32);
+    }
+    return total;
+  }
+  return null;
+}
+
+const MAX_UNPACKED = 60 * 1024 * 1024;
+/** Columns read per row: our templates have fewer than 20. */
+const MAX_COLUMNS = 60;
+
 export async function parseSheet(bytes: Buffer, filename: string): Promise<Row[]> {
   if (/\.xlsx$/i.test(filename)) {
+    const unpacked = zipUnpackedSize(bytes);
+    if (unpacked === null || unpacked > MAX_UNPACKED) throw new Error("Not a readable .xlsx, or too large unpacked");
     const ExcelJS = (await import("exceljs")).default;
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(bytes as unknown as ArrayBuffer);
     const ws = wb.worksheets[0];
     if (!ws) return [];
     const table: string[][] = [];
+    const cols = Math.min(ws.columnCount, MAX_COLUMNS);
     ws.eachRow({ includeEmpty: false }, (row) => {
+      if (table.length > MAX_ROWS + 1) return; // the route refuses more; don't build them
       const cells: string[] = [];
-      for (let c = 1; c <= ws.columnCount; c++) {
+      for (let c = 1; c <= cols; c++) {
         const v = row.getCell(c).value;
         cells.push(
           v == null

@@ -7,6 +7,8 @@ import { ErrorBox, errText, send, useFetch } from "@/components/admin/AdminKit";
 import TripHeader from "@/components/dispatch/TripHeader";
 import TripStops from "@/components/dispatch/TripStops";
 import { DayClose, LoadSheet } from "@/components/dispatch/TripSummary";
+import VanLoad, { ShortList, stockShortOf, type StockShort } from "@/components/dispatch/VanLoad";
+import VanUnload from "@/components/dispatch/VanUnload";
 import { plural, type TripDetail } from "@/components/dispatch/kit";
 
 /** Print only the trip header and the load sheet: hide the app shell. */
@@ -20,9 +22,12 @@ const PRINT_CSS = `@media print {
 export default function TripView({ id }: { id: string }) {
   const { data, error, reload } = useFetch<TripDetail>(`/api/trips/${id}`);
   const [flash, setFlash] = useState<string | null>(null);
+  // Bumped on every change so the van stock cards load again.
+  const [version, setVersion] = useState(0);
 
   const done = (msg?: string) => {
     reload();
+    setVersion((v) => v + 1);
     if (msg) {
       setFlash(msg);
       setTimeout(() => setFlash(null), 5000);
@@ -67,6 +72,16 @@ export default function TripView({ id }: { id: string }) {
         </div>
       )}
 
+      {canManage && (
+        <div className="print:hidden">
+          {trip.status === "CLOSED" ? (
+            <VanUnload tripId={trip.id} version={version} onDone={done} />
+          ) : (
+            <VanLoad tripId={trip.id} version={version} onDone={done} />
+          )}
+        </div>
+      )}
+
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
         <div className="space-y-5 min-w-0">
           <div className="print:hidden">
@@ -96,15 +111,19 @@ function PrimaryAction({ data, onDone }: { data: TripDetail; onDone: (msg?: stri
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<string | null>(null);
+  const [short, setShort] = useState<StockShort[] | null>(null);
 
-  async function start() {
+  async function start(stockOverride = false) {
     setBusy(true);
     setError(null);
     try {
-      const d = await send<{ stops: number; invoiced: number }>(`/api/trips/${trip.id}/start`, "POST");
+      const d = await send<{ stops: number; invoiced: number }>(`/api/trips/${trip.id}/start`, "POST", stockOverride ? { stockOverride: true } : undefined);
+      setShort(null);
       onDone(`Trip started: ${plural(d.stops, "order")} out for delivery${d.invoiced ? `, ${plural(d.invoiced, "invoice")} made` : ""}.`);
     } catch (e) {
-      setError(errText(e));
+      const s = stockShortOf(e);
+      if (s && !stockOverride) setShort(s);
+      else setError(errText(e));
     } finally {
       setBusy(false);
     }
@@ -136,19 +155,37 @@ function PrimaryAction({ data, onDone }: { data: TripDetail; onDone: (msg?: stri
 
   if (trip.status === "PLANNED") {
     return (
-      <div className="card p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
-        <div className="min-w-0">
-          <p className="font-heading font-bold">Ready to leave?</p>
-          <p className="text-sm text-[var(--muted)]">
-            {summary.stops
-              ? `Starting sends all ${plural(summary.stops, "order")} out for delivery and puts the driver on duty.`
-              : "Add orders from the dispatch board first."}
-          </p>
-          {error && <p className="text-sm text-[#a8281e] mt-1">{error}</p>}
+      <div className="card p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+          <div className="min-w-0">
+            <p className="font-heading font-bold">Ready to leave?</p>
+            <p className="text-sm text-[var(--muted)]">
+              {summary.stops
+                ? `Starting sends all ${plural(summary.stops, "order")} out for delivery and puts the driver on duty.`
+                : "Add orders from the dispatch board first."}
+            </p>
+            {error && <p className="text-sm text-[#a8281e] mt-1">{error}</p>}
+          </div>
+          {!short && (
+            <button type="button" className="btn btn-kesar shrink-0" disabled={busy || summary.stops === 0} onClick={() => start(false)}>
+              <Icon name="truck" className="h-4 w-4" /> {busy ? "Starting…" : "Start trip"}
+            </button>
+          )}
         </div>
-        <button type="button" className="btn btn-kesar shrink-0" disabled={busy || summary.stops === 0} onClick={start}>
-          <Icon name="truck" className="h-4 w-4" /> {busy ? "Starting…" : "Start trip"}
-        </button>
+        {short && (
+          <div className="rounded-2xl bg-[var(--genda-tint)] p-3 space-y-2">
+            <ShortList rows={short} />
+            <p className="text-xs text-[var(--ink-2)]">Starting tops the van up for every order. If the goods are really there, start anyway: the missing units are booked in first.</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="btn btn-kesar btn-sm !min-h-[44px]" disabled={busy} onClick={() => start(true)}>
+                {busy ? "Starting…" : "Start anyway"}
+              </button>
+              <button type="button" className="btn btn-quiet btn-sm !min-h-[44px]" disabled={busy} onClick={() => setShort(null)}>
+                Not yet
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

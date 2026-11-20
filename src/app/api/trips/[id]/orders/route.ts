@@ -5,8 +5,9 @@ import { moneyFail } from "@/lib/money-api";
 import { queueEInvoice } from "@/lib/einvoice-queue";
 import { addOrders, removeOrder } from "@/lib/trips";
 import { tripAuth } from "@/lib/trip-api";
+import { can } from "@/lib/permissions";
 
-/** Put orders on the trip. Body: { orderIds: string[] }. On a trip that has left they go out at once. */
+/** Put orders on the trip. Body: { orderIds: string[], stockOverride? }. On a trip that has left they go out (and on the van) at once. */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const a = await tripAuth(id);
@@ -15,7 +16,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const orderIds = Array.isArray(body?.orderIds) ? body.orderIds.map(String) : [];
   let docs;
   try {
-    docs = await withMoney(a.tenant.id, a.session.userId, (ctx) => addOrders(ctx, id, orderIds));
+    const stockOverride = body?.stockOverride === true && can(a.session.role, "stock.manage");
+    docs = await withMoney(a.tenant.id, a.session.userId, (ctx) => addOrders(ctx, id, orderIds, { stockOverride }));
   } catch (e) {
     return moneyFail(e);
   }

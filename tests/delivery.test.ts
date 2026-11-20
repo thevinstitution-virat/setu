@@ -16,6 +16,7 @@ import { placeOrder } from "@/lib/order-place";
 import { CART_DEFAULTS } from "@/lib/cart-settings";
 import { INVOICE_DEFAULTS } from "@/lib/invoice-settings";
 import { DELIVERY_DEFAULTS } from "@/lib/delivery-settings";
+import { INVENTORY_DEFAULTS } from "@/lib/inventory-settings";
 import { chargeReturnables, deliverOrder, failDelivery, repriceOrder, returnableBalances, type DeliverInput } from "@/lib/delivery";
 import { addOrders, autoSequence, closeTrip, createTrip, sequenceStops, startTrip, tripSummary } from "@/lib/trips";
 import { istDate } from "@/lib/gst";
@@ -87,6 +88,8 @@ beforeAll(async () => {
     cart: { ...CART_DEFAULTS, minOrderValue: 0, deliveryCharge: 3000, freeDeliveryAbove: 100_000_00, deliveryGstRate: 18, closedWeekdays: [], holidays: [], cutoffTime: "23:59" },
     invoice: invoiceCfg("dispatch"),
     delivery: DELIVERY_DEFAULTS,
+    // Stock tracking is tested in stock.test.ts.
+    inventory: INVENTORY_DEFAULTS,
   });
 });
 

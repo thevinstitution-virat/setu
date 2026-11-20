@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { spendDraft } from "@/lib/order-drafts";
 import { guard } from "@/lib/guard";
 import { emit } from "@/lib/jobs";
 import { withMoney } from "@/lib/ledger";
@@ -8,6 +9,8 @@ import { moneyFail } from "@/lib/money-api";
 
 /** Never send password hashes or other account internals to the browser. */
 const USER = { id: true, name: true, phone: true } as const;
+/** Product fields shops and field staff never need: our buying price, supplier, reorder and visibility rules. */
+const PRODUCT_PUBLIC = { omit: { lastCost: true, supplierId: true, reorderLevel: true, reorderQty: true, visibleAreaIds: true, visibleGroupIds: true } } as const;
 
 export async function GET() {
   const auth = await guard();
@@ -23,7 +26,12 @@ export async function GET() {
   } else if (session.role === "SALES_AGENT") {
     const agent = await db.salesAgentProfile.findUnique({ where: { userId: session.userId } });
     if (!agent) return NextResponse.json({ orders: [] });
-    where = { retailer: { salesAgentId: agent.id } };
+    // Their book, plus orders they placed for other shops (off-beat).
+    where = { OR: [{ retailer: { salesAgentId: agent.id } }, { placedById: session.userId }] };
+  } else if (session.role === "SUPERVISOR") {
+    const team = await db.user.findMany({ where: { supervisorId: session.userId }, select: { id: true } });
+    const ids = [session.userId, ...team.map((u) => u.id)];
+    where = { OR: [{ placedById: { in: ids } }, { retailer: { salesAgent: { userId: { in: ids } } } }] };
   } else if (session.role === "DELIVERY_AGENT") {
     const agent = await db.deliveryAgentProfile.findUnique({ where: { userId: session.userId } });
     if (!agent) return NextResponse.json({ orders: [] });
@@ -34,7 +42,7 @@ export async function GET() {
     where,
     include: {
       retailer: { include: { user: { select: USER } } },
-      items: { include: { product: true } },
+      items: { include: { product: PRODUCT_PUBLIC } },
       delivery: { omit: { code: session.role !== "RETAILER" }, include: { deliveryAgent: { include: { user: { select: USER } } } } },
     },
     orderBy: { createdAt: "desc" },
@@ -58,8 +66,8 @@ export async function POST(req: Request) {
   // retailer short of balance gets a 402; a scheme that just ran out a 409).
   let order;
   try {
-    ({ order } = await withMoney(tenant.id, session.userId, (ctx) =>
-      placeOrder(ctx, {
+    ({ order } = await withMoney(tenant.id, session.userId, async (ctx) => {
+      const placed = await placeOrder(ctx, {
         retailerId: who.retailerId,
         placedById: session.userId,
         items: body.items,
@@ -67,8 +75,10 @@ export async function POST(req: Request) {
         deliveryDate: body.deliveryDate,
         notes: body.notes,
         visitId: body.visitId,
-      })
-    ));
+      });
+      if (body.draftId) await spendDraft(ctx.tx, who.retailerId, body.draftId, placed.order.id);
+      return placed;
+    }));
   } catch (e) {
     return moneyFail(e);
   }

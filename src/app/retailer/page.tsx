@@ -9,6 +9,9 @@ import { getServerLang, tr } from "@/lib/i18n/server";
 import Icon from "@/components/Icon";
 import HomeShelves from "@/components/store/HomeShelves";
 import { formatDay } from "@/components/store/format";
+import AnnouncementCards from "@/components/engage/AnnouncementCards";
+import { referralSettings } from "@/lib/engage-settings";
+import RatePrompt from "./RatePrompt";
 
 export default async function RetailerHome() {
   const db = await getDb();
@@ -30,6 +33,7 @@ export default async function RetailerHome() {
   const tenant = await requireTenant();
   const khata = profile ? await withMoney(tenant.id, session!.userId, (ctx) => khataSummary(ctx, profile.id)) : null;
 
+  const referral = referralSettings(tenant.settings);
   const orderCount = profile ? await db.order.count({ where: { retailerId: profile.id } }) : 0;
   const reachedIdx = latestOrder ? ORDER_STATUS_FLOW.indexOf(latestOrder.status) : -1;
 
@@ -43,7 +47,11 @@ export default async function RetailerHome() {
         </p>
       </div>
 
+      <RatePrompt />
+
       {khata && <KhataCard k={khata} />}
+
+      <AnnouncementCards />
 
       {latestOrder ? (
         <div className="panel-dark p-5 space-y-4">
@@ -129,6 +137,30 @@ export default async function RetailerHome() {
           </span>
         </Link>
       </div>
+
+      {referral.on && (
+        <Link href="/retailer/refer" className="card p-4 flex items-center gap-3 hover:-translate-y-0.5 transition">
+          <span className="icon-tile bg-[var(--genda-tint)] text-[var(--genda-text)] shrink-0">
+            <Icon name="gift" />
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="block font-bold text-sm">Refer a shop, earn {formatINR(referral.referrerReward, { whole: true })}</span>
+            <span className="block text-xs text-[var(--muted)] mt-0.5">Added to your wallet after their first order</span>
+          </span>
+          <Icon name="arrow" className="h-4 w-4 shrink-0" />
+        </Link>
+      )}
+
+      <Link href="/retailer/help" className="card p-4 flex items-center gap-3 hover:-translate-y-0.5 transition">
+        <span className="icon-tile bg-ink/5 text-[var(--ink-2)] shrink-0">
+          <Icon name="chat" />
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block font-bold text-sm">Need help?</span>
+          <span className="block text-xs text-[var(--muted)] mt-0.5">Raise a complaint about an order or a bill</span>
+        </span>
+        <Icon name="arrow" className="h-4 w-4 shrink-0" />
+      </Link>
     </div>
   );
 }

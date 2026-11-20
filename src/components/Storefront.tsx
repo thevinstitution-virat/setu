@@ -8,12 +8,14 @@ import Icon from "@/components/Icon";
 import ProductCard from "@/components/store/ProductCard";
 import ProductSheet from "@/components/store/ProductSheet";
 import CartReview, { type PlaceError } from "@/components/store/CartReview";
+import OrderByText, { type TextAdd } from "@/components/store/OrderByText";
 import { fileUrl } from "@/components/store/format";
 import {
   isScoped,
   offerCovers,
   ProductThumb,
   QtyControl,
+  StockChip,
   type Banner,
   type Cart,
   type CartEntry,
@@ -21,6 +23,7 @@ import {
   type PlacedOrder,
   type QuoteJson,
   type StoreFilters,
+  type StoreProduct,
 } from "@/components/store/shared";
 
 export type { PlacedOrder, StoreFilters } from "@/components/store/shared";
@@ -37,6 +40,7 @@ export default function Storefront({
   visitId,
   submitLabel = "Place order",
   initial,
+  draftId,
   onPlacedAction,
 }: {
   retailerId?: string;
@@ -44,6 +48,8 @@ export default function Storefront({
   submitLabel?: string;
   /** Filters to start with (from ?q= ?category= ?brand= ?scheme= ?product=). */
   initial?: StoreFilters;
+  /** A WhatsApp order draft to open in "Type or speak your order" (?draft=). */
+  draftId?: string | null;
   onPlacedAction: (order: PlacedOrder) => void;
 }) {
   const [data, setData] = useState<CatalogueData | null>(null);
@@ -66,6 +72,8 @@ export default function Storefront({
   const [nonce, setNonce] = useState(0);
   const [placing, setPlacing] = useState(false);
   const [placeError, setPlaceError] = useState<PlaceError | null>(null);
+  /** The WhatsApp draft the cart came from: placing the order uses it up. */
+  const [fromDraft, setFromDraft] = useState<string | null>(null);
 
   const draftKey = data ? `setu:cart:${data.retailer.id}` : null;
   const restored = useRef(false);
@@ -182,6 +190,7 @@ export default function Storefront({
           deliveryDate: sendDate ?? undefined,
           notes: notes.trim() || undefined,
           visitId,
+          draftId: fromDraft ?? undefined,
         }),
       });
       const d = await res.json().catch(() => ({}));
@@ -198,6 +207,7 @@ export default function Storefront({
         }
       }
       setCart({});
+      setFromDraft(null);
       setCoupon("");
       setNotes("");
       setReviewOpen(false);
@@ -240,7 +250,7 @@ export default function Storefront({
 
   const groups = useMemo(() => {
     const order = new Map(categories.map((c, i) => [c.id, i]));
-    const m = new Map<string, { name: string; items: CatalogueProduct[] }>();
+    const m = new Map<string, { name: string; items: StoreProduct[] }>();
     for (const p of visible) {
       const g = m.get(p.category.id) ?? { name: p.category.name, items: [] };
       g.items.push(p);
@@ -279,7 +289,28 @@ export default function Storefront({
   const cartIds = Object.keys(cart);
   const unitCount = cartIds.length;
   const sheetProduct = openProduct ? (byId.get(openProduct) ?? null) : null;
-  const buyAgain = data.buyAgain.map((id) => byId.get(id)).filter((p): p is CatalogueProduct => !!p);
+  const buyAgain = data.buyAgain.map((id) => byId.get(id)).filter((p): p is StoreProduct => !!p);
+  const usual = (data.usual?.lines ?? []).flatMap((l) => {
+    const p = byId.get(l.productId);
+    return p && p.stock !== "out" ? [{ ...l, product: p }] : [];
+  });
+  const usualMissing = usual.filter((u) => !cart[u.productId]);
+  function addUsual() {
+    for (const u of usualMissing) setEntry(u.productId, { qty: u.qty, mode: "units" });
+  }
+  /** From "Type or speak your order": adds to what is in the cart (same units), else sets it. */
+  function addFromText(adds: TextAdd[], draft: string | null) {
+    setPlaceError(null);
+    setCart((c) => {
+      const next = { ...c };
+      for (const a of adds) {
+        const had = next[a.productId];
+        next[a.productId] = had && had.mode === a.entry.mode ? { ...had, qty: had.qty + a.entry.qty } : a.entry;
+      }
+      return next;
+    });
+    if (draft) setFromDraft(draft);
+  }
 
   return (
     <div className="space-y-4">
@@ -346,6 +377,41 @@ export default function Storefront({
         </section>
       )}
 
+      {/* Type or speak your order (A1) */}
+      {(draftId || (!filtering && data.orderText)) && (
+        <OrderByText retailerId={retailerId} products={products} byId={byId} inCartAction={(id) => !!cart[id]} draftId={draftId} onAddAction={addFromText} />
+      )}
+
+      {/* Usual order (A2) */}
+      {!filtering && usual.length > 0 && (
+        <section className="card p-3.5 space-y-2.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="page-kick">Usual order</p>
+              <p className="text-xs text-[var(--muted)] mt-0.5">
+                What this shop buys most times, from its last {data.usual!.basedOn} orders
+              </p>
+            </div>
+            <button type="button" className="btn btn-primary btn-sm shrink-0" disabled={!usualMissing.length} onClick={addUsual}>
+              {usualMissing.length ? `Add ${usualMissing.length} to cart` : "All in cart"}
+            </button>
+          </div>
+          <ul className="text-sm divide-y divide-[var(--line)]">
+            {usual.map((u) => (
+              <li key={u.productId} className="flex items-center justify-between gap-3 py-1.5">
+                <button type="button" className="min-w-0 truncate text-left" onClick={() => setOpenProduct(u.productId)}>
+                  {u.product.name}
+                </button>
+                <span className="shrink-0 tabular-nums text-[var(--muted)]">
+                  {u.qty} {u.product.unit}
+                  {cart[u.productId] && <span className="ml-1.5 text-[var(--mint-text)] font-semibold">✓</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* Buy again */}
       {!filtering && buyAgain.length > 0 && (
         <section className="space-y-2">
@@ -354,11 +420,12 @@ export default function Storefront({
             {buyAgain.map((p) => (
               <div key={p.id} className="card shrink-0 w-[148px] p-2.5 flex flex-col gap-2">
                 <button type="button" onClick={() => setOpenProduct(p.id)} className="text-left space-y-1.5 min-w-0">
-                  <ProductThumb name={p.name} imageKey={p.images[0]} className="h-12 w-12" />
+                  <ProductThumb name={p.name} imageKey={p.images[0]} className={`h-12 w-12 ${p.stock === "out" ? "opacity-60" : ""}`} />
                   <span className="block text-xs font-semibold leading-snug line-clamp-2">{p.name}</span>
                   <span className="block text-xs text-[var(--muted)]">
                     {formatINR(p.price)} / {p.unit}
                   </span>
+                  <StockChip stock={p.stock} />
                 </button>
                 <div className="mt-auto flex justify-end">
                   <QtyControl product={p} entry={cart[p.id]} onChangeAction={(e) => setEntry(p.id, e)} compact />

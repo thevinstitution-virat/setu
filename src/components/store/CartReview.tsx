@@ -122,6 +122,8 @@ export default function CartReview({
               const p = products.get(id);
               if (!p) return null;
               const l = lineFor(id);
+              // Units in stock when the cart asks for more (stock tracked; warn or refuse).
+              const inStock = fresh ? quote?.stockShort?.[id] : undefined;
               return (
                 <div key={id} className="py-3 first:pt-0 space-y-2">
                   <div className="flex items-start justify-between gap-3">
@@ -139,6 +141,11 @@ export default function CartReview({
                         <p className="text-xs font-semibold text-[var(--mint-text)] mt-0.5">
                           −{formatINR(l.discount)}
                           {l.schemes.length > 0 && ` · ${l.schemes.join(", ")}`}
+                        </p>
+                      )}
+                      {inStock !== undefined && (
+                        <p className="text-xs font-semibold text-[var(--genda-text)] mt-0.5">
+                          {inStock > 0 ? `Only ${inStock} ${p.unit} in stock` : "Out of stock"}
                         </p>
                       )}
                     </div>
@@ -310,6 +317,13 @@ export default function CartReview({
           {fresh && quote && quote.problems.length > 0 && (
             <ul className="rounded-xl bg-[#fde4e1] text-[#a8281e] p-3 text-sm space-y-1 list-disc pl-7">
               {quote.problems.map((m) => (
+                <li key={m}>{m}</li>
+              ))}
+            </ul>
+          )}
+          {fresh && quote && (quote.warnings ?? []).length > 0 && (
+            <ul className="rounded-xl bg-[var(--genda-tint)] text-[var(--genda-text)] p-3 text-sm font-semibold space-y-1 list-disc pl-7">
+              {quote.warnings.map((m) => (
                 <li key={m}>{m}</li>
               ))}
             </ul>

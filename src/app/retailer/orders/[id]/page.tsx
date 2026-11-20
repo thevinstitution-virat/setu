@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { getDb } from "@/lib/tenant";
+import { getDb, requireTenant } from "@/lib/tenant";
+import { supportSettings } from "@/lib/engage-settings";
+import RateDelivery from "./RateDelivery";
 import { STATUS_COLOR } from "@/lib/orders";
 import { getServerLang, tr } from "@/lib/i18n/server";
 import OrderTimeline from "@/components/OrderTimeline";
@@ -18,13 +20,18 @@ const DOC_LABEL = {
   DEBIT_NOTE: "Debit note",
 } as const;
 
+const withinDays = (at: Date, days: number) => Date.now() - at.getTime() <= days * 24 * 3600_000;
+
 export default async function RetailerOrderDetail({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ rate?: string; stars?: string }>;
 }) {
   const db = await getDb();
   const { id } = await params;
+  const sp = await searchParams;
   const session = await getSession();
   const lang = await getServerLang();
   const profile = await db.retailerProfile.findUnique({ where: { userId: session!.userId } });
@@ -45,6 +52,17 @@ export default async function RetailerOrderDetail({
     orderBy: { date: "asc" },
     select: { id: true, type: true, number: true, total: true },
   });
+
+  // Rating: delivered, not rated yet, and still inside the business's rating window.
+  let rate: "open" | "rated" | null = null;
+  let rated: { rating: number } | null = null;
+  if (order.status === "DELIVERED") {
+    rated = await db.deliveryFeedback.findUnique({ where: { orderId: order.id }, select: { rating: true } });
+    const days = supportSettings((await requireTenant()).settings).feedbackDays;
+    const at = order.delivery?.deliveredAt ?? order.updatedAt;
+    rate = rated ? "rated" : withinDays(at, days) ? "open" : null;
+  }
+  const stars = Number(sp.stars);
 
   // The code the driver asks for on high-value drops (only the retailer sees it).
   const code = order.status === "OUT_FOR_DELIVERY" && order.delivery?.code && !order.delivery.codeVerified ? order.delivery.code : null;
@@ -101,6 +119,16 @@ export default async function RetailerOrderDetail({
         </div>
       )}
 
+      {rate === "open" && (
+        <RateDelivery orderId={order.id} focus={sp.rate === "1"} stars={Number.isInteger(stars) ? stars : null} />
+      )}
+      {rate === "rated" && rated && (
+        <p className="card p-3 text-sm flex items-center gap-2">
+          <Icon name="star" className="h-4 w-4 text-[var(--genda)]" />
+          You rated this delivery {rated.rating}/5. Thank you.
+        </p>
+      )}
+
       {invoices.length > 0 && (
         <div className="card p-4 space-y-3">
           <div className="flex items-center justify-between gap-2">
@@ -153,6 +181,20 @@ export default async function RetailerOrderDetail({
         <OrderLines items={order.items} order={order} />
         {order.notes && <p className="text-xs text-[var(--muted)] mt-3">Note: {order.notes}</p>}
       </div>
+
+      <Link
+        href={`/retailer/help?new=1&order=${order.id}`}
+        className="card p-4 flex items-center gap-3 hover:-translate-y-0.5 transition"
+      >
+        <span className="icon-tile bg-ink/5 text-[var(--ink-2)] shrink-0">
+          <Icon name="chat" />
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block font-bold text-sm">Problem with this order?</span>
+          <span className="block text-xs text-[var(--muted)]">Damaged, missing or wrong goods, or a bill problem</span>
+        </span>
+        <Icon name="chevronRight" className="h-4 w-4 shrink-0 text-[var(--muted)]" />
+      </Link>
     </div>
   );
 }

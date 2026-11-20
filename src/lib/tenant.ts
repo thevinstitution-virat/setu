@@ -18,9 +18,13 @@ export type CurrentTenant = {
   id: string;
   slug: string;
   name: string;
-  status: "TRIAL" | "ACTIVE" | "SUSPENDED";
+  status: "TRIAL" | "ACTIVE" | "SUSPENDED" | "CLOSED";
   brand: Record<string, unknown>;
   settings: Record<string, unknown>;
+  /** Why the business is paused (billing:..., or the platform's note). */
+  suspendReason: string | null;
+  /** When a requested deletion will run. */
+  deleteAfter: Date | null;
 };
 
 const RESERVED = new Set(["www", "app", "api", "admin", "platform", "static", "cdn", "mail"]);
@@ -60,6 +64,8 @@ function toCurrent(t: {
   status: CurrentTenant["status"];
   brand: unknown;
   settings: unknown;
+  suspendReason?: string | null;
+  deleteAfter?: Date | null;
 }): CurrentTenant {
   return {
     id: t.id,
@@ -68,6 +74,8 @@ function toCurrent(t: {
     status: t.status,
     brand: (t.brand ?? {}) as Record<string, unknown>,
     settings: (t.settings ?? {}) as Record<string, unknown>,
+    suspendReason: t.suspendReason ?? null,
+    deleteAfter: t.deleteAfter ?? null,
   };
 }
 
@@ -86,10 +94,12 @@ export async function resolveTenantByHost(host: string): Promise<CurrentTenant |
     const t = await prisma.tenant.findUnique({ where: { slug: c.slug } });
     tenant = t ? toCurrent(t) : null;
   } else if (c.kind === "custom") {
-    const d = await prisma.tenantDomain.findUnique({ where: { host: c.host }, include: { tenant: true } });
-    tenant = d?.verifiedAt ? toCurrent(d.tenant) : null;
+    const d = await prisma.tenantDomain.findUnique({ where: { verifiedHost: c.host }, include: { tenant: true } });
+    tenant = d ? toCurrent(d.tenant) : null;
   }
-  if (tenant?.status === "SUSPENDED") tenant = null;
+  // A paused (SUSPENDED) business still resolves, so its owner can sign in to
+  // pay or export; guard() lets nobody else through. A closed one is gone.
+  if (tenant?.status === "CLOSED") tenant = null;
 
   cache.set(host, { tenant, at: Date.now() });
   return tenant;

@@ -6,18 +6,24 @@ import { moneyFail } from "@/lib/money-api";
 import { queueEInvoice } from "@/lib/einvoice-queue";
 import { startTrip } from "@/lib/trips";
 import { tripAuth } from "@/lib/trip-api";
+import { can } from "@/lib/permissions";
 
 /**
  * The trip leaves: every stop goes out for delivery (and is invoiced when the
  * business invoices at dispatch). Dispatch staff, or the trip's driver.
+ * With stock tracking, the van is topped up to carry every order. Body
+ * { stockOverride: true } (stock staff only) loads even when the warehouse
+ * records are short, correcting them.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const a = await tripAuth(id, { driver: true });
   if (!a.ok) return a.res;
+  const body = await req.json().catch(() => null);
+  const stockOverride = body?.stockOverride === true && can(a.session.role, "stock.manage");
   let out;
   try {
-    out = await withMoney(a.tenant.id, a.session.userId, (ctx) => startTrip(ctx, id));
+    out = await withMoney(a.tenant.id, a.session.userId, (ctx) => startTrip(ctx, id, new Date(), { stockOverride }));
   } catch (e) {
     return moneyFail(e);
   }

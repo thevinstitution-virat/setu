@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import { formatINR, gstOn } from "@/lib/money";
-import { Field, Sheet, errText, readRupees, send } from "@/components/admin/AdminKit";
+import { Field, Sheet, errText, readRupees, send, useFetch } from "@/components/admin/AdminKit";
 import {
   EINV_LABEL,
   InvoicePanel,
@@ -126,6 +126,15 @@ const REASONS: Record<Kind | "debit", string[]> = {
   debit: ["Rate was too low", "Missed charge", "Freight charge"],
 };
 
+type Restock = "good" | "damaged" | "expired" | "none";
+
+const RESTOCK: { key: Restock; label: string }[] = [
+  { key: "good", label: "Good (back on the shelf)" },
+  { key: "damaged", label: "Damaged" },
+  { key: "expired", label: "Expired" },
+  { key: "none", label: "Don't put back" },
+];
+
 /** Rough GST on a part of a line, at the line's rate (zero when the line carried no GST). */
 function lineTax(l: InvoiceLineJson, taxable: number) {
   return l.cgst + l.sgst + l.igst > 0 ? gstOn(taxable, l.gstRate) : 0;
@@ -140,6 +149,11 @@ function NoteSheet({ type, inv, onClose }: { type: "CREDIT_NOTE" | "DEBIT_NOTE";
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Returned goods can go back into stock when stock tracking is on (alerts is null when it's off).
+  const stockOn = useFetch<{ alerts: unknown }>(credit ? "/api/stock/alerts" : null);
+  const canRestock = credit && !!stockOn.data && stockOn.data.alerts !== null;
+  const [restock, setRestock] = useState<Restock>("good");
+  const [restocked, setRestocked] = useState<{ noteId: string; text: string } | null>(null);
 
   const lines =
     kind === "return" ? inv.lines.filter((l) => !l.isService && l.quantity > 0) : credit ? inv.lines.filter((l) => l.taxable > 0) : inv.lines;
@@ -196,13 +210,25 @@ function NoteSheet({ type, inv, onClose }: { type: "CREDIT_NOTE" | "DEBIT_NOTE";
     setBusy(true);
     setError(null);
     try {
-      const res = await send<{ note: { id: string } }>(`/api/invoices/${inv.id}/notes`, "POST", {
+      const putBack = canRestock && kind === "return" && restock !== "none" ? restock : null;
+      const res = await send<{ note: { id: string }; restocked?: { productId: string; qty: number }[] }>(`/api/invoices/${inv.id}/notes`, "POST", {
         type,
         kind,
         reason: reason.trim(),
         lines: kind === "cancel" ? [] : body,
+        ...(putBack ? { restock: putBack } : {}),
       });
-      router.push(`/admin/invoices/${res.note.id}`);
+      if (!putBack) return router.push(`/admin/invoices/${res.note.id}`);
+      const back = res.restocked ?? [];
+      const units = back.reduce((a, r) => a + r.qty, 0);
+      const where = putBack === "good" ? "back on the shelf" : `in the damaged bin (${putBack})`;
+      setRestocked({
+        noteId: res.note.id,
+        text: back.length
+          ? `${units} unit${units === 1 ? "" : "s"} of ${back.length} product${back.length === 1 ? "" : "s"} put ${where}.`
+          : "Nothing went back into stock: the order isn't delivered yet, or these goods already came back.",
+      });
+      setBusy(false);
     } catch (e) {
       setError(errText(e));
       setBusy(false);
@@ -210,6 +236,26 @@ function NoteSheet({ type, inv, onClose }: { type: "CREDIT_NOTE" | "DEBIT_NOTE";
   }
 
   const total = taxable + tax;
+  if (restocked) {
+    return (
+      <Sheet
+        title="Credit note issued"
+        onClose={() => router.push(`/admin/invoices/${restocked.noteId}`)}
+        footer={
+          <div className="flex justify-end">
+            <button type="button" className="btn btn-kesar btn-sm" onClick={() => router.push(`/admin/invoices/${restocked.noteId}`)}>
+              Open credit note
+            </button>
+          </div>
+        }
+      >
+        <div className="rounded-2xl bg-[var(--mint-tint)] p-3 text-sm text-[var(--mint-text)] flex items-start gap-2" role="status">
+          <Icon name="check" className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{restocked.text}</span>
+        </div>
+      </Sheet>
+    );
+  }
   return (
     <Sheet
       title={credit ? `Credit note on ${inv.number}` : `Debit note on ${inv.number}`}
@@ -318,6 +364,35 @@ function NoteSheet({ type, inv, onClose }: { type: "CREDIT_NOTE" | "DEBIT_NOTE";
         </div>
       )}
 
+      {kind === "return" && canRestock && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-[var(--ink-2)]">Goods back in stock?</p>
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Goods back in stock?">
+            {RESTOCK.map((o) => (
+              <button
+                key={o.key}
+                type="button"
+                role="radio"
+                aria-checked={restock === o.key}
+                onClick={() => setRestock(o.key)}
+                className={`min-h-[44px] rounded-2xl border px-3 py-2 text-left text-sm font-semibold transition ${
+                  restock === o.key ? "border-mor bg-[var(--mint-tint)]" : "border-[var(--line)] bg-white"
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-[var(--muted)]">
+            {restock === "good"
+              ? "Goes back into the loading warehouse, in the batch it was sold from."
+              : restock === "none"
+                ? "Stock stays as it is."
+                : "Goes to the damaged bin. Clear it from Stock later."}
+          </p>
+        </div>
+      )}
+
       <Field label="Reason" hint="Prints on the note and shows in the khata.">
         <input
           className="input"
@@ -332,7 +407,16 @@ function NoteSheet({ type, inv, onClose }: { type: "CREDIT_NOTE" | "DEBIT_NOTE";
       </Field>
       <div className="flex flex-wrap gap-1.5 -mt-2">
         {REASONS[credit ? kind : "debit"].map((s) => (
-          <button key={s} type="button" className="chip !py-1" onClick={() => setReason(s)}>
+          <button
+            key={s}
+            type="button"
+            className="chip !py-1"
+            onClick={() => {
+              setReason(s);
+              if (s === "Damaged goods") setRestock("damaged");
+              else if (s === "Expired goods") setRestock("expired");
+            }}
+          >
             {s}
           </button>
         ))}
