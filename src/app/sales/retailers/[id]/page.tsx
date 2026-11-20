@@ -1,143 +1,43 @@
-"use client";
+import { getSession } from "@/lib/auth";
+import { getDb } from "@/lib/tenant";
+import InvoiceList, { dueByNumber } from "@/components/InvoiceList";
+import RetailerDetail from "./RetailerDetail";
 
-import { useEffect, useState, use as usePromise } from "react";
-import { useRouter } from "next/navigation";
-import OrderBuilder, { ProductLite } from "@/components/OrderBuilder";
-import { STATUS_COLOR } from "@/lib/orders";
-import { useLanguage } from "@/lib/i18n/LanguageProvider";
-import type { OrderStatus as OrderStatusKey } from "@/generated/prisma/client";
+/** Retailer screen for the sales agent; the last 5 invoices are read here (only for the agent's own retailers). */
+export default async function RetailerDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const db = await getDb();
+  const session = await getSession();
+  const [agent, retailer] = await Promise.all([
+    db.salesAgentProfile.findUnique({ where: { userId: session!.userId }, select: { id: true } }),
+    db.retailerProfile.findUnique({ where: { id }, select: { salesAgentId: true } }),
+  ]);
+  const mine = !!agent && retailer?.salesAgentId === agent.id;
 
-type RetailerDetail = {
-  id: string;
-  outletName: string;
-  shopNumber: string;
-  complexName: string;
-  pinCode: string;
-  user: { phone: string | null };
-  area: { name: string };
-  orders: {
-    id: string;
-    orderNumber: string;
-    status: OrderStatusKey;
-    totalAmount: number;
-    createdAt: string;
-    items: unknown[];
-  }[];
-  visits: { id: string; checkInAt: string; checkOutAt: string | null }[];
-};
-
-export default function RetailerDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = usePromise(params);
-  const router = useRouter();
-  const { t } = useLanguage();
-  const [retailer, setRetailer] = useState<RetailerDetail | null>(null);
-  const [products, setProducts] = useState<ProductLite[]>([]);
-  const [showOrder, setShowOrder] = useState(false);
-
-  async function load() {
-    const d = await fetch(`/api/sales/retailers/${id}`).then((r) => r.json());
-    setRetailer(d.retailer);
-    setProducts(d.products ?? []);
-  }
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  async function placeOrder(items: { productId: string; quantity: number }[]) {
-    const openVisit = retailer?.visits.find((v) => !v.checkOutAt);
-    const res = await fetch("/api/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items, retailerId: id, visitId: openVisit?.id }),
+  let invoices: React.ReactNode = null;
+  if (mine) {
+    const rows = await db.invoice.findMany({
+      where: { retailerId: id },
+      orderBy: [{ date: "desc" }, { number: "desc" }],
+      take: 5,
+      select: {
+        id: true,
+        type: true,
+        number: true,
+        date: true,
+        total: true,
+        order: { select: { orderNumber: true } },
+        original: { select: { number: true } },
+      },
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
-    router.push(`/sales/orders`);
-  }
-
-  async function checkOutVisit(visitId: string) {
-    await fetch(`/api/visits/${visitId}/checkout`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: "{}" });
-    await load();
-  }
-
-  if (!retailer) return <p className="text-sm text-foreground/50">Loading…</p>;
-
-  const openVisit = retailer.visits.find((v) => !v.checkOutAt);
-
-  if (showOrder) {
-    return (
+    const due = await dueByNumber(db, rows.map((r) => r.number));
+    invoices = (
       <div>
-        <button className="text-sm text-brand-dark mb-3" onClick={() => setShowOrder(false)}>
-          ← Back to {retailer.outletName}
-        </button>
-        <OrderBuilder products={products} onSubmitAction={placeOrder} submitLabel="Place order for retailer" />
+        <p className="text-sm font-semibold mb-2">Recent invoices</p>
+        <InvoiceList rows={rows.map((r) => ({ ...r, due: due.get(r.number) ?? null }))} hrefBase="/sales/invoices" />
       </div>
     );
   }
 
-  return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold">{retailer.outletName}</h1>
-        <p className="text-sm text-foreground/50">
-          Shop {retailer.shopNumber}, {retailer.complexName} · {retailer.area.name}
-        </p>
-        {retailer.user.phone && (
-          <p className="text-sm text-foreground/50">📞 {retailer.user.phone}</p>
-        )}
-      </div>
-
-      {openVisit && (
-        <div className="card p-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs text-foreground/50">Visit in progress</p>
-            <p className="text-sm font-medium">
-              Checked in {new Date(openVisit.checkInAt).toLocaleTimeString()}
-            </p>
-          </div>
-          <button
-            onClick={() => checkOutVisit(openVisit.id)}
-            className="rounded-xl bg-black/5 text-sm font-medium px-3 py-2"
-          >
-            Check out
-          </button>
-        </div>
-      )}
-
-      <button
-        onClick={() => setShowOrder(true)}
-        className="w-full rounded-xl bg-brand text-white font-medium py-3"
-      >
-        Capture order
-      </button>
-
-      <div>
-        <p className="text-sm font-semibold mb-2">Recent orders</p>
-        <div className="space-y-2">
-          {retailer.orders.map((o) => (
-            <div key={o.id} className="card p-3 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">{o.orderNumber}</p>
-                <p className="text-xs text-foreground/50">
-                  {new Date(o.createdAt).toLocaleDateString()} · ₹{o.totalAmount.toFixed(2)}
-                </p>
-              </div>
-              <span className={`text-xs font-medium px-2 py-1 rounded-full ${STATUS_COLOR[o.status]}`}>
-                {t(`status.${o.status}`)}
-              </span>
-            </div>
-          ))}
-          {retailer.orders.length === 0 && (
-            <p className="text-sm text-foreground/50">No orders yet.</p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  return <RetailerDetail id={id} invoices={invoices} />;
 }

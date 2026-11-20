@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci_admin
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+
+    env:
+      # The app connects as a NON-superuser role, exactly as in production —
+      # superusers bypass row-level security and would hide isolation bugs.
+      DATABASE_URL: postgresql://setu:setu_ci@localhost:5432/setu?schema=public
+      SESSION_SECRET: ci-only-secret-not-used-anywhere-else
+      PLATFORM_DOMAIN: localhost
+      DEFAULT_TENANT_SLUG: demo
+      JOBS_DISABLED: "1"
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Create app database role
+        env:
+          PGPASSWORD: ci_admin
+        run: |
+          psql -h localhost -U postgres -c "CREATE ROLE setu LOGIN PASSWORD 'setu_ci' CREATEDB NOSUPERUSER NOBYPASSRLS;"
+          psql -h localhost -U postgres -c "CREATE DATABASE setu OWNER setu;"
+          psql -h localhost -U postgres -c "CREATE DATABASE setu_shadow OWNER setu;"
+
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Migrations apply cleanly
+        run: npx prisma migrate deploy
+      - name: Schema matches migrations
+        run: npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url "postgresql://setu:setu_ci@localhost:5432/setu_shadow" --exit-code
+      - run: npm run db:seed
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build

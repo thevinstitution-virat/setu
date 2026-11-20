@@ -64,7 +64,7 @@ function TimelineRow({
   return (
     <div className="flex gap-3">
       <div className="flex flex-col items-center">
-        <div className={`h-3 w-3 rounded-full ${done ? "bg-brand" : "bg-black/15"}`} />
+        <div className={`h-3 w-3 rounded-full ${done ? "bg-[var(--mint)]" : "bg-black/15"}`} />
         <div className="w-px flex-1 bg-black/10" />
       </div>
       <div className="pb-3">

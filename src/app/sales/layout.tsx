@@ -1,20 +1,27 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
+import { pageSession } from "@/lib/guard";
 import AppShell, { type NavItem } from "@/components/AppShell";
+import { layoutChrome } from "@/lib/chrome";
+import DutyTracker from "@/components/field/DutyTracker";
 
 const nav: NavItem[] = [
-  { href: "/sales", labelKey: "nav.today", icon: "📍" },
-  { href: "/sales/beat", labelKey: "nav.beat", icon: "🗺️" },
-  { href: "/sales/orders", labelKey: "nav.orders", icon: "📦" },
-  { href: "/sales/attendance", labelKey: "nav.attendance", icon: "🕒" },
+  { href: "/sales", labelKey: "nav.today", icon: "pin" },
+  { href: "/sales/beat", labelKey: "nav.beat", icon: "route" },
+  { href: "/sales/orders", labelKey: "nav.orders", icon: "box" },
+  { href: "/sales/stores", labelKey: "nav.shops", icon: "plus" },
+  { href: "/sales/targets", labelKey: "nav.targets", icon: "chart" },
+  { href: "/sales/attendance", labelKey: "nav.attendance", icon: "clock" },
 ];
 
 export default async function SalesLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession();
+  const session = await pageSession();
   if (!session || session.role !== "SALES_AGENT") redirect("/login");
 
+  const chrome = await layoutChrome(session, nav);
+
   return (
-    <AppShell nav={nav} userName={session.name} roleKey="role.salesAgent">
+    <AppShell chrome={chrome} nav={nav} userName={session.name} roleKey="role.salesAgent">
+      <DutyTracker />
       {children}
     </AppShell>
   );

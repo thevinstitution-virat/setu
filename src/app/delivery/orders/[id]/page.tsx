@@ -1,147 +1,38 @@
-"use client";
+import { getSession } from "@/lib/auth";
+import { getDb, requireTenant } from "@/lib/tenant";
+import { deliverySettings } from "@/lib/delivery-settings";
+import DeliverOrder from "./DeliverOrder";
+import type { DeliveryInvoice } from "./DeliveryInvoiceCard";
 
-import { useEffect, useState, use as usePromise } from "react";
-import { useRouter } from "next/navigation";
-import SignaturePad from "@/components/SignaturePad";
-import { getLocation } from "@/lib/geo";
-
-type OrderDetail = {
-  id: string;
-  orderNumber: string;
-  status: string;
-  totalAmount: number;
-  retailer: { outletName: string; shopNumber: string; complexName: string; user: { phone: string | null } };
-  items: { id: string; quantity: number; price: number; product: { name: string } }[];
-};
-
-export default function DeliverOrderPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = usePromise(params);
-  const router = useRouter();
-  const [order, setOrder] = useState<OrderDetail | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "ONLINE" | "CREDIT">("CASH");
-  const [signature, setSignature] = useState<string | null>(null);
-  const [photo, setPhoto] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch(`/api/orders/${id}`)
-      .then((r) => r.json())
-      .then((d) => setOrder(d.order));
-  }, [id]);
-
-  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setPhoto(reader.result as string);
-    reader.readAsDataURL(file);
-  }
-
-  async function complete() {
-    setError(null);
-    setLoading(true);
-    try {
-      const loc = await getLocation();
-      const res = await fetch(`/api/orders/${id}/deliver`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          paymentMethod,
-          codAmount: paymentMethod === "CASH" ? order?.totalAmount : 0,
-          podPhotoUrl: photo,
-          podSignatureData: signature,
-          ...loc,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      router.push("/delivery");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  if (!order) return <p className="text-sm text-foreground/50">Loading…</p>;
-
-  if (order.status === "DELIVERED") {
-    return <p className="text-sm text-emerald-700 font-medium">This order has already been delivered.</p>;
-  }
+/**
+ * Delivery screen. The order itself loads on the client (/api/orders/[id]);
+ * the invoice issued at dispatch (or at delivery) and the stop's trip are
+ * read here, only for the agent the order is assigned to.
+ */
+export default async function DeliverOrderPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const [db, session, tenant] = await Promise.all([getDb(), getSession(), requireTenant()]);
+  const [agent, delivery] = await Promise.all([
+    db.deliveryAgentProfile.findUnique({ where: { userId: session!.userId }, select: { id: true } }),
+    db.delivery.findUnique({ where: { orderId: id }, select: { deliveryAgentId: true, trip: { select: { status: true } } } }),
+  ]);
+  const mine = !!agent && delivery?.deliveryAgentId === agent.id;
+  const rows = mine
+    ? await db.invoice.findMany({
+        where: { orderId: id },
+        orderBy: { date: "asc" },
+        select: { id: true, type: true, number: true, total: true, ewbNo: true, ewbVehicle: true, ewbValidUntil: true },
+      })
+    : [];
+  const invoices: DeliveryInvoice[] = rows.map((r) => ({ ...r, ewbValidUntil: r.ewbValidUntil?.toISOString() ?? null }));
+  const { photoRequired } = deliverySettings(tenant.settings);
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold">{order.retailer.outletName}</h1>
-        <p className="text-sm text-foreground/50">
-          Shop {order.retailer.shopNumber}, {order.retailer.complexName}
-        </p>
-        {order.retailer.user.phone && (
-          <p className="text-sm text-foreground/50">📞 {order.retailer.user.phone}</p>
-        )}
-      </div>
-
-      <div className="card p-4">
-        <p className="text-sm font-semibold mb-2">{order.orderNumber}</p>
-        <div className="space-y-1">
-          {order.items.map((item) => (
-            <div key={item.id} className="flex justify-between text-sm">
-              <span>
-                {item.product.name} × {item.quantity}
-              </span>
-              <span>₹{(item.price * item.quantity).toFixed(2)}</span>
-            </div>
-          ))}
-        </div>
-        <div className="border-t border-black/5 mt-2 pt-2 flex justify-between font-semibold text-sm">
-          <span>Total</span>
-          <span>₹{order.totalAmount.toFixed(2)}</span>
-        </div>
-      </div>
-
-      <div className="card p-4 space-y-3">
-        <p className="text-sm font-semibold">Payment collection</p>
-        <div className="flex gap-2">
-          {(["CASH", "ONLINE", "CREDIT"] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => setPaymentMethod(m)}
-              className={`flex-1 rounded-xl py-2 text-sm font-medium ${
-                paymentMethod === m ? "bg-brand text-white" : "bg-black/5 text-foreground/70"
-              }`}
-            >
-              {m === "CASH" ? "Cash" : m === "ONLINE" ? "Online" : "Credit"}
-            </button>
-          ))}
-        </div>
-        {paymentMethod === "CASH" && (
-          <p className="text-sm text-foreground/60">Collect ₹{order.totalAmount.toFixed(2)} in cash.</p>
-        )}
-      </div>
-
-      <div className="card p-4 space-y-3">
-        <p className="text-sm font-semibold">Proof of delivery</p>
-        <SignaturePad onChangeAction={setSignature} />
-        <label className="block">
-          <span className="text-xs text-foreground/50">Delivery photo (optional)</span>
-          <input type="file" accept="image/*" capture="environment" onChange={handlePhoto} className="block text-sm mt-1" />
-        </label>
-        {photo && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={photo} alt="Proof of delivery" className="rounded-lg max-h-32" />
-        )}
-      </div>
-
-      {error && <p className="text-sm text-red-600">{error}</p>}
-
-      <button
-        onClick={complete}
-        disabled={loading}
-        className="w-full rounded-xl bg-brand text-white font-medium py-3 disabled:opacity-60"
-      >
-        {loading ? "Completing…" : "Mark delivered"}
-      </button>
-    </div>
+    <DeliverOrder
+      id={id}
+      invoices={invoices}
+      photoRequired={photoRequired}
+      tripStatus={mine ? (delivery?.trip?.status ?? null) : null}
+    />
   );
 }

@@ -1,27 +1,14 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { stockMutation, optStr } from "@/lib/stock-api";
+import { optNum } from "@/lib/field-api";
+import { endVisit } from "@/lib/field";
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await getSession();
-  if (!session || session.role !== "SALES_AGENT") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+/** Body: { reason? (needed when no order was placed on the visit), note?, lat?, lng? } */
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const agent = await prisma.salesAgentProfile.findUnique({ where: { userId: session.userId } });
-  const visit = await prisma.visit.findUnique({ where: { id } });
-  if (!agent || !visit || visit.salesAgentId !== agent.id) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  const body = await req.json().catch(() => ({}));
-  const updated = await prisma.visit.update({
-    where: { id },
-    data: { checkOutAt: new Date(), notes: body?.notes },
-  });
-
-  return NextResponse.json({ visit: updated });
+  return stockMutation(
+    req,
+    "visit.end",
+    (ctx, b) => endVisit(ctx, { userId: ctx.actorId!, role: "SALES_AGENT" }, id, { reason: b.reason, note: optStr(b.note ?? b.notes, 500), lat: optNum(b.lat), lng: optNum(b.lng) }),
+    { perm: "field.work", entity: "Visit", entityId: id }
+  );
 }
