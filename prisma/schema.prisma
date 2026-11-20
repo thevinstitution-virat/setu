@@ -26,6 +26,8 @@ enum Role {
   RETAILER
   SALES_AGENT
   DELIVERY_AGENT
+  /// Leads a team of field staff (sales agents, drivers): attendance, beats, leave, targets, reports.
+  SUPERVISOR
 }
 
 enum OrderStatus {
@@ -53,54 +55,129 @@ enum TenantStatus {
   TRIAL
   ACTIVE
   SUSPENDED
+  /// Data purged after a deletion request (DPDP). The row stays as a tombstone for our own invoices.
+  CLOSED
 }
 
 // ───────────────────────────── Platform tables ─────────────────────────────
 
 model Tenant {
-  id        String       @id @default(cuid())
-  slug      String       @unique // subdomain: <slug>.<PLATFORM_DOMAIN>
-  name      String       // display / brand name
-  legalName String?
-  gstin     String?
-  stateCode String?      // GST state code, e.g. "27" for Maharashtra
-  address   String?
-  phone     String?
-  status    TenantStatus @default(TRIAL)
-  plan      String       @default("trial")
+  id                String       @id @default(cuid())
+  slug              String       @unique // subdomain: <slug>.<PLATFORM_DOMAIN>
+  name              String // display / brand name
+  legalName         String?
+  gstin             String?
+  stateCode         String? // GST state code, e.g. "27" for Maharashtra
+  address           String?
+  phone             String?
+  status            TenantStatus @default(TRIAL)
+  plan              String       @default("trial")
   /// White-label settings: { primary, accent, logoUrl, shortName, ... }
-  brand     Json         @default("{}")
+  brand             Json         @default("{}")
   /// Business rules: { orderCutoff, slots, minOrderPaise, ... }
-  settings  Json         @default("{}")
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  settings          Json         @default("{}")
+  /// Platform overrides of the plan: { features: { inventory: true }, limits: { staff: 80 } }
+  overrides         Json         @default("{}")
+  /// Set-up checklist steps the owner ticked off or skipped.
+  onboarding        Json         @default("{}")
+  suspendedAt       DateTime?
+  suspendReason     String?
+  /// Owner asked to delete the business; data is purged after deleteAfter unless cancelled.
+  deleteRequestedAt DateTime?
+  deleteAfter       DateTime?
+  closedAt          DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
-  domains           TenantDomain[]
-  users             User[]
-  regions           Region[]
-  areas             Area[]
-  retailers         RetailerProfile[]
-  salesAgents       SalesAgentProfile[]
-  beats             Beat[]
-  deliveryAgents    DeliveryAgentProfile[]
-  products          Product[]
-  orders            Order[]
-  orderItems        OrderItem[]
-  orderStatusEvents OrderStatusEvent[]
-  visits            Visit[]
-  attendance        Attendance[]
-  deliveries        Delivery[]
-  otpChallenges     OtpChallenge[]
-  counters          Counter[]
-  auditLogs         AuditLog[]
-  ledgerAccounts    LedgerAccount[]
-  journalEntries    JournalEntry[]
-  ledgerLines       LedgerLine[]
-  bills             Bill[]
-  payments          Payment[]
-  allocations       PaymentAllocation[]
-  cheques           Cheque[]
-  cashHandovers     CashHandover[]
+  domains            TenantDomain[]
+  users              User[]
+  regions            Region[]
+  areas              Area[]
+  retailers          RetailerProfile[]
+  salesAgents        SalesAgentProfile[]
+  beats              Beat[]
+  deliveryAgents     DeliveryAgentProfile[]
+  products           Product[]
+  orders             Order[]
+  orderItems         OrderItem[]
+  orderStatusEvents  OrderStatusEvent[]
+  visits             Visit[]
+  attendance         Attendance[]
+  deliveries         Delivery[]
+  otpChallenges      OtpChallenge[]
+  counters           Counter[]
+  auditLogs          AuditLog[]
+  ledgerAccounts     LedgerAccount[]
+  journalEntries     JournalEntry[]
+  ledgerLines        LedgerLine[]
+  bills              Bill[]
+  payments           Payment[]
+  allocations        PaymentAllocation[]
+  cheques            Cheque[]
+  cashHandovers      CashHandover[]
+  brands             Brand[]
+  categories         Category[]
+  hsnCodes           HsnCode[]
+  priceLists         PriceList[]
+  priceListItems     PriceListItem[]
+  retailerPrices     RetailerPrice[]
+  retailerGroups     RetailerGroup[]
+  groupMembers       RetailerGroupMember[]
+  schemes            Scheme[]
+  redemptions        SchemeRedemption[]
+  banners            Banner[]
+  invoices           Invoice[]
+  invoiceLines       InvoiceLine[]
+  vehicles           Vehicle[]
+  trips              Trip[]
+  returnables        Returnable[]
+  returnableMoves    ReturnableMove[]
+  dutyShifts         DutyShift[]
+  stockLocations     StockLocation[]
+  stockLots          StockLot[]
+  stockMoves         StockMove[]
+  suppliers          Supplier[]
+  purchaseOrders     PurchaseOrder[]
+  poLines            PurchaseOrderLine[]
+  purchases          Purchase[]
+  purchaseLines      PurchaseLine[]
+  beatRetailers      BeatRetailer[]
+  beatPlans          BeatPlan[]
+  locationPings      LocationPing[]
+  leaveRequests      LeaveRequest[]
+  storeLeads         StoreLead[]
+  targets            Target[]
+  handoffUses        HandoffUse[]
+  notifications      Notification[]
+  messages           MessageLog[]
+  pushSubscriptions  PushSubscription[]
+  messageTemplates   MessageTemplate[]
+  tickets            Ticket[]
+  ticketMessages     TicketMessage[]
+  feedback           DeliveryFeedback[]
+  referrals          Referral[]
+  announcements      Announcement[]
+  paymentIntents     PaymentIntent[]
+  gatewayEvents      GatewayEvent[]
+  gatewaySettlements GatewaySettlement[]
+  bankStatements     BankStatement[]
+  bankLines          BankLine[]
+  apiKeys            ApiKey[]
+  webhookEndpoints   WebhookEndpoint[]
+  webhookDeliveries  WebhookDelivery[]
+  geoCache           GeoCache[]
+  subscription       Subscription?
+  usage              UsageCounter[]
+  suggestions        Suggestion[]
+  visitTasks         VisitTask[]
+  automationRuns     AutomationRun[]
+  aiCosts            AiCostLog[]
+  orderDrafts        OrderDraft[]
+  photoChecks        PhotoCheck[]
+  shelfAudits        ShelfAudit[]
+  platformInvoices   PlatformInvoice[]
+  supportSessions    SupportSession[]
+  exports            TenantExport[]
 }
 
 /// Custom domains a tenant has verified (e.g. order.agencyname.in).
@@ -108,9 +185,23 @@ model TenantDomain {
   id         String    @id @default(cuid())
   tenantId   String
   tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  host       String    @unique
+  /// Several businesses may claim the same address while unverified (each gets its own
+  /// token), so nobody can squat it; the first to prove it in DNS wins (verifiedHost).
+  host       String
+  /// = host once verified, else null. Unique: one business per live address.
+  verifiedHost String?  @unique
+  /// Value the owner puts in a TXT record at _setu-verify.<host>.
+  token      String    @default(cuid())
   verifiedAt DateTime?
+  checkedAt  DateTime?
+  lastError  String?
+  /// Certificate / proxy hook result.
+  tlsStatus  String?
   createdAt  DateTime  @default(now())
+
+  @@unique([tenantId, host])
+  @@index([tenantId])
+  @@index([host])
 }
 
 // ───────────────────────────── Tenant tables ─────────────────────────────
@@ -126,21 +217,53 @@ model User {
   passwordHash String?
   role         Role
   active       Boolean  @default(true)
+  /// The hidden login platform support uses inside this business (audited support sessions). Not a seat, never listed.
+  isSupport    Boolean  @default(false)
+  /// Bumped to end every signed-in session of this person ("sign out everywhere"); sessions carry it as sv.
+  sessionVersion Int    @default(0)
   createdAt    DateTime @default(now())
+  /// The supervisor this person reports to (field staff). Supervisors see and manage their team.
+  supervisorId String?
+  supervisor   User?    @relation("Team", fields: [supervisorId], references: [id])
+  team         User[]   @relation("Team")
 
   retailerProfile      RetailerProfile?
   salesAgentProfile    SalesAgentProfile?
   deliveryAgentProfile DeliveryAgentProfile?
 
-  orderEvents OrderStatusEvent[]
-  auditLogs   AuditLog[]
-  paymentsCollected Payment[]      @relation("PaymentCollectedBy")
-  handoversGiven    CashHandover[] @relation("HandoverStaff")
+  orderEvents       OrderStatusEvent[]
+  auditLogs         AuditLog[]
+  paymentsCollected Payment[]          @relation("PaymentCollectedBy")
+  handoversGiven    CashHandover[]     @relation("HandoverStaff")
+  attendance        Attendance[]
+  locationPings     LocationPing[]
+  leaveRequests     LeaveRequest[]     @relation("LeaveOf")
+  leaveDecisions    LeaveRequest[]     @relation("LeaveDecidedBy")
+  storeLeads        StoreLead[]        @relation("LeadBy")
+  leadDecisions     StoreLead[]        @relation("LeadDecidedBy")
+  targets           Target[]
+  shelfAuditsBy     ShelfAudit[]       @relation("ShelfAuditBy")
+  beatPlansMade     BeatPlan[]         @relation("BeatPlanBy")
+  /// Language for messages sent to this person (en | hi); follows the language toggle.
+  lang              String             @default("en")
+  /// What this person turned off: channels (sms, whatsapp, push) and topics (reminders, promo).
+  mutes             String[]           @default([])
+  notifications     Notification[]
+  pushSubscriptions PushSubscription[]
+  ticketsRaised     Ticket[]           @relation("TicketBy")
+  ticketsAssigned   Ticket[]           @relation("TicketAssignee")
+  ticketMessages    TicketMessage[]
+  announcementsMade Announcement[]
+  paymentIntents    PaymentIntent[]    @relation("IntentBy")
+  bankStatements    BankStatement[]
+  apiKeys           ApiKey[]
+  webhookEndpoints  WebhookEndpoint[]
 
   @@unique([tenantId, phone])
   @@unique([tenantId, email])
   @@unique([tenantId, loginId])
   @@index([tenantId, role])
+  @@index([tenantId, supervisorId])
 }
 
 model Region {
@@ -163,39 +286,82 @@ model Area {
 
   retailers RetailerProfile[]
   beats     Beat[]
+  leads     StoreLead[]
 
   @@unique([regionId, name])
   @@index([tenantId])
 }
 
 model RetailerProfile {
-  id           String             @id @default(cuid())
-  tenantId     String             @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant       Tenant             @relation(fields: [tenantId], references: [id])
-  userId       String             @unique
-  user         User               @relation(fields: [userId], references: [id])
-  outletName   String
-  shopNumber   String
-  complexName  String
-  pinCode      String
-  areaId       String
-  area         Area               @relation(fields: [areaId], references: [id])
-  salesAgentId String?
-  salesAgent   SalesAgentProfile? @relation(fields: [salesAgentId], references: [id])
+  id             String             @id @default(cuid())
+  tenantId       String             @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant         Tenant             @relation(fields: [tenantId], references: [id])
+  userId         String             @unique
+  user           User               @relation(fields: [userId], references: [id])
+  outletName     String
+  shopNumber     String
+  complexName    String
+  pinCode        String
+  areaId         String
+  area           Area               @relation(fields: [areaId], references: [id])
+  salesAgentId   String?
+  salesAgent     SalesAgentProfile? @relation(fields: [salesAgentId], references: [id])
   /// null = use the tenant default (settings.money.defaultPaymentMode)
-  paymentMode  PaymentMode?
+  paymentMode    PaymentMode?
   /// Credit limit in paise. null = tenant default; 0 = no credit.
-  creditLimit  Int?
+  creditLimit    Int?
   /// Days a bill may stay unpaid before it is overdue. null = tenant default.
-  creditDays   Int?
-  createdAt    DateTime           @default(now())
+  creditDays     Int?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @default(now()) @updatedAt
+  /// Where the map pin came from: gps (on site), address (looked up), manual.
+  locationSource String?
 
-  orders   Order[]
-  visits   Visit[]
-  bills    Bill[]
-  payments Payment[]
-  accounts LedgerAccount[]
+  priceListId String?
+  priceList   PriceList? @relation(fields: [priceListId], references: [id])
 
+  /// GST registration of the shop (B2B invoices). null = unregistered (B2C).
+  gstin     String?
+  /// Legal name as on the GST certificate; null = outlet name.
+  legalName String?
+  /// GST state code of the shop (place of supply); null = the tenant's state.
+  stateCode String?
+
+  /// Shop location, captured from the first delivery (or set by the office); used for route order.
+  lat          Float?
+  lng          Float?
+  /// How the shop wants goods handed over; shown to the driver.
+  deliveryPref DeliveryPref?
+  /// Free-text note for the driver ("back gate after 2 PM").
+  deliveryNote String?
+  /// Food licence number (FSSAI, 14 digits), when the shop has one.
+  fssai        String?
+  /// Shop front photo (storage key), e.g. from the field store form.
+  photoKey     String?
+
+  orders          Order[]
+  invoices        Invoice[]
+  visits          Visit[]
+  visitTasks      VisitTask[]
+  orderDrafts     OrderDraft[]
+  shelfAudits     ShelfAudit[]
+  groups          RetailerGroupMember[]
+  prices          RetailerPrice[]
+  bills           Bill[]
+  payments        Payment[]
+  tickets         Ticket[]
+  feedback        DeliveryFeedback[]
+  /// Code other shops enter when they sign up (refer and earn). Made on first use.
+  referralCode    String?
+  referralsMade   Referral[]            @relation("Referrer")
+  referredBy      Referral?             @relation("Referee")
+  accounts        LedgerAccount[]
+  returnableMoves ReturnableMove[]
+  beats           BeatRetailer[]
+  lead            StoreLead?
+  paymentIntents  PaymentIntent[]
+
+  @@unique([tenantId, referralCode])
   @@index([tenantId, areaId])
   @@index([tenantId, salesAgentId])
 }
@@ -207,14 +373,17 @@ model SalesAgentProfile {
   userId   String @unique
   user     User   @relation(fields: [userId], references: [id])
 
-  beats      Beat[]
-  retailers  RetailerProfile[]
-  visits     Visit[]
-  attendance Attendance[]
+  beats     Beat[]
+  retailers RetailerProfile[]
+  visits    Visit[]
+  beatPlans BeatPlan[]
+  leads     StoreLead[]
+  tasks     VisitTask[]
 
   @@index([tenantId])
 }
 
+/// A route of shops a sales agent covers, usually on fixed weekdays.
 model Beat {
   id           String            @id @default(cuid())
   tenantId     String            @default(dbgenerated("current_setting('app.tenant_id'::text)"))
@@ -224,8 +393,53 @@ model Beat {
   salesAgent   SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
   areaId       String
   area         Area              @relation(fields: [areaId], references: [id])
+  /// Usual days, 0 = Sunday … 6 = Saturday. A dated plan for a day overrides these.
+  weekdays     Int[]             @default([])
+  active       Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+
+  shops BeatRetailer[]
+  plans BeatPlan[]
 
   @@index([tenantId])
+  @@index([tenantId, salesAgentId])
+}
+
+/// A shop on a beat, in visiting order.
+model BeatRetailer {
+  id         String          @id @default(cuid())
+  tenantId   String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant          @relation(fields: [tenantId], references: [id])
+  beatId     String
+  beat       Beat            @relation(fields: [beatId], references: [id], onDelete: Cascade)
+  retailerId String
+  retailer   RetailerProfile @relation(fields: [retailerId], references: [id])
+  seq        Int             @default(0)
+
+  @@unique([beatId, retailerId])
+  @@index([tenantId, retailerId])
+}
+
+/// The beat an agent works on a given day (overrides the beat's usual weekdays).
+model BeatPlan {
+  id           String            @id @default(cuid())
+  tenantId     String            @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
+  salesAgentId String
+  salesAgent   SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
+  /// IST day, YYYY-MM-DD.
+  date         String
+  /// null = no beat that day (e.g. office day).
+  beatId       String?
+  beat         Beat?             @relation(fields: [beatId], references: [id])
+  note         String?
+  createdById  String?
+  createdBy    User?             @relation("BeatPlanBy", fields: [createdById], references: [id])
+  createdAt    DateTime          @default(now())
+  visits       Visit[]
+
+  @@unique([tenantId, salesAgentId, date])
+  @@index([tenantId, date])
 }
 
 model DeliveryAgentProfile {
@@ -236,62 +450,122 @@ model DeliveryAgentProfile {
   user     User   @relation(fields: [userId], references: [id])
 
   deliveries Delivery[]
+  trips      Trip[]
 
   @@index([tenantId])
 }
 
 model Product {
-  id           String  @id @default(cuid())
-  tenantId     String  @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant       Tenant  @relation(fields: [tenantId], references: [id])
-  name         String
-  sku          String
-  category     String
-  unit         String
-  /// Selling rate before GST, in paise.
-  price        Int
+  id              String    @id @default(cuid())
+  tenantId        String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  name            String
+  /// Hindi name (Devanagari) — shown in Hindi and used for search.
+  nameHi          String?
+  /// Extra search words, comma separated (local names, misspellings).
+  aliases         String?
+  description     String?
+  sku             String
+  categoryId      String
+  category        Category  @relation(fields: [categoryId], references: [id])
+  brandId         String?
+  brand           Brand?    @relation(fields: [brandId], references: [id])
+  hsnCode         String?
+  /// Base selling unit (piece, pack, kg …). Prices and quantities are per base unit.
+  unit            String
+  /// Optional bigger pack, e.g. "box" of caseSize base units.
+  caseUnit        String?
+  caseSize        Int?
+  /// Minimum order quantity in base units.
+  moq             Int       @default(1)
+  /// Default selling rate before GST, in paise (price lists and retailer prices override it).
+  price           Int
   /// Maximum retail price, in paise.
-  mrp          Int
-  gstRate      Float   @default(0)
-  specialOffer String?
-  imageUrl     String?
-  active       Boolean @default(true)
+  mrp             Int
+  /// GST %. Kept in sync with the HSN code's rate when one is set.
+  gstRate         Float     @default(0)
+  specialOffer    String?
+  /// Storage keys of product photos; the first is the main one.
+  images          String[]  @default([])
+  /// Empty = visible to every area / group.
+  visibleAreaIds  String[]  @default([])
+  visibleGroupIds String[]  @default([])
+  sort            Int       @default(0)
+  active          Boolean   @default(true)
+  /// Stock (Phase 5): alert and suggest a purchase order when available stock falls to this level (base units).
+  reorderLevel    Int?
+  /// Quantity to order when reordering (base units). null = enough to reach twice the reorder level.
+  reorderQty      Int?
+  /// Usual supplier (principal company) for purchase orders.
+  supplierId      String?
+  supplier        Supplier? @relation(fields: [supplierId], references: [id])
+  /// Batch expiry date is required when goods are received.
+  trackExpiry     Boolean   @default(false)
+  /// Last purchase cost per base unit before GST, in paise.
+  lastCost        Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
 
-  orderItems OrderItem[]
+  orderItems     OrderItem[]
+  priceListItems PriceListItem[]
+  retailerPrices RetailerPrice[]
+  stockLots      StockLot[]
+  stockMoves     StockMove[]
+  poLines        PurchaseOrderLine[]
+  purchaseLines  PurchaseLine[]
 
   @@unique([tenantId, sku])
   @@index([tenantId, active])
+  @@index([tenantId, categoryId])
+  @@index([tenantId, brandId])
 }
 
 model Order {
-  id          String          @id @default(cuid())
-  tenantId    String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant      Tenant          @relation(fields: [tenantId], references: [id])
-  orderNumber String
-  retailerId  String
-  retailer    RetailerProfile @relation(fields: [retailerId], references: [id])
-  placedById  String?
-  status      OrderStatus     @default(PLACED)
-  /// Amounts in paise.
-  subtotal    Int             @default(0)
-  gstAmount   Int             @default(0)
-  totalAmount Int
-  notes       String?
+  id               String          @id @default(cuid())
+  tenantId         String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant           Tenant          @relation(fields: [tenantId], references: [id])
+  orderNumber      String
+  retailerId       String
+  retailer         RetailerProfile @relation(fields: [retailerId], references: [id])
+  placedById       String?
+  status           OrderStatus     @default(PLACED)
+  /// Amounts in paise. gross − discount + deliveryCharge = subtotal (taxable); subtotal + gst = total.
+  grossAmount      Int             @default(0)
+  discountAmount   Int             @default(0)
+  deliveryCharge   Int             @default(0)
+  /// GST % on the delivery charge at order time.
+  deliveryGstRate  Float           @default(0)
+  couponCode       String?
+  /// Delivery day chosen or assigned at order time (IST date).
+  deliveryDate     DateTime?       @db.Date
+  priceListId      String?
+  subtotal         Int             @default(0)
+  gstAmount        Int             @default(0)
+  totalAmount      Int
+  notes            String?
   /// Placed over the credit limit or with overdue bills: needs approval before it moves on.
-  creditHold       Boolean   @default(false)
+  creditHold       Boolean         @default(false)
   creditHoldReason String?
   creditApprovedBy String?
   creditApprovedAt DateTime?
   /// Prepaid: amount reserved from the wallet when the order was placed (paise).
-  walletHold  Int             @default(0)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  walletHold       Int             @default(0)
+  /// Spot sale: sold by the driver from van stock and delivered on the spot.
+  spot             Boolean         @default(false)
+  /// Total as ordered, kept when delivery cut the order short before invoicing (invoice at delivery).
+  orderedTotal     Int?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
-  items        OrderItem[]
-  bill         Bill?
-  statusEvents OrderStatusEvent[]
-  delivery     Delivery?
-  visit        Visit?
+  items          OrderItem[]
+  bill           Bill?
+  invoices       Invoice[]
+  statusEvents   OrderStatusEvent[]
+  tickets        Ticket[]
+  feedback       DeliveryFeedback?
+  delivery       Delivery?
+  visit          Visit?
+  paymentIntents PaymentIntent[]
 
   @@unique([tenantId, orderNumber])
   @@index([tenantId, status, createdAt])
@@ -299,17 +573,32 @@ model Order {
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
-  tenantId  String  @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant    Tenant  @relation(fields: [tenantId], references: [id])
-  orderId   String
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
-  quantity  Int
+  id           String  @id @default(cuid())
+  tenantId     String  @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant  @relation(fields: [tenantId], references: [id])
+  orderId      String
+  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product @relation(fields: [productId], references: [id])
+  quantity     Int
   /// Rate per unit before GST, in paise, frozen at order time.
-  price     Int
-  gstRate   Float   @default(0)
+  price        Int
+  gstRate      Float   @default(0)
+  /// Scheme discount on this line before GST, in paise.
+  discount     Int     @default(0)
+  /// MRP per unit at order time, in paise.
+  mrp          Int?
+  /// Ordered in cases: cases × caseSize = quantity.
+  cases        Int?
+  caseSize     Int?
+  /// Free goods line given by this scheme (price 0).
+  freeSchemeId String?
+  /// Quantity as ordered, kept when delivery changed the billed quantity (invoice at delivery). null = quantity.
+  orderedQty   Int?
+  /// Quantity handed over at delivery. null = not delivered yet (or delivered before line-level delivery).
+  deliveredQty Int?
+  /// Why less than ordered was delivered.
+  shortReason  String?
 
   @@index([tenantId, orderId])
 }
@@ -330,38 +619,214 @@ model OrderStatusEvent {
 }
 
 model Visit {
-  id           String            @id @default(cuid())
-  tenantId     String            @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant       Tenant            @relation(fields: [tenantId], references: [id])
-  salesAgentId String
-  salesAgent   SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
-  retailerId   String
-  retailer     RetailerProfile   @relation(fields: [retailerId], references: [id])
-  checkInAt    DateTime          @default(now())
-  checkInLat   Float?
-  checkInLng   Float?
-  checkOutAt   DateTime?
-  notes        String?
-  orderId      String?           @unique
-  order        Order?            @relation(fields: [orderId], references: [id])
+  id              String            @id @default(cuid())
+  tenantId        String            @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant          Tenant            @relation(fields: [tenantId], references: [id])
+  salesAgentId    String
+  salesAgent      SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
+  retailerId      String
+  retailer        RetailerProfile   @relation(fields: [retailerId], references: [id])
+  checkInAt       DateTime          @default(now())
+  checkInLat      Float?
+  checkInLng      Float?
+  checkOutAt      DateTime?
+  notes           String?
+  orderId         String?           @unique
+  order           Order?            @relation(fields: [orderId], references: [id])
+  checkInAccuracy Int?
+  /// Metres from the shop's map pin at check-in (null when either has no position).
+  distanceM       Int?
+  checkOutLat     Float?
+  checkOutLng     Float?
+  /// Set at check-out: an order was taken, or why not.
+  outcome         VisitOutcome?
+  /// Key from NO_ORDER_REASONS (src/lib/field-settings.ts).
+  noOrderReason   String?
+  /// The shop is not on the agent's list or today's beat.
+  offBeat         Boolean           @default(false)
+  beatPlanId      String?
+  beatPlan        BeatPlan?         @relation(fields: [beatPlanId], references: [id])
+  photoKey        String?
 
   @@index([tenantId, salesAgentId, checkInAt])
+  @@index([tenantId, retailerId, checkInAt])
 }
 
-model Attendance {
-  id           String            @id @default(cuid())
-  tenantId     String            @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant       Tenant            @relation(fields: [tenantId], references: [id])
-  salesAgentId String
-  salesAgent   SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
-  date         String
-  checkInAt    DateTime?
-  checkInLat   Float?
-  checkInLng   Float?
-  checkOutAt   DateTime?
+enum VisitOutcome {
+  ORDER
+  NO_ORDER
+}
 
-  @@unique([salesAgentId, date])
-  @@index([tenantId])
+/// One working day of a field person (sales agent, driver, supervisor): check in and out with selfie and position.
+model Attendance {
+  id               String    @id @default(cuid())
+  tenantId         String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+  userId           String
+  user             User      @relation(fields: [userId], references: [id])
+  /// IST day, YYYY-MM-DD.
+  date             String
+  checkInAt        DateTime?
+  checkInLat       Float?
+  checkInLng       Float?
+  checkInAccuracy  Int?
+  /// Storage key of the check-in selfie.
+  checkInSelfie    String?
+  checkOutAt       DateTime?
+  checkOutLat      Float?
+  checkOutLng      Float?
+  checkOutAccuracy Int?
+  checkOutSelfie   String?
+  /// Worked minutes, set at check-out.
+  minutes          Int?
+  /// Distance travelled from location pings (metres), set at check-out.
+  distanceM        Int?
+  /// Checked in after the work start time (settings.field.workStart).
+  late             Boolean   @default(false)
+  note             String?
+
+  @@unique([tenantId, userId, date])
+  @@index([tenantId, date])
+}
+
+/// A position sent while a field person is on duty (never off duty). Purged after settings.field.pingRetentionDays.
+model LocationPing {
+  id       String   @id @default(cuid())
+  tenantId String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  userId   String
+  user     User     @relation(fields: [userId], references: [id])
+  at       DateTime
+  lat      Float
+  lng      Float
+  accuracy Int?
+  /// "app" (foreground PWA) or "android" (background, wrapper).
+  source   String   @default("app")
+  battery  Int?
+
+  @@index([tenantId, userId, at])
+  @@index([tenantId, at])
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model LeaveRequest {
+  id           String      @id @default(cuid())
+  tenantId     String      @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+  userId       String
+  user         User        @relation("LeaveOf", fields: [userId], references: [id])
+  /// IST days, inclusive.
+  fromDate     String
+  toDate       String
+  days         Int
+  /// Key from LEAVE_TYPES.
+  type         String
+  reason       String?
+  status       LeaveStatus @default(PENDING)
+  decidedById  String?
+  decidedBy    User?       @relation("LeaveDecidedBy", fields: [decidedById], references: [id])
+  decidedAt    DateTime?
+  decisionNote String?
+  createdAt    DateTime    @default(now())
+
+  @@index([tenantId, userId, fromDate])
+  @@index([tenantId, status])
+}
+
+enum LeadStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// A new shop proposed from the field, waiting for the office to approve (creates the retailer).
+model StoreLead {
+  id           String             @id @default(cuid())
+  tenantId     String             @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant             @relation(fields: [tenantId], references: [id])
+  outletName   String
+  ownerName    String
+  phone        String
+  gstin        String?
+  fssai        String?
+  shopNumber   String
+  complexName  String
+  pinCode      String
+  areaId       String
+  area         Area               @relation(fields: [areaId], references: [id])
+  lat          Float?
+  lng          Float?
+  accuracy     Int?
+  photoKey     String?
+  note         String?
+  status       LeadStatus         @default(PENDING)
+  createdById  String
+  createdBy    User               @relation("LeadBy", fields: [createdById], references: [id])
+  /// Sales agent the shop goes to when approved (defaults to the proposer when an agent).
+  salesAgentId String?
+  salesAgent   SalesAgentProfile? @relation(fields: [salesAgentId], references: [id])
+  decidedById  String?
+  decidedBy    User?              @relation("LeadDecidedBy", fields: [decidedById], references: [id])
+  decidedAt    DateTime?
+  decisionNote String?
+  retailerId   String?            @unique
+  retailer     RetailerProfile?   @relation(fields: [retailerId], references: [id])
+  createdAt    DateTime           @default(now())
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdById, createdAt])
+}
+
+enum TargetMetric {
+  /// Order value booked (paise, before cancellations).
+  VALUE
+  /// Units ordered (optionally of one product or brand).
+  VOLUME
+  /// New shops approved from this person's proposals.
+  NEW_OUTLETS
+  /// Payments collected (paise).
+  COLLECTION
+}
+
+/// A monthly goal for one person, with an incentive paid on achievement.
+model Target {
+  id        String       @id @default(cuid())
+  tenantId  String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant       @relation(fields: [tenantId], references: [id])
+  userId    String
+  user      User         @relation(fields: [userId], references: [id])
+  /// YYYY-MM.
+  period    String
+  metric    TargetMetric
+  goal      Int
+  productId String?
+  brandId   String?
+  /// Paid at 100 % (paise); pro rata from minPct, capped at capPct.
+  incentive Int          @default(0)
+  minPct    Int          @default(80)
+  capPct    Int          @default(120)
+  note      String?
+  createdAt DateTime     @default(now())
+
+  @@index([tenantId, period])
+  @@index([tenantId, userId, period])
+}
+
+/// One-time switch tokens used to move between businesses (multi-distributor staff). Replays are refused.
+model HandoffUse {
+  id       String   @id
+  tenantId String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  userId   String
+  usedAt   DateTime @default(now())
+
+  @@index([tenantId, usedAt])
 }
 
 model Delivery {
@@ -385,7 +850,26 @@ model Delivery {
   /// Cash collected on delivery, in paise.
   codAmount        Int                  @default(0)
 
+  tripId       String?
+  trip         Trip?         @relation(fields: [tripId], references: [id])
+  /// Stop number on the trip (1, 2, 3 …).
+  seq          Int           @default(0)
+  state        DeliveryState @default(ASSIGNED)
+  /// Last failed attempt: reason key and note.
+  failReason   String?
+  failNote     String?
+  failedAt     DateTime?
+  attempts     Int           @default(0)
+  /// Delivery-code tries by the driver (5 at most; counted atomically before comparing).
+  codeTries    Int           @default(0)
+  /// Code the retailer sees in the app and tells the driver (high-value drops).
+  code         String?
+  codeVerified Boolean       @default(false)
+  /// GPS accuracy of lat/lng, in metres.
+  accuracy     Float?
+
   @@index([tenantId, deliveryAgentId])
+  @@index([tenantId, tripId])
 }
 
 /// One-time passwords for phone login. Stored hashed; survives restarts and
@@ -422,7 +906,7 @@ model AuditLog {
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
   actorId   String?
   actor     User?    @relation(fields: [actorId], references: [id])
-  action    String   // e.g. "order.status", "product.update", "user.create"
+  action    String // e.g. "order.status", "product.update", "user.create"
   entity    String
   entityId  String?
   before    Json?
@@ -451,10 +935,10 @@ enum PaymentMode {
 }
 
 enum AccountType {
-  RECEIVABLE      // per retailer: what they owe us
-  WALLET          // per retailer: prepaid money we hold (credit balance)
-  WALLET_HOLD     // per retailer: wallet money reserved for open orders
-  STAFF_CASH      // per staff member: cash in hand not yet handed over
+  RECEIVABLE // per retailer: what they owe us
+  WALLET // per retailer: prepaid money we hold (credit balance)
+  WALLET_HOLD // per retailer: wallet money reserved for open orders
+  STAFF_CASH // per staff member: cash in hand not yet handed over
   OFFICE_CASH
   BANK
   UPI_CLEARING
@@ -465,6 +949,9 @@ enum AccountType {
   DISCOUNT
   PENALTY_INCOME
   CASH_SHORTAGE
+  PROMOTIONS // rewards we give away (refer and earn)
+  GATEWAY_CLEARING // paid online, not yet settled to our bank by the gateway
+  GATEWAY_FEES // the gateway's fee and its GST
 }
 
 enum EntryKind {
@@ -483,6 +970,9 @@ enum EntryKind {
   HANDOVER
   SHORTAGE_WRITEOFF
   REVERSAL
+  REWARD
+  BANK_MATCH // money seen in the bank statement (UPI or cash deposit moved to Bank)
+  GATEWAY_SETTLEMENT
 }
 
 enum PayMethod {
@@ -492,6 +982,7 @@ enum PayMethod {
   BANK
   WALLET
   CREDIT_NOTE
+  ONLINE // paid through the payment gateway (link or QR)
 }
 
 enum PayPurpose {
@@ -579,25 +1070,25 @@ model LedgerLine {
 }
 
 model Bill {
-  id         String              @id @default(cuid())
-  tenantId   String              @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant     Tenant              @relation(fields: [tenantId], references: [id])
+  id         String          @id @default(cuid())
+  tenantId   String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant          @relation(fields: [tenantId], references: [id])
   retailerId String
-  retailer   RetailerProfile     @relation(fields: [retailerId], references: [id])
+  retailer   RetailerProfile @relation(fields: [retailerId], references: [id])
   kind       BillKind
   number     String
-  orderId    String?             @unique
-  order      Order?              @relation(fields: [orderId], references: [id])
+  orderId    String?         @unique
+  order      Order?          @relation(fields: [orderId], references: [id])
   date       DateTime
   dueDate    DateTime
   /// Paise owed by this bill.
   amount     Int
   /// Paise allocated from payments so far (maintained by allocateRetailer).
-  paid       Int                 @default(0)
-  settled    Boolean             @default(false)
+  paid       Int             @default(0)
+  settled    Boolean         @default(false)
   note       String?
   entryId    String?
-  createdAt  DateTime            @default(now())
+  createdAt  DateTime        @default(now())
 
   allocations PaymentAllocation[]
 
@@ -606,13 +1097,13 @@ model Bill {
 }
 
 model Payment {
-  id            String              @id @default(cuid())
-  tenantId      String              @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant        Tenant              @relation(fields: [tenantId], references: [id])
+  id            String          @id @default(cuid())
+  tenantId      String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant          @relation(fields: [tenantId], references: [id])
   number        String
   retailerId    String
-  retailer      RetailerProfile     @relation(fields: [retailerId], references: [id])
-  purpose       PayPurpose          @default(DUES)
+  retailer      RetailerProfile @relation(fields: [retailerId], references: [id])
+  purpose       PayPurpose      @default(DUES)
   method        PayMethod
   state         PaymentState
   /// Paise.
@@ -624,20 +1115,26 @@ model Payment {
   /// Collected against this order at delivery (allocated to its bill first).
   orderId       String?
   collectedById String?
-  collectedBy   User?               @relation("PaymentCollectedBy", fields: [collectedById], references: [id])
-  collectedAt   DateTime            @default(now())
+  collectedBy   User?           @relation("PaymentCollectedBy", fields: [collectedById], references: [id])
+  collectedAt   DateTime        @default(now())
   verifiedById  String?
   verifiedAt    DateTime?
   rejectReason  String?
   entryId       String?
   /// Paise of this payment already allocated to bills.
-  allocated     Int                 @default(0)
-  createdAt     DateTime            @default(now())
+  allocated     Int             @default(0)
+  createdAt     DateTime        @default(now())
+
+  /// Paid through the gateway: our request and the gateway's payment id (never posted twice).
+  intentId         String?
+  intent           PaymentIntent? @relation(fields: [intentId], references: [id])
+  gatewayPaymentId String?
 
   allocations PaymentAllocation[]
   cheque      Cheque?
 
   @@unique([tenantId, number])
+  @@unique([tenantId, gatewayPaymentId])
   @@index([tenantId, retailerId, collectedAt])
   @@index([tenantId, state])
   @@index([tenantId, collectedById, collectedAt])
@@ -695,4 +1192,1669 @@ model CashHandover {
   createdAt    DateTime @default(now())
 
   @@index([tenantId, staffUserId, createdAt])
+}
+
+// ───────────────────────────── Catalogue, pricing, schemes (Phase 2) ─────────────────────────────
+
+model Brand {
+  id        String   @id @default(cuid())
+  tenantId  String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  logoKey   String?
+  sort      Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  products Product[]
+
+  @@unique([tenantId, name])
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  tenantId  String     @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  name      String
+  parentId  String?
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  imageKey  String?
+  sort      Int        @default(0)
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+
+  products Product[]
+
+  @@unique([tenantId, name])
+}
+
+/// GST rate by HSN code. Changing a rate here updates every product with that code.
+model HsnCode {
+  id          String  @id @default(cuid())
+  tenantId    String  @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant  @relation(fields: [tenantId], references: [id])
+  code        String
+  description String?
+  gstRate     Float
+
+  @@unique([tenantId, code])
+}
+
+/// A named set of rates (Wholesale, Retail, Key account …) assigned to retailers.
+model PriceList {
+  id          String   @id @default(cuid())
+  tenantId    String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  items     PriceListItem[]
+  retailers RetailerProfile[]
+
+  @@unique([tenantId, name])
+}
+
+model PriceListItem {
+  id          String    @id @default(cuid())
+  tenantId    String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  priceListId String
+  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  /// Rate before GST, in paise.
+  price       Int
+
+  @@unique([priceListId, productId])
+  @@index([tenantId, productId])
+}
+
+/// A special rate for one retailer; beats their price list.
+model RetailerPrice {
+  id         String          @id @default(cuid())
+  tenantId   String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant          @relation(fields: [tenantId], references: [id])
+  retailerId String
+  retailer   RetailerProfile @relation(fields: [retailerId], references: [id])
+  productId  String
+  product    Product         @relation(fields: [productId], references: [id])
+  price      Int
+  note       String?
+  updatedAt  DateTime        @updatedAt
+
+  @@unique([retailerId, productId])
+  @@index([tenantId, productId])
+}
+
+model RetailerGroup {
+  id          String   @id @default(cuid())
+  tenantId    String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  members RetailerGroupMember[]
+
+  @@unique([tenantId, name])
+}
+
+model RetailerGroupMember {
+  tenantId   String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant          @relation(fields: [tenantId], references: [id])
+  groupId    String
+  group      RetailerGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  retailerId String
+  retailer   RetailerProfile @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, retailerId])
+  @@index([tenantId, retailerId])
+}
+
+enum SchemeType {
+  BUY_X_GET_Y
+  SLAB
+  PERCENT
+  FLAT
+}
+
+/// A trade scheme. Applies to the items in scope (products / brands / categories;
+/// all empty = the whole cart) for the targeted retailers (areas / groups /
+/// retailers; all empty = everyone) within the date window. Params by type are
+/// validated in src/lib/schemes.ts.
+model Scheme {
+  id                 String     @id @default(cuid())
+  tenantId           String     @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant             Tenant     @relation(fields: [tenantId], references: [id])
+  name               String
+  description        String?
+  type               SchemeType
+  params             Json
+  productIds         String[]   @default([])
+  brandIds           String[]   @default([])
+  categoryIds        String[]   @default([])
+  areaIds            String[]   @default([])
+  groupIds           String[]   @default([])
+  retailerIds        String[]   @default([])
+  /// Set = applies only when the retailer enters this code.
+  couponCode         String?
+  startsAt           DateTime?
+  endsAt             DateTime?
+  /// Lower runs first.
+  priority           Int        @default(100)
+  /// false = once it applies to an item, no later scheme applies to that item.
+  stackable          Boolean    @default(true)
+  /// Total discount + free-goods value this scheme may give, in paise (null = no cap).
+  budget             Int?
+  spent              Int        @default(0)
+  maxUsesPerRetailer Int?
+  active             Boolean    @default(true)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  redemptions SchemeRedemption[]
+
+  @@unique([tenantId, couponCode])
+  @@index([tenantId, active])
+}
+
+model SchemeRedemption {
+  id         String   @id @default(cuid())
+  tenantId   String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  schemeId   String
+  scheme     Scheme   @relation(fields: [schemeId], references: [id])
+  orderId    String
+  retailerId String
+  /// Discount + free-goods value given, in paise.
+  value      Int
+  freeQty    Int      @default(0)
+  reversed   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, schemeId])
+  @@index([tenantId, retailerId, schemeId])
+  @@index([tenantId, orderId])
+}
+
+model Banner {
+  id        String    @id @default(cuid())
+  tenantId  String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  title     String
+  subtitle  String?
+  imageKey  String?
+  /// product | brand | category | scheme | url
+  linkType  String?
+  linkId    String?
+  areaIds   String[]  @default([])
+  groupIds  String[]  @default([])
+  startsAt  DateTime?
+  endsAt    DateTime?
+  sort      Int       @default(0)
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId, active])
+}
+
+// ───────────────────────────── Invoicing and GST (Phase 3) ─────────────────────────────
+//
+// One table for every GST document: tax invoices, bills of supply, credit
+// notes and debit notes. Issued documents are immutable (a database trigger
+// refuses changes to numbers, parties and amounts, and any delete); mistakes
+// are corrected with credit / debit notes. Only the e-invoice / e-way bill
+// fields are filled in later.
+
+enum InvoiceType {
+  TAX_INVOICE
+  BILL_OF_SUPPLY
+  CREDIT_NOTE
+  DEBIT_NOTE
+}
+
+enum EInvoiceStatus {
+  NOT_REQUIRED
+  PENDING
+  GENERATED
+  FAILED
+  CANCELLED
+}
+
+model Invoice {
+  id            String          @id @default(cuid())
+  tenantId      String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant          @relation(fields: [tenantId], references: [id])
+  type          InvoiceType
+  /// e.g. INV2627-00042: per tenant, per type, per financial year, gap-free.
+  number        String
+  /// Financial year code, e.g. "2627".
+  fy            String
+  date          DateTime
+  orderId       String?
+  order         Order?          @relation(fields: [orderId], references: [id])
+  retailerId    String
+  retailer      RetailerProfile @relation(fields: [retailerId], references: [id])
+  /// Credit / debit note: the invoice it adjusts.
+  originalId    String?
+  original      Invoice?        @relation("NoteOf", fields: [originalId], references: [id])
+  notes         Invoice[]       @relation("NoteOf")
+  /// Credit / debit note: "return" (goods back), "value" (rate or discount change) or "cancel" (whole order cancelled).
+  noteKind      String?
+  reason        String?
+  /// Snapshots at issue time: { legalName, tradeName, gstin, stateCode, address, city, pinCode, phone }.
+  seller        Json
+  buyer         Json
+  /// Buyer has a GSTIN.
+  b2b           Boolean
+  /// GST state code of the place of supply.
+  placeOfSupply String
+  interState    Boolean
+  /// Paise.
+  taxable       Int
+  cgst          Int
+  sgst          Int
+  igst          Int
+  total         Int
+  /// The ledger entry this document posted.
+  entryId       String?
+  createdById   String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  einvStatus      EInvoiceStatus @default(NOT_REQUIRED)
+  irn             String?
+  ackNo           String?
+  ackDate         DateTime?
+  signedQr        String?
+  einvError       String?
+  einvAttempts    Int            @default(0)
+  /// Bumped by "Stop old links": every share link made before stops working.
+  shareVersion    Int            @default(0)
+  einvCancelledAt DateTime?
+  ewbNo           String?
+  ewbDate         DateTime?
+  ewbValidUntil   DateTime?
+  ewbVehicle      String?
+  ewbDistanceKm   Int?
+
+  lines InvoiceLine[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, date])
+  @@index([tenantId, retailerId, date])
+  @@index([tenantId, orderId])
+  @@index([tenantId, originalId])
+  @@index([tenantId, einvStatus])
+}
+
+model InvoiceLine {
+  id             String  @id @default(cuid())
+  tenantId       String  @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant         Tenant  @relation(fields: [tenantId], references: [id])
+  invoiceId      String
+  invoice        Invoice @relation(fields: [invoiceId], references: [id])
+  sl             Int
+  productId      String?
+  orderItemId    String?
+  /// Credit / debit note line: the invoice line it adjusts.
+  originalLineId String?
+  description    String
+  hsnCode        String?
+  isService      Boolean @default(false)
+  /// GST unit code (UQC), e.g. PCS, KGS, BOX.
+  unit           String
+  /// Units on this line; freeQty of them are free goods (no value).
+  quantity       Int
+  freeQty        Int     @default(0)
+  /// Paise per unit before GST.
+  rate           Int
+  gross          Int
+  discount       Int
+  taxable        Int
+  gstRate        Float
+  cgst           Int
+  sgst           Int
+  igst           Int
+  total          Int
+
+  @@index([tenantId, invoiceId])
+  @@index([tenantId, originalLineId])
+}
+
+// ───────────────────────────── Delivery operations (Phase 4) ─────────────────────────────
+
+enum DeliveryState {
+  ASSIGNED
+  DELIVERED
+  FAILED
+}
+
+enum DeliveryPref {
+  RING_BELL
+  AT_DOOR
+  IN_HAND
+  KEEP_IN_BAG
+}
+
+enum TripStatus {
+  PLANNED
+  STARTED
+  CLOSED
+}
+
+model Vehicle {
+  id         String   @id @default(cuid())
+  tenantId   String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  /// Registration number, e.g. MH12AB1234.
+  number     String
+  name       String?
+  /// Load capacity in kg (information only).
+  capacityKg Int?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  trips         Trip[]
+  stockLocation StockLocation?
+
+  @@unique([tenantId, number])
+}
+
+/// One run of one vehicle and driver in one slot of one day.
+model Trip {
+  id           String               @id @default(cuid())
+  tenantId     String               @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant               @relation(fields: [tenantId], references: [id])
+  /// TRP2627-00001, per tenant per financial year.
+  number       String
+  date         DateTime             @db.Date
+  /// Slot key from settings.delivery.slots ("morning", "evening" …).
+  slot         String
+  driverId     String
+  driver       DeliveryAgentProfile @relation(fields: [driverId], references: [id])
+  vehicleId    String?
+  vehicle      Vehicle?             @relation(fields: [vehicleId], references: [id])
+  status       TripStatus           @default(PLANNED)
+  note         String?
+  createdById  String?
+  startedAt    DateTime?
+  startedById  String?
+  closedAt     DateTime?
+  closedById   String?
+  /// Day-close figures frozen when the trip is closed (lib/trips.ts TripSummary).
+  closeSummary Json?
+  createdAt    DateTime             @default(now())
+
+  deliveries      Delivery[]
+  returnableMoves ReturnableMove[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, date])
+  @@index([tenantId, driverId, status])
+}
+
+/// Crates, jars, cans … that go out full and come back empty.
+model Returnable {
+  id         String   @id @default(cuid())
+  tenantId   String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  name       String
+  nameHi     String?
+  /// Charged per unit the retailer can't return, in paise. 0 = no charge.
+  unitCharge Int      @default(0)
+  active     Boolean  @default(true)
+  sort       Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  moves ReturnableMove[]
+
+  @@unique([tenantId, name])
+}
+
+/// Append-only. Retailer balance of a returnable = sum(given − taken).
+model ReturnableMove {
+  id           String          @id @default(cuid())
+  tenantId     String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant          @relation(fields: [tenantId], references: [id])
+  returnableId String
+  returnable   Returnable      @relation(fields: [returnableId], references: [id])
+  retailerId   String
+  retailer     RetailerProfile @relation(fields: [retailerId], references: [id])
+  tripId       String?
+  trip         Trip?           @relation(fields: [tripId], references: [id])
+  orderId      String?
+  /// DELIVERY (at a drop), PICKUP (collected without an order), OPENING, ADJUST, CHARGE (short units billed).
+  kind         String
+  /// Full units left at the shop.
+  given        Int             @default(0)
+  /// Empties taken back (or, for CHARGE, units billed instead).
+  taken        Int             @default(0)
+  photoKey     String?
+  note         String?
+  /// Bill raised for a CHARGE.
+  billId       String?
+  actorId      String?
+  createdAt    DateTime        @default(now())
+
+  @@index([tenantId, retailerId, returnableId])
+  @@index([tenantId, tripId])
+}
+
+/// Driver on / off duty. Location is recorded only at the start and end of duty.
+model DutyShift {
+  id       String    @id @default(cuid())
+  tenantId String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  userId   String
+  startAt  DateTime  @default(now())
+  startLat Float?
+  startLng Float?
+  endAt    DateTime?
+  endLat   Float?
+  endLng   Float?
+
+  @@index([tenantId, userId, startAt])
+}
+
+// ───────────────────────────── Inventory (Phase 5) ─────────────────────────────
+
+enum StockPlace {
+  WAREHOUSE
+  VAN
+  /// Damaged and expired goods waiting to be written off or sent back to the supplier.
+  DAMAGED
+}
+
+enum StockMoveKind {
+  OPENING
+  PURCHASE
+  /// Between two warehouses.
+  TRANSFER
+  /// Warehouse to van.
+  LOAD
+  /// Van back to the warehouse (or the damaged bin) after a trip.
+  UNLOAD
+  SALE
+  /// Goods a retailer sent back on a credit note.
+  RETURN
+  /// Into the damaged bin.
+  DAMAGE
+  WRITE_OFF
+  SUPPLIER_RETURN
+  ADJUST
+}
+
+enum PoStatus {
+  DRAFT
+  SENT
+  PARTLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+/// Where stock sits: a warehouse, a van (one per vehicle) or the damaged bin.
+model StockLocation {
+  id        String     @id @default(cuid())
+  tenantId  String     @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  kind      StockPlace
+  name      String
+  vehicleId String?    @unique
+  vehicle   Vehicle?   @relation(fields: [vehicleId], references: [id])
+  address   String?
+  /// The warehouse vans load from and office deliveries sell from.
+  isDefault Boolean    @default(false)
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+
+  lots      StockLot[]
+  purchases Purchase[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, kind])
+}
+
+/// Stock of one product, batch and expiry at one place. qty is kept by lib/stock.ts next to an append-only StockMove.
+model StockLot {
+  id         String        @id @default(cuid())
+  tenantId   String        @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant        @relation(fields: [tenantId], references: [id])
+  productId  String
+  product    Product       @relation(fields: [productId], references: [id])
+  locationId String
+  location   StockLocation @relation(fields: [locationId], references: [id])
+  /// "" = no batch number.
+  batch      String        @default("")
+  expiry     DateTime?     @db.Date
+  mfgDate    DateTime?     @db.Date
+  /// On hand, in base units. Never below 0 (check constraint).
+  qty        Int           @default(0)
+  /// Cost per base unit before GST, in paise.
+  unitCost   Int?
+  receivedAt DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  moves StockMove[]
+
+  @@index([tenantId, productId, locationId])
+  @@index([tenantId, locationId])
+}
+
+/// Append-only stock history (a trigger refuses edits and deletes).
+model StockMove {
+  id          String        @id @default(cuid())
+  tenantId    String        @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  kind        StockMoveKind
+  productId   String
+  product     Product       @relation(fields: [productId], references: [id])
+  /// The lot the goods left (or, for goods coming in, the lot they went into).
+  lotId       String?
+  lot         StockLot?     @relation(fields: [lotId], references: [id])
+  /// For moves between places: the lot the goods went into.
+  toLotId     String?
+  fromId      String?
+  toId        String?
+  /// Base units, always above 0; fromId / toId give the direction.
+  qty         Int
+  /// Reason key (ADJUST_REASONS, return condition …).
+  reason      String?
+  note        String?
+  unitCost    Int?
+  orderId     String?
+  orderItemId String?
+  tripId      String?
+  purchaseId  String?
+  /// Credit note (RETURN) or purchase order.
+  docId       String?
+  actorId     String?
+  createdAt   DateTime      @default(now())
+
+  @@index([tenantId, productId, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, orderId])
+  @@index([tenantId, tripId])
+}
+
+/// Principal company / supplier we buy from.
+model Supplier {
+  id          String   @id @default(cuid())
+  tenantId    String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  gstin       String?
+  address     String?
+  /// Days from sending a purchase order to the goods arriving (A6 reorder suggestions plan for this). 0–90.
+  leadDays    Int      @default(3)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  products       Product[]
+  purchaseOrders PurchaseOrder[]
+  purchases      Purchase[]
+
+  @@unique([tenantId, name])
+}
+
+model PurchaseOrder {
+  id           String    @id @default(cuid())
+  tenantId     String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  /// PO2627-00001, per tenant per financial year.
+  number       String
+  supplierId   String
+  supplier     Supplier  @relation(fields: [supplierId], references: [id])
+  status       PoStatus  @default(DRAFT)
+  expectedDate DateTime? @db.Date
+  note         String?
+  createdById  String?
+  sentAt       DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  lines    PurchaseOrderLine[]
+  receipts Purchase[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status])
+}
+
+model PurchaseOrderLine {
+  id          String        @id @default(cuid())
+  tenantId    String        @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  poId        String
+  po          PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product       @relation(fields: [productId], references: [id])
+  /// Base units.
+  quantity    Int
+  /// Expected cost per base unit before GST, in paise.
+  unitCost    Int?
+  receivedQty Int           @default(0)
+
+  @@index([tenantId, poId])
+}
+
+/// Goods received (GRN): stock in from a supplier.
+model Purchase {
+  id          String         @id @default(cuid())
+  tenantId    String         @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant         @relation(fields: [tenantId], references: [id])
+  /// GRN2627-00001, per tenant per financial year.
+  number      String
+  supplierId  String
+  supplier    Supplier       @relation(fields: [supplierId], references: [id])
+  locationId  String
+  location    StockLocation  @relation(fields: [locationId], references: [id])
+  poId        String?
+  po          PurchaseOrder? @relation(fields: [poId], references: [id])
+  /// The supplier's bill number and date.
+  billNo      String?
+  billDate    DateTime?      @db.Date
+  /// Cost of the goods before GST, in paise.
+  total       Int            @default(0)
+  note        String?
+  createdById String?
+  createdAt   DateTime       @default(now())
+
+  lines PurchaseLine[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, createdAt])
+}
+
+model PurchaseLine {
+  id         String    @id @default(cuid())
+  tenantId   String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  purchaseId String
+  purchase   Purchase  @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product   @relation(fields: [productId], references: [id])
+  quantity   Int
+  batch      String    @default("")
+  expiry     DateTime? @db.Date
+  mfgDate    DateTime? @db.Date
+  unitCost   Int?
+  lotId      String?
+
+  @@index([tenantId, purchaseId])
+}
+
+// ───────────────────────────── Phase 7: communication and engagement ─────────────────────────────
+
+/// In-app notification (the bell). Every event lands here; SMS / WhatsApp / push copies go through MessageLog.
+model Notification {
+  id        String    @id @default(cuid())
+  tenantId  String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  event     String
+  title     String
+  body      String
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  /// Stops the same event reaching the same person twice (job retries).
+  dedupeKey String?
+
+  @@unique([tenantId, dedupeKey])
+  @@index([tenantId, userId, createdAt])
+  @@index([tenantId, userId, readAt])
+}
+
+enum MessageChannel {
+  SMS
+  WHATSAPP
+  PUSH
+}
+
+enum MessageStatus {
+  /// Waiting for the sender job.
+  QUEUED
+  SENT
+  FAILED
+  /// No provider set up: kept so the office can see what would have gone out.
+  LOGGED
+  /// Not sent: the person turned the channel off, has no number, or no phone subscribed.
+  SKIPPED
+}
+
+/// Outbox: one row per message per channel, written in the same transaction as the business change.
+model MessageLog {
+  id         String         @id @default(cuid())
+  tenantId   String         @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant         @relation(fields: [tenantId], references: [id])
+  userId     String?
+  channel    MessageChannel
+  /// Phone number (SMS / WhatsApp) or "push".
+  to         String
+  event      String
+  lang       String
+  title      String?
+  body       String
+  link       String?
+  /// WhatsApp: approved template name and its body parameters, in order.
+  waTemplate String?
+  params     Json?
+  /// WhatsApp: a document (invoice PDF) sent as the header.
+  docUrl     String?
+  status     MessageStatus  @default(QUEUED)
+  provider   String?
+  providerId String?
+  error      String?
+  attempts   Int            @default(0)
+  dedupeKey  String?
+  createdAt  DateTime       @default(now())
+  sentAt     DateTime?
+
+  @@unique([tenantId, dedupeKey])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, userId, createdAt])
+}
+
+/// A browser or phone that accepted web push for a person.
+model PushSubscription {
+  id         String    @id @default(cuid())
+  tenantId   String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  endpoint   String
+  p256dh     String
+  auth       String
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  @@unique([tenantId, endpoint])
+  @@index([tenantId, userId])
+}
+
+/// A business's own wording for one event in one language (the built-in wording is used otherwise).
+model MessageTemplate {
+  id         String   @id @default(cuid())
+  tenantId   String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  event      String
+  lang       String
+  title      String
+  body       String
+  /// WhatsApp template name approved for this business (body parameters follow the {placeholders} in order).
+  waTemplate String?
+  /// SMS DLT template id registered for this wording.
+  dltId      String?
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantId, event, lang])
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  /// Waiting for the retailer to answer.
+  WAITING
+  RESOLVED
+  CLOSED
+}
+
+/// A complaint from a retailer (damaged goods, missing items, billing ...) with an SLA.
+model Ticket {
+  id              String          @id @default(cuid())
+  tenantId        String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant          Tenant          @relation(fields: [tenantId], references: [id])
+  number          String
+  retailerId      String
+  retailer        RetailerProfile @relation(fields: [retailerId], references: [id])
+  orderId         String?
+  order           Order?          @relation(fields: [orderId], references: [id])
+  category        String
+  subject         String
+  status          TicketStatus    @default(OPEN)
+  /// normal | high
+  priority        String          @default("normal")
+  assignedToId    String?
+  assignedTo      User?           @relation("TicketAssignee", fields: [assignedToId], references: [id])
+  createdById     String
+  createdBy       User            @relation("TicketBy", fields: [createdById], references: [id])
+  slaDueAt        DateTime
+  slaNotifiedAt   DateTime?
+  firstResponseAt DateTime?
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  messages        TicketMessage[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, status, slaDueAt])
+  @@index([tenantId, retailerId, createdAt])
+}
+
+model TicketMessage {
+  id        String   @id @default(cuid())
+  tenantId  String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id])
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  body      String
+  photoKeys String[] @default([])
+  /// Office-only note: never shown to the retailer.
+  internal  Boolean  @default(false)
+  /// Status change made with this message, e.g. "OPEN>RESOLVED".
+  change    String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, ticketId, createdAt])
+}
+
+/// The retailer's rating of one delivered order.
+model DeliveryFeedback {
+  id           String          @id @default(cuid())
+  tenantId     String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant          @relation(fields: [tenantId], references: [id])
+  orderId      String          @unique
+  order        Order           @relation(fields: [orderId], references: [id])
+  retailerId   String
+  retailer     RetailerProfile @relation(fields: [retailerId], references: [id])
+  /// Driver who delivered it (for per-driver averages).
+  driverUserId String?
+  rating       Int
+  tags         String[]        @default([])
+  comment      String?
+  createdAt    DateTime        @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, driverUserId])
+}
+
+enum ReferralStatus {
+  /// Signed up with the code; waiting for a first delivered order.
+  PENDING
+  REWARDED
+  /// Did not qualify in time, or cancelled by the office.
+  LAPSED
+}
+
+/// Refer and earn: shop A's code used by shop B at sign-up.
+model Referral {
+  id             String          @id @default(cuid())
+  tenantId       String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  referrerId     String
+  referrer       RetailerProfile @relation("Referrer", fields: [referrerId], references: [id])
+  refereeId      String          @unique
+  referee        RetailerProfile @relation("Referee", fields: [refereeId], references: [id])
+  code           String
+  status         ReferralStatus  @default(PENDING)
+  /// Rewards in paise, fixed when the shop signed up (later setting changes do not move them).
+  referrerReward Int
+  refereeReward  Int             @default(0)
+  minOrder       Int
+  expiresAt      DateTime
+  orderId        String?
+  rewardedAt     DateTime?
+  note           String?
+  createdAt      DateTime        @default(now())
+
+  @@index([tenantId, referrerId, createdAt])
+  @@index([tenantId, status])
+}
+
+enum AnnouncementAudience {
+  RETAILERS
+  STAFF
+  ALL
+}
+
+/// A notice to retailers (by area or group) or staff (by role), shown in the app and optionally sent out once.
+model Announcement {
+  id          String               @id @default(cuid())
+  tenantId    String               @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant               @relation(fields: [tenantId], references: [id])
+  title       String
+  body        String
+  audience    AnnouncementAudience @default(RETAILERS)
+  areaIds     String[]             @default([])
+  groupIds    String[]             @default([])
+  roles       String[]             @default([])
+  link        String?
+  imageKey    String?
+  pinned      Boolean              @default(false)
+  startsAt    DateTime             @default(now())
+  endsAt      DateTime?
+  /// Channels to send it on once, when published (in-app is always on).
+  channels    String[]             @default([])
+  publishedAt DateTime?
+  sentCount   Int                  @default(0)
+  createdById String
+  createdBy   User                 @relation(fields: [createdById], references: [id])
+  createdAt   DateTime             @default(now())
+
+  @@index([tenantId, publishedAt])
+}
+
+// ───────────────────────────── Phase 8: payments and integrations ─────────────────────────────
+
+enum IntentKind {
+  LINK
+  QR
+}
+
+enum IntentStatus {
+  CREATED
+  PARTIAL
+  PAID
+  EXPIRED
+  CANCELLED
+}
+
+enum BankLineStatus {
+  UNMATCHED
+  SUGGESTED
+  MATCHED
+  IGNORED
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  DEAD
+}
+
+/// A request for money through the gateway: a payment link or a single-use UPI QR.
+model PaymentIntent {
+  id          String          @id @default(cuid())
+  tenantId    String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant          @relation(fields: [tenantId], references: [id])
+  kind        IntentKind
+  /// razorpay | simulator
+  provider    String
+  retailerId  String
+  retailer    RetailerProfile @relation(fields: [retailerId], references: [id])
+  purpose     PayPurpose      @default(DUES)
+  /// Paise asked for, and paid so far.
+  amount      Int
+  paidAmount  Int             @default(0)
+  orderId     String?
+  order       Order?          @relation(fields: [orderId], references: [id])
+  /// plink_… / qr_… at the gateway.
+  providerRef String?
+  shortUrl    String?
+  imageUrl    String?
+  status      IntentStatus    @default(CREATED)
+  error       String?
+  note        String?
+  expiresAt   DateTime
+  createdById String?
+  createdBy   User?           @relation("IntentBy", fields: [createdById], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  payments Payment[]
+
+  @@unique([tenantId, providerRef])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, retailerId, createdAt])
+}
+
+/// Every webhook the gateway sent us (deduplicated by its event id).
+model GatewayEvent {
+  id         String   @id @default(cuid())
+  tenantId   String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  provider   String
+  eventId    String
+  event      String
+  payload    Json
+  /// PROCESSED | IGNORED | FAILED
+  status     String
+  error      String?
+  receivedAt DateTime @default(now())
+
+  @@unique([tenantId, provider, eventId])
+  @@index([tenantId, receivedAt])
+}
+
+/// Money the gateway paid into our bank: net amount, its fee and the GST on the fee.
+model GatewaySettlement {
+  id          String   @id @default(cuid())
+  tenantId    String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  provider    String
+  providerRef String
+  /// Paise: net paid to the bank; fees include the tax.
+  amount      Int
+  fees        Int
+  tax         Int
+  utr         String?
+  settledAt   DateTime
+  entryId     String?
+  createdAt   DateTime @default(now())
+
+  @@unique([tenantId, providerRef])
+}
+
+model BankStatement {
+  id           String    @id @default(cuid())
+  tenantId     String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  fileName     String
+  /// Which bank account (a label the office types, e.g. "HDFC current").
+  account      String
+  fromDate     DateTime?
+  toDate       DateTime?
+  lineCount    Int       @default(0)
+  skipped      Int       @default(0)
+  uploadedById String
+  uploadedBy   User      @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime  @default(now())
+
+  lines BankLine[]
+
+  @@index([tenantId, createdAt])
+}
+
+/// One line of a bank statement and what it was matched to.
+model BankLine {
+  id          String         @id @default(cuid())
+  tenantId    String         @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant         @relation(fields: [tenantId], references: [id])
+  statementId String
+  statement   BankStatement  @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  date        DateTime
+  narration   String
+  reference   String?
+  /// Paise; one of them is 0.
+  debit       Int            @default(0)
+  credit      Int            @default(0)
+  balance     Int?
+  /// The same line in two uploads is imported once.
+  fingerprint String
+  status      BankLineStatus @default(UNMATCHED)
+  /// VERIFY | UPI_CLEAR | CHEQUE_CLEAR | SETTLEMENT | CASH_DEPOSIT | NEW_PAYMENT
+  matchKind   String?
+  /// Id of the payment / cheque / settlement it matched (one line per thing).
+  matchRef    String?
+  suggestions Json?
+  entryId     String?
+  note        String?
+  matchedById String?
+  matchedAt   DateTime?
+  createdAt   DateTime       @default(now())
+
+  @@unique([tenantId, fingerprint])
+  @@unique([tenantId, matchKind, matchRef])
+  @@index([tenantId, status, date])
+  @@index([tenantId, statementId])
+}
+
+/// Keys for the business's own software (ERP) to read its data. Only the hash is kept.
+model ApiKey {
+  id          String    @id @default(cuid())
+  tenantId    String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  name        String
+  prefix      String
+  hash        String
+  scopes      String[]
+  lastUsedAt  DateTime?
+  lastUsedIp  String?
+  revokedAt   DateTime?
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@unique([tenantId, prefix])
+}
+
+/// Where to send events (signed POSTs) for the business's own software.
+model WebhookEndpoint {
+  id             String   @id @default(cuid())
+  tenantId       String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  url            String
+  description    String?
+  events         String[]
+  /// Signing secret, encrypted.
+  secret         String
+  active         Boolean  @default(true)
+  failStreak     Int      @default(0)
+  disabledReason String?
+  createdById    String
+  createdBy      User     @relation(fields: [createdById], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  deliveries WebhookDelivery[]
+
+  @@index([tenantId, active])
+}
+
+model WebhookDelivery {
+  id            String          @id @default(cuid())
+  tenantId      String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant          @relation(fields: [tenantId], references: [id])
+  endpointId    String
+  endpoint      WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  event         String
+  /// The same event about the same thing is delivered once per endpoint.
+  eventKey      String
+  payload       Json
+  status        DeliveryStatus  @default(PENDING)
+  attempts      Int             @default(0)
+  nextAttemptAt DateTime        @default(now())
+  lastCode      Int?
+  lastError     String?
+  durationMs    Int?
+  sentAt        DateTime?
+  createdAt     DateTime        @default(now())
+
+  @@unique([tenantId, endpointId, eventKey])
+  @@index([tenantId, status, nextAttemptAt])
+  @@index([tenantId, endpointId, createdAt])
+}
+
+/// Maps answers kept so the same address or route is not paid for twice.
+model GeoCache {
+  id        String   @id @default(cuid())
+  tenantId  String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  /// geocode | route
+  kind      String
+  key       String
+  result    Json
+  provider  String
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, kind, key])
+}
+
+// ───────────────────────────── SaaS platform (Phase 9) ─────────────────────────────
+
+enum SubStatus {
+  TRIAL
+  ACTIVE
+  /// An invoice is overdue, or the trial ended without a plan.
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+}
+
+enum PlatformInvoiceStatus {
+  ISSUED
+  PAID
+  VOID
+}
+
+enum PlatformRole {
+  OWNER
+  SUPPORT
+}
+
+enum SupportMode {
+  READ
+  WRITE
+}
+
+enum ExportStatus {
+  QUEUED
+  RUNNING
+  READY
+  FAILED
+  EXPIRED
+}
+
+/// A price plan we sell. Prices in paise per month. Global (no tenant).
+model Plan {
+  code          String   @id
+  name          String
+  /// Flat monthly fee.
+  basePaise     Int      @default(0)
+  /// Per active staff login (not retailers) per month.
+  seatPaise     Int      @default(0)
+  /// Per active retailer (ordered, or was delivered to, in the month).
+  retailerPaise Int      @default(0)
+  /// AI credits included each month; more are billed at aiCreditPaise each.
+  aiCredits     Int      @default(0)
+  aiCreditPaise Int      @default(0)
+  /// Module codes this plan turns on (lib/plans.ts FEATURES).
+  features      String[] @default([])
+  /// { staff, retailers } — missing = no limit.
+  limits        Json     @default("{}")
+  trialDays     Int      @default(14)
+  /// Shown on the sign-up page.
+  public        Boolean  @default(true)
+  active        Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  subscriptions Subscription[]
+}
+
+/// A tenant's plan and billing period. One per tenant.
+model Subscription {
+  id           String    @id @default(cuid())
+  tenantId     String    @unique @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  planCode     String
+  plan         Plan      @relation(fields: [planCode], references: [code])
+  status       SubStatus @default(TRIAL)
+  trialEndsAt  DateTime?
+  /// Current billing period [periodStart, periodEnd). Billed in arrears at periodEnd.
+  periodStart  DateTime
+  periodEnd    DateTime
+  /// The plan picked during the trial, billed from the end of the trial.
+  nextPlanCode String?
+  billingEmail String?
+  cancelAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+/// Metered usage per month (YYYY-MM, IST): ai_credits, messages, api_calls.
+model UsageCounter {
+  id        String   @id @default(cuid())
+  tenantId  String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  period    String
+  metric    String
+  value     Int      @default(0)
+  /// Provider cost in paise (AI), for the platform cost view.
+  costPaise Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, period, metric])
+}
+
+/// Our own GST invoice to a tenant for its subscription. Amounts never change after issue; only payment and void fields do.
+model PlatformInvoice {
+  id             String                @id @default(cuid())
+  tenantId       String                @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant         Tenant                @relation(fields: [tenantId], references: [id])
+  number         String                @unique
+  fy             String
+  periodStart    DateTime
+  periodEnd      DateTime
+  /// [{ code, description, sac, qty, ratePaise, amountPaise }]
+  lines          Json
+  /// Snapshot of the buyer: { legalName, gstin, address, stateCode }
+  billTo         Json
+  /// Snapshot of us: { legalName, gstin, address, stateCode }
+  seller         Json
+  interState     Boolean
+  taxable        Int
+  cgst           Int                   @default(0)
+  sgst           Int                   @default(0)
+  igst           Int                   @default(0)
+  total          Int
+  status         PlatformInvoiceStatus @default(ISSUED)
+  issuedAt       DateTime              @default(now())
+  dueAt          DateTime
+  paidAt         DateTime?
+  paidRef        String?
+  paidVia        String?
+  voidReason     String?
+  /// Payment link on the platform's own gateway account, when set up.
+  payLinkId      String?
+  payUrl         String?
+  remindersSent  Int                   @default(0)
+  lastReminderAt DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@unique([tenantId, periodStart])
+  @@index([status, dueAt])
+}
+
+/// Gap-free number series for platform documents (one row per series and FY).
+model PlatformCounter {
+  key   String @id
+  value Int    @default(0)
+}
+
+/// People who run the platform (us). Separate from tenant users.
+model PlatformUser {
+  id           String       @id @default(cuid())
+  name         String
+  email        String       @unique
+  passwordHash String
+  role         PlatformRole @default(SUPPORT)
+  active       Boolean      @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime     @default(now())
+
+  supportSessions SupportSession[]
+  audits          PlatformAudit[]
+  announcements   PlatformAnnouncement[]
+}
+
+/// A platform user working inside a tenant, with a reason, for a short time. The tenant can see these.
+model SupportSession {
+  id             String       @id @default(cuid())
+  tenantId       String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant         Tenant       @relation(fields: [tenantId], references: [id])
+  platformUserId String
+  platformUser   PlatformUser @relation(fields: [platformUserId], references: [id])
+  reason         String
+  mode           SupportMode  @default(READ)
+  startedAt      DateTime     @default(now())
+  expiresAt      DateTime
+  endedAt        DateTime?
+  /// When the sign-in link was used (single use).
+  usedAt         DateTime?
+
+  @@index([tenantId, startedAt])
+}
+
+/// Everything a platform user did in the console.
+/// Gateway events on our own platform account, kept so a repeat (or a replay) is done once.
+model PlatformWebhookEvent {
+  id        String   @id @default(cuid())
+  provider  String
+  eventId   String
+  event     String
+  createdAt DateTime @default(now())
+
+  @@unique([provider, eventId])
+}
+
+model PlatformAudit {
+  id             String        @id @default(cuid())
+  actorId        String?
+  actor          PlatformUser? @relation(fields: [actorId], references: [id])
+  action         String
+  /// The business it was about (ours, not the business's: no row-level security, kept after a purge).
+  targetTenantId String?
+  detail         Json?
+  ip             String?
+  createdAt      DateTime      @default(now())
+
+  @@index([targetTenantId, createdAt])
+  @@index([createdAt])
+}
+
+/// Messages from us to the offices of tenants (maintenance, new features, billing notices).
+model PlatformAnnouncement {
+  id          String        @id @default(cuid())
+  title       String
+  body        String
+  /// info | warning
+  level       String        @default("info")
+  /// ADMINS (office) or STAFF (every staff login)
+  audience    String        @default("ADMINS")
+  /// Only these tenants; empty = everyone.
+  tenantIds   String[]      @default([])
+  startsAt    DateTime      @default(now())
+  endsAt      DateTime?
+  createdById String?
+  createdBy   PlatformUser? @relation(fields: [createdById], references: [id])
+  createdAt   DateTime      @default(now())
+
+  @@index([startsAt])
+}
+
+/// A full copy of a tenant's data (DPDP export): gzipped JSON in storage.
+model TenantExport {
+  id          String       @id @default(cuid())
+  tenantId    String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  status      ExportStatus @default(QUEUED)
+  fileKey     String?
+  bytes       Int?
+  rows        Int?
+  error       String?
+  /// Tenant user id, or "platform:<id>".
+  requestedBy String?
+  /// Made automatically before a deletion.
+  forDeletion Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  readyAt     DateTime?
+  expiresAt   DateTime?
+
+  @@index([tenantId, createdAt])
+}
+
+/// Phone check for self-serve sign-up (before a tenant exists).
+model SignupChallenge {
+  id         String    @id @default(cuid())
+  phone      String
+  codeHash   String
+  attempts   Int       @default(0)
+  ip         String?
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([phone, createdAt])
+  @@index([ip, createdAt])
+}
+
+enum SuggestionStatus {
+  OPEN
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+/// Something an automation (roadmap §7) proposes and a permitted person accepts or rejects. Nothing touching money or prices is applied without a person.
+model Suggestion {
+  id          String           @id @default(cuid())
+  tenantId    String           @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant           @relation(fields: [tenantId], references: [id])
+  /// visit_plan | credit_limit | credit_stop | credit_restore | check | trip_plan
+  kind        String
+  /// What it is about: retailer, sales_agent, user, cash_handover, order, delivery, day.
+  subjectType String
+  subjectId   String
+  title       String
+  detail      String           @default("")
+  /// Plain-words reasons shown with it.
+  reasons     Json             @default("[]")
+  /// What accepting it does (ids, amounts, lists).
+  payload     Json             @default("{}")
+  /// Priority 0–100; higher first.
+  score       Int              @default(0)
+  status      SuggestionStatus @default(OPEN)
+  /// One suggestion per thing per day/week; a rerun never duplicates.
+  dedupeKey   String
+  /// The day it is for (YYYY-MM-DD, IST), when it has one.
+  forDate     String?
+  decidedById String?
+  decidedAt   DateTime?
+  /// Accepted by the business's auto-apply rule, not a person.
+  auto        Boolean          @default(false)
+  note        String?
+  result      Json?
+  expiresAt   DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([tenantId, dedupeKey])
+  @@index([tenantId, status, kind, createdAt])
+}
+
+/// A shop added to a sales agent's day (from an accepted visit plan, or by hand), shown on their route with the reasons.
+model VisitTask {
+  id           String            @id @default(cuid())
+  tenantId     String            @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
+  salesAgentId String
+  salesAgent   SalesAgentProfile @relation(fields: [salesAgentId], references: [id])
+  retailerId   String
+  retailer     RetailerProfile   @relation(fields: [retailerId], references: [id])
+  /// YYYY-MM-DD (IST)
+  date         String
+  /// VisitReason keys (automation-math.ts)
+  reasons      String[]
+  note         String            @default("")
+  /// visit_plan | manual
+  source       String            @default("visit_plan")
+  suggestionId String?
+  createdById  String?
+  createdAt    DateTime          @default(now())
+
+  @@unique([tenantId, salesAgentId, retailerId, date])
+  @@index([tenantId, date])
+}
+
+/// One run of one automation for one business: when, how many suggestions, any error.
+model AutomationRun {
+  id         String    @id @default(cuid())
+  tenantId   String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  /// visit_plan | credit | collections | checks | trip_plan | expire
+  feature    String
+  /// schedule | manual
+  trigger    String    @default("schedule")
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  made       Int       @default(0)
+  error      String?
+
+  @@index([tenantId, startedAt])
+}
+
+/// Every call to an AI model: tokens, provider cost and the credits charged to the business. (The maths automations make none.)
+model AiCostLog {
+  id           String   @id @default(cuid())
+  tenantId     String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  feature      String
+  provider     String
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  costPaise    Int      @default(0)
+  credits      Int      @default(0)
+  actorId      String?
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+}
+
+/// A1: an order a shop sent as a message (WhatsApp), read into lines by the
+/// rules or AI. The shop opens it in the app, checks it and places the order;
+/// nothing is ordered from the message alone.
+model OrderDraft {
+  id         String           @id @default(cuid())
+  tenantId   String           @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant           @relation(fields: [tenantId], references: [id])
+  retailerId String
+  retailer   RetailerProfile  @relation(fields: [retailerId], references: [id])
+  /// whatsapp
+  channel    String           @default("whatsapp")
+  /// The message as sent (trimmed to 2,000 characters).
+  text       String
+  /// ParsedLine[] (lib/order-text.ts)
+  lines      Json             @default("[]")
+  /// ai | rules
+  source     String?
+  status     OrderDraftStatus @default(READING)
+  /// Provider message id: the same message is never read twice.
+  messageId  String?
+  /// The order placed from it.
+  orderId    String?
+  /// What we answered on WhatsApp (sent, logged without a provider, or the error).
+  reply      String?
+  createdAt  DateTime         @default(now())
+  expiresAt  DateTime
+
+  @@unique([tenantId, messageId])
+  @@index([tenantId, retailerId, status])
+}
+
+enum OrderDraftStatus {
+  READING
+  OPEN
+  USED
+  EXPIRED
+}
+
+/// A3 / A8 / A10: a photo looked at once (payment proof, delivery photo,
+/// crate pickup, shelf). The same photo used for two things is caught by its
+/// hash; what the AI read (when there is one) is kept, never acted on alone.
+model PhotoCheck {
+  id          String   @id @default(cuid())
+  tenantId    String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  /// payment | delivery | pickup | shelf
+  subjectType String
+  subjectId   String
+  fileKey     String
+  /// SHA-256 of the file's bytes.
+  hash        String
+  /// rules | ai
+  source      String
+  /// ok | warn | bad
+  verdict     String
+  /// Short keys: reused, reference_reused, amount_differs, unclear, crates_differ …
+  flags       String[] @default([])
+  /// What was read (amounts, references, counts, notes) and what it was compared with.
+  result      Json     @default("{}")
+  credits     Int      @default(0)
+  checkedAt   DateTime @default(now())
+
+  @@unique([tenantId, subjectType, subjectId, fileKey])
+  @@index([tenantId, hash])
+}
+
+/// A10: a shelf photo at a shop with our facings, other brands' facings and
+/// empty slots, counted by the AI and checked (or typed) by the field person.
+model ShelfAudit {
+  id         String          @id @default(cuid())
+  tenantId   String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant          @relation(fields: [tenantId], references: [id])
+  retailerId String
+  retailer   RetailerProfile @relation(fields: [retailerId], references: [id])
+  visitId    String?
+  byId       String
+  by         User            @relation("ShelfAuditBy", fields: [byId], references: [id])
+  photoKey   String
+  ours       Int
+  others     Int
+  empty      Int
+  /// Our products seen on the shelf (product ids).
+  seen       String[]        @default([])
+  /// manual | ai | ai_edited
+  source     String          @default("manual")
+  /// What the AI counted, before any edit.
+  read       Json?
+  note       String?
+  createdAt  DateTime        @default(now())
+
+  @@index([tenantId, retailerId, createdAt])
+  @@index([tenantId, createdAt])
+}
+
+/// Sign-in tries with a password (platform table, no tenant scope): five wrong
+/// tries for one login in 15 minutes, or 30 from one address, lock it for a while.
+/// Rows older than a day are deleted by otp.cleanup.
+model AuthAttempt {
+  id        String   @id @default(cuid())
+  /// The business id, or "platform" for the console.
+  scope     String
+  /// The login id or email, lower case.
+  key       String
+  ip        String?
+  ok        Boolean
+  createdAt DateTime @default(now())
+
+  @@index([scope, key, createdAt])
+  @@index([ip, createdAt])
 }

@@ -54,6 +54,9 @@ async function newRetailer(terms: { paymentMode?: "PREPAID" | "POSTPAID"; credit
   return u.retailerProfile!.id;
 }
 
+let productId = "";
+
+/** A one-line order whose line adds up, so it can be invoiced (Phase 3) when delivered. */
 async function newOrder(ctx: Ctx, retailerId: string, subtotal: number, gst = 0) {
   return ctx.tx.order.create({
     data: {
@@ -63,6 +66,7 @@ async function newOrder(ctx: Ctx, retailerId: string, subtotal: number, gst = 0)
       subtotal,
       gstAmount: gst,
       totalAmount: subtotal + gst,
+      items: { create: { productId, quantity: 1, price: subtotal, gstRate: gst ? Math.round((gst * 100) / subtotal) : 0 } },
     },
   });
 }
@@ -103,6 +107,7 @@ beforeAll(async () => {
   adminId = (await db.user.findFirstOrThrow({ where: { role: "ADMIN" } })).id;
   driverId = (await db.user.findFirstOrThrow({ where: { role: "DELIVERY_AGENT" } })).id;
   areaId = (await db.area.findFirstOrThrow()).id;
+  productId = (await db.product.findFirstOrThrow({ orderBy: { sku: "asc" } })).id;
 });
 
 afterAll(() => prisma.$disconnect());

@@ -1,4 +1,5 @@
 import type { OrderStatus } from "@/generated/prisma/client";
+import { fyCode } from "@/lib/gst";
 
 export const ORDER_STATUS_FLOW: OrderStatus[] = [
   "PLACED",
@@ -38,8 +39,7 @@ export const STATUS_TILE: Record<OrderStatus, string> = {
 
 /** Indian financial year label for a date: 19 Nov 2026 → "2627" (FY 2026-27). */
 export function fyLabel(d = new Date()): string {
-  const y = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
-  return `${String(y % 100).padStart(2, "0")}${String((y + 1) % 100).padStart(2, "0")}`;
+  return fyCode(d); // Indian time, so 31 March 11 pm IST is still the old year
 }
 
 export function formatOrderNumber(fy: string, seq: number) {

@@ -39,7 +39,8 @@ export async function khataSummary(ctx: Ctx, retailerId: string) {
   ]);
   // Same exposure the credit check uses: what they owe + orders not yet delivered.
   const openOrders = await ctx.tx.order.aggregate({
-    where: { retailerId, status: { notIn: ["DELIVERED", "CANCELLED"] } },
+    // Orders invoiced at dispatch are already in the receivable, so leave them out.
+    where: { retailerId, status: { notIn: ["DELIVERED", "CANCELLED"] }, invoices: { none: { type: { in: ["TAX_INVOICE", "BILL_OF_SUPPLY"] } } } },
     _sum: { totalAmount: true },
   });
   const openOrderTotal = Number(openOrders._sum.totalAmount ?? 0);
@@ -180,7 +181,13 @@ export async function collectScope(db: TenantDb, session: SessionPayload, retail
     const agent = await db.deliveryAgentProfile.findUnique({ where: { userId: session.userId } });
     if (!agent) return null;
     const has = await db.delivery.findFirst({ where: { deliveryAgentId: agent.id, order: { retailerId } }, select: { id: true } });
-    return has ? { retailer, office: false } : null;
+    if (has) return { retailer, office: false };
+    // Spot sales may go to any shop, so a driver who can spot-sell sees dues while on the road.
+    if (can(session.role, "stock.spot_sell")) {
+      const onRoad = await db.trip.findFirst({ where: { driverId: agent.id, status: "STARTED" }, select: { id: true } });
+      if (onRoad) return { retailer, office: false };
+    }
+    return null;
   }
   return null;
 }
