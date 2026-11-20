@@ -69,19 +69,19 @@ export async function verifyOtp(db: TenantDb, phone: string, code: string): Prom
     orderBy: { createdAt: "desc" },
   });
   if (!challenge) return false;
-  if (challenge.attempts >= MAX_ATTEMPTS) {
-    throw new OtpError("Too many wrong attempts. Request a new OTP.", 429);
-  }
+  // Claim the try before comparing, in one statement: parallel guesses can't
+  // all read "fewer than 5" and slip past the limit.
+  const claimed = await db.otpChallenge.updateMany({
+    where: { id: challenge.id, verifiedAt: null, attempts: { lt: MAX_ATTEMPTS } },
+    data: { attempts: { increment: 1 } },
+  });
+  if (claimed.count === 0) throw new OtpError("Too many wrong attempts. Request a new OTP.", 429);
 
   const expected = Buffer.from(challenge.codeHash, "hex");
   const given = Buffer.from(hash(phone, code), "hex");
-  const ok = expected.length === given.length && timingSafeEqual(expected, given);
-
-  await db.otpChallenge.update({
-    where: { id: challenge.id },
-    data: ok ? { verifiedAt: new Date() } : { attempts: { increment: 1 } },
-  });
-  return ok;
+  if (!(expected.length === given.length && timingSafeEqual(expected, given))) return false;
+  const won = await db.otpChallenge.updateMany({ where: { id: challenge.id, verifiedAt: null }, data: { verifiedAt: new Date() } });
+  return won.count === 1;
 }
 
 /** True if this phone passed OTP in the last 15 minutes and that proof is unused. */

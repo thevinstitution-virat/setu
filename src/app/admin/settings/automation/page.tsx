@@ -239,6 +239,67 @@ export default function AutomationSettingsPage() {
             <NumberSetting label="Order enough to last" hint="After the supplier's delivery time" value={s.forecast.coverDays} min={1} max={60} unit="days" disabled={busy || !s.forecast.on} onSave={(v) => save("forecast", { coverDays: v })} />
             <NumberSetting label="Stock should last" hint="Higher keeps more safety stock" value={s.forecast.serviceLevel} min={50} max={99} unit="% of days" disabled={busy || !s.forecast.on} onSave={(v) => save("forecast", { serviceLevel: v })} />
           </section>
+
+          <section className="card p-4 space-y-3">
+            <h2 className="font-heading font-bold">Orders by text and voice</h2>
+            <p className="text-xs text-[var(--muted)]">
+              Shops and agents type, paste or speak an order the way they&apos;d say it (&ldquo;5 peti nimbu, 2 jeera&rdquo;). It is matched to your products and becomes a cart they check before placing. Works without AI; with AI it reads messier messages.
+            </p>
+            <Toggle checked={s.orderText.on} disabled={busy} onChange={(v) => save("orderText", { on: v })} label="Type or speak your order" />
+            <Toggle
+              checked={s.orderText.whatsapp}
+              disabled={busy || !s.orderText.on}
+              onChange={(v) => save("orderText", { whatsapp: v })}
+              label="Orders sent on WhatsApp"
+              hint="A shop's message to the WhatsApp order number comes back as a link to check and place it. Nothing is ordered without the shop."
+            />
+          </section>
+
+          <section className="card p-4 space-y-3">
+            <h2 className="font-heading font-bold">Ask your business</h2>
+            <p className="text-xs text-[var(--muted)]">
+              On{" "}
+              <Link href="/admin/reports/ask" className="font-bold text-[var(--kesar-text)]">
+                Reports → Ask
+              </Link>
+              , ask in Hindi or English: &ldquo;who owes more than 20,000 for over 30 days?&rdquo;. Answers come from your reports, never made up.
+            </p>
+            <Toggle checked={s.ask.on} disabled={busy} onChange={(v) => save("ask", { on: v })} label="Allow questions" />
+          </section>
+
+          <section className="card p-4 space-y-3">
+            <h2 className="font-heading font-bold">Photo checks</h2>
+            <p className="text-xs text-[var(--muted)]">
+              The same photo used twice and the same UTR on two payments are always caught, without AI. With AI, photos are also read: payment screenshots and cheques are compared with what was entered, and delivery and crate photos are looked at. Results are notes and checks; a person still verifies every payment.
+            </p>
+            <Toggle checked={s.photos.on} disabled={busy} onChange={(v) => save("photos", { on: v })} label="Read photos with AI" hint="Photos are sent to the AI provider. Names and phone numbers are never asked for." />
+            <Toggle
+              checked={s.photos.payments}
+              disabled={busy || !s.photos.on}
+              onChange={(v) => save("photos", { payments: v })}
+              label="UPI screenshots and cheques"
+              hint="Amount, UTR, date and status, shown in Payments → To verify."
+            />
+            <Toggle
+              checked={s.photos.delivery}
+              disabled={busy || !s.photos.on}
+              onChange={(v) => save("photos", { delivery: v })}
+              label="Delivery and crate pickup photos"
+              hint="Blank photos or no shop or goods in them, and crate counts that differ, come to Suggestions → Checks."
+            />
+          </section>
+
+          <section className="card p-4 space-y-3">
+            <h2 className="font-heading font-bold">Shelf audits</h2>
+            <p className="text-xs text-[var(--muted)]">
+              At a visit, sales agents photograph the shop&apos;s shelf and save our facings, other brands&apos; and empty slots. With AI the counts are filled from the photo for the agent to check. See{" "}
+              <Link href="/admin/reports/shelf" className="font-bold text-[var(--kesar-text)]">
+                Reports → Shelf
+              </Link>
+              .
+            </p>
+            <Toggle checked={s.shelf.on} disabled={busy} onChange={(v) => save("shelf", { on: v })} label="Shelf audits at visits" />
+          </section>
         </div>
       )}
 

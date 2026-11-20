@@ -8,6 +8,7 @@ import Icon from "@/components/Icon";
 import ProductCard from "@/components/store/ProductCard";
 import ProductSheet from "@/components/store/ProductSheet";
 import CartReview, { type PlaceError } from "@/components/store/CartReview";
+import OrderByText, { type TextAdd } from "@/components/store/OrderByText";
 import { fileUrl } from "@/components/store/format";
 import {
   isScoped,
@@ -39,6 +40,7 @@ export default function Storefront({
   visitId,
   submitLabel = "Place order",
   initial,
+  draftId,
   onPlacedAction,
 }: {
   retailerId?: string;
@@ -46,6 +48,8 @@ export default function Storefront({
   submitLabel?: string;
   /** Filters to start with (from ?q= ?category= ?brand= ?scheme= ?product=). */
   initial?: StoreFilters;
+  /** A WhatsApp order draft to open in "Type or speak your order" (?draft=). */
+  draftId?: string | null;
   onPlacedAction: (order: PlacedOrder) => void;
 }) {
   const [data, setData] = useState<CatalogueData | null>(null);
@@ -68,6 +72,8 @@ export default function Storefront({
   const [nonce, setNonce] = useState(0);
   const [placing, setPlacing] = useState(false);
   const [placeError, setPlaceError] = useState<PlaceError | null>(null);
+  /** The WhatsApp draft the cart came from: placing the order uses it up. */
+  const [fromDraft, setFromDraft] = useState<string | null>(null);
 
   const draftKey = data ? `setu:cart:${data.retailer.id}` : null;
   const restored = useRef(false);
@@ -184,6 +190,7 @@ export default function Storefront({
           deliveryDate: sendDate ?? undefined,
           notes: notes.trim() || undefined,
           visitId,
+          draftId: fromDraft ?? undefined,
         }),
       });
       const d = await res.json().catch(() => ({}));
@@ -200,6 +207,7 @@ export default function Storefront({
         }
       }
       setCart({});
+      setFromDraft(null);
       setCoupon("");
       setNotes("");
       setReviewOpen(false);
@@ -290,6 +298,19 @@ export default function Storefront({
   function addUsual() {
     for (const u of usualMissing) setEntry(u.productId, { qty: u.qty, mode: "units" });
   }
+  /** From "Type or speak your order": adds to what is in the cart (same units), else sets it. */
+  function addFromText(adds: TextAdd[], draft: string | null) {
+    setPlaceError(null);
+    setCart((c) => {
+      const next = { ...c };
+      for (const a of adds) {
+        const had = next[a.productId];
+        next[a.productId] = had && had.mode === a.entry.mode ? { ...had, qty: had.qty + a.entry.qty } : a.entry;
+      }
+      return next;
+    });
+    if (draft) setFromDraft(draft);
+  }
 
   return (
     <div className="space-y-4">
@@ -354,6 +375,11 @@ export default function Storefront({
             </p>
           )}
         </section>
+      )}
+
+      {/* Type or speak your order (A1) */}
+      {(draftId || (!filtering && data.orderText)) && (
+        <OrderByText retailerId={retailerId} products={products} byId={byId} inCartAction={(id) => !!cart[id]} draftId={draftId} onAddAction={addFromText} />
       )}
 
       {/* Usual order (A2) */}

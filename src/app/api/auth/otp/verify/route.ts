@@ -4,6 +4,8 @@ import { tenantDb } from "@/lib/db";
 import { verifyOtp, consumeVerifiedPhone, OtpError } from "@/lib/otp";
 import { createSessionCookie, roleHome } from "@/lib/auth";
 import { isFieldRole } from "@/lib/field-settings";
+import { requestIp } from "@/lib/audit";
+import { HOUR, limited } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   const tenant = await getTenant();
@@ -19,6 +21,12 @@ export async function POST(req: Request) {
   const code = body?.code?.trim();
   if (!phone || !code) {
     return NextResponse.json({ error: "Missing phone or code" }, { status: 400 });
+  }
+
+  // Each code allows 5 tries; this caps guessing across many phones from one address.
+  const ip = requestIp(req);
+  if (ip && (await limited("otp-check-ip", ip, 60, HOUR))) {
+    return NextResponse.json({ error: "Too many tries from this network. Please wait an hour." }, { status: 429 });
   }
 
   try {

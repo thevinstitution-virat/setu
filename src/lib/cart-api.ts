@@ -23,8 +23,10 @@ export async function cartRetailer(
     return me ? { retailerId: me.id } : { error: "Retailer profile not found", status: 404 };
   }
   if (typeof retailerId !== "string" || !retailerId) return { error: "Choose a retailer", status: 400 };
-  const retailer = await db.retailerProfile.findUnique({ where: { id: retailerId }, select: { id: true, salesAgentId: true } });
+  const retailer = await db.retailerProfile.findUnique({ where: { id: retailerId }, select: { id: true, salesAgentId: true, user: { select: { active: true } } } });
   if (!retailer) return { error: "Retailer not found", status: 404 };
+  // A deactivated shop can still be viewed by the office, but nobody orders for it.
+  if (!retailer.user.active && purpose !== "view") return { error: "This shop is deactivated", status: 403 };
   if (session.role === "SALES_AGENT" || session.role === "SUPERVISOR") {
     if (await mayServeRetailer(db, session, retailer.salesAgentId)) return { retailerId: retailer.id };
     return { error: "Retailer not assigned to you", status: 403 };
@@ -59,5 +61,7 @@ export function parseCartBody(body: unknown) {
     notes: typeof b.notes === "string" ? b.notes.slice(0, 500) : null,
     retailerId: b.retailerId,
     visitId: typeof b.visitId === "string" ? b.visitId : null,
+    /** A WhatsApp order draft this cart came from (A1): used up when the order is placed. */
+    draftId: typeof b.draftId === "string" ? b.draftId : null,
   };
 }

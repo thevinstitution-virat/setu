@@ -333,12 +333,16 @@ const roundTo = (v: number, step: number) => Math.max(0, Math.round(v / step) * 
 
 // ---------- A9: checks that something may be wrong ----------
 
-export type AnomalyKind = "cash_variance" | "far_from_shop" | "shop_closed" | "big_discount";
+export type AnomalyKind = "cash_variance" | "far_from_shop" | "shop_closed" | "big_discount" | "photo_reused" | "reference_reused" | "photo_unclear" | "crates_mismatch";
 export const ANOMALY_LABEL: Record<AnomalyKind, string> = {
   cash_variance: "Cash short at hand-over",
   far_from_shop: "Delivered far from the shop",
   shop_closed: "Shop closed again and again",
   big_discount: "Unusual discount",
+  photo_reused: "Same photo used twice",
+  reference_reused: "Same UTR on two payments",
+  photo_unclear: "Delivery photo doesn't show the drop",
+  crates_mismatch: "Crates don't match the photo",
 };
 
 export const isFar = (at: Point | null, shop: Point | null, limitMetres: number) => (at && shop ? metres(at, shop) > limitMetres : false);

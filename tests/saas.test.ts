@@ -64,6 +64,14 @@ describe("gate (pause, support, modules)", () => {
 
   it("lets a normal request through", () => expect(gate(base)).toBeNull());
 
+  it("a supervisor login opens nothing on a plan without the field module", () => {
+    const noField = new Set<Feature>(["inventory"]);
+    expect(gate({ ...base, role: "SUPERVISOR" })).toBeNull();
+    expect(gate({ ...base, role: "SUPERVISOR", features: noField })?.feature).toBe("field");
+    expect(gate({ ...base, role: "SUPERVISOR", features: noField, path: "/api/field/attendance", method: "GET" })?.status).toBe(402);
+    expect(gate({ ...base, role: "SALES_AGENT", features: noField })).toBeNull();
+  });
+
   it("a paused business: only the owner, only billing / export / account", () => {
     expect(gate({ ...base, tenantStatus: "SUSPENDED" })?.status).toBe(423);
     expect(gate({ ...base, tenantStatus: "SUSPENDED", path: "/api/admin/billing" })).toBeNull();
@@ -310,14 +318,20 @@ describe("custom domains", () => {
     const d = await addDomain(id, host.toUpperCase());
     expect(d.host).toBe(host);
     await expect(addDomain(id, host)).rejects.toThrow(DomainError);
-    await expect(addDomain(demoId, host)).rejects.toThrow(/another business/);
+    // An unverified claim can't squat the address: another business may claim it too, with its own code.
+    const rival = await addDomain(demoId, host);
+    expect(rival.token).not.toBe(d.token);
 
     const wrong = await checkDomain(id, d.id, async () => [["something-else"]]);
     expect(wrong.verifiedAt).toBeNull();
     expect(wrong.lastError).toMatch(/_setu-verify/);
+    // The real owner proves it first: theirs, and the rival's claim is dropped.
     const ok = await checkDomain(id, d.id, async (name) => (name === `_setu-verify.${host}` ? [[d.token.slice(0, 5), d.token.slice(5)]] : []));
     expect(ok.verifiedAt).not.toBeNull();
+    expect(ok.verifiedHost).toBe(host);
     expect(ok.lastError).toBeNull();
+    expect(await asPlatform((tx) => tx.tenantDomain.count({ where: { id: rival.id } }))).toBe(0);
+    await expect(addDomain(demoId, host)).rejects.toThrow(/another business/);
 
     await expect(checkDomain(demoId, d.id, async () => [])).rejects.toThrow(/not found/);
     await removeDomain(id, d.id);

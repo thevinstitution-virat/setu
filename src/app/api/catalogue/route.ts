@@ -55,6 +55,7 @@ export async function GET(req: Request) {
     const usedCats = new Set(products.flatMap((p) => p.categoryPath));
     const usedBrands = new Set(products.map((p) => p.brand?.id).filter(Boolean));
     const cart = cartSettings(t.settings);
+    const auto = automationSettings(t.settings);
     return {
       retailer: { id: retailer.id, outletName: retailer.outletName, area: retailer.area.name, priceList: retailer.priceList?.name ?? null },
       products: products.map((p) => ({ ...p, stock: badges.get(p.id) ?? null })),
@@ -65,6 +66,7 @@ export async function GET(req: Request) {
         .map((b) => ({ id: b.id, title: b.title, subtitle: b.subtitle, imageKey: b.imageKey, linkType: b.linkType, linkId: b.linkId })),
       offers,
       buyAgain,
+      orderText: auto.orderText.on,
       usual: { basedOn: usual.basedOn, lines: usual.lines.filter((l) => visible.has(l.productId)).map((l) => ({ productId: l.productId, qty: l.qty, times: l.times, of: l.of })) },
       cart: {
         minOrderValue: cart.minOrderValue,

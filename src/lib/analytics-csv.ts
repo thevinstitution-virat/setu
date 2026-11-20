@@ -4,6 +4,7 @@
  */
 import type { agentPerformance, ownerDashboard, productMix, retailerAnalytics, returnsAndDamage, routeProfitability, schemeRoi, stockValue, deliveryPerformance } from "@/lib/analytics";
 import { CHURN_LABEL } from "@/lib/analytics";
+import type { shelfReport } from "@/lib/shelf";
 
 type Cell = string | number | null;
 const rs = (p: number | null | undefined) => (p == null ? "" : (p / 100).toFixed(2));
@@ -20,6 +21,7 @@ type Data = {
   schemes: Awaited<ReturnType<typeof schemeRoi>>;
   routes: Awaited<ReturnType<typeof routeProfitability>>;
   returns: Awaited<ReturnType<typeof returnsAndDamage>>;
+  shelf: Awaited<ReturnType<typeof shelfReport>>;
 };
 
 export function csvRows<K extends keyof Data>(kind: K, d: Data[K]): Cell[][] {
@@ -136,9 +138,16 @@ export function csvRows<K extends keyof Data>(kind: K, d: Data[K]): Cell[][] {
         ...x.reasons.map((r) => [r.reason, r.count, rs(r.value)]),
       ];
     }
+    case "shelf": {
+      const x = d as Data["shelf"];
+      return [
+        ["Shop", "Area", "Audited", "By", "Our facings", "Other brands", "Empty slots", "Our share", "Share before", "Change (points)", "Counted by", "Photo flagged"],
+        ...x.rows.map((r) => [r.outletName, r.area, r.day, r.by, r.ours, r.others, r.empty, pct(r.share), pct(r.prevShare), r.change ?? "", r.source === "manual" ? "Typed" : r.source === "ai" ? "AI" : "AI, corrected", r.flagged ? "Yes" : ""]),
+      ];
+    }
   }
 }
 
 export type ReportKind = keyof Data;
-export const REPORT_KINDS: ReportKind[] = ["dashboard", "sales", "retailers", "team", "stock", "delivery", "schemes", "routes", "returns"];
+export const REPORT_KINDS: ReportKind[] = ["dashboard", "sales", "retailers", "team", "stock", "delivery", "schemes", "routes", "returns", "shelf"];
 export const isReportKind = (v: unknown): v is ReportKind => typeof v === "string" && (REPORT_KINDS as string[]).includes(v);

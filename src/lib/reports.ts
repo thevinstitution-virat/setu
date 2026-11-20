@@ -20,6 +20,7 @@ import {
 } from "@/lib/analytics";
 import { reportSettings } from "@/lib/report-settings";
 import type { ReportData, ReportKind } from "@/lib/analytics-csv";
+import { shelfReport } from "@/lib/shelf";
 
 /** Long reports (a year of invoices) get more time than a normal request. */
 const TIMEOUT = 45_000;
@@ -55,6 +56,8 @@ export async function loadReport<K extends ReportKind>(tenantId: string, kind: K
         }
         case "returns":
           return returnsAndDamage(tx, p);
+        case "shelf":
+          return shelfReport(tx, p);
       }
     },
     { timeout: TIMEOUT }

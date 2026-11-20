@@ -8,7 +8,8 @@
  * Fresh users in the demo tenant; settings restored afterwards.
  */
 import "dotenv/config";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, onTestFinished } from "vitest";
+import webpush from "web-push";
 import { prisma } from "@/lib/prisma";
 import { tenantDb, withTenantTx } from "@/lib/db";
 import { balanceOf, withMoney } from "@/lib/ledger";
@@ -202,6 +203,17 @@ describe("notification centre", () => {
   });
 
   it("without a provider WhatsApp is kept as LOGGED; a broken push device fails and is retried at most 3 times", async () => {
+    // Push needs a key pair; CI has none in its environment, so make a throwaway one.
+    const saved = { pub: process.env.VAPID_PUBLIC_KEY, priv: process.env.VAPID_PRIVATE_KEY };
+    if (!saved.pub || !saved.priv) {
+      const keys = webpush.generateVAPIDKeys();
+      process.env.VAPID_PUBLIC_KEY = keys.publicKey;
+      process.env.VAPID_PRIVATE_KEY = keys.privateKey;
+    }
+    onTestFinished(() => {
+      process.env.VAPID_PUBLIC_KEY = saved.pub;
+      process.env.VAPID_PRIVATE_KEY = saved.priv;
+    });
     await flushTenant(T, 500);
     const wa = (await logs(user.a, "order.placed"))[0];
     expect(wa.status).toBe("LOGGED");

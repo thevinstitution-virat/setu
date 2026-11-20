@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { can } from "@/lib/permissions";
 
+const USER = { id: true, name: true, phone: true } as const;
+const PRODUCT_PUBLIC = { omit: { lastCost: true, supplierId: true, reorderLevel: true, reorderQty: true, visibleAreaIds: true, visibleGroupIds: true } } as const;
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -14,10 +17,10 @@ export async function GET(
   const order = await db.order.findUnique({
     where: { id },
     include: {
-      retailer: { include: { user: true, area: { include: { region: true } } } },
-      items: { include: { product: true } },
-      statusEvents: { orderBy: { createdAt: "asc" }, include: { actor: true } },
-      delivery: { include: { deliveryAgent: { include: { user: true } } } },
+      retailer: { include: { user: { select: USER }, area: { include: { region: true } } } },
+      items: { include: { product: PRODUCT_PUBLIC } },
+      statusEvents: { orderBy: { createdAt: "asc" }, include: { actor: { select: { id: true, name: true, role: true } } } },
+      delivery: { include: { deliveryAgent: { include: { user: { select: USER } } } } },
     },
   });
 
