@@ -104,7 +104,13 @@ export default function BillingPage() {
     }
     const name = data?.plans.find((p) => p.code === code)?.name ?? "The plan";
     setPicking(null);
-    setFlash(r.data.status === "TRIAL" ? `${name} is picked. It starts when your trial ends.` : `You are now on ${name}.`);
+    setFlash(
+      r.data.status === "TRIAL"
+        ? `${name} is picked. It starts when your trial ends.`
+        : r.data.nextPlanCode === code
+          ? `${name} starts with your next billing month. This month stays on your current plan.`
+          : `You are now on ${name}.`
+    );
     await load();
     // The shell's banners and locked pages are drawn on the server.
     router.refresh();
@@ -119,7 +125,10 @@ export default function BillingPage() {
 
   function planAction(p: PlanCard) {
     const current = !!sub && !inTrial && sub.planCode === p.code;
-    const picked = inTrial && sub?.nextPlanCode === p.code;
+    const picked = !!sub && sub.nextPlanCode === p.code;
+    // Same rule as the server: a smaller monthly bill at today's staff and shops starts next month.
+    const monthly = (x: PlanCard) => x.basePaise + x.seatPaise * (data?.limits.staff.used ?? 0) + x.retailerPaise * (data?.limits.retailers.used ?? 0);
+    const cheaperNow = !!paidPlan && !inTrial && monthly(p) < monthly(paidPlan);
     if (current) return <p className="text-sm font-semibold text-[var(--mint-text)] flex items-center gap-1.5"><Icon name="check" className="h-4 w-4" /> Your plan</p>;
     if (picking === p.code) {
       return (
@@ -129,7 +138,9 @@ export default function BillingPage() {
               ? `${p.name} starts when your trial ends${sub?.trialEndsAt ? ` on ${istDate(sub.trialEndsAt)}` : ""}. Until then you try its modules for free.`
               : lapsedTrial || !sub
                 ? `${p.name} starts today. Your first bill comes at the end of the month.`
-                : `Switch to ${p.name} now? The whole of this month is billed on ${p.name}.`}
+                : cheaperNow
+                  ? `Move to ${p.name}? It starts with your next billing month (${sub ? istDate(sub.periodEnd) : ""}); this month is billed on your current plan.`
+                  : `Switch to ${p.name} now? The whole of this month is billed on ${p.name}.`}
           </p>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => choose(p.code)}>
@@ -154,7 +165,7 @@ export default function BillingPage() {
           setFlash(null);
         }}
       >
-        {picked ? "Picked for after the trial" : inTrial ? "Pick this plan" : "Choose this plan"}
+        {picked ? (inTrial ? "Picked for after the trial" : "Starts next billing month") : inTrial ? "Pick this plan" : "Choose this plan"}
       </button>
     );
   }
@@ -214,6 +225,7 @@ export default function BillingPage() {
         {sub && !inTrial && sub.planCode !== "trial" && (
           <p className="text-sm text-[var(--ink-2)]">
             This billing month: {istDate(sub.periodStart)} to {istDate(sub.periodEnd)}. The bill comes at the end of it.
+            {nextPlan && ` From ${istDate(sub.periodEnd)}: ${nextPlan.name}.`}
           </p>
         )}
         {lapsedTrial && <p className="text-sm text-[var(--ink-2)]">Your trial has ended. Pick a plan below to carry on.</p>}

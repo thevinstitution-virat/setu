@@ -94,8 +94,8 @@ export async function resolveTenantByHost(host: string): Promise<CurrentTenant |
     const t = await prisma.tenant.findUnique({ where: { slug: c.slug } });
     tenant = t ? toCurrent(t) : null;
   } else if (c.kind === "custom") {
-    const d = await prisma.tenantDomain.findUnique({ where: { host: c.host }, include: { tenant: true } });
-    tenant = d?.verifiedAt ? toCurrent(d.tenant) : null;
+    const d = await prisma.tenantDomain.findUnique({ where: { verifiedHost: c.host }, include: { tenant: true } });
+    tenant = d ? toCurrent(d.tenant) : null;
   }
   // A paused (SUSPENDED) business still resolves, so its owner can sign in to
   // pay or export; guard() lets nobody else through. A closed one is gone.

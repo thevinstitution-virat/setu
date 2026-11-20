@@ -263,6 +263,8 @@ export async function POST(req: Request) {
   if (!auth.ok) return auth.res;
   const { session, tenant, db } = auth;
 
+  // Refuse a big body before reading it into memory.
+  if (Number(req.headers.get("content-length") ?? 0) > MAX_BYTES + 64 * 1024) return NextResponse.json({ error: "File is larger than 5 MB" }, { status: 413 });
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
   const type = String(form?.get("type") ?? "") as ImportType;

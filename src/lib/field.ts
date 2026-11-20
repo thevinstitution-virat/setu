@@ -11,6 +11,7 @@ import type { Role, TargetMetric } from "@/generated/prisma/client";
 import type { Ctx } from "@/lib/ledger";
 import type { Tx } from "@/lib/db";
 import { MoneyError } from "@/lib/money-error";
+import { keyBelongsTo } from "@/lib/storage";
 import { notify, staffWith } from "@/lib/notify";
 import { can } from "@/lib/permissions";
 import { validGstin } from "@/lib/gst";
@@ -109,9 +110,18 @@ export async function assertUserInScope(ctx: Ctx, userId: unknown) {
 
 export type Punch = { selfie?: string | null; lat?: number | null; lng?: number | null; accuracy?: number | null; now?: Date };
 
-function needPunchProof(s: FieldSettings, p: Punch, verb: string) {
+async function needPunchProof(ctx: Ctx, s: FieldSettings, p: Punch, verb: string) {
   if (s.selfie && !p.selfie) throw fail(`Take a selfie to ${verb}`);
   if (s.geo && (p.lat == null || p.lng == null)) throw fail(`Turn on location to ${verb}`);
+  if (p.selfie) {
+    // A fresh selfie uploaded here: this tenant's selfie folder, never one used for another punch.
+    if (!keyBelongsTo(p.selfie, ctx.tenantId) || p.selfie.split("/")[2] !== "selfie") throw fail(`Take a selfie to ${verb}`);
+    const used = await ctx.tx.attendance.findFirst({
+      where: { OR: [{ checkInSelfie: p.selfie }, { checkOutSelfie: p.selfie }] },
+      select: { id: true },
+    });
+    if (used) throw fail(`Take a new selfie to ${verb}`);
+  }
 }
 
 /**
@@ -127,7 +137,7 @@ export async function checkIn(ctx: Ctx, userId: string, p: Punch, opts: { auto?:
     if (day.checkOutAt && !opts.auto) throw fail("You have already checked out today", 409);
     return day;
   }
-  if (!opts.auto) needPunchProof(s, p, "check in");
+  if (!opts.auto) await needPunchProof(ctx, s, p, "check in");
   const data = {
     checkInAt: now,
     checkInLat: p.lat ?? null,
@@ -153,7 +163,7 @@ export async function checkOut(ctx: Ctx, userId: string, p: Punch) {
   if (shift) throw fail("Go off duty first", 409);
   const open = await openVisitOf(ctx.tx, userId);
   if (open) throw fail(`Check out of ${open.retailer.outletName} first`, 409);
-  needPunchProof(s, p, "check out");
+  await needPunchProof(ctx, s, p, "check out");
   const pings = await ctx.tx.locationPing.findMany({ where: { userId, at: { gte: day.checkInAt, lte: now } }, select: { at: true, lat: true, lng: true, accuracy: true } });
   return ctx.tx.attendance.update({
     where: { id: day.id },
@@ -886,11 +896,15 @@ export async function reportRows(tx: Tx, scope: string[] | null, kind: ReportKin
   ];
 }
 
-/** RFC 4180 CSV, with a BOM so Excel opens it as UTF-8. Cells starting with = + - @ are quoted with a ' to stop formula injection. */
+/**
+ * RFC 4180 CSV, with a BOM so Excel opens it as UTF-8. Text starting with
+ * = + - @, a tab or a carriage return gets a leading ' so Excel never runs it
+ * as a formula; plain numbers (also "-12.50") are left alone.
+ */
 export function toCsv(rows: (string | number | null)[][]): string {
   const cell = (v: string | number | null) => {
     let s = v == null ? "" : String(v);
-    if (/^[=+\-@]/.test(s) && typeof v === "string") s = `'${s}`;
+    if (typeof v === "string" && /^[=+\-@\t\r]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s)) s = `'${s}`;
     return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return "﻿" + rows.map((r) => r.map(cell).join(",")).join("\r\n") + "\r\n";

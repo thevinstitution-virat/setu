@@ -25,6 +25,7 @@ import { runDailySummaries } from "@/lib/daily-summary";
 import { runAutomations } from "@/lib/automation";
 import { readDraft } from "@/lib/order-drafts";
 import { sweepAllPhotos, sweepPhotos } from "@/lib/photo-checks";
+import { purgeLoginAttempts } from "@/lib/login-limit";
 
 /**
  * Worker-side handlers. Phase 0 keeps them small (logging, housekeeping);
@@ -84,7 +85,8 @@ export const handlers: Partial<Record<QueueName, Handler>> = {
   "otp.cleanup": async () => {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const res = await asPlatform((tx) => tx.otpChallenge.deleteMany({ where: { createdAt: { lt: cutoff } } }));
-    console.log(`[job] otp.cleanup removed ${res.count}`);
+    const tries = await purgeLoginAttempts();
+    console.log(`[job] otp.cleanup removed ${res.count} codes, ${tries} sign-in tries`);
   },
   "pings.cleanup": async () => {
     // Each business keeps positions for its own retention period (Settings -> Field team).

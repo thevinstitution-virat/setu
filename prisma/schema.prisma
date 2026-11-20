@@ -185,7 +185,11 @@ model TenantDomain {
   id         String    @id @default(cuid())
   tenantId   String
   tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  host       String    @unique
+  /// Several businesses may claim the same address while unverified (each gets its own
+  /// token), so nobody can squat it; the first to prove it in DNS wins (verifiedHost).
+  host       String
+  /// = host once verified, else null. Unique: one business per live address.
+  verifiedHost String?  @unique
   /// Value the owner puts in a TXT record at _setu-verify.<host>.
   token      String    @default(cuid())
   verifiedAt DateTime?
@@ -195,7 +199,9 @@ model TenantDomain {
   tlsStatus  String?
   createdAt  DateTime  @default(now())
 
+  @@unique([tenantId, host])
   @@index([tenantId])
+  @@index([host])
 }
 
 // ───────────────────────────── Tenant tables ─────────────────────────────
@@ -213,6 +219,8 @@ model User {
   active       Boolean  @default(true)
   /// The hidden login platform support uses inside this business (audited support sessions). Not a seat, never listed.
   isSupport    Boolean  @default(false)
+  /// Bumped to end every signed-in session of this person ("sign out everywhere"); sessions carry it as sv.
+  sessionVersion Int    @default(0)
   createdAt    DateTime @default(now())
   /// The supervisor this person reports to (field staff). Supervisors see and manage their team.
   supervisorId String?
@@ -852,6 +860,8 @@ model Delivery {
   failNote     String?
   failedAt     DateTime?
   attempts     Int           @default(0)
+  /// Delivery-code tries by the driver (5 at most; counted atomically before comparing).
+  codeTries    Int           @default(0)
   /// Code the retailer sees in the app and tells the driver (high-value drops).
   code         String?
   codeVerified Boolean       @default(false)
@@ -1462,6 +1472,8 @@ model Invoice {
   signedQr        String?
   einvError       String?
   einvAttempts    Int            @default(0)
+  /// Bumped by "Stop old links": every share link made before stops working.
+  shareVersion    Int            @default(0)
   einvCancelledAt DateTime?
   ewbNo           String?
   ewbDate         DateTime?
@@ -2550,6 +2562,17 @@ model SupportSession {
 }
 
 /// Everything a platform user did in the console.
+/// Gateway events on our own platform account, kept so a repeat (or a replay) is done once.
+model PlatformWebhookEvent {
+  id        String   @id @default(cuid())
+  provider  String
+  eventId   String
+  event     String
+  createdAt DateTime @default(now())
+
+  @@unique([provider, eventId])
+}
+
 model PlatformAudit {
   id             String        @id @default(cuid())
   actorId        String?
@@ -2817,4 +2840,21 @@ model ShelfAudit {
 
   @@index([tenantId, retailerId, createdAt])
   @@index([tenantId, createdAt])
+}
+
+/// Sign-in tries with a password (platform table, no tenant scope): five wrong
+/// tries for one login in 15 minutes, or 30 from one address, lock it for a while.
+/// Rows older than a day are deleted by otp.cleanup.
+model AuthAttempt {
+  id        String   @id @default(cuid())
+  /// The business id, or "platform" for the console.
+  scope     String
+  /// The login id or email, lower case.
+  key       String
+  ip        String?
+  ok        Boolean
+  createdAt DateTime @default(now())
+
+  @@index([scope, key, createdAt])
+  @@index([ip, createdAt])
 }

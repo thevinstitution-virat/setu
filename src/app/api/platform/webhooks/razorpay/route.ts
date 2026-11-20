@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { asPlatform } from "@/lib/db";
 import { validWebhook } from "@/lib/razorpay";
@@ -28,7 +29,21 @@ export async function POST(req: Request) {
   if (!inv || inv.payLinkId !== link?.id) return NextResponse.json({ ok: true, ignored: "unknown invoice" });
   const paid = ev.payload?.payment?.entity;
   if (paid?.amount !== undefined && paid.amount < inv.total) return NextResponse.json({ ok: true, ignored: "short payment" });
-  await markInvoicePaid(inv.id, { ref: paid?.id ?? link?.id ?? null, via: "razorpay" });
+  // Once per event: Razorpay retries, and a captured request could be sent again.
+  const eventId = (req.headers.get("x-razorpay-event-id") || `body:${createHash("sha256").update(raw).digest("hex")}`).slice(0, 100);
+  try {
+    await asPlatform((tx) => tx.platformWebhookEvent.create({ data: { provider: "razorpay", eventId, event: ev.event ?? "" } }));
+  } catch (e) {
+    if ((e as { code?: string }).code === "P2002") return NextResponse.json({ ok: true, ignored: "repeat" });
+    throw e;
+  }
+  try {
+    await markInvoicePaid(inv.id, { ref: paid?.id ?? link?.id ?? null, via: "razorpay" });
+  } catch (e) {
+    // Let Razorpay's retry try again.
+    await asPlatform((tx) => tx.platformWebhookEvent.deleteMany({ where: { provider: "razorpay", eventId } })).catch(() => null);
+    throw e;
+  }
   await platformAudit(null, "invoice.paid_online", { tenantId: inv.tenantId, detail: { invoice: inv.number, payment: paid?.id ?? null } });
   return NextResponse.json({ ok: true });
 }

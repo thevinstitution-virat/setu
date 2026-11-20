@@ -57,8 +57,11 @@ export async function addDomain(tenantId: string, raw: string) {
   return asPlatform(async (tx) => {
     const n = await tx.tenantDomain.count({ where: { tenantId } });
     if (n >= MAX_DOMAINS) throw new DomainError(`At most ${MAX_DOMAINS} addresses. Remove one first.`);
-    const taken = await tx.tenantDomain.findUnique({ where: { host } });
-    if (taken) throw new DomainError(taken.tenantId === tenantId ? "You have added this address already" : "This address is used by another business", 409);
+    // Another business's unverified claim doesn't block this one: each gets its own code, and
+    // whoever proves the address in DNS first keeps it (so nobody can squat a domain).
+    const live = await tx.tenantDomain.findUnique({ where: { verifiedHost: host } });
+    if (live) throw new DomainError(live.tenantId === tenantId ? "You have added this address already" : "This address is used by another business", 409);
+    if (await tx.tenantDomain.findUnique({ where: { tenantId_host: { tenantId, host } } })) throw new DomainError("You have added this address already", 409);
     return tx.tenantDomain.create({ data: { tenantId, host } });
   });
 }
@@ -78,14 +81,31 @@ export async function checkDomain(tenantId: string, id: string, resolveTxt: Reso
   } catch {
     error = `No TXT record found at ${verifyName(d.host)} yet. DNS changes can take up to an hour.`;
   }
-  let tlsStatus = d.tlsStatus;
-  if (found && !d.verifiedAt) tlsStatus = await requestCertificate(d.host);
-  const row = await asPlatform((tx) =>
-    tx.tenantDomain.update({
-      where: { id: d.id },
-      data: { checkedAt: now, lastError: found ? null : error, ...(found && !d.verifiedAt ? { verifiedAt: now, tlsStatus } : {}) },
-    })
-  );
+  if (found && !d.verifiedAt) {
+    // First proof wins; the unique verifiedHost settles a race between two businesses.
+    const won = await asPlatform(async (tx) => {
+      if (await tx.tenantDomain.findUnique({ where: { verifiedHost: d.host } })) return false;
+      try {
+        await tx.tenantDomain.update({ where: { id: d.id }, data: { verifiedAt: now, verifiedHost: d.host, checkedAt: now, lastError: null } });
+      } catch (e) {
+        if ((e as { code?: string }).code === "P2002") return false;
+        throw e;
+      }
+      // Other businesses' claims on this address can never verify now.
+      await tx.tenantDomain.deleteMany({ where: { host: d.host, verifiedAt: null, id: { not: d.id } } });
+      return true;
+    });
+    if (!won) {
+      return asPlatform((tx) =>
+        tx.tenantDomain.update({ where: { id: d.id }, data: { checkedAt: now, lastError: "Another business has already proved this address. Remove it here." } })
+      );
+    }
+    const tlsStatus = await requestCertificate(d.host);
+    const row = await asPlatform((tx) => tx.tenantDomain.update({ where: { id: d.id }, data: { tlsStatus } }));
+    clearTenantCache();
+    return row;
+  }
+  const row = await asPlatform((tx) => tx.tenantDomain.update({ where: { id: d.id }, data: { checkedAt: now, lastError: found ? null : error } }));
   if (found) clearTenantCache();
   return row;
 }
@@ -108,8 +128,7 @@ export async function tlsAllowed(host: string) {
     const t = await prisma.tenant.findUnique({ where: { slug: sub }, select: { status: true } });
     return !!t && t.status !== "CLOSED";
   }
-  const d = await prisma.tenantDomain.findUnique({ where: { host: h }, select: { verifiedAt: true } });
-  return !!d?.verifiedAt;
+  return !!(await prisma.tenantDomain.findUnique({ where: { verifiedHost: h }, select: { id: true } }));
 }
 
 /** Ask the proxy for a certificate. Never throws; returns a status line kept on the domain. */

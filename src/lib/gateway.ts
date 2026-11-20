@@ -5,7 +5,7 @@ import { balanceOf, post, recordPayment, withMoney, type Ctx } from "@/lib/ledge
 import { MoneyError } from "@/lib/money-error";
 import { formatINR } from "@/lib/money";
 import { decryptSecret, sha256, token } from "@/lib/secrets";
-import { gatewayOn, gatewaySettings, type GatewaySettings } from "@/lib/gateway-settings";
+import { gatewayOn, gatewaySettings, simulatorAllowed, type GatewaySettings } from "@/lib/gateway-settings";
 import * as rzp from "@/lib/razorpay";
 import { tenantUrl } from "@/lib/notify";
 
@@ -403,6 +403,7 @@ export async function cancelIntent(tenantId: string, actorId: string | null, int
 
 /** Demo / tests: pay a simulator request (all that is left, or a part). */
 export async function simulatePay(tenantId: string, intentId: string, amount?: number | null) {
+  if (!simulatorAllowed()) throw new MoneyError("Payment request not found", 404);
   return withMoney(tenantId, null, async (ctx) => {
     const intent = await ctx.tx.paymentIntent.findUnique({ where: { id: intentId } });
     if (!intent || intent.provider !== "simulator") throw new MoneyError("Payment request not found", 404);

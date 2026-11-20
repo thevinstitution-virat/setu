@@ -16,6 +16,7 @@ import { PRESETS, change, makePeriod, presetPeriod, previousPeriod, type Period 
 import { reorderList } from "@/lib/stock";
 import { inventorySettings } from "@/lib/inventory-settings";
 import { INTENTS, INTENT_KEYS, MAX_LIMIT, MAX_QUESTION, cleanQuery, readQuestion, type AskParams, type AskPeriod, type AskQuery, type Intent } from "@/lib/ask-rules";
+import { HOUR, limited } from "@/lib/rate-limit";
 
 export type Column = { key: string; label: string; kind: "text" | "money" | "number" | "pct" | "days" };
 export type Row = Record<string, string | number | null>;
@@ -287,7 +288,8 @@ export async function ask(o: { tenantId: string; actorId: string | null; questio
   let note: string | null = null;
   if (!query) {
     const status = await aiStatus(o.tenantId, now);
-    if (status.available) {
+    // 60 AI-read questions an hour per person; after that only the built-in phrasing works.
+    if (status.available && !(o.actorId && (await limited(`ai-ask:${o.tenantId}`, o.actorId, 60, HOUR, now)))) {
       const r = await aiJson({
         tenantId: o.tenantId,
         actorId: o.actorId,

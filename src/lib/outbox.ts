@@ -2,6 +2,7 @@ import webpush from "web-push";
 import { meter } from "@/lib/billing";
 import type { MessageLog } from "@/generated/prisma/client";
 import { asPlatform, withTenantTx } from "@/lib/db";
+import { pushEndpointAllowed } from "@/lib/security";
 
 /**
  * Sends queued outbox rows (MessageLog). Runs in the worker (messages.flush):
@@ -44,6 +45,11 @@ async function sendPush(tenantId: string, m: MessageLog): Promise<Outcome> {
   let sent = 0;
   let lastError = "";
   for (const s of subs) {
+    // Saved before the push-service check existed: never POST anywhere else.
+    if (!pushEndpointAllowed(s.endpoint)) {
+      lastError = "Not a known push service";
+      continue;
+    }
     try {
       await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 24 * 3600 });
       sent++;

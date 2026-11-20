@@ -31,6 +31,7 @@ type Money = {
   chequeBouncePenalty: number;
   upiVpa: string;
   upiPayeeName: string;
+  checkFieldDigital: boolean;
 };
 
 /** Form values as typed (₹ and days as text). */
@@ -43,6 +44,7 @@ type Form = {
   chequeBouncePenalty: string;
   upiVpa: string;
   upiPayeeName: string;
+  checkFieldDigital: boolean;
 };
 
 /** Field names in server messages → words the owner knows. */
@@ -65,6 +67,7 @@ function toForm(m: Money): Form {
     chequeBouncePenalty: rupees(m.chequeBouncePenalty),
     upiVpa: m.upiVpa,
     upiPayeeName: m.upiPayeeName,
+    checkFieldDigital: m.checkFieldDigital ?? true,
   };
 }
 
@@ -100,6 +103,7 @@ function toPatch(f: Form): Money | string {
     chequeBouncePenalty: penalty,
     upiVpa: f.upiVpa.trim(),
     upiPayeeName: f.upiPayeeName.trim(),
+    checkFieldDigital: f.checkFieldDigital,
   };
 }
 
@@ -463,6 +467,33 @@ export default function SettingsPage() {
               onChange={(e) => set("overdueGraceDays", e.target.value)}
             />
             <span className="block text-xs text-[var(--muted)] mt-1">Extra days after the due date before the hold starts.</span>
+          </label>
+        </section>
+
+        <section className="card p-5 space-y-4">
+          <p className="font-heading font-bold">UPI and bank taken in the field</p>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="sr-only peer"
+              checked={form.checkFieldDigital}
+              onChange={(e) => set("checkFieldDigital", e.target.checked)}
+            />
+            <span
+              aria-hidden="true"
+              className={`mt-0.5 shrink-0 h-6 w-11 rounded-full p-0.5 transition peer-focus-visible:ring-2 peer-focus-visible:ring-mor ${
+                form.checkFieldDigital ? "bg-mor" : "bg-ink/15"
+              }`}
+            >
+              <span className={`block h-5 w-5 rounded-full bg-white shadow transition ${form.checkFieldDigital ? "translate-x-5" : ""}`} />
+            </span>
+            <span>
+              <span className="block text-sm font-medium">Check them before they count</span>
+              <span className="block text-xs text-[var(--muted)]">
+                A UPI or bank payment entered by a salesperson or driver waits in Payments → To verify until someone in the office sees it in the bank.
+                Turned off, it counts at once. Cash and cheques are checked at handover and deposit either way.
+              </span>
+            </span>
           </label>
         </section>
 

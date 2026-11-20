@@ -9,6 +9,8 @@ import { moneyFail } from "@/lib/money-api";
 
 /** Never send password hashes or other account internals to the browser. */
 const USER = { id: true, name: true, phone: true } as const;
+/** Product fields shops and field staff never need: our buying price, supplier, reorder and visibility rules. */
+const PRODUCT_PUBLIC = { omit: { lastCost: true, supplierId: true, reorderLevel: true, reorderQty: true, visibleAreaIds: true, visibleGroupIds: true } } as const;
 
 export async function GET() {
   const auth = await guard();
@@ -40,7 +42,7 @@ export async function GET() {
     where,
     include: {
       retailer: { include: { user: { select: USER } } },
-      items: { include: { product: true } },
+      items: { include: { product: PRODUCT_PUBLIC } },
       delivery: { omit: { code: session.role !== "RETAILER" }, include: { deliveryAgent: { include: { user: { select: USER } } } } },
     },
     orderBy: { createdAt: "desc" },
