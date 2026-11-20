@@ -14,6 +14,15 @@ export function sessionSecret() {
   return new TextEncoder().encode(s ?? "setu-dev-secret-change-me");
 }
 
+/** Signs console cookies and support links: never the businesses' secret. */
+export function platformSecret() {
+  const s = process.env.PLATFORM_SESSION_SECRET;
+  if (!s && process.env.NODE_ENV === "production") {
+    throw new Error("PLATFORM_SESSION_SECRET must be set in production");
+  }
+  return new TextEncoder().encode(s ?? "setu-dev-platform-secret");
+}
+
 export type SessionPayload = {
   userId: string;
   tenantId: string;

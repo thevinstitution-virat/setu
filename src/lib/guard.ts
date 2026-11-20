@@ -44,6 +44,11 @@ export function gate(i: GateInput): { error: string; status: number; code: strin
   if (i.support?.mode === "READ" && i.method && !["GET", "HEAD", "OPTIONS"].includes(i.method) && !under(path, READONLY_OK)) {
     return { error: "This support session is read-only.", status: 403, code: "support_read_only" };
   }
+  // A supervisor login is the field module itself: without it, it opens nothing
+  // (not orders, attendance or every shop through the general routes).
+  if (i.role === "SUPERVISOR" && !i.features.has("field")) {
+    return { error: "Supervisor logins need the Field team module, which is not in this plan. Ask the owner.", status: 402, code: "upgrade", feature: "field" };
+  }
   const f = path ? featureForPath(path) : null;
   if (f && !i.features.has(f)) {
     return { error: `Not in your plan: ${FEATURES[f]}. Move to a plan that has it under Billing.`, status: 402, code: "upgrade", feature: f };

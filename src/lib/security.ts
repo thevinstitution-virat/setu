@@ -37,10 +37,21 @@ export const SECURITY_HEADERS: { key: string; value: string }[] = [
 ];
 
 /** A session secret fit for production: set, at least 32 characters, not the development default. */
-export function secretProblem(secret: string | undefined): string | null {
-  if (!secret) return "SESSION_SECRET is not set";
-  if (secret === "setu-dev-secret-change-me") return "SESSION_SECRET is still the development default";
-  if (secret.length < 32) return "SESSION_SECRET must be at least 32 characters";
+export function secretProblem(secret: string | undefined, name = "SESSION_SECRET"): string | null {
+  if (!secret) return `${name} is not set`;
+  if (secret === "setu-dev-secret-change-me" || secret === "setu-dev-platform-secret") return `${name} is still the development default`;
+  if (secret.length < 32) return `${name} must be at least 32 characters`;
+  return null;
+}
+
+/**
+ * The console (and support links into a business) sign with their own secret,
+ * so a leak of the businesses' SESSION_SECRET can't mint console or support access.
+ */
+export function platformSecretProblem(env: { SESSION_SECRET?: string; PLATFORM_SESSION_SECRET?: string }): string | null {
+  const p = secretProblem(env.PLATFORM_SESSION_SECRET, "PLATFORM_SESSION_SECRET");
+  if (p) return p;
+  if (env.PLATFORM_SESSION_SECRET === env.SESSION_SECRET) return "PLATFORM_SESSION_SECRET must differ from SESSION_SECRET";
   return null;
 }
 

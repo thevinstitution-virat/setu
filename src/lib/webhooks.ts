@@ -1,6 +1,8 @@
 import { createHmac } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
+import http from "node:http";
+import https from "node:https";
 import type { Prisma } from "@/generated/prisma/client";
 import type { Tx } from "@/lib/db";
 import { asPlatform, withTenantTx } from "@/lib/db";
@@ -99,13 +101,51 @@ export function checkWebhookUrl(raw: unknown): string | { url: string } {
   return { url: u.toString() };
 }
 
-/** Right before sending: the name must not point into a private network. */
-async function resolvesPublic(url: string) {
-  if (allowPrivate()) return true;
-  const host = new URL(url).hostname.replace(/^\[|\]$/g, "");
-  if (isIP(host)) return !privateIp(host);
-  const addrs = await lookup(host, { all: true }).catch(() => []);
-  return addrs.length > 0 && addrs.every((a) => !privateIp(a.address));
+export class PrivateAddressError extends Error {
+  constructor() {
+    super("The address points into a private network");
+  }
+}
+
+type LookupCb = (err: NodeJS.ErrnoException | null, address: string | { address: string; family: number }[], family?: number) => void;
+
+/**
+ * DNS lookup for the socket itself: resolves, refuses if any answer is private,
+ * and hands the socket exactly the addresses it checked. Checking first and
+ * fetching after would resolve twice, and a hostile name server can answer a
+ * public address the first time and a private one the second (DNS rebinding).
+ */
+export function pinnedLookup(hostname: string, options: { all?: boolean; family?: number } | number, cb: LookupCb) {
+  const opts = typeof options === "number" ? { family: options } : (options ?? {});
+  lookup(hostname, { all: true, family: opts.family || 0 })
+    .then((addrs) => {
+      if (!addrs.length) return cb(Object.assign(new Error(`No address for ${hostname}`), { code: "ENOTFOUND" }), "");
+      if (!allowPrivate() && addrs.some((a) => privateIp(a.address))) return cb(new PrivateAddressError(), "");
+      if (opts.all) cb(null, addrs);
+      else cb(null, addrs[0].address, addrs[0].family);
+    })
+    .catch((e: NodeJS.ErrnoException) => cb(e, ""));
+}
+
+/** POST through a connection pinned to checked addresses. No redirects followed; the body is not read. */
+function postPinned(url: string, headers: Record<string, string>, body: string, timeoutMs: number): Promise<number> {
+  const u = new URL(url);
+  const host = u.hostname.replace(/^\[|\]$/g, "");
+  if (isIP(host) && !allowPrivate() && privateIp(host)) return Promise.reject(new PrivateAddressError());
+  const mod = u.protocol === "https:" ? https : http;
+  return new Promise((resolve, reject) => {
+    const req = mod.request(
+      u,
+      { method: "POST", headers: { ...headers, "Content-Length": String(Buffer.byteLength(body)) }, lookup: pinnedLookup as never, timeout: timeoutMs, agent: false },
+      (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      }
+    );
+    req.on("timeout", () => req.destroy(Object.assign(new Error("timeout"), { name: "TimeoutError" })));
+    req.on("error", reject);
+    req.end(body);
+  });
 }
 
 // ───────────────────────────── endpoints ─────────────────────────────
@@ -181,20 +221,18 @@ type SendResult = { ok: boolean; code: number | null; error: string | null; ms: 
 
 async function send(url: string, secret: string, event: string, deliveryId: string, body: string): Promise<SendResult> {
   const started = Date.now();
-  if (!(await resolvesPublic(url))) return { ok: false, code: null, error: "The address points into a private network", ms: 0 };
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "User-Agent": "Setu-Webhooks/1", "Setu-Event": event, "Setu-Delivery": deliveryId, "Setu-Signature": sign(secret, body) },
+    const status = await postPinned(
+      url,
+      { "Content-Type": "application/json", "User-Agent": "Setu-Webhooks/1", "Setu-Event": event, "Setu-Delivery": deliveryId, "Setu-Signature": sign(secret, body) },
       body,
-      redirect: "manual",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    await res.body?.cancel().catch(() => null);
-    const ok = res.status >= 200 && res.status < 300;
-    return { ok, code: res.status, error: ok ? null : res.status >= 300 && res.status < 400 ? "Redirects are not followed" : `Answered ${res.status}`, ms: Date.now() - started };
+      TIMEOUT_MS
+    );
+    const ok = status >= 200 && status < 300;
+    return { ok, code: status, error: ok ? null : status >= 300 && status < 400 ? "Redirects are not followed" : `Answered ${status}`, ms: Date.now() - started };
   } catch (e) {
     const err = e as Error;
+    if (err instanceof PrivateAddressError) return { ok: false, code: null, error: err.message, ms: 0 };
     return { ok: false, code: null, error: err.name === "TimeoutError" ? "No answer in 10 seconds" : (err.message ?? "Could not connect").slice(0, 200), ms: Date.now() - started };
   }
 }

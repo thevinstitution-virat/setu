@@ -101,6 +101,7 @@ describe("password sign-in limits", () => {
 describe("go-live readiness", () => {
   const good = {
     SESSION_SECRET: "s".repeat(40),
+    PLATFORM_SESSION_SECRET: "p".repeat(40),
     SECRETS_KEY: "k".repeat(40),
     PLATFORM_DOMAIN: "setu.in",
     SMS_PROVIDER: "",
@@ -124,6 +125,12 @@ describe("go-live readiness", () => {
   it("fails the unsafe switches", () => {
     const s = status({ ...good, OTP_DEV_MODE: "1", ALLOW_GATEWAY_SIMULATOR: "1", ALLOW_PRIVATE_WEBHOOKS: "true", JOBS_DISABLED: "1", AI_PROVIDER: "fake", PLATFORM_DOMAIN: "localhost", SESSION_SECRET: "setu-dev-secret-change-me" });
     for (const id of ["otp_dev", "simulator", "private_webhooks", "jobs", "ai", "platform_domain", "session_secret"]) expect(s[id], id).toBe("fail");
+  });
+
+  it("the console needs its own secret", () => {
+    expect(status({ ...good, PLATFORM_SESSION_SECRET: "" }).platform_secret).toBe("fail");
+    expect(status({ ...good, PLATFORM_SESSION_SECRET: good.SESSION_SECRET }).platform_secret).toBe("fail");
+    expect(status(good).platform_secret).toBe("ok");
   });
 
   it("local storage needs a volume", () => {

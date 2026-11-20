@@ -66,24 +66,29 @@ signed-in user or extra effort; **Low** = hardening.
 - Every console route is guarded; prices and totals are always worked out on the server.
 - Sign-in links and support tokens are single-use with their own audiences.
 
+## Open items, fixed in the second pass (20 Nov)
+
+| Item | Was | Fix |
+|---|---|---|
+| Webhook DNS rebinding | The name was checked, then fetched separately: a hostile name server could answer a public address first and a private one second. | The check runs inside the socket's own DNS lookup (`pinnedLookup`), so the connection uses exactly the addresses that were checked. |
+| Custom domains before verification | A business could add another's domain and block the real owner until it verified. | Several businesses may hold an unverified claim, each with its own code; the first to prove it in DNS gets it (`verifiedHost`, unique) and the other claims are dropped. |
+| Razorpay events on our own account | Repeats were harmless (state checks) but not recorded. | Each event id is recorded once (`PlatformWebhookEvent`); a repeat or replay is ignored. The business-side webhook already did this (`GatewayEvent`). |
+| `?notice=` / `?error=` on the login page | Showed any text from the address bar. | Only known codes show a message (`lib/login-notices.ts`); anything else shows nothing. |
+| One secret for every cookie | The console cookie and support links were signed with the businesses' `SESSION_SECRET`. | They use `PLATFORM_SESSION_SECRET` (required in production, must differ; the app refuses to start without it, and the readiness check fails). Every token check pins HS256. |
+| Invoice share links | Never expired, couldn't be stopped. | Links work 90 days; "Stop old links" on the invoice ends every link sent so far. Links sent before this change last 90 days from the document's date. |
+| Supervisors on plans without the field module | A supervisor login could still use orders, attendance and every shop. | A supervisor opens nothing without the module (402), and one can't be created on such a plan. |
+| Cooldowns | Statements could be re-sent by WhatsApp / SMS without limit; delete → cancel loops made a full export each time. | 3 statements a day per shop; 3 deletion requests a day per business (exports were already one an hour). |
+| Field staff UI | Staff weren't told a UPI / bank collection waits for the office. | The collect screens say so when the business has the check on. |
+
 ## Not fixed yet
 
-| Item | Why it matters | Suggested fix |
+| Item | Why it matters | Next step |
 |---|---|---|
-| Webhook DNS rebinding | The address is checked, then fetched; a host can answer a public address first and a private one second. | Resolve once and connect to that address (custom lookup in the HTTP agent). |
-| Custom domains before verification | A business can add another's domain and hold it until the owner verifies. | Expire unverified domains after a few days; let a verified claim replace an unverified one. |
-| Razorpay webhook event ids | Repeated events are made harmless by state checks, but not deduplicated by event id. | Store event ids, skip repeats. |
-| `?notice=` on the login page | Shows text from the address bar (plain text, no HTML), usable for convincing phishing messages. | Map short codes to our own messages. |
-| One secret for every cookie | Tenant and console sessions are told apart by audience, but share `SESSION_SECRET`. | A separate console secret. |
-| Invoice share links | Don't expire. | Expiry plus "revoke link". |
-| Supervisors on plans without the field module | Not yet walked through for what they can still open. | Check and gate. |
-| Cooldowns | Sending a khata statement again and again; account delete / export loops. | Short per-shop cooldowns. |
-| Field staff UI | Staff aren't yet told that a UPI / bank collection now waits for the office. | A line on the collect screen and receipt. |
-| Dependencies | `npm audit`: 6 findings, none reachable in the running app (see DEPLOY.md §5). | Recheck with Prisma 7 / exceljs 5. |
-| Pen test | A code review misses what only shows in a running system. | Before the first paying external business. |
+| Dependencies | `npm audit` (rechecked 20 Nov): still 6 findings (4 high, 2 moderate), none reachable in the running app (see DEPLOY.md §5). The fixes are breaking upgrades. | Recheck with Prisma 7 / exceljs 5. |
+| Pen test | A code review misses what only shows in a running system. | An outside test before the first paying external business. |
 
 ## How it was checked
 
-- `tests/security-review.test.ts` (new): client address, private addresses, push endpoints, file access, CSV cells, zip size, field money rule, reserved addresses, login timing, OTP parallel guesses, plan changes. `tests/field.test.ts` updated for fresh selfies.
-- Full suite: 28 files, 420 tests pass. `tsc` clean; eslint on changed files: no errors. Production build passes.
-- Local production server: sign-in, the admin pages changed, the new settings switch, and session revocation (a signed-out person's old cookie gets 401, a fresh sign-in works, others stay signed in).
+- `tests/security-review.test.ts` (new): client address, private addresses, push endpoints, file access, CSV cells, zip size, field money rule, reserved addresses, login timing, OTP parallel guesses, plan changes; second pass: pinned webhook lookup, login notices. `tests/field.test.ts` updated for fresh selfies; `tests/gst.test.ts` for link expiry and stopping; `tests/saas.test.ts` for domain claims and supervisors; `tests/golive.test.ts` for the console secret.
+- Full suite: 28 files, 426 tests pass. `tsc` clean; eslint on changed files: no errors. Production build passes.
+- Local production server: sign-in, the admin pages changed, the new settings switch, session revocation, login notices (made-up text not shown, a real code shown), invoice links (old link 404 after "Stop old links", new link works), the field check endpoint, and console sign-in with its own secret.

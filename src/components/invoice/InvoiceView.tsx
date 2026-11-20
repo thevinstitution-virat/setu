@@ -80,12 +80,12 @@ export type InvoiceJson = {
   due: number | null;
   ewayNeeded: boolean;
 };
-export type ShareJson = { url: string; pdfUrl: string; text: string; whatsapp: string };
+export type ShareJson = { url: string; pdfUrl: string; text: string; whatsapp: string; expiresAt?: string };
 export type InvoiceResponse = {
   invoice: InvoiceJson;
   share: ShareJson;
   einvoiceProblems: string[];
-  can: { creditNote: boolean; debitNote: boolean; einvoice: boolean; cancelEinvoice: boolean; eway: boolean };
+  can: { creditNote: boolean; debitNote: boolean; einvoice: boolean; cancelEinvoice: boolean; eway: boolean; stopLinks?: boolean };
 };
 
 export const STATE_NAMES: Record<string, string> = {
@@ -228,7 +228,7 @@ export function InvoiceView({ doc }: { doc: InvoiceJson }) {
  * Open / download the PDF, send on WhatsApp, share the PDF file (phones with
  * the Web Share API), copy the link.
  */
-export function InvoiceShare({ doc, share, pdfPath }: { doc: Pick<InvoiceJson, "id" | "number">; share: ShareJson; pdfPath?: string }) {
+export function InvoiceShare({ doc, share, pdfPath, onStopped }: { doc: Pick<InvoiceJson, "id" | "number">; share: ShareJson; pdfPath?: string; onStopped?: () => void }) {
   const pdf = pdfPath ?? `/api/invoices/${doc.id}/pdf`;
   const [msg, setMsg] = useState("");
   const [canShareFile, setCanShareFile] = useState(false);
@@ -251,6 +251,14 @@ export function InvoiceShare({ doc, share, pdfPath }: { doc: Pick<InvoiceJson, "
     } catch (e) {
       if ((e as Error).name !== "AbortError") setMsg((e as Error).message || "Sharing didn't work");
     }
+  }
+  async function stopLinks() {
+    if (!confirm("Stop every link shared for this document so far? Anyone opening an old link will see \"not valid\". New links can be shared again.")) return;
+    setMsg("");
+    const res = await fetch(`/api/invoices/${doc.id}/share`, { method: "POST" });
+    if (!res.ok) return setMsg(((await res.json().catch(() => ({}))) as { error?: string }).error ?? "Could not stop the links");
+    setMsg("Old links stopped. The buttons above now share a new link.");
+    onStopped?.();
   }
   async function copy() {
     try {
@@ -281,7 +289,17 @@ export function InvoiceShare({ doc, share, pdfPath }: { doc: Pick<InvoiceJson, "
         <button type="button" className="btn btn-quiet btn-sm" onClick={copy}>
           Copy link
         </button>
+        {onStopped && (
+          <button type="button" className="btn btn-quiet btn-sm" onClick={stopLinks}>
+            Stop old links
+          </button>
+        )}
       </div>
+      {share.expiresAt && (
+        <p className="text-xs text-[var(--muted)]">
+          A shared link works until {new Date(share.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })}. In the app it is always here.
+        </p>
+      )}
       {msg && <p className="text-xs text-[var(--muted)] break-all">{msg}</p>}
     </div>
   );
@@ -317,7 +335,7 @@ export function InvoicePanel({
   if (!data) return <div className="card p-4 text-sm text-[var(--muted)]">Loading…</div>;
   return (
     <div className="space-y-4">
-      <InvoiceShare doc={data.invoice} share={data.share} />
+      <InvoiceShare doc={data.invoice} share={data.share} onStopped={data.can.stopLinks ? load : undefined} />
       <InvoiceView doc={data.invoice} />
       {data.invoice.notes.length > 0 && (
         <div className="card p-4">

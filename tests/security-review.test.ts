@@ -184,3 +184,35 @@ describe("plan changes", () => {
     expect((await asPlatform((tx) => tx.tenant.findUniqueOrThrow({ where: { id }, select: { plan: true } }))).plan).toBe("starter");
   });
 });
+
+describe("open items (second pass)", () => {
+  it("webhook connections use only the addresses the check saw", async () => {
+    const { pinnedLookup, PrivateAddressError } = await import("@/lib/webhooks");
+    const ask = (host: string, all: boolean) =>
+      new Promise<{ err: unknown; addr: unknown }>((resolve) => pinnedLookup(host, { all }, (err, addr) => resolve({ err, addr })));
+    // A name that resolves to a private address is refused at connect time, whatever it said earlier.
+    const r = await ask("localhost", false);
+    expect(r.err).toBeInstanceOf(PrivateAddressError);
+    expect((await ask("localhost", true)).err).toBeInstanceOf(PrivateAddressError);
+    // Dev switch: allowed, and the socket gets the checked address.
+    process.env.ALLOW_PRIVATE_WEBHOOKS = "1";
+    try {
+      const ok = await ask("localhost", true);
+      expect(ok.err).toBeNull();
+      expect(Array.isArray(ok.addr) && ok.addr.length > 0).toBe(true);
+    } finally {
+      delete process.env.ALLOW_PRIVATE_WEBHOOKS;
+    }
+  });
+
+  it("the sign-in page shows only our own messages", async () => {
+    const { noticeCode, noticeText } = await import("@/lib/login-notices");
+    expect(noticeText("Call 99999 99999 to restore your account")).toBeNull();
+    expect(noticeText(null)).toBeNull();
+    const code = noticeCode("This link has expired. Switch again from the other business.", "switch");
+    expect(code).toBe("switch-expired");
+    expect(noticeText(code)).toMatch(/expired/);
+    expect(noticeCode("anything else", "support")).toBe("link-failed");
+    expect(noticeText("link-failed")).toMatch(/didn't work/);
+  });
+});

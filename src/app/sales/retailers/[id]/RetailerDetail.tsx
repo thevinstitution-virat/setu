@@ -279,7 +279,7 @@ export default function RetailerDetail({ id, invoices }: { id: string; invoices?
           {collecting ? (
             <div className="border-t border-black/5 pt-3 space-y-3">
               <p className="text-sm font-semibold">Collect payment</p>
-              <PaymentFields value={pay} onChangeAction={setPay} methods={["CASH", "UPI", "CHEQUE"]} />
+              <PaymentFields value={pay} onChangeAction={setPay} methods={["CASH", "UPI", "CHEQUE"]} field />
               {payError && <p className="text-sm text-[#a8281e]">{payError}</p>}
               <div className="flex gap-2">
                 <button className="btn btn-quiet flex-1" onClick={() => setCollecting(false)} disabled={paySaving}>

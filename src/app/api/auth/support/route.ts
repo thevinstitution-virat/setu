@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { noticeCode } from "@/lib/login-notices";
 import { getTenant } from "@/lib/tenant";
 import { localRedirect } from "@/lib/redirect";
 import { createSessionCookie } from "@/lib/auth";
@@ -15,7 +16,7 @@ export async function GET(req: Request) {
     await createSessionCookie({ userId: user.id, tenantId: tenant.id, role: "ADMIN", name: user.name, via: "support", supportId: session.id }, seconds);
     return localRedirect("/admin");
   } catch (e) {
-    if (e instanceof SupportError) return localRedirect(`/login?notice=${encodeURIComponent(e.message)}`);
+    if (e instanceof SupportError) return localRedirect(`/login?notice=${noticeCode(e.message, "support")}`);
     throw e;
   }
 }

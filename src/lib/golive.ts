@@ -9,7 +9,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
-import { secretProblem } from "@/lib/security";
+import { platformSecretProblem, secretProblem } from "@/lib/security";
 import { LEGAL_DRAFT } from "@/lib/legal";
 
 export type CheckStatus = "ok" | "warn" | "fail";
@@ -25,6 +25,8 @@ export function envChecks(env: Env): Check[] {
 
   const sp = secretProblem(env.SESSION_SECRET);
   add("session_secret", "Session secret", sp ? "fail" : "ok", sp ?? "Set, 32+ characters");
+  const pp = platformSecretProblem(env);
+  add("platform_secret", "Console secret", pp ? "fail" : "ok", pp ?? "Set, 32+ characters, separate from the session secret");
   add("secrets_key", "Key for stored provider secrets", set(env.SECRETS_KEY) ? "ok" : "fail", set(env.SECRETS_KEY) ? "Set" : "SECRETS_KEY is not set: businesses' Razorpay and WhatsApp keys can't be stored");
 
   const domain = env.PLATFORM_DOMAIN?.trim() ?? "";

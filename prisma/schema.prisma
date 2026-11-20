@@ -185,7 +185,11 @@ model TenantDomain {
   id         String    @id @default(cuid())
   tenantId   String
   tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  host       String    @unique
+  /// Several businesses may claim the same address while unverified (each gets its own
+  /// token), so nobody can squat it; the first to prove it in DNS wins (verifiedHost).
+  host       String
+  /// = host once verified, else null. Unique: one business per live address.
+  verifiedHost String?  @unique
   /// Value the owner puts in a TXT record at _setu-verify.<host>.
   token      String    @default(cuid())
   verifiedAt DateTime?
@@ -195,7 +199,9 @@ model TenantDomain {
   tlsStatus  String?
   createdAt  DateTime  @default(now())
 
+  @@unique([tenantId, host])
   @@index([tenantId])
+  @@index([host])
 }
 
 // ───────────────────────────── Tenant tables ─────────────────────────────
@@ -1466,6 +1472,8 @@ model Invoice {
   signedQr        String?
   einvError       String?
   einvAttempts    Int            @default(0)
+  /// Bumped by "Stop old links": every share link made before stops working.
+  shareVersion    Int            @default(0)
   einvCancelledAt DateTime?
   ewbNo           String?
   ewbDate         DateTime?
@@ -2554,6 +2562,17 @@ model SupportSession {
 }
 
 /// Everything a platform user did in the console.
+/// Gateway events on our own platform account, kept so a repeat (or a replay) is done once.
+model PlatformWebhookEvent {
+  id        String   @id @default(cuid())
+  provider  String
+  eventId   String
+  event     String
+  createdAt DateTime @default(now())
+
+  @@unique([provider, eventId])
+}
+
 model PlatformAudit {
   id             String        @id @default(cuid())
   actorId        String?

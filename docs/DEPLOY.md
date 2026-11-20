@@ -31,6 +31,7 @@ Migrations run on every web start (`npm run start:prod` = `prisma migrate deploy
 |---|---|
 | `DATABASE_URL` | the app role, above |
 | `SESSION_SECRET` | 32+ random characters (`openssl rand -base64 48`). The web service refuses to start without a good one |
+| `PLATFORM_SESSION_SECRET` | another random string of 32+ characters, different from `SESSION_SECRET` (signs the console cookie and support links). The app refuses to start without it |
 | `SECRETS_KEY` | 32+ random characters; encrypts businesses' Razorpay and WhatsApp keys. **Never change it** once keys are saved |
 | `PLATFORM_DOMAIN` | e.g. `sellerssetu.in` |
 | `APP_ENV` | `prod` |
@@ -86,4 +87,5 @@ Roadmap §10, weeks −2 and −1. Do it first on a staging copy (a second Cooli
 - Security headers on every response (`src/lib/security.ts`): no framing, no MIME sniffing, HSTS, camera / location / microphone on our own pages only.
 - **`npm audit`** (20 Nov): 6 findings, none reachable in the running app. 4 high + 1 moderate in `effect`, used only by the Prisma CLI's config loader (a ReDoS in its own parsers, tooling only); 1 moderate in `uuid` under `exceljs` (a bounds check when a caller passes its own buffer, which exceljs doesn't). Both fixes are breaking downgrades / upgrades (`npm audit fix --force`); recheck when Prisma 7 / exceljs 5 are taken up.
 - Security review of every API route (20 Nov): findings, fixes and what is still open are in `docs/SECURITY-REVIEW.md`. It added `TRUST_PROXY_HOPS` (above), the "UPI and bank taken in the field" switch (Settings → Money; on by default: field UPI / bank waits in Payments → To verify) and "Sign out" for a staff member on the Team page (ends their sessions on every device; `POST /api/auth/logout {"everywhere": true}` does the same for yourself, no button yet).
+- Second pass (20 Nov): the review's open items are fixed (see `docs/SECURITY-REVIEW.md`); it adds `PLATFORM_SESSION_SECRET` (above) and migration `20261121180000_review_open_items`.
 - Pen test before the first paying external business (roadmap §8).

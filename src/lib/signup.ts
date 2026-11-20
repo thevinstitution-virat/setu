@@ -235,7 +235,7 @@ export async function signWelcome(tenantId: string, userId: string) {
 export async function consumeWelcome(token: string, tenantId: string) {
   let claims: { jti?: string; to?: unknown; uid?: unknown };
   try {
-    ({ payload: claims } = await jwtVerify(token, sessionSecret(), { audience: WELCOME_AUD }));
+    ({ payload: claims } = await jwtVerify(token, sessionSecret(), { audience: WELCOME_AUD, algorithms: ["HS256"] }));
   } catch {
     throw new SignupError("This link has expired. Sign in with your login id and password.", undefined, 401);
   }
