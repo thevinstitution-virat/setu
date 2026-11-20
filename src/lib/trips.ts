@@ -49,6 +49,8 @@ export async function createTrip(
 }
 
 async function openTrip(ctx: Ctx, tripId: string) {
+  // Lock the trip row: two "start" or "close" requests at once run one after the other.
+  await ctx.tx.$executeRaw`SELECT 1 FROM "Trip" WHERE id = ${tripId} FOR UPDATE`;
   const trip = await ctx.tx.trip.findUnique({ where: { id: tripId } });
   if (!trip) throw new MoneyError("Trip not found", 404);
   if (trip.status === "CLOSED") throw new MoneyError("This trip is closed");

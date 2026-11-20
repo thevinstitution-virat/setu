@@ -19,6 +19,28 @@ export type AutomationSettings = {
   usualOrder: { on: boolean };
   /** A5: split a day's orders into trips. */
   tripPlan: { on: boolean; maxDrops: number };
+  /**
+   * A6: demand forecast. Reorder suggestions to suppliers (enough for the
+   * supplier's lead time + coverDays, with safety stock for serviceLevel %),
+   * and the next-day load sheet (topUp: load up to the usual for that weekday).
+   */
+  forecast: { on: boolean; coverDays: number; serviceLevel: number; topUp: boolean };
+  /**
+   * A1: shops and agents type, paste or speak an order and it becomes a cart
+   * to check; whatsapp: orders sent to the business's WhatsApp number become
+   * drafts the shop confirms in the app.
+   */
+  orderText: { on: boolean; whatsapp: boolean };
+  /** A11: the owner asks questions about the business in Hindi or English. */
+  ask: { on: boolean };
+  /**
+   * A3 / A8: look at photos. payments: read UPI screenshots and cheque photos
+   * in the "To verify" queue; delivery: delivery and crate-pickup photos.
+   * The same photo used twice is always caught (no AI needed).
+   */
+  photos: { on: boolean; payments: boolean; delivery: boolean };
+  /** A10: shelf photos at a visit, with our facings, others' and empty slots. */
+  shelf: { on: boolean };
 };
 
 export const AUTOMATION_DEFAULTS: AutomationSettings = {
@@ -28,6 +50,11 @@ export const AUTOMATION_DEFAULTS: AutomationSettings = {
   checks: { on: true, cashShort: 20_000, farMetres: 300, closedTimes: 3, discountPct: 20 },
   usualOrder: { on: true },
   tripPlan: { on: true, maxDrops: 25 },
+  forecast: { on: true, coverDays: 7, serviceLevel: 90, topUp: true },
+  orderText: { on: true, whatsapp: true },
+  ask: { on: true },
+  photos: { on: true, payments: true, delivery: true },
+  shelf: { on: true },
 };
 
 export type AutomationKey = keyof AutomationSettings;
@@ -50,6 +77,8 @@ const LIMITS: Record<string, [number, number]> = {
   closedTimes: [2, 10],
   discountPct: [1, 90],
   maxDrops: [3, 100],
+  coverDays: [1, 60],
+  serviceLevel: [50, 99],
 };
 
 /**

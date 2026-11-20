@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import type { SupportMode } from "@/generated/prisma/client";
 import { asPlatform, tenantDb, withTenantTx } from "@/lib/db";
-import { sessionSecret } from "@/lib/auth";
+import { platformSecret } from "@/lib/auth";
 
 /**
  * Support sessions (Phase 9). A platform user works inside a business only
@@ -54,7 +54,7 @@ export async function startSupport(p: { platformUserId: string; platformUserName
     });
     return row;
   });
-  const token = await new SignJWT({ to: p.tenantId }).setProtectedHeader({ alg: "HS256" }).setJti(s.id).setAudience(AUD).setIssuedAt().setExpirationTime("5m").sign(sessionSecret());
+  const token = await new SignJWT({ to: p.tenantId }).setProtectedHeader({ alg: "HS256" }).setJti(s.id).setAudience(AUD).setIssuedAt().setExpirationTime("5m").sign(platformSecret());
   return { session: s, token, slug: tenant.slug };
 }
 
@@ -62,7 +62,7 @@ export async function startSupport(p: { platformUserId: string; platformUserName
 export async function consumeSupport(token: string, tenantId: string, now = new Date()) {
   let claims: { jti?: string; to?: unknown };
   try {
-    ({ payload: claims } = await jwtVerify(token, sessionSecret(), { audience: AUD }));
+    ({ payload: claims } = await jwtVerify(token, platformSecret(), { audience: AUD, algorithms: ["HS256"] }));
   } catch {
     throw new SupportError("This support link has expired. Start a new session from the console.");
   }

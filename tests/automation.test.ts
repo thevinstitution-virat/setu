@@ -148,7 +148,7 @@ describe("settings and who decides", () => {
   });
 
   it("gives each role only the kinds it may decide", () => {
-    expect(kindsFor("ADMIN")).toHaveLength(6);
+    expect(kindsFor("ADMIN")).toHaveLength(8);
     expect(kindsFor("SUPERVISOR")).toEqual(["visit_plan"]);
     expect(kindsFor("SALES_AGENT")).toEqual([]);
   });

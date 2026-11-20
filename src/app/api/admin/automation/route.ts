@@ -5,13 +5,16 @@ import { withTenantTx } from "@/lib/db";
 import { DAILY, runFeature, type Feature } from "@/lib/automation";
 import { automationSettings } from "@/lib/automation-settings";
 import { usagePeriod } from "@/lib/billing";
+import { aiConfig, aiStatus } from "@/lib/ai";
+import { aiSettings } from "@/lib/ai-settings";
 
-const FEATURES: Feature[] = ["visit_plan", "collections", "checks", "credit", "expire"];
+const FEATURES: Feature[] = ["visit_plan", "collections", "checks", "credit", "reorder", "expire"];
 
 /** GET → automation settings, the last runs, open suggestions by kind and this month's AI use. */
 export async function GET() {
   const auth = await guard("settings.manage");
   if (!auth.ok) return auth.res;
+  const status = await aiStatus(auth.tenant.id);
   const out = await withTenantTx(auth.tenant.id, async (tx) => {
     const [t, runs, open, ai] = await Promise.all([
       tx.tenant.findUniqueOrThrow({ where: { id: auth.tenant.id }, select: { settings: true } }),
@@ -23,7 +26,14 @@ export async function GET() {
       settings: automationSettings(t.settings),
       runs,
       open: Object.fromEntries(open.map((o) => [o.kind, o._count._all])),
-      ai: { credits: ai?.value ?? 0, costPaise: ai?.costPaise ?? 0 },
+      ai: {
+        credits: ai?.value ?? 0,
+        costPaise: ai?.costPaise ?? 0,
+        settings: aiSettings(t.settings),
+        available: status.available,
+        message: status.available ? null : status.message,
+        model: status.available ? status.model : aiConfig().provider === "none" ? null : aiConfig().model,
+      },
     };
   });
   return NextResponse.json(out, { headers: { "cache-control": "no-store" } });

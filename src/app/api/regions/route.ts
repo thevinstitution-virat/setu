@@ -19,8 +19,8 @@ export async function POST(req: Request) {
   const { session, db } = auth;
   const body = await req.json().catch(() => null);
   const { name } = body ?? {};
-  if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 });
-  const region = await db.region.create({ data: { name } });
+  if (typeof name !== "string" || !name.trim()) return NextResponse.json({ error: "name is required" }, { status: 400 });
+  const region = await db.region.create({ data: { name: name.trim().slice(0, 80) } });
   await audit(db, { actorId: session.userId, action: "region.create", entity: "Region", entityId: region.id, after: region, ip: requestIp(req) });
   return NextResponse.json({ region });
 }

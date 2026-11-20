@@ -274,7 +274,8 @@ export class BillingError extends Error {}
 export async function choosePlan(tenantId: string, code: string, now = new Date()) {
   const result = await withTenantTx(tenantId, async (tx) => {
     const plan = await tx.plan.findUnique({ where: { code } });
-    if (!plan || !plan.active || code === "trial") throw new BillingError("Pick one of the plans on offer");
+    // Hidden plans (negotiated prices) are given from the console, never picked by code here.
+    if (!plan || !plan.active || !plan.public || code === "trial") throw new BillingError("Pick one of the plans on offer");
     const limits = parseLimits(plan.limits);
     const [seats, shops] = await Promise.all([countSeats(tx), tx.user.count({ where: { active: true, role: "RETAILER" } })]);
     if (limits.staff !== undefined && seats > limits.staff) throw new BillingError(`${plan.name} allows ${limits.staff} staff logins; ${seats} are active. Deactivate some first.`);
@@ -289,6 +290,13 @@ export async function choosePlan(tenantId: string, code: string, now = new Date(
       // Trial ended without a plan: the paid period starts now.
       return tx.subscription.update({ where: { tenantId }, data: { planCode: code, nextPlanCode: null, status: "ACTIVE", periodStart: now, periodEnd: addMonth(now) } });
     }
+    // The month is billed on the plan held when it ends, so a cheaper plan starts with the next
+    // month (else: top plan all month, switch the day before the bill). A dearer one starts now.
+    const current = await tx.plan.findUnique({ where: { code: sub.planCode } });
+    // "Cheaper" = a smaller monthly bill at today's staff and shops (rates alone mislead: a top plan can have a lower seat rate).
+    const monthly = (p: Plan) => billLines(p, { seats, retailers: shops, aiCredits: 0 }, "").reduce((a, l) => a + l.amountPaise, 0);
+    const cheaper = !!current && monthly(plan) < monthly(current);
+    if (cheaper) return tx.subscription.update({ where: { tenantId }, data: { nextPlanCode: code === sub.planCode ? null : code } });
     return tx.subscription.update({ where: { tenantId }, data: { planCode: code, nextPlanCode: null } });
   });
   await asPlatform(async (tx) => {
@@ -359,7 +367,13 @@ export async function runBilling(now = new Date(), only?: string[]): Promise<Bil
       const inv = await issueInvoice(tenantId, cur.periodStart, cur.periodEnd, now);
       if (inv) out.invoiced++;
       const nextStart = cur.periodEnd;
-      cur = await asPlatform((tx) => tx.subscription.update({ where: { tenantId }, data: { periodStart: nextStart, periodEnd: addMonth(nextStart) } }));
+      const switchTo = cur.status === "ACTIVE" ? cur.nextPlanCode : null;
+      cur = await asPlatform(async (tx) => {
+        const s = await tx.subscription.update({ where: { tenantId }, data: { periodStart: nextStart, periodEnd: addMonth(nextStart), ...(switchTo ? { planCode: switchTo, nextPlanCode: null } : {}) } });
+        if (switchTo) await tx.tenant.update({ where: { id: tenantId }, data: { plan: switchTo } });
+        return s;
+      });
+      if (switchTo) invalidateEntitlements(tenantId);
     }
   }
 

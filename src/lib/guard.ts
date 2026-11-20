@@ -44,6 +44,11 @@ export function gate(i: GateInput): { error: string; status: number; code: strin
   if (i.support?.mode === "READ" && i.method && !["GET", "HEAD", "OPTIONS"].includes(i.method) && !under(path, READONLY_OK)) {
     return { error: "This support session is read-only.", status: 403, code: "support_read_only" };
   }
+  // A supervisor login is the field module itself: without it, it opens nothing
+  // (not orders, attendance or every shop through the general routes).
+  if (i.role === "SUPERVISOR" && !i.features.has("field")) {
+    return { error: "Supervisor logins need the Field team module, which is not in this plan. Ask the owner.", status: 402, code: "upgrade", feature: "field" };
+  }
   const f = path ? featureForPath(path) : null;
   if (f && !i.features.has(f)) {
     return { error: `Not in your plan: ${FEATURES[f]}. Move to a plan that has it under Billing.`, status: 402, code: "upgrade", feature: f };
@@ -78,9 +83,10 @@ export async function guard(perm?: Permission | Permission[]): Promise<Ok | Fail
   const db = tenantDb(tenant.id);
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { active: true, role: true, name: true, isSupport: true },
+    select: { active: true, role: true, name: true, isSupport: true, sessionVersion: true },
   });
   if (!user || !user.active) return fail("This account is not active", 401);
+  if ((session.sv ?? 0) !== user.sessionVersion) return fail("You were signed out. Please sign in again.", 401);
 
   let support: { mode: "READ" | "WRITE" } | null = null;
   if (user.isSupport) {
@@ -111,9 +117,10 @@ export async function pageSession(): Promise<SessionPayload | null> {
   if (!session) return null;
   const user = await tenantDb(tenant.id).user.findUnique({
     where: { id: session.userId },
-    select: { active: true, role: true, name: true, isSupport: true },
+    select: { active: true, role: true, name: true, isSupport: true, sessionVersion: true },
   });
   if (!user || !user.active) return null;
+  if ((session.sv ?? 0) !== user.sessionVersion) return null;
   if (user.isSupport && !(session.supportId && (await activeSupport(tenant.id, session.supportId)))) return null;
   if (tenant.status === "SUSPENDED" && user.role !== "ADMIN") return null;
   return { ...session, role: user.role, name: user.name };

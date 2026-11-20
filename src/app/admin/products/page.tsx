@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Icon from "@/components/Icon";
@@ -158,10 +159,15 @@ function Catalogue() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <p className="page-kick">Catalogue</p>
-        <h1 className="page-title">Products</h1>
-        <p className="page-sub">What retailers can order, how it is grouped, its GST, and the banners on their home screen.</p>
+      <div className="page-head">
+        <div className="min-w-0">
+          <p className="page-kick">Catalogue</p>
+          <h1 className="page-title">Products</h1>
+          <p className="page-sub">What retailers can order, how it is grouped, its GST, and the banners on their home screen.</p>
+        </div>
+        <Link href="/admin/products/assist" className="btn btn-quiet btn-sm">
+          <Icon name="star" className="h-4 w-4" /> Catalogue assist
+        </Link>
       </div>
       <TabBar tabs={TABS} value={tab} onChange={pick} />
       {tab === "products" && <ProductsTab />}

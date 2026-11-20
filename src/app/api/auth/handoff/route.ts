@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { noticeCode } from "@/lib/login-notices";
 import { localRedirect } from "@/lib/redirect";
 import { guard } from "@/lib/guard";
 import { audit, requestIp } from "@/lib/audit";
@@ -40,6 +41,6 @@ export async function GET(req: Request) {
     return localRedirect(roleHome(user.role), 303);
   } catch (e) {
     if (!(e instanceof HandoffError)) throw e;
-    return localRedirect(`/login?error=${encodeURIComponent(e.message)}`, 303);
+    return localRedirect(`/login?error=${noticeCode(e.message, "switch")}`, 303);
   }
 }

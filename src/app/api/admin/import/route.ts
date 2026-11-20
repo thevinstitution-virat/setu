@@ -20,6 +20,7 @@ import {
   type RetailerRow,
   type RowError,
 } from "@/lib/importers";
+import { tidyProductRows, type TidyChange, type TidyDuplicate } from "@/lib/catalogue-rules";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 
@@ -262,6 +263,8 @@ export async function POST(req: Request) {
   if (!auth.ok) return auth.res;
   const { session, tenant, db } = auth;
 
+  // Refuse a big body before reading it into memory.
+  if (Number(req.headers.get("content-length") ?? 0) > MAX_BYTES + 64 * 1024) return NextResponse.json({ error: "File is larger than 5 MB" }, { status: 413 });
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
   const type = String(form?.get("type") ?? "") as ImportType;
@@ -284,6 +287,18 @@ export async function POST(req: Request) {
   if (!rows.length) return NextResponse.json({ error: "The file has no data rows" }, { status: 400 });
   if (rows.length > MAX_ROWS) {
     return NextResponse.json({ error: `At most ${MAX_ROWS} rows per file; split it` }, { status: 400 });
+  }
+
+  // A13: tidy a product sheet first (names, units, GST, categories) and flag likely duplicates.
+  let tidy: { changes: TidyChange[]; changeCount: number; duplicates: TidyDuplicate[] } | null = null;
+  if (type === "products" && String(form?.get("tidy") ?? "") === "1") {
+    const existing = await withTenantTx(tenant.id, async (tx) => ({
+      products: await tx.product.findMany({ select: { name: true, sku: true } }),
+      categories: (await tx.category.findMany({ select: { name: true } })).map((c) => c.name),
+    }));
+    const t = tidyProductRows(rows, existing);
+    rows = t.rows;
+    tidy = { changes: t.changes.slice(0, 200), changeCount: t.changes.length, duplicates: t.duplicates.slice(0, 100) };
   }
 
   const checked =
@@ -322,6 +337,7 @@ export async function POST(req: Request) {
         mode: "preview",
         rows: rows.length,
         committed: false,
+        tidy,
         ...e.summary,
         errors: e.summary.errors.slice(0, 200),
         errorCount: e.summary.errors.length,
@@ -334,10 +350,10 @@ export async function POST(req: Request) {
     actorId: session.userId,
     action: `import.${type}`,
     entity: "Import",
-    after: { file: file.name, rows: rows.length, created: summary.created, updated: summary.updated },
+    after: { file: file.name, rows: rows.length, created: summary.created, updated: summary.updated, tidied: tidy?.changeCount ?? 0 },
     ip: requestIp(req),
   });
   await emit("import.completed", { tenantId: tenant.id, type, created: summary.created, updated: summary.updated });
 
-  return NextResponse.json({ mode: "commit", rows: rows.length, committed: true, ...summary, errorCount: 0 });
+  return NextResponse.json({ mode: "commit", rows: rows.length, committed: true, tidy, ...summary, errorCount: 0 });
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
+import { crossSiteRefused } from "@/lib/security";
 
 const SESSION_COOKIE = "setu_session";
 const secret = new TextEncoder().encode(
@@ -26,7 +27,8 @@ const protectedPrefixes: Record<string, string> = {
  *    so guard() and layouts can check the plan's modules and read-only
  *    support sessions in one place. Any such header sent by a client is
  *    overwritten here.
- * 2. Sends signed-out visitors of the role areas to /login.
+ * 2. Refuses writes to /api from pages on another host (lib/security.ts).
+ * 3. Sends signed-out visitors of the role areas to /login.
  */
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -41,6 +43,10 @@ export async function proxy(request: NextRequest) {
   const proto = (request.headers.get("x-forwarded-proto") ?? request.nextUrl.protocol.replace(":", "")).split(",")[0].trim();
   const to = (path: string) => NextResponse.redirect(new URL(path, host ? `${proto}://${host}` : request.url), 307);
 
+  if (crossSiteRefused({ method: request.method, path: pathname, origin: request.headers.get("origin"), host })) {
+    return NextResponse.json({ error: "This request came from another site and was refused" }, { status: 403 });
+  }
+
   const matchedPrefix = Object.keys(protectedPrefixes).find((p) => pathname === p || pathname.startsWith(`${p}/`));
   if (!matchedPrefix) return next();
 
@@ -50,7 +56,7 @@ export async function proxy(request: NextRequest) {
   }
 
   try {
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
     const role = payload.role as string;
     if (role !== protectedPrefixes[matchedPrefix]) {
       return to(roleHomes[role] ?? "/login");

@@ -940,6 +940,8 @@ export async function recordHandover(ctx: Ctx, h: { staffUserId: string; counted
 /** Accept a shortage as a loss (removes it from the staff member's cash-in-hand). */
 export async function writeOffShortage(ctx: Ctx, staffUserId: string, amount: number, note: string) {
   if (!Number.isInteger(amount) || amount <= 0) throw new MoneyError("Amount must be more than ₹0");
+  // Same lock as a handover: two write-offs at once can't exceed what is held.
+  await ctx.tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${ctx.tenantId}:cash:${staffUserId}`}))`;
   const held = await cashInHand(ctx, staffUserId);
   if (amount > held) throw new MoneyError(`Only ${formatINR(held)} is outstanding for this person`);
   return post(ctx, {

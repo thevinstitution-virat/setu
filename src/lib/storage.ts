@@ -150,8 +150,26 @@ export async function getFile(key: string) {
   return (await getDriver()).get(key);
 }
 
+/** Delete one file (and the local driver's .type note beside it). */
+export async function deleteFile(key: string) {
+  const d = await getDriver();
+  await d.removePrefix(key);
+  await d.removePrefix(`${key}.type`);
+}
+
 /** Delete all of a tenant's files (DPDP purge). */
 export async function deleteTenantFiles(tenantId: string) {
   if (!/^[a-z0-9]+$/i.test(tenantId)) throw new Error("Bad tenant id");
   return (await getDriver()).removePrefix(`t/${tenantId}/`);
+}
+
+/** Kinds (t/<tenant>/<kind>/...) a shop must never open, and kinds never served by /api/files (data exports: owner-only route). */
+const STAFF_ONLY_KINDS = new Set(["selfie"]);
+const NOT_SERVED_KINDS = new Set(["export"]);
+
+/** May this role open this file through /api/files? (The tenant check is keyBelongsTo.) */
+export function mayOpen(key: string, role: string) {
+  const kind = key.split("/")[2] ?? "";
+  if (NOT_SERVED_KINDS.has(kind)) return false;
+  return !(role === "RETAILER" && STAFF_ONLY_KINDS.has(kind));
 }
