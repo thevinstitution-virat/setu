@@ -7,6 +7,7 @@ import { FAIL_REASONS, PREF_LABEL } from "@/lib/delivery-settings";
 import { errText, send } from "@/components/admin/AdminKit";
 import { OrderLink } from "@/components/dispatch/ReadyOrders";
 import { failLabel, plural, type StopJson, type TripDetail } from "@/components/dispatch/kit";
+import RouteEstimate from "@/components/dispatch/RouteEstimate";
 
 /** Stops in route order with reorder, auto route, remove and "Not delivered". */
 export default function TripStops({ data, onDone }: { data: TripDetail; onDone: (msg?: string) => void }) {
@@ -58,6 +59,7 @@ export default function TripStops({ data, onDone }: { data: TripDetail; onDone: 
             {open.length !== stops.length ? ` · ${open.length} open` : ""}
           </span>
         </div>
+        {stops.length > 0 && <RouteEstimate tripId={trip.id} stopsKey={stops.map((s) => s.orderId).join(",")} />}
         {(directions || (editable && open.length > 1)) && (
           <div className="flex flex-wrap gap-2">
             {editable && open.length > 1 && (

@@ -18,10 +18,14 @@ export async function POST(req: Request) {
   const { session, db } = auth;
   const body = await req.json().catch(() => null);
   const { name, regionId } = body ?? {};
-  if (!name || !regionId) {
+  if (typeof name !== "string" || !name.trim() || typeof regionId !== "string" || !regionId) {
     return NextResponse.json({ error: "name and regionId are required" }, { status: 400 });
   }
-  const area = await db.area.create({ data: { name, regionId } });
+  // Foreign keys ignore row security: make sure the region is this tenant's.
+  if (!(await db.region.findUnique({ where: { id: regionId }, select: { id: true } }))) {
+    return NextResponse.json({ error: "Region not found" }, { status: 404 });
+  }
+  const area = await db.area.create({ data: { name: name.trim().slice(0, 80), regionId } });
   await audit(db, { actorId: session.userId, action: "area.create", entity: "Area", entityId: area.id, after: area, ip: requestIp(req) });
   return NextResponse.json({ area });
 }

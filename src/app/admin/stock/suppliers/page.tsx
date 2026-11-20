@@ -14,6 +14,7 @@ type Supplier = {
   email: string | null;
   gstin: string | null;
   address: string | null;
+  leadDays: number;
   active: boolean;
   _count: { products: number; purchaseOrders: number };
 };
@@ -129,6 +130,7 @@ function SupplierCard({ s, onEdit }: { s: Supplier; onEdit: () => void }) {
             </p>
           )}
           {s.gstin && <p className="text-xs text-[var(--muted)] break-all">GSTIN {s.gstin}</p>}
+          <p className="text-xs text-[var(--muted)]">Delivers in {plural(s.leadDays, "day")}</p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {!s.active && <ActiveChip active={false} />}
@@ -159,12 +161,15 @@ function SupplierSheet({ supplier, onClose, onSaved }: { supplier: Supplier | nu
   const [email, setEmail] = useState(supplier?.email ?? "");
   const [gstin, setGstin] = useState(supplier?.gstin ?? "");
   const [address, setAddress] = useState(supplier?.address ?? "");
+  const [leadDays, setLeadDays] = useState(String(supplier?.leadDays ?? 3));
   const [active, setActive] = useState(supplier?.active ?? true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save() {
     if (name.trim().length < 2) return setError("Enter the supplier name");
+    const lead = Number(leadDays);
+    if (!/^\d+$/.test(leadDays) || lead > 90) return setError("Delivery time must be 0 to 90 days");
     const body: Record<string, unknown> = {
       name: name.trim(),
       contactName: contactName.trim(),
@@ -172,6 +177,7 @@ function SupplierSheet({ supplier, onClose, onSaved }: { supplier: Supplier | nu
       email: email.trim(),
       gstin: gstin.trim(),
       address: address.trim(),
+      leadDays: lead,
     };
     if (supplier) body.active = active;
     setBusy(true);
@@ -239,6 +245,9 @@ function SupplierSheet({ supplier, onClose, onSaved }: { supplier: Supplier | nu
           value={gstin}
           onChange={(e) => setGstin(e.target.value.toUpperCase().replace(/\s/g, ""))}
         />
+      </Field>
+      <Field label="Days to deliver" hint="From sending a purchase order to the goods arriving. Reorder suggestions order enough to last this long.">
+        <input className="input !w-28" inputMode="numeric" maxLength={2} value={leadDays} onChange={(e) => setLeadDays(e.target.value.replace(/\D/g, ""))} />
       </Field>
       <Field label="Address">
         <textarea className="input min-h-[80px]" maxLength={300} value={address} onChange={(e) => setAddress(e.target.value)} />

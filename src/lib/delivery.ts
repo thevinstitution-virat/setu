@@ -107,6 +107,9 @@ export type DeliverInput = {
 
 /** Mark an order delivered, line by line. Runs inside withMoney. */
 export async function deliverOrder(ctx: Ctx, input: DeliverInput, now = new Date()) {
+  // Lock the order first: a double tap or a retried request waits here and
+  // then sees it delivered, instead of booking the payment and stock twice.
+  await ctx.tx.$executeRaw`SELECT 1 FROM "Order" WHERE id = ${input.orderId} FOR UPDATE`;
   const order = await ctx.tx.order.findUniqueOrThrow({
     where: { id: input.orderId },
     include: { items: { orderBy: { id: "asc" } }, delivery: true, retailer: { select: { id: true, lat: true } } },
@@ -179,13 +182,15 @@ export async function deliverOrder(ctx: Ctx, input: DeliverInput, now = new Date
   }
 
   const cashAmount = input.collect?.method === "CASH" ? input.collect.amount : 0;
+  // Paid by the delivery QR (or a link) before handing over: online, collected.
+  const paidOnline = !input.collect && (await ctx.tx.payment.count({ where: { orderId: order.id, method: "ONLINE", state: "CONFIRMED" } })) > 0;
   const deliveryData = {
     deliveredAt: now,
     state: "DELIVERED" as const,
     podPhotoUrl: input.pod.photo,
     podSignatureData: input.pod.signature,
-    paymentMethod: !input.collect ? ("CREDIT" as const) : input.collect.method === "CASH" ? ("CASH" as const) : ("ONLINE" as const),
-    paymentStatus: input.collect ? ("COLLECTED" as const) : ("PENDING" as const),
+    paymentMethod: paidOnline ? ("ONLINE" as const) : !input.collect ? ("CREDIT" as const) : input.collect.method === "CASH" ? ("CASH" as const) : ("ONLINE" as const),
+    paymentStatus: input.collect || paidOnline ? ("COLLECTED" as const) : ("PENDING" as const),
     codAmount: cashAmount,
     lat: input.pod.lat,
     lng: input.pod.lng,
@@ -267,6 +272,12 @@ export async function recordReturnables(
     seen.add(r.returnableId);
     const ret = await ctx.tx.returnable.findUnique({ where: { id: r.returnableId } });
     if (!ret || (!ret.active && at.kind !== "ADJUST")) throw new MoneyError("That crate type isn't in use");
+    // A driver can't take back more than the shop holds (plus what they just gave):
+    // otherwise unreturned crates could be hidden and never charged.
+    if (taken > 0 && (at.kind === "DELIVERY" || at.kind === "PICKUP")) {
+      const held = (await returnableBalances(ctx, retailerId)).find((b) => b.returnableId === ret.id)?.balance ?? 0;
+      if (taken > held + given) throw new MoneyError(`The shop holds only ${held + given} ${ret.name}`);
+    }
     await ctx.tx.returnableMove.create({
       data: {
         returnableId: ret.id,

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { spendDraft } from "@/lib/order-drafts";
 import { guard } from "@/lib/guard";
 import { emit } from "@/lib/jobs";
 import { withMoney } from "@/lib/ledger";
@@ -8,6 +9,8 @@ import { moneyFail } from "@/lib/money-api";
 
 /** Never send password hashes or other account internals to the browser. */
 const USER = { id: true, name: true, phone: true } as const;
+/** Product fields shops and field staff never need: our buying price, supplier, reorder and visibility rules. */
+const PRODUCT_PUBLIC = { omit: { lastCost: true, supplierId: true, reorderLevel: true, reorderQty: true, visibleAreaIds: true, visibleGroupIds: true } } as const;
 
 export async function GET() {
   const auth = await guard();
@@ -39,7 +42,7 @@ export async function GET() {
     where,
     include: {
       retailer: { include: { user: { select: USER } } },
-      items: { include: { product: true } },
+      items: { include: { product: PRODUCT_PUBLIC } },
       delivery: { omit: { code: session.role !== "RETAILER" }, include: { deliveryAgent: { include: { user: { select: USER } } } } },
     },
     orderBy: { createdAt: "desc" },
@@ -63,8 +66,8 @@ export async function POST(req: Request) {
   // retailer short of balance gets a 402; a scheme that just ran out a 409).
   let order;
   try {
-    ({ order } = await withMoney(tenant.id, session.userId, (ctx) =>
-      placeOrder(ctx, {
+    ({ order } = await withMoney(tenant.id, session.userId, async (ctx) => {
+      const placed = await placeOrder(ctx, {
         retailerId: who.retailerId,
         placedById: session.userId,
         items: body.items,
@@ -72,8 +75,10 @@ export async function POST(req: Request) {
         deliveryDate: body.deliveryDate,
         notes: body.notes,
         visitId: body.visitId,
-      })
-    ));
+      });
+      if (body.draftId) await spendDraft(ctx.tx, who.retailerId, body.draftId, placed.order.id);
+      return placed;
+    }));
   } catch (e) {
     return moneyFail(e);
   }

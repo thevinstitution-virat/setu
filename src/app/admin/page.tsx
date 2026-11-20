@@ -1,6 +1,8 @@
 import { formatINR } from "@/lib/money";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getDb } from "@/lib/tenant";
+import { pageSession } from "@/lib/guard";
 import { STATUS_COLOR, STATUS_TILE } from "@/lib/orders";
 import { getServerLang, tr } from "@/lib/i18n/server";
 import type { OrderStatus } from "@/generated/prisma/client";
@@ -17,6 +19,9 @@ const STATUSES: OrderStatus[] = [
 ];
 
 export default async function AdminPipeline() {
+  // Check here, not only in the layout: a client navigation can render this page without its layout.
+  const session = await pageSession();
+  if (!session || session.role !== "ADMIN") redirect("/login");
   const db = await getDb();
   const lang = await getServerLang();
   const [counts, recentOrders, retailerCount, salesAgentCount, deliveryAgentCount, productCount] =
@@ -46,9 +51,14 @@ export default async function AdminPipeline() {
           <h1 className="page-title">Pipeline overview</h1>
           <p className="page-sub">Every order at every stage, without a phone call.</p>
         </div>
-        <Link href="/admin/orders" className="btn btn-kesar btn-sm">
-          Manage orders <Icon name="arrow" className="h-4 w-4" />
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/admin/reports" className="btn btn-outline btn-sm">
+            Reports
+          </Link>
+          <Link href="/admin/orders" className="btn btn-kesar btn-sm">
+            Manage orders <Icon name="arrow" className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
 
       <div className="card p-3 sm:p-4">

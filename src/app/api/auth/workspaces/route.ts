@@ -10,11 +10,13 @@ export async function GET() {
   const { session, db, tenant } = auth;
   if (!isFieldRole(session.role)) return NextResponse.json({ current: { name: tenant.name }, workspaces: [], canHop: false });
   const me = await db.user.findUnique({ where: { id: session.userId }, select: { phone: true } });
-  const workspaces = me?.phone ? await workspacesFor(me.phone, tenant.id) : [];
+  // Only a session that proved this phone by code may see the other businesses: an owner can type
+  // any number on a staff login, and must not learn who else employs that number.
+  const proved = (session.via === "otp" || session.via === "handoff") && !!me?.phone && session.phone === me.phone;
+  const workspaces = proved ? await workspacesFor(me!.phone!, tenant.id) : [];
   return NextResponse.json({
     current: { name: tenant.name },
     workspaces: workspaces.map((w) => ({ slug: w.slug, name: w.name, role: w.role })),
-    // A password session must sign in on the other business; OTP sessions hop straight in.
-    canHop: (session.via === "otp" || session.via === "handoff") && session.phone === me?.phone,
+    canHop: proved,
   });
 }

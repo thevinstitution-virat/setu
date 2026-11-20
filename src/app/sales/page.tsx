@@ -5,6 +5,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import { ErrorBox, useFetch } from "@/components/admin/AdminKit";
 import PunchCard from "@/components/field/PunchCard";
+import AnnouncementCards from "@/components/engage/AnnouncementCards";
 import WorkspaceSwitcher from "@/components/field/WorkspaceSwitcher";
 import { FIELD_EVENT, clock, type DayRoute, type VisitsToday } from "@/components/field/kit";
 
@@ -37,6 +38,7 @@ export default function SalesToday() {
 
       <WorkspaceSwitcher />
       <PunchCard />
+      <AnnouncementCards />
 
       {open && (
         <Link
