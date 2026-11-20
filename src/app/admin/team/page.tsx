@@ -138,6 +138,20 @@ export default function AdminTeamPage() {
     }
   }
 
+  async function signOutEverywhere(u: TeamUser) {
+    if (!window.confirm(`Sign ${u.name} out on every phone and computer? They sign in again with their password or a code.`)) return;
+    setRowError(null);
+    setBusyId(u.id);
+    try {
+      await send(`/api/admin/users/${u.id}`, "PATCH", { signOut: true });
+      setRowError({ id: u.id, text: `${u.name} is signed out everywhere.` });
+    } catch (e) {
+      setRowError({ id: u.id, text: errText(e) });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function assignAgent(retailerId: string, salesAgentProfileId: string) {
     setRowError(null);
     try {
@@ -274,6 +288,17 @@ export default function AdminTeamPage() {
                     >
                       {busyId === u.id ? "…" : u.active ? "Active" : "Inactive"}
                     </button>
+                    {u.active && (
+                      <button
+                        type="button"
+                        onClick={() => signOutEverywhere(u)}
+                        disabled={busyId === u.id}
+                        className="min-h-[44px] text-xs font-medium rounded-lg px-3 bg-black/5 text-[var(--ink-2)]"
+                        title="End their sessions on every device (a lost phone)"
+                      >
+                        Sign out
+                      </button>
+                    )}
                   </div>
                 </div>
                 {rowError?.id === u.id && <p className="text-xs text-[#a8281e]">{rowError.text}</p>}

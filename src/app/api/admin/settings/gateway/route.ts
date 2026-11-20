@@ -3,7 +3,7 @@ import { guard } from "@/lib/guard";
 import { audit, requestIp } from "@/lib/audit";
 import { asPlatform } from "@/lib/db";
 import { encryptSecret } from "@/lib/secrets";
-import { gatewaySettings, parseGatewaySettings, publicGateway, type GatewaySettings } from "@/lib/gateway-settings";
+import { gatewaySettings, parseGatewaySettings, publicGateway, simulatorAllowed, type GatewaySettings } from "@/lib/gateway-settings";
 import { invalidateTenantCache } from "@/lib/tenant";
 import { tenantUrl } from "@/lib/notify";
 
@@ -22,8 +22,6 @@ async function view(tenantId: string, settings: unknown) {
     simulatorAllowed: simulatorAllowed(),
   };
 }
-
-const simulatorAllowed = () => process.env.NODE_ENV !== "production" || process.env.ALLOW_GATEWAY_SIMULATOR === "1";
 
 export async function GET() {
   const auth = await guard("gateway.manage");

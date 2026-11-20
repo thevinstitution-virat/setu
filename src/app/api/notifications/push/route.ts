@@ -1,5 +1,6 @@
 import { engageWrite } from "@/lib/engage-api";
 import { MoneyError } from "@/lib/money-error";
+import { pushEndpointAllowed } from "@/lib/security";
 
 /** Body: the browser's PushSubscription JSON { endpoint, keys: { p256dh, auth } } → saved for me. */
 export async function POST(req: Request) {
@@ -14,6 +15,7 @@ export async function POST(req: Request) {
       if (!/^https:\/\/[^\s]{10,800}$/.test(endpoint) || typeof keys.p256dh !== "string" || typeof keys.auth !== "string" || keys.p256dh.length > 200 || keys.auth.length > 100) {
         throw new MoneyError("This browser's push details look wrong");
       }
+      if (!pushEndpointAllowed(endpoint)) throw new MoneyError("This browser's push service isn't supported");
       // One endpoint belongs to whoever subscribed last on that browser (shared phones change hands).
       const existing = await ctx.tx.pushSubscription.findUnique({ where: { tenantId_endpoint: { tenantId: ctx.tenantId, endpoint } } });
       if (existing) {

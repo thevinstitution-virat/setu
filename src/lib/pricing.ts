@@ -343,6 +343,10 @@ export async function quoteCart(
       continue;
     }
     const w = wanted.get(p.id) ?? { quantity: 0, cases: 0 };
+    if (w.quantity + qty > MAX_QTY) {
+      problems.push(`${p.name}: quantity must be a whole number of at least 1`);
+      continue;
+    }
     w.quantity += qty;
     w.cases = cases !== null && w.cases !== null ? w.cases + cases : null;
     wanted.set(p.id, w);

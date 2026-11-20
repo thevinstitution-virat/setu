@@ -2,6 +2,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { Role } from "@/generated/prisma/client";
 import { getTenant } from "@/lib/tenant";
+import { tenantDb } from "@/lib/db";
 
 const SESSION_COOKIE = "setu_session";
 
@@ -24,11 +25,17 @@ export type SessionPayload = {
   supportId?: string;
   /** Verified phone (OTP / handoff sessions). */
   phone?: string;
+  /** The user's sessionVersion when this session was made; a bump ends it (guard / pageSession). */
+  sv?: number;
 };
 
+const AUDIENCE = "setu-tenant";
+
 export async function createSessionCookie(payload: SessionPayload, maxAgeSec = 60 * 60 * 24 * 30) {
-  const token = await new SignJWT({ ...payload })
+  const u = await tenantDb(payload.tenantId).user.findUnique({ where: { id: payload.userId }, select: { sessionVersion: true } });
+  const token = await new SignJWT({ ...payload, sv: u?.sessionVersion ?? 0 })
     .setProtectedHeader({ alg: "HS256" })
+    .setAudience(AUDIENCE)
     .setIssuedAt()
     .setExpirationTime(Math.floor(Date.now() / 1000) + maxAgeSec)
     .sign(sessionSecret());
@@ -53,7 +60,9 @@ export async function getSession(): Promise<SessionPayload | null> {
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, sessionSecret());
+    const { payload } = await jwtVerify(token, sessionSecret(), { algorithms: ["HS256"] });
+    // Sessions made before audiences existed have none; any other audience is another kind of token.
+    if (payload.aud !== undefined && payload.aud !== AUDIENCE) return null;
     const session = payload as unknown as SessionPayload;
     const tenant = await getTenant();
     if (!tenant || session.tenantId !== tenant.id) return null;

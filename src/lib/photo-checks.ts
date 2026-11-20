@@ -38,6 +38,7 @@ import {
   type PhotoResult,
   type PickupRead,
 } from "@/lib/photo-rules";
+import { HOUR, limited } from "@/lib/rate-limit";
 
 export type PhotoSubject = "payment" | "delivery" | "pickup" | "shelf";
 export const PHOTO_SUBJECTS: PhotoSubject[] = ["payment", "delivery", "pickup", "shelf"];
@@ -352,6 +353,7 @@ export type ShelfRead = { ours: number; others: number; empty: number; seen: { i
 export async function readShelf(tenantId: string, o: { actorId: string; retailerId: string; photoKey: string; now?: Date }): Promise<{ ok: true; read: ShelfRead; credits: number } | { ok: false; message: string }> {
   const now = o.now ?? new Date();
   if (!keyBelongsTo(o.photoKey, tenantId)) return { ok: false, message: "That photo isn't from this business" };
+  if (await limited(`ai-shelf:${tenantId}`, o.actorId, 30, HOUR, now)) return { ok: false, message: "Many shelf photos were read this hour. Count and type them in." };
   const ctx = await withTenantTx(tenantId, async (tx) => {
     const s = await settingsOf(tx, tenantId);
     if (!s.shelf.on) return null;

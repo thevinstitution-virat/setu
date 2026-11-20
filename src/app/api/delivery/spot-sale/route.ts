@@ -4,7 +4,7 @@ import { audit, requestIp } from "@/lib/audit";
 import { emit, kickPhotos } from "@/lib/jobs";
 import { keyBelongsTo } from "@/lib/storage";
 import { withMoney } from "@/lib/ledger";
-import { moneyFail, parseCollect } from "@/lib/money-api";
+import { fieldNeedsCheck, moneyFail, parseCollect, referenceUsed } from "@/lib/money-api";
 import { parseCartBody } from "@/lib/cart-api";
 import { queueEInvoice } from "@/lib/einvoice-queue";
 import { spotSale } from "@/lib/spot-sale";
@@ -36,6 +36,8 @@ export async function POST(req: Request) {
   if (raw?.collect) {
     const parsed = parseCollect(raw.collect, tenant.id);
     if (typeof parsed === "string") return NextResponse.json({ error: parsed }, { status: 400 });
+    const used = parsed.method === "UPI" || parsed.method === "BANK" ? await referenceUsed(db, parsed.reference) : null;
+    if (used) return NextResponse.json({ error: `This reference was already used (${used.number})` }, { status: 409 });
     collect = parsed;
   }
   const returnables: ReturnableInput[] = Array.isArray(raw?.returnables)
@@ -53,7 +55,7 @@ export async function POST(req: Request) {
         items: cart.items,
         returnables,
         pod,
-        collect: collect ? { ...collect, collectorId: session.userId, atOffice: false } : null,
+        collect: collect ? { ...collect, collectorId: session.userId, atOffice: false, needsVerification: fieldNeedsCheck(collect.method, false, tenant.settings) } : null,
       })
     );
   } catch (e) {

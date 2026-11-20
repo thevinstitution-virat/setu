@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getTenant } from "@/lib/tenant";
 import { tenantDb } from "@/lib/db";
-import { verifyPassword } from "@/lib/password";
+import { burnPasswordCheck, verifyPassword } from "@/lib/password";
 import { createSessionCookie, roleHome } from "@/lib/auth";
 import { requestIp } from "@/lib/audit";
 import { lockedMessage, loginLocked, recordLogin } from "@/lib/login-limit";
@@ -28,7 +28,8 @@ export async function POST(req: Request) {
     omit: { passwordHash: false },
   });
 
-  if (!user || !user.passwordHash || !verifyPassword(password, user.passwordHash)) {
+  const passwordOk = user?.passwordHash ? verifyPassword(password, user.passwordHash) : burnPasswordCheck(password);
+  if (!user || !passwordOk) {
     await recordLogin(tenant.id, loginId, ip, false);
     return NextResponse.json({ error: "Invalid login ID or password" }, { status: 401 });
   }

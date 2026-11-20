@@ -1,5 +1,5 @@
 import { publicTenantUrl } from "@/lib/redirect";
-import { createHmac, randomInt, randomUUID } from "node:crypto";
+import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
 import { asPlatform, tenantDb, type Tx } from "@/lib/db";
@@ -30,6 +30,10 @@ export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$/;
 export const RESERVED_SLUGS = new Set([
   "www", "app", "api", "admin", "platform", "static", "cdn", "mail", "demo", "second", "start", "signup", "login",
   "billing", "help", "support", "status", "docs", "blog", "setu", "sellerssetu", "test", "staging", "dev", "assets", "files", "pay",
+  // Sound like us, or like mail / DNS / sign-in hosts (phishing look-alikes).
+  "console", "auth", "account", "accounts", "secure", "security", "verify", "otp", "sso", "id", "my", "m", "mobile",
+  "ns", "ns1", "ns2", "dns", "mx", "smtp", "imap", "pop", "webmail", "email", "ftp", "vpn", "portal", "dashboard",
+  "official", "team", "staff", "root", "system", "internal", "legal", "privacy", "terms", "abuse", "noreply", "no-reply",
 ]);
 
 export class SignupError extends Error {
@@ -90,11 +94,12 @@ export async function verifySignupOtp(challengeId: string, code: string, now = n
   const c = await prisma.signupChallenge.findUnique({ where: { id: challengeId } });
   if (!c || c.usedAt || c.expiresAt <= now) throw new SignupError("The code has expired. Ask for a new one.", "code");
   if (c.verifiedAt) return { phone: c.phone };
-  if (c.attempts >= 5) throw new SignupError("Too many wrong codes. Ask for a new one.", "code", 429);
-  if (codeHash(c.id, code.trim()) !== c.codeHash) {
-    await prisma.signupChallenge.update({ where: { id: c.id }, data: { attempts: { increment: 1 } } });
-    throw new SignupError("That code is not right", "code");
-  }
+  // Claim the try first (atomic), so parallel guesses can't pass the limit.
+  const claimed = await prisma.signupChallenge.updateMany({ where: { id: c.id, verifiedAt: null, attempts: { lt: 5 } }, data: { attempts: { increment: 1 } } });
+  if (claimed.count === 0) throw new SignupError("Too many wrong codes. Ask for a new one.", "code", 429);
+  const given = Buffer.from(codeHash(c.id, code.trim()), "hex");
+  const want = Buffer.from(c.codeHash, "hex");
+  if (given.length !== want.length || !timingSafeEqual(given, want)) throw new SignupError("That code is not right", "code");
   await prisma.signupChallenge.update({ where: { id: c.id }, data: { verifiedAt: now } });
   return { phone: c.phone };
 }

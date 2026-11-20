@@ -87,7 +87,11 @@ export async function placeOrder(
   }
 
   if (p.visitId) {
-    await tx.visit.updateMany({ where: { id: p.visitId, orderId: null }, data: { orderId: created.id } });
+    // Only this shop's visit, made by the person placing the order.
+    await tx.visit.updateMany({
+      where: { id: p.visitId, orderId: null, retailerId: p.retailerId, salesAgent: { userId: p.placedById } },
+      data: { orderId: created.id },
+    });
   }
   const credit = await onOrderPlaced(ctx, created);
   return { order: { ...created, creditHold: credit.hold, creditHoldReason: credit.reason }, quote };

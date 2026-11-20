@@ -6,7 +6,7 @@ import { recordPayment, withMoney } from "@/lib/ledger";
 import { collectScope } from "@/lib/khata";
 import { kickPhotos } from "@/lib/jobs";
 import { checksFor } from "@/lib/photo-checks";
-import { moneyFail, parseCollect, parseRange } from "@/lib/money-api";
+import { fieldNeedsCheck, moneyFail, parseCollect, parseRange, referenceUsed } from "@/lib/money-api";
 import type { PaymentState, PayMethod, Prisma } from "@/generated/prisma/client";
 
 /**
@@ -70,6 +70,8 @@ export async function POST(req: Request) {
 
   const parsed = parseCollect(body, tenant.id);
   if (typeof parsed === "string") return NextResponse.json({ error: parsed }, { status: 400 });
+  const used = parsed.method === "UPI" || parsed.method === "BANK" ? await referenceUsed(db, parsed.reference) : null;
+  if (used) return NextResponse.json({ error: `This reference was already used (${used.number})` }, { status: 409 });
   const purpose = body?.purpose === "WALLET" ? "WALLET" : "DUES";
   let orderId: string | null = null;
   if (typeof body?.orderId === "string") {
@@ -88,6 +90,7 @@ export async function POST(req: Request) {
         orderId,
         collectorId: session.userId,
         atOffice: scope.office,
+        needsVerification: fieldNeedsCheck(parsed.method, scope.office, tenant.settings),
       })
     );
   } catch (e) {

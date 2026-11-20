@@ -43,3 +43,17 @@ export function secretProblem(secret: string | undefined): string | null {
   if (secret.length < 32) return "SESSION_SECRET must be at least 32 characters";
   return null;
 }
+
+/** Web push services browsers use; the server only ever POSTs to these (no requests into our own network). */
+const PUSH_HOSTS = ["fcm.googleapis.com", "android.googleapis.com", "push.services.mozilla.com", "push.apple.com", "notify.windows.com"];
+
+export function pushEndpointAllowed(endpoint: string) {
+  try {
+    const u = new URL(endpoint);
+    if (u.protocol !== "https:" || u.port || u.username || u.password) return false;
+    const h = u.hostname.toLowerCase();
+    return PUSH_HOSTS.some((p) => h === p || h.endsWith(`.${p}`));
+  } catch {
+    return false;
+  }
+}

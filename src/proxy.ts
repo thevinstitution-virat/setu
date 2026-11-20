@@ -56,7 +56,7 @@ export async function proxy(request: NextRequest) {
   }
 
   try {
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
     const role = payload.role as string;
     if (role !== protectedPrefixes[matchedPrefix]) {
       return to(roleHomes[role] ?? "/login");

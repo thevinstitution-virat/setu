@@ -213,6 +213,8 @@ model User {
   active       Boolean  @default(true)
   /// The hidden login platform support uses inside this business (audited support sessions). Not a seat, never listed.
   isSupport    Boolean  @default(false)
+  /// Bumped to end every signed-in session of this person ("sign out everywhere"); sessions carry it as sv.
+  sessionVersion Int    @default(0)
   createdAt    DateTime @default(now())
   /// The supervisor this person reports to (field staff). Supervisors see and manage their team.
   supervisorId String?
@@ -852,6 +854,8 @@ model Delivery {
   failNote     String?
   failedAt     DateTime?
   attempts     Int           @default(0)
+  /// Delivery-code tries by the driver (5 at most; counted atomically before comparing).
+  codeTries    Int           @default(0)
   /// Code the retailer sees in the app and tells the driver (high-value drops).
   code         String?
   codeVerified Boolean       @default(false)

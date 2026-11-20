@@ -12,6 +12,7 @@ import { withTenantTx, type Tx } from "@/lib/db";
 import { catalogueFor, retailerPricingCtx, type CatalogueProduct } from "@/lib/pricing";
 import { aiJson, aiStatus } from "@/lib/ai";
 import { MAX_ORDER_QTY, MAX_ORDER_TEXT, confidenceOf, matchProducts, parseOrderText, parsePhrase, type OrderProduct, type ParsedLine } from "@/lib/order-text";
+import { DAY, HOUR, limited } from "@/lib/rate-limit";
 
 export type ReadOrder = { lines: ParsedLine[]; source: "ai" | "rules"; credits: number; note: string | null };
 
@@ -55,6 +56,11 @@ export async function readOrder(o: { tenantId: string; actorId: string | null; r
 
   const status = await aiStatus(o.tenantId, o.now);
   if (!status.available) return { lines: rules, source: "rules", credits: 0, note: null, products: all };
+  // Each AI read costs the business credits: per shop, 30 an hour and 120 a day; then the rules answer.
+  const scope = `ai-order:${o.tenantId}`;
+  if ((await limited(`${scope}:h`, o.retailerId, 30, HOUR, o.now)) || (await limited(`${scope}:d`, o.retailerId, 120, DAY, o.now))) {
+    return { lines: rules, source: "rules", credits: 0, note: "Many orders were read for this shop just now; read by the built-in rules instead.", products: all };
+  }
   const cands = candidates(rules, text, all, products);
   if (!cands.length) return { lines: rules, source: "rules", credits: 0, note: null, products: all };
 

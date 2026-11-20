@@ -38,14 +38,48 @@ const TIMEOUT_MS = 10_000;
 
 const allowPrivate = () => process.env.ALLOW_PRIVATE_WEBHOOKS === "1";
 
-function privateIp(ip: string) {
-  if (isIP(ip) === 6) {
-    const v = ip.toLowerCase();
-    if (v.startsWith("::ffff:")) return privateIp(v.slice(7));
-    return v === "::1" || v === "::" || v.startsWith("fc") || v.startsWith("fd") || v.startsWith("fe8") || v.startsWith("fe9") || v.startsWith("fea") || v.startsWith("feb");
+/** IPv6 text → 8 numbers (handles "::" and a dotted IPv4 tail), or null. */
+function v6Words(ip: string): number[] | null {
+  let v = ip.toLowerCase().split("%")[0];
+  const dotted = v.match(/^(.*:)(\d+\.\d+\.\d+\.\d+)$/);
+  if (dotted) {
+    const p = dotted[2].split(".").map(Number);
+    if (p.some((n) => !(n >= 0 && n <= 255))) return null;
+    v = `${dotted[1]}${((p[0] << 8) | p[1]).toString(16)}:${((p[2] << 8) | p[3]).toString(16)}`;
   }
-  const [a, b] = ip.split(".").map(Number);
-  return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
+  const halves = v.split("::");
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(":") : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const fill = halves.length === 2 ? 8 - head.length - tail.length : 0;
+  if (fill < 0 || (halves.length === 1 && head.length !== 8)) return null;
+  const words = [...head, ...Array(fill).fill("0"), ...tail].map((h) => (/^[0-9a-f]{1,4}$/.test(h) ? parseInt(h, 16) : NaN));
+  return words.length === 8 && words.every((n) => !Number.isNaN(n)) ? words : null;
+}
+
+function privateV4(ip: string) {
+  const p = ip.split(".").map(Number);
+  if (p.length !== 4 || p.some((n) => !(Number.isInteger(n) && n >= 0 && n <= 255))) return true; // unreadable: refuse
+  const [a, b, c] = p;
+  return (
+    a === 0 || a === 10 || a === 127 || a >= 224 ||
+    (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) ||
+    (a === 100 && b >= 64 && b <= 127) || (a === 198 && (b === 18 || b === 19)) || (a === 192 && b === 0 && (c === 0 || c === 2)) ||
+    (a === 198 && b === 51 && c === 100) || (a === 203 && b === 0 && c === 113)
+  );
+}
+
+/** True for loopback, private, link-local, reserved, and IPv6 forms that carry one (mapped, NAT64, 6to4). */
+export function privateIp(ip: string): boolean {
+  if (isIP(ip) === 4) return privateV4(ip);
+  const w = v6Words(ip);
+  if (!w) return true;
+  const v4 = (hi: number, lo: number) => `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+  if (w.slice(0, 5).every((x) => x === 0) && (w[5] === 0xffff || w[5] === 0)) return w[5] === 0 && w[6] === 0 && w[7] <= 1 ? true : privateV4(v4(w[6], w[7])); // ::ffff:a.b.c.d, ::a.b.c.d, ::, ::1
+  if (w[0] === 0x64 && w[1] === 0xff9b) return privateV4(v4(w[6], w[7])); // NAT64
+  if (w[0] === 0x2002) return privateV4(v4(w[1], w[2])); // 6to4
+  const top = w[0];
+  return (top & 0xfe00) === 0xfc00 || (top & 0xffc0) === 0xfe80 || (top & 0xffc0) === 0xfec0 || (top & 0xff00) === 0xff00 || top === 0x2001 && w[1] === 0xdb8;
 }
 
 /** Shape check when saving an endpoint. */

@@ -41,6 +41,7 @@ Migrations run on every web start (`npm run start:prod` = `prisma migrate deploy
 | `PLATFORM_LEGAL_NAME`, `PLATFORM_ADDRESS`, `GRIEVANCE_CONTACT` | shown on invoices and the terms / privacy pages |
 | `BACKUP_DATABASE_URL` | the backup role, above |
 | `NEXT_PUBLIC_WHATSAPP_NUMBER` | a **build** argument: changing it needs a rebuild |
+| `TRUST_PROXY_HOPS` | `1` behind Coolify's Traefik; `2` if a CDN (e.g. Cloudflare proxy) sits in front. Wrong = rate limits and audit IPs use the wrong address |
 
    Leave empty in production: `DEFAULT_TENANT_SLUG`, `OTP_DEV_MODE`, `ALLOW_GATEWAY_SIMULATOR`, `ALLOW_PRIVATE_WEBHOOKS`, `JOBS_DISABLED`, and `AI_PROVIDER=fake`.
 4. Deploy. Health check: `GET /api/health` (database ping), already in the image.
@@ -84,4 +85,5 @@ Roadmap §10, weeks −2 and −1. Do it first on a staging copy (a second Cooli
 - Writes to `/api` from another site's pages are refused (403); webhooks and `/api/v1` (API keys) are exempt. The session cookie is `SameSite=Lax`, the console's `Strict`.
 - Security headers on every response (`src/lib/security.ts`): no framing, no MIME sniffing, HSTS, camera / location / microphone on our own pages only.
 - **`npm audit`** (20 Nov): 6 findings, none reachable in the running app. 4 high + 1 moderate in `effect`, used only by the Prisma CLI's config loader (a ReDoS in its own parsers, tooling only); 1 moderate in `uuid` under `exceljs` (a bounds check when a caller passes its own buffer, which exceljs doesn't). Both fixes are breaking downgrades / upgrades (`npm audit fix --force`); recheck when Prisma 7 / exceljs 5 are taken up.
+- Security review of every API route (20 Nov): findings, fixes and what is still open are in `docs/SECURITY-REVIEW.md`. It added `TRUST_PROXY_HOPS` (above), the "UPI and bank taken in the field" switch (Settings → Money; on by default: field UPI / bank waits in Payments → To verify) and "Sign out" for a staff member on the Team page (ends their sessions on every device; `POST /api/auth/logout {"everywhere": true}` does the same for yourself, no button yet).
 - Pen test before the first paying external business (roadmap §8).

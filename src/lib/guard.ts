@@ -78,9 +78,10 @@ export async function guard(perm?: Permission | Permission[]): Promise<Ok | Fail
   const db = tenantDb(tenant.id);
   const user = await db.user.findUnique({
     where: { id: session.userId },
-    select: { active: true, role: true, name: true, isSupport: true },
+    select: { active: true, role: true, name: true, isSupport: true, sessionVersion: true },
   });
   if (!user || !user.active) return fail("This account is not active", 401);
+  if ((session.sv ?? 0) !== user.sessionVersion) return fail("You were signed out. Please sign in again.", 401);
 
   let support: { mode: "READ" | "WRITE" } | null = null;
   if (user.isSupport) {
@@ -111,9 +112,10 @@ export async function pageSession(): Promise<SessionPayload | null> {
   if (!session) return null;
   const user = await tenantDb(tenant.id).user.findUnique({
     where: { id: session.userId },
-    select: { active: true, role: true, name: true, isSupport: true },
+    select: { active: true, role: true, name: true, isSupport: true, sessionVersion: true },
   });
   if (!user || !user.active) return null;
+  if ((session.sv ?? 0) !== user.sessionVersion) return null;
   if (user.isSupport && !(session.supportId && (await activeSupport(tenant.id, session.supportId)))) return null;
   if (tenant.status === "SUSPENDED" && user.role !== "ADMIN") return null;
   return { ...session, role: user.role, name: user.name };
