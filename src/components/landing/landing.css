@@ -13,27 +13,25 @@
   overflow-x: clip;
 }
 
-.ls-rv {
+/* Scroll reveal: LandingFx adds `ls-ready` to <html> (content stays visible
+   without JS) and `in` to each block once it scrolls into view. `--i` staggers. */
+html.ls-ready .ls-rv {
   opacity: 0;
-  transform: translateY(28px);
-  animation: ls-rv linear both;
-  animation-timeline: view();
-  animation-range: entry 0% cover 22%;
+  transform: translateY(34px) scale(0.985);
+  transition:
+    opacity 0.8s cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 0.95s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 90ms);
 }
-@keyframes ls-rv {
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-@supports not (animation-timeline: view()) {
-  .ls-rv {
-    opacity: 1;
-    transform: none;
-  }
+html.ls-ready .ls-rv[data-in] {
+  opacity: 1;
+  transform: none;
 }
 
+/* Sections are flex items of a column; without width:100% they shrink to their
+   content and the two-column splits collapse into one narrow column. */
 .ls-sec {
+  width: 100%;
   max-width: 1180px;
   margin: 0 auto;
   padding: 92px 22px;
@@ -200,7 +198,7 @@
 .ls-links a:hover {
   color: var(--ink);
 }
-@media (min-width: 900px) {
+@media (min-width: 1100px) {
   .ls-links {
     display: flex;
   }
@@ -208,9 +206,11 @@
 
 /* ---------- Hero ---------- */
 .ls-hero {
+  position: relative;
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 56px 22px 40px;
+  padding: 44px 22px 40px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(320px, 560px);
   gap: 40px;
@@ -247,7 +247,7 @@
   margin: 22px 0 0;
   font-family: var(--font-heading), var(--font-deva), sans-serif;
   font-weight: 800;
-  font-size: clamp(38px, 5.6vw, 68px);
+  font-size: clamp(38px, 5.2vw, 64px);
   line-height: 1.03;
   letter-spacing: -0.02em;
   text-wrap: balance;
@@ -1301,20 +1301,49 @@
   }
 }
 
-/* ---------- Built-for strip ---------- */
+/* ---------- Built-for strip (marquee) ---------- */
 .ls-strip {
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.4);
+  width: 100%;
+  max-width: 1180px;
+  margin: 28px auto 0;
+  padding: 0 22px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.ls-strip-lbl {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+.ls-marq {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.ls-marq-track {
+  display: flex;
+  width: max-content;
+  animation: ls-marq 34s linear infinite;
+}
+.ls-marq:hover .ls-marq-track {
+  animation-play-state: paused;
+}
+@keyframes ls-marq {
+  to {
+    transform: translateX(-50%);
+  }
 }
 .ls-strip ul {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 20px 22px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 28px;
-  align-items: center;
+  gap: 14px;
+  padding: 6px 14px 6px 0;
+  margin: 0;
   list-style: none;
   font-size: 13.5px;
   font-weight: 700;
@@ -1324,17 +1353,16 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--line);
+  white-space: nowrap;
 }
 .ls-strip svg {
   width: 17px;
   height: 17px;
-}
-.ls-strip .lbl {
-  color: var(--muted);
-  font-weight: 800;
-  text-transform: uppercase;
-  font-size: 12px;
-  letter-spacing: 0.04em;
+  color: var(--kesar);
 }
 
 /* ---------- Journey (how it works) ---------- */
@@ -2388,4 +2416,1047 @@
   color: var(--ink);
   font-weight: inherit;
   text-decoration: none;
+}
+
+/* ═══════════════════════ Landing refresh (Nov 2026) ═══════════════════════ */
+
+/* ---------- Nav: light text over the dark hero, cream glass after it ---------- */
+.ls-nav {
+  transition:
+    background 0.35s ease,
+    border-color 0.35s ease;
+}
+html:not(.ls-past-hero) .ls-nav:not(.menu-open) {
+  background: transparent;
+  border-bottom-color: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html.ls-scrolled:not(.ls-past-hero) .ls-nav:not(.menu-open) {
+  background: rgba(8, 38, 37, 0.72);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  backdrop-filter: blur(18px) saturate(1.3);
+}
+html:not(.ls-past-hero) .ls-nav:not(.menu-open) .ls-brand-name,
+html:not(.ls-past-hero) .ls-nav:not(.menu-open) .ls-signin {
+  color: #fff;
+}
+html:not(.ls-past-hero) .ls-nav:not(.menu-open) .ls-brand-hi {
+  color: var(--genda);
+}
+html:not(.ls-past-hero) .ls-nav:not(.menu-open) .ls-links {
+  color: rgba(255, 255, 255, 0.78);
+}
+html:not(.ls-past-hero) .ls-nav:not(.menu-open) .ls-links a:hover {
+  color: #fff;
+}
+html:not(.ls-past-hero) .ls-nav:not(.menu-open) .ls-burger span {
+  background: #fff;
+}
+/* A backdrop-filter would make the nav the containing block of the fixed menu
+   sheet (squashing it to 0 px), so drop it while the menu is open. */
+.ls-nav.menu-open {
+  background: var(--background);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.ls-links a {
+  position: relative;
+}
+.ls-links a::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--kesar);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s ease;
+}
+.ls-links a:hover::after {
+  transform: scaleX(1);
+}
+.ls-signin {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ink);
+  white-space: nowrap;
+  text-decoration: none;
+  padding: 10px 4px;
+}
+.ls-prog {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--kesar), var(--genda));
+  transform: scaleX(0);
+  transform-origin: left;
+  pointer-events: none;
+}
+.ls-burger {
+  display: grid;
+  place-content: center;
+  gap: 5px;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+}
+.ls-burger span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ink);
+  transition:
+    transform 0.3s ease,
+    opacity 0.2s ease;
+}
+.menu-open .ls-burger span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+.menu-open .ls-burger span:nth-child(2) {
+  opacity: 0;
+}
+.menu-open .ls-burger span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+.ls-menu {
+  position: fixed;
+  inset: 68px 0 0 0;
+  z-index: 49;
+  overflow: auto;
+  background: var(--background);
+  padding: 8px 22px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  animation: ls-fade 0.25s ease both;
+}
+.ls-menu[hidden] {
+  display: none;
+}
+.ls-menu-links a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 2px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-heading), var(--font-deva), sans-serif;
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--ink);
+  text-decoration: none;
+  animation: ls-up 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+.ls-menu-links svg {
+  width: 18px;
+  height: 18px;
+  color: var(--kesar);
+}
+.ls-menu-foot {
+  display: grid;
+  gap: 12px;
+}
+.ls-menu-foot > :first-child {
+  justify-self: start;
+}
+.ls-menu-foot .btn {
+  width: 100%;
+}
+@media (max-width: 1099px) {
+  .ls-signin {
+    display: none;
+  }
+}
+@media (min-width: 1100px) {
+  .ls-burger,
+  .ls-menu {
+    display: none !important;
+  }
+}
+@media (max-width: 640px) {
+  .ls-nav-lang {
+    display: none;
+  }
+}
+@media (max-width: 400px) {
+  .ls-nav-cta {
+    display: none;
+  }
+}
+
+/* Bigger language buttons on the landing page (they were 24px tall) */
+.ls [role="group"][aria-label="Language"] button {
+  min-height: 34px;
+  min-width: 40px;
+}
+@media (pointer: coarse) {
+  .ls [role="group"][aria-label="Language"] button {
+    min-height: 42px;
+    min-width: 44px;
+  }
+}
+
+/* ---------- Hero: dark "night market" scene ---------- */
+.ls-herow {
+  position: relative;
+  isolation: isolate;
+  margin-top: -68px;
+  padding-top: 68px;
+  overflow: hidden;
+  color: #f6efe2;
+  background:
+    radial-gradient(1100px 620px at 78% -8%, rgba(46, 138, 128, 0.55), transparent 60%),
+    linear-gradient(172deg, #0e3b38 0%, #082625 62%, #061c1b 100%);
+  border-radius: 0 0 40px 40px;
+}
+.ls-herow[data-paused] *,
+.ls-herow[data-paused] *::before,
+.ls-herow[data-paused] *::after {
+  animation-play-state: paused !important;
+}
+.ls-aurora {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.ls-aurora i {
+  position: absolute;
+  border-radius: 50%;
+}
+.ls-aurora .a1 {
+  width: 52vw;
+  height: 52vw;
+  left: -14vw;
+  top: -18vw;
+  background: radial-gradient(circle, rgba(219, 92, 23, 0.42), transparent 62%);
+  animation: ls-drift1 22s ease-in-out infinite alternate;
+}
+.ls-aurora .a2 {
+  width: 46vw;
+  height: 46vw;
+  right: -12vw;
+  top: 6vw;
+  background: radial-gradient(circle, rgba(60, 201, 160, 0.28), transparent 62%);
+  animation: ls-drift2 27s ease-in-out infinite alternate;
+}
+.ls-aurora .a3 {
+  width: 38vw;
+  height: 38vw;
+  left: 26vw;
+  bottom: -16vw;
+  background: radial-gradient(circle, rgba(242, 179, 61, 0.26), transparent 62%);
+  animation: ls-drift3 31s ease-in-out infinite alternate;
+}
+@keyframes ls-drift1 {
+  to {
+    transform: translate(12vw, 8vw) scale(1.15);
+  }
+}
+@keyframes ls-drift2 {
+  to {
+    transform: translate(-10vw, 10vw) scale(0.9);
+  }
+}
+@keyframes ls-drift3 {
+  to {
+    transform: translate(8vw, -12vw) scale(1.2);
+  }
+}
+.ls-hgrid {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 20%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 20%, transparent 75%);
+}
+.ls-hcopy {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.ls-herow .ls-h1 {
+  margin-top: 4px;
+  color: #fbf6ec;
+}
+.ls-herow .ls-pill {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #f6efe2;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.ls-herow .ls-pill b {
+  background: var(--genda);
+  color: var(--ink);
+}
+.ls-herow .ls-lead {
+  margin-top: 0;
+  color: rgba(246, 239, 226, 0.78);
+}
+.ls-herow .ls-lead b {
+  color: #fff;
+}
+.ls-herow .ls-ticks {
+  margin-top: 0;
+  color: rgba(246, 239, 226, 0.82);
+}
+.ls-herow .ls-ticks svg {
+  color: var(--mint);
+}
+/* On the dark hero the highlighter becomes saffron-gold text with a drawn swash */
+.ls-herow .ls-mark {
+  position: relative;
+  background: none;
+  padding: 0;
+  color: var(--genda);
+}
+.ls-herow .ls-mark::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0.25em;
+  bottom: -0.04em;
+  height: 0.12em;
+  border-radius: 0.1em;
+  background: linear-gradient(90deg, var(--kesar), var(--genda));
+  transform-origin: left;
+  animation: ls-swash 0.9s 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes ls-swash {
+  from {
+    transform: scaleX(0);
+  }
+}
+.ls-rot {
+  display: inline-grid;
+  vertical-align: bottom;
+}
+.ls-rot-w {
+  grid-area: 1 / 1;
+  justify-self: start;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(0.5em);
+  transform: translateY(-0.35em);
+  filter: blur(6px);
+  transition:
+    opacity 0.22s ease,
+    transform 0.3s ease,
+    filter 0.22s ease;
+}
+.ls-rot-w.on {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  transition:
+    opacity 0.45s ease 0.22s,
+    transform 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) 0.22s,
+    filter 0.45s ease 0.22s;
+}
+.ls-rot-w:not(.on) .ls-mark::after {
+  animation: none;
+  transform: scaleX(0);
+}
+.ls-rot-w.on .ls-mark::after {
+  animation: ls-swash 0.7s 0.15s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Entrance for hero pieces (CSS only, ends visible without JS) */
+.ls-in {
+  animation: ls-up 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(0.08s + var(--i, 0) * 0.09s);
+}
+@keyframes ls-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+@keyframes ls-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.ls-btn-ghost {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1.5px solid rgba(255, 255, 255, 0.32);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.ls-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.ls-shine {
+  position: relative;
+  overflow: hidden;
+}
+.ls-shine::after {
+  content: "";
+  position: absolute;
+  inset: -40% auto -40% -60%;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transform: skewX(-18deg);
+  animation: ls-shine 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes ls-shine {
+  0%,
+  62% {
+    left: -60%;
+  }
+  100% {
+    left: 130%;
+  }
+}
+
+/* Map scene sits on the dark hero (its own text stays ink) */
+.ls-herow .ls-fleet {
+  color: var(--ink);
+}
+.ls-herow .ls-fmap {
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 0 0 6px rgba(255, 255, 255, 0.04),
+    0 40px 80px -30px rgba(0, 0, 0, 0.7);
+}
+.ls-herow .ls-rscr {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 40px 70px -30px rgba(0, 0, 0, 0.8);
+}
+.cf-drop {
+  left: 85%;
+  top: 19.74%;
+}
+.cf-ph {
+  left: 50%;
+  top: 30%;
+}
+.cf-a {
+  left: 89%;
+  top: 21%;
+}
+/* Small screens: keep map labels from piling up on each other */
+@media (max-width: 600px) {
+  .ls-ntoast,
+  .ls-fmap .lab-drop {
+    display: none;
+  }
+  .ls-mpill {
+    left: 10px;
+    top: 10px;
+    font-size: 11.5px;
+    padding: 6px 10px;
+  }
+  .ls-etab {
+    top: 25% !important;
+    transform: translate(-62%, 0);
+    font-size: 12px;
+    padding: 6px 9px;
+  }
+  .ls-etab::after {
+    bottom: auto;
+    top: -6px;
+    left: 62%;
+    border: 6px solid transparent;
+    border-top: 0;
+    border-bottom-color: var(--ink);
+  }
+  .ls-dchipx {
+    top: 25% !important;
+    left: 80% !important;
+  }
+}
+
+/* Count-up facts under the hero */
+.ls-stats {
+  position: relative;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 8px 22px 56px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+@media (max-width: 860px) {
+  .ls-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.ls-stat {
+  border-radius: 20px;
+  padding: 20px 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.ls-stat-n {
+  display: block;
+  font-family: var(--font-heading), var(--font-deva), sans-serif;
+  font-weight: 800;
+  font-size: clamp(34px, 4vw, 46px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  background: linear-gradient(180deg, #ffd27a, var(--genda) 55%, #e58c2c);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-variant-numeric: tabular-nums;
+}
+.ls-stat-l {
+  display: block;
+  margin-top: 8px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: rgba(246, 239, 226, 0.72);
+}
+
+/* ---------- Section kicker gets a leading rule ---------- */
+.ls-kick::before {
+  content: "";
+  width: 22px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.7;
+}
+
+/* ---------- Pointer light on cards ---------- */
+.ls-glow {
+  position: relative;
+  isolation: isolate;
+}
+.ls-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(460px circle at var(--mx, -999px) var(--my, -999px), rgba(242, 179, 61, 0.22), transparent 45%);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+.ls-glow:hover::before {
+  opacity: 1;
+}
+
+/* Gentle float for product mock-ups (uses `translate`, so it never fights the
+   reveal's `transform`) */
+.ls-float {
+  animation: ls-float 7s ease-in-out infinite;
+}
+@keyframes ls-float {
+  50% {
+    translate: 0 -8px;
+  }
+}
+
+/* Bars grow and rows arrive one by one once their block is revealed */
+.ls-rv .bar i {
+  transform-origin: left;
+  transition: transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) 0.35s;
+}
+html.ls-ready .ls-rv:not([data-in]) .bar i {
+  transform: scaleX(0);
+}
+html.ls-ready .ls-rv .ls-visit,
+html.ls-ready .ls-rv .ls-clockin,
+html.ls-ready .ls-rv .ls-bl {
+  transition:
+    opacity 0.55s ease,
+    transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: calc(0.25s + var(--i, 0) * 0.11s);
+}
+html.ls-ready .ls-rv:not([data-in]) .ls-visit,
+html.ls-ready .ls-rv:not([data-in]) .ls-clockin,
+html.ls-ready .ls-rv:not([data-in]) .ls-bl {
+  opacity: 0;
+  transform: translateX(-16px);
+}
+
+/* Two-column sections: picture after the words once they stack */
+@media (max-width: 920px) {
+  .ls-split > .ls-media-first {
+    order: 2;
+  }
+}
+
+/* ---------- How it works ---------- */
+.ls-pscr > * {
+  animation: ls-up 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.ls-pscr > :nth-child(2) {
+  animation-delay: 0.06s;
+}
+.ls-pscr > :nth-child(3) {
+  animation-delay: 0.12s;
+}
+.ls-pscr > :nth-child(4) {
+  animation-delay: 0.18s;
+}
+.ls-pscr > :nth-child(5) {
+  animation-delay: 0.24s;
+}
+.ls-pscr > :nth-child(n + 6) {
+  animation-delay: 0.3s;
+}
+.ls-pscr {
+  box-shadow:
+    0 0 0 6px #0b2120,
+    0 30px 60px -28px rgba(8, 38, 37, 0.8);
+}
+@media (max-width: 600px) {
+  .ls-jr {
+    padding: 18px 14px;
+  }
+  .ls-stg {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .ls-stg > span:nth-child(2) {
+    flex: 1 1 150px;
+  }
+  .ls-stg-who {
+    margin-left: 54px;
+  }
+  .ls-stg-body {
+    padding-left: 10px;
+  }
+}
+
+/* ---------- Godown ---------- */
+.ls-gdn {
+  isolation: isolate;
+  box-shadow: 0 40px 80px -40px rgba(8, 38, 37, 0.7);
+}
+.ls-gdn-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(520px 320px at 12% 0%, rgba(242, 179, 61, 0.18), transparent 70%),
+    radial-gradient(480px 360px at 100% 100%, rgba(60, 201, 160, 0.16), transparent 70%);
+  animation: ls-breathe-bg 9s ease-in-out infinite alternate;
+}
+@keyframes ls-breathe-bg {
+  to {
+    opacity: 0.55;
+  }
+}
+.ls-inv {
+  box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.55);
+}
+
+/* ---------- Live map: agents really move ---------- */
+.ls-mapwrap {
+  overflow: hidden;
+}
+.mv-ravi {
+  z-index: 3;
+  animation: ls-ravi 16s linear infinite;
+}
+@keyframes ls-ravi {
+  0% {
+    left: 11%;
+    top: 79.03%;
+    opacity: 0;
+  }
+  4%,
+  8% {
+    left: 11%;
+    top: 79.03%;
+    opacity: 1;
+  }
+  24% {
+    left: 11%;
+    top: 50%;
+  }
+  62% {
+    left: 89%;
+    top: 50%;
+  }
+  78% {
+    left: 89%;
+    top: 26%;
+    opacity: 1;
+  }
+  84%,
+  100% {
+    left: 89%;
+    top: 26%;
+    opacity: 0;
+  }
+}
+.mv-imran {
+  z-index: 3;
+  animation: ls-imran 12s linear infinite;
+}
+@keyframes ls-imran {
+  0% {
+    left: 20%;
+    opacity: 0;
+  }
+  5% {
+    left: 21%;
+    opacity: 1;
+  }
+  70% {
+    left: 65%;
+    opacity: 1;
+  }
+  78%,
+  100% {
+    left: 65%;
+    opacity: 0;
+  }
+}
+.ls-agent-walk {
+  animation: ls-bob 1.6s ease-in-out infinite;
+}
+@keyframes ls-bob {
+  50% {
+    translate: 0 -3px;
+  }
+}
+.ls-mchip {
+  opacity: 0;
+}
+.mc-ravi {
+  animation: ls-chip-ravi 16s ease infinite;
+}
+@keyframes ls-chip-ravi {
+  0%,
+  78% {
+    opacity: 0;
+    transform: translate(-50%, 8px) scale(0.85);
+  }
+  81%,
+  95% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.mc-imran {
+  animation: ls-chip-imran 12s ease infinite;
+}
+@keyframes ls-chip-imran {
+  0%,
+  70% {
+    opacity: 0;
+    transform: translate(-50%, 8px) scale(0.85);
+  }
+  74%,
+  94% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ---------- Owner dashboard ---------- */
+.ls-team .ls-live {
+  color: #7ee8c6;
+}
+.ls-sbox {
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+.ls-sbox:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 24px -16px rgba(15, 42, 42, 0.45);
+}
+
+/* ---------- Go-live steps ---------- */
+.ls-steps3 {
+  position: relative;
+}
+.ls-steps3 > .ls-s3 {
+  z-index: 1;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
+}
+.ls-steps3 > .ls-s3:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 24px 40px -24px rgba(15, 42, 42, 0.45);
+}
+.ls-steps-line {
+  position: absolute;
+  left: 0;
+  top: 44px;
+  width: 100%;
+  height: 20px;
+  z-index: 0;
+  overflow: visible;
+}
+.ls-steps-line path {
+  fill: none;
+  stroke: var(--kesar);
+  stroke-width: 2.5;
+  stroke-dasharray: 6 9;
+  vector-effect: non-scaling-stroke;
+  animation: ls-march 1.2s linear infinite;
+}
+@keyframes ls-march {
+  to {
+    stroke-dashoffset: -15;
+  }
+}
+@media (max-width: 860px) {
+  .ls-steps-line {
+    display: none;
+  }
+}
+.ls-s3 .num {
+  background: linear-gradient(180deg, var(--kesar), var(--genda));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.ls-s3.mor .num {
+  background: linear-gradient(180deg, #ffd27a, var(--genda));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+html.ls-ready .ls-steps3.ls-rv > .ls-s3 {
+  transition:
+    opacity 0.6s ease,
+    transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 0.3s ease;
+  transition-delay: calc(0.15s + var(--i, 0) * 0.14s), calc(0.15s + var(--i, 0) * 0.14s), 0s;
+}
+html.ls-ready .ls-steps3.ls-rv:not([data-in]) > .ls-s3 {
+  opacity: 0;
+  transform: translateY(26px);
+}
+
+/* ---------- FAQ: smooth open/close ---------- */
+.ls-answ {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.35s ease;
+}
+.ls-answ > .ls-ans {
+  overflow: hidden;
+  min-height: 0;
+  padding-bottom: 0;
+  transition: padding-bottom 0.35s ease;
+}
+.ls-qa.open .ls-answ {
+  grid-template-rows: 1fr;
+}
+.ls-qa.open .ls-answ > .ls-ans {
+  padding-bottom: 18px;
+}
+.ls-qa.open {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 18px 34px -22px rgba(219, 92, 23, 0.45);
+}
+.ls-qx {
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  background: rgba(15, 42, 42, 0.06);
+  transition:
+    transform 0.25s,
+    background 0.25s,
+    color 0.25s;
+}
+.ls-qbtn.open .ls-qx {
+  background: var(--kesar);
+  color: #fff;
+}
+.ls-qbtn {
+  min-height: 56px;
+}
+
+/* ---------- CTA: the bridge draws itself ---------- */
+.ls-cta {
+  isolation: isolate;
+  box-shadow: 0 50px 90px -50px rgba(8, 38, 37, 0.85);
+}
+.ls-aurora.soft {
+  opacity: 0.9;
+}
+.ls-aurora.soft .a1 {
+  width: 60%;
+  height: 160%;
+  left: -20%;
+  top: -60%;
+}
+.ls-aurora.soft .a2 {
+  width: 55%;
+  height: 150%;
+  right: -18%;
+  top: -10%;
+}
+.ls-cta-br {
+  opacity: 0.4;
+}
+.ls-cta-br path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+html.ls-ready .ls-cta.ls-rv .ls-cta-br path {
+  transition: stroke-dashoffset 2.6s cubic-bezier(0.4, 0, 0.2, 1) 0.3s;
+}
+html.ls-ready .ls-cta.ls-rv:not([data-in]) .ls-cta-br path {
+  stroke-dashoffset: 1;
+}
+
+/* ---------- Footer ---------- */
+.ls-foot {
+  display: block;
+  width: 100%;
+  padding: 24px 22px 40px;
+  color: var(--ink-2);
+}
+.ls-foot-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr));
+  gap: 32px;
+  padding: 36px 0 32px;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 860px) {
+  .ls-foot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ls-foot-brand {
+    grid-column: 1 / -1;
+  }
+}
+.ls-foot-brand p {
+  margin: 14px 0 16px;
+  max-width: 340px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.ls-foot nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ls-foot h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ls-foot nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+}
+.ls-foot nav a:hover {
+  color: var(--kesar-text);
+}
+.ls-foot-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+}
+.ls-foot-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+.ls-foot .ls-foot-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  color: var(--mor);
+  font-weight: 700;
+  text-decoration: none;
+}
+.ls-foot .ls-foot-links a:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Reduced motion: everything settles, nothing loops ---------- */
+@media (prefers-reduced-motion: reduce) {
+  html.ls-ready .ls-rv,
+  html.ls-ready .ls-rv * {
+    transition: none !important;
+  }
+  .ls-aurora i,
+  .ls-marq-track,
+  .ls-float,
+  .ls-shine::after,
+  .ls-agent-walk,
+  .ls-gdn-glow,
+  .ls-steps-line path {
+    animation: none !important;
+  }
+  .ls-marq-track > ul:last-child {
+    display: none;
+  }
+  .ls-marq-track ul {
+    flex-wrap: wrap;
+  }
+  .mv-ravi {
+    left: 50% !important;
+    top: 50% !important;
+    opacity: 1 !important;
+  }
+  .mv-imran {
+    left: 40% !important;
+    opacity: 1 !important;
+  }
+  .ls-mchip {
+    opacity: 1 !important;
+    transform: translate(-50%, 0) !important;
+  }
+}
+
+@media print {
+  html.ls-ready .ls-rv,
+  html.ls-ready .ls-rv * {
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }

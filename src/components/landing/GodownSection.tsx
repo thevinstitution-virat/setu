@@ -3,6 +3,7 @@
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import { landingContent } from "@/lib/i18n/landing-content";
 import { ROADMAP } from "@/lib/brand";
+import { CountUp } from "./use-landing";
 
 export default function GodownSection() {
   const { lang } = useLanguage();
@@ -11,6 +12,7 @@ export default function GodownSection() {
   return (
     <section className="ls-sec" id="godown" style={{ paddingTop: 0 }}>
       <div className="ls-gdn ls-rv">
+        <div className="ls-gdn-glow" aria-hidden="true" />
         <div className="ls-split">
           <div>
             <div className="ls-kick">
@@ -59,7 +61,7 @@ export default function GodownSection() {
             </ul>
           </div>
 
-          <div className="ls-inv" role="img" aria-label={c.invAria}>
+          <div className="ls-inv ls-float" role="img" aria-label={c.invAria}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <b style={{ fontSize: 15 }}>{c.godown} · Aminabad</b>
               <span className="ls-live">
@@ -70,15 +72,21 @@ export default function GodownSection() {
             <div className="ls-kpis">
               <div className="ls-kpi">
                 <small>{c.kSku}</small>
-                <b>248</b>
+                <b>
+                  <CountUp to={248} />
+                </b>
               </div>
               <div className="ls-kpi">
                 <small>{c.kPacked}</small>
-                <b>128</b>
+                <b>
+                  <CountUp to={128} />
+                </b>
               </div>
               <div className="ls-kpi">
                 <small>{c.kLow}</small>
-                <b style={{ color: "#db7a54" }}>3</b>
+                <b style={{ color: "var(--kesar-text)" }}>
+                  <CountUp to={3} from={0} duration={900} />
+                </b>
               </div>
             </div>
             <div style={{ marginTop: 8 }}>
@@ -108,9 +116,9 @@ export default function GodownSection() {
                   <small>ATTA-10</small>
                 </span>
                 <span className="bar">
-                  <i className="b3" style={{ width: "8%", background: "#f08a4b" }} />
+                  <i className="b3" style={{ width: "8%", background: "var(--kesar)" }} />
                 </span>
-                <span className="n" style={{ color: "#db7a54" }}>14</span>
+                <span className="n" style={{ color: "var(--kesar-text)" }}>14</span>
               </div>
               <div className="ls-sku">
                 <span>

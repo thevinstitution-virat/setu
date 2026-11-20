@@ -44,7 +44,7 @@ export default function JourneySection() {
         <p className="ls-sub">{c.jSub}</p>
       </div>
 
-      <div className="ls-jr glass ls-rv">
+      <div className="ls-jr glass ls-glow ls-rv">
         <div className="ls-jrail">
           <span className="ls-jfill" style={{ width: `${(stage / (count - 1)) * 100}%` }} />
           <span className="ls-jpkg" style={{ left: `${(stage / (count - 1)) * 100}%` }}>
@@ -67,11 +67,11 @@ export default function JourneySection() {
                   }}
                 >
                   <span className="ls-stg-n">{String(i + 1).padStart(2, "0")}</span>
-                  <span>
+                  <span style={{ minWidth: 0 }}>
                     <b>{st.title}</b>
                     <small style={{ display: "block", color: "var(--muted)", fontSize: 12 }}>{st.time}</small>
                   </span>
-                  <span className={`chip ${WHO_CLASS[st.whoClass]}`}>{st.who}</span>
+                  <span className={`chip ls-stg-who ${WHO_CLASS[st.whoClass]}`}>{st.who}</span>
                 </button>
                 {i === stage && <div className="ls-stg-body">{st.body}</div>}
               </div>
@@ -96,7 +96,7 @@ function StagePhone({ stage }: { stage: number }) {
 
   return (
     <div className="ls-phone">
-      <div className="ls-pscr">
+      <div className="ls-pscr" key={stage}>
         {stage === 0 && (
           <>
             <b style={{ fontSize: 13 }}>{c.shop}</b>

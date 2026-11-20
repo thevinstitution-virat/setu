@@ -19,6 +19,10 @@ export type LandingContent = {
   navMap: string;
   navBill: string;
   navFaq: string;
+  navBeat: string;
+  navOwner: string;
+  menuOpen: string;
+  menuClose: string;
   signIn: string;
   demo: string;
 
@@ -27,7 +31,10 @@ export type LandingContent = {
   pill: string;
   h1a: string;
   h1b: string;
+  /** EN only: words that rotate after "every"; empty = static h1b. */
+  rotWords: string[];
   lead: string;
+  stats: { n: number; from: number; suffix: string; label: string }[];
   cta1: string;
   cta2: string;
   tick1: string;
@@ -221,6 +228,10 @@ export type LandingContent = {
   footTag: string;
   footProduct: string;
   footDesign: string;
+  footExplore: string;
+  footStart: string;
+  footTalk: string;
+  footEmail: string;
 };
 
 export const landingContent: Record<Lang, LandingContent> = {
@@ -230,15 +241,26 @@ export const landingContent: Record<Lang, LandingContent> = {
     navMap: "Live map",
     navBill: "Billing",
     navFaq: "FAQ",
+    navBeat: "Sales beat",
+    navOwner: "Dashboard",
+    menuOpen: "Open menu",
+    menuClose: "Close menu",
     signIn: "Sign in",
-    demo: "Book a demo",
+    demo: "Start free trial",
 
     pillTag: "NEW",
     pill: "Built for distributors and the retailers they serve",
     h1a: "The bridge between your godown and",
     h1b: "every retailer.",
+    rotWords: ["retailer.", "kirana store.", "medical store.", "general store."],
     lead: "puts your orders, stock, sales beat, billing and deliveries on one app — so every retailer can order in a minute, and every delivery can be tracked to the shop door.",
-    cta1: "Book a free demo",
+    stats: [
+      { n: 5, from: 0, suffix: "", label: "roles on one app — owner, office, sales, delivery, retailer" },
+      { n: 2, from: 0, suffix: "", label: "languages on every screen — English and Hindi" },
+      { n: 60, from: 0, suffix: "s", label: "for a retailer to place an order" },
+      { n: 0, from: 9, suffix: "", label: "app-store downloads needed" },
+    ],
+    cta1: "Start free trial",
     cta2: "See how it works",
     tick1: "No app store needed",
     tick2: "OTP login for retailers",
@@ -438,7 +460,7 @@ export const landingContent: Record<Lang, LandingContent> = {
     delAgents: "Delivery agents out",
     retailersOrdering: "Retailers ordering",
     cashToday: "Collected today",
-    seeDash: "See it with your data",
+    seeDash: "Try it with your data",
 
     lTitle: "Works the way your team already talks.",
     lSub: "Switch the whole app between English and Hindi — every real screen, not just the menu. Try it: this page switches too.",
@@ -481,7 +503,7 @@ export const landingContent: Record<Lang, LandingContent> = {
       },
     ],
 
-    ctaKick: "Book a free demo",
+    ctaKick: "Free trial",
     ctaTitle: "Build the bridge to every retailer.",
     ctaSub: "See Seller's Setu running with your own products, team and retailers.",
     ctaStart: "Get started",
@@ -489,6 +511,10 @@ export const landingContent: Record<Lang, LandingContent> = {
     footTag: "Orders, stock, beats, billing and deliveries — in one app.",
     footProduct: "A product of VPD Vastus Ventures Private Limited",
     footDesign: "Concept and design by VGraphics",
+    footExplore: "Explore",
+    footStart: "Get started",
+    footTalk: "Talk to us",
+    footEmail: "Email us",
   },
   hi: {
     navJourney: "कैसे काम करता है",
@@ -496,15 +522,26 @@ export const landingContent: Record<Lang, LandingContent> = {
     navMap: "लाइव नक्शा",
     navBill: "बिलिंग",
     navFaq: "सवाल",
+    navBeat: "सेल्स बीट",
+    navOwner: "डैशबोर्ड",
+    menuOpen: "मेन्यू खोलें",
+    menuClose: "मेन्यू बंद करें",
     signIn: "लॉगिन",
-    demo: "डेमो बुक करें",
+    demo: "मुफ़्त ट्रायल शुरू करें",
 
     pillTag: "नया",
     pill: "डिस्ट्रीब्यूटर और उनके रिटेलरों के लिए बना",
     h1a: "आपके गोदाम और",
     h1b: "हर रिटेलर के बीच का सेतु।",
+    rotWords: [],
     lead: "आपके ऑर्डर, स्टॉक, सेल्स बीट, बिलिंग और डिलीवरी को एक ऐप पर लाता है — ताकि हर रिटेलर एक मिनट में ऑर्डर कर सके, और हर डिलीवरी दुकान के दरवाज़े तक ट्रैक हो।",
-    cta1: "मुफ़्त डेमो बुक करें",
+    stats: [
+      { n: 5, from: 0, suffix: "", label: "भूमिकाएँ एक ऐप पर — मालिक, ऑफ़िस, सेल्स, डिलीवरी, रिटेलर" },
+      { n: 2, from: 0, suffix: "", label: "भाषाएँ हर स्क्रीन पर — अंग्रेज़ी और हिंदी" },
+      { n: 60, from: 0, suffix: " सेकंड", label: "में रिटेलर का ऑर्डर" },
+      { n: 0, from: 9, suffix: "", label: "ऐप स्टोर डाउनलोड की ज़रूरत" },
+    ],
+    cta1: "मुफ़्त ट्रायल शुरू करें",
     cta2: "देखें कैसे काम करता है",
     tick1: "ऐप स्टोर की ज़रूरत नहीं",
     tick2: "रिटेलर के लिए OTP लॉगिन",
@@ -704,7 +741,7 @@ export const landingContent: Record<Lang, LandingContent> = {
     delAgents: "बाहर डिलीवरी एजेंट",
     retailersOrdering: "ऑर्डर करने वाले रिटेलर",
     cashToday: "आज की वसूली",
-    seeDash: "अपने डेटा के साथ देखें",
+    seeDash: "अपने डेटा के साथ आज़माएँ",
 
     lTitle: "जैसे आपकी टीम बात करती है, वैसे ही काम करे।",
     lSub: "पूरा ऐप हिंदी और अंग्रेज़ी में बदलें — सिर्फ़ मेन्यू नहीं, हर असली स्क्रीन। आज़माकर देखें: यह पेज भी बदल जाता है।",
@@ -747,7 +784,7 @@ export const landingContent: Record<Lang, LandingContent> = {
       },
     ],
 
-    ctaKick: "मुफ़्त डेमो बुक करें",
+    ctaKick: "मुफ़्त ट्रायल",
     ctaTitle: "हर रिटेलर तक अपना सेतु बनाइए।",
     ctaSub: "सेलर्स सेतु को अपने ही उत्पाद, टीम और रिटेलरों के साथ चलता देखें।",
     ctaStart: "शुरू करें",
@@ -755,5 +792,9 @@ export const landingContent: Record<Lang, LandingContent> = {
     footTag: "ऑर्डर, स्टॉक, बीट, बिलिंग और डिलीवरी — एक ऐप में।",
     footProduct: "VPD Vastus Ventures Private Limited का एक प्रोडक्ट",
     footDesign: "संकल्पना और डिज़ाइन — VGraphics",
+    footExplore: "देखें",
+    footStart: "शुरू करें",
+    footTalk: "बात करें",
+    footEmail: "ईमेल करें",
   },
 };

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import { landingContent } from "@/lib/i18n/landing-content";
-import { Confetti, useInView } from "./use-landing";
+import { Confetti, CountUp, RotatingWord, useInView } from "./use-landing";
 
 export default function HeroSection() {
   const { lang } = useLanguage();
@@ -11,33 +11,48 @@ export default function HeroSection() {
   const [ref, inView] = useInView<HTMLDivElement>();
 
   return (
-    <section className="ls-hero" ref={ref} style={{ animationPlayState: inView ? "running" : "paused" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>
-        <span className="ls-pill">
+    <div className="ls-herow" data-paused={inView ? undefined : ""}>
+      <div className="ls-aurora" aria-hidden="true">
+        <i className="a1" />
+        <i className="a2" />
+        <i className="a3" />
+      </div>
+      <div className="ls-hgrid" aria-hidden="true" />
+    <section className="ls-hero" ref={ref}>
+      <div className="ls-hcopy">
+        <span className="ls-pill ls-in" style={{ "--i": 0 } as React.CSSProperties}>
           <b>{c.pillTag}</b>
           {c.pill}
         </span>
-        <h1 className="ls-h1">
-          {c.h1a} <span className="ls-mark">{c.h1b}</span>
+        <h1 className="ls-h1 ls-in" style={{ "--i": 1 } as React.CSSProperties}>
+          {c.rotWords.length > 0 ? (
+            <>
+              {c.h1a} every <RotatingWord words={c.rotWords} />
+            </>
+          ) : (
+            <>
+              {c.h1a} <span className="ls-mark">{c.h1b}</span>
+            </>
+          )}
         </h1>
-        <p className="ls-lead" style={{ maxWidth: 540 }}>
+        <p className="ls-lead ls-in" style={{ "--i": 2 } as React.CSSProperties}>
           <b>Seller&apos;s Setu</b> {c.lead}
         </p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-          <Link href="#demo" className="btn btn-kesar btn-lg">
+        <div className="ls-in" style={{ display: "flex", flexWrap: "wrap", gap: 12, "--i": 3 } as React.CSSProperties}>
+          <Link href="/start" className="btn btn-kesar btn-lg ls-shine">
             {c.cta1}
             <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M5 12h14M13 6l6 6-6 6" />
             </svg>
           </Link>
-          <Link href="#journey" className="btn btn-glass btn-lg">
+          <Link href="#journey" className="btn btn-lg ls-btn-ghost">
             <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true" fill="currentColor">
               <path d="M8 5.5v13l11-6.5z" />
             </svg>
             {c.cta2}
           </Link>
         </div>
-        <div className="ls-ticks">
+        <div className="ls-ticks ls-in" style={{ "--i": 4 } as React.CSSProperties}>
           {[c.tick1, c.tick2, c.tick3].map((t) => (
             <span key={t}>
               <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
@@ -49,7 +64,7 @@ export default function HeroSection() {
         </div>
       </div>
 
-      <div className="ls-fleet ls" role="img" aria-label={c.sceneAria}>
+      <div className="ls-fleet ls ls-in" role="img" aria-label={c.sceneAria} style={{ "--i": 2 } as React.CSSProperties}>
         <div className="ls-fmap">
           <svg viewBox="0 0 1000 760" aria-hidden="true">
             <rect className="l-blk" x="16" y="16" width="120" height="120" rx="10" />
@@ -122,7 +137,7 @@ export default function HeroSection() {
               <path d="M3 10l2-6h14l2 6zM9 20v-5h6v5" />
             </svg>
           </div>
-          <span className="ls-mlab" style={{ left: "85%", top: "22.5%" }}>
+          <span className="ls-mlab lab-drop" style={{ left: "85%", top: "22.5%" }}>
             <span className="chip glass">{c.dropLbl}</span>
           </span>
           <span className="ls-etab" style={{ left: "85%", top: "9%" }}>
@@ -253,5 +268,14 @@ export default function HeroSection() {
         </div>
       </div>
     </section>
+      <div className="ls-stats">
+        {c.stats.map((s, i) => (
+          <div className="ls-stat ls-rv" key={i} style={{ "--i": i } as React.CSSProperties}>
+            <CountUp to={s.n} from={s.from} suffix={s.suffix} className="ls-stat-n" duration={s.n > 10 ? 1600 : 1100} />
+            <span className="ls-stat-l">{s.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

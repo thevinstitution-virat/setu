@@ -54,7 +54,7 @@ export default function BeatSection() {
             </li>
           </ul>
         </div>
-        <div className="ls-beat glass ls-rv">
+        <div className="ls-beat glass ls-glow ls-rv">
           <div className="ls-ringw">
             <span className="ls-ring">
               <span>9/14</span>
@@ -65,7 +65,7 @@ export default function BeatSection() {
               <span style={{ fontSize: 13, color: "var(--muted)" }}>{c.beatMeta}</span>
             </span>
           </div>
-          <div className="ls-visit">
+          <div className="ls-visit" style={{ "--i": 1 } as React.CSSProperties}>
             <span className="ls-visit-n">7</span>
             <span>
               <b>Gupta General Store</b>
@@ -73,7 +73,7 @@ export default function BeatSection() {
             </span>
             <span className="chip chip-mint">₹3,120</span>
           </div>
-          <div className="ls-visit">
+          <div className="ls-visit" style={{ "--i": 2 } as React.CSSProperties}>
             <span className="ls-visit-n">8</span>
             <span>
               <b>{c.shop}</b>
@@ -81,7 +81,7 @@ export default function BeatSection() {
             </span>
             <span className="chip chip-mint">₹4,133</span>
           </div>
-          <div className="ls-visit">
+          <div className="ls-visit" style={{ "--i": 3 } as React.CSSProperties}>
             <span className="ls-visit-n">9</span>
             <span>
               <b>Verma Traders</b>
@@ -89,7 +89,7 @@ export default function BeatSection() {
             </span>
             <span className="chip chip-genda">{c.noOrder}</span>
           </div>
-          <div className="ls-visit">
+          <div className="ls-visit" style={{ "--i": 4 } as React.CSSProperties}>
             <span className="ls-visit-n">10</span>
             <span>
               <b>Ansari Store</b>
@@ -97,7 +97,7 @@ export default function BeatSection() {
             </span>
             <span className="chip">0.6 km</span>
           </div>
-          <div className="ls-clockin">
+          <div className="ls-clockin" style={{ "--i": 5 } as React.CSSProperties}>
             <span className="tile">
               <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <circle cx="12" cy="12" r="9" />

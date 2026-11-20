@@ -17,11 +17,12 @@ export default function FaqSection() {
       </div>
       <div className="ls-faq">
         {c.faq.map((item, i) => (
-          <div className="ls-qa glass" key={item.q}>
+          <div className={`ls-qa glass ls-rv ${i === open ? "open" : ""}`} key={i} style={{ "--i": i } as React.CSSProperties}>
             <button
               type="button"
               className={`ls-qbtn ${i === open ? "open" : ""}`}
               aria-expanded={i === open}
+              aria-controls={`faq-a-${i}`}
               onClick={() => setOpen(i === open ? -1 : i)}
             >
               <span>{item.q}</span>
@@ -31,7 +32,9 @@ export default function FaqSection() {
                 </svg>
               </span>
             </button>
-            {i === open && <p className="ls-ans">{item.a}</p>}
+            <div className="ls-answ" id={`faq-a-${i}`} role="region" aria-hidden={i !== open}>
+              <p className="ls-ans">{item.a}</p>
+            </div>
           </div>
         ))}
       </div>

@@ -15,6 +15,7 @@ import BilingualSection from "@/components/landing/BilingualSection";
 import StepsSection from "@/components/landing/StepsSection";
 import FaqSection from "@/components/landing/FaqSection";
 import CtaFooterSection from "@/components/landing/CtaFooterSection";
+import LandingFx from "@/components/landing/LandingFx";
 
 export default async function Home() {
   const session = await getSession();
@@ -43,6 +44,7 @@ export default async function Home() {
         <FaqSection />
       </main>
       <CtaFooterSection />
+      <LandingFx />
     </div>
   );
 }

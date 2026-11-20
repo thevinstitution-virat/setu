@@ -20,7 +20,7 @@ export default function LiveMapSection() {
         <p className="ls-sub">{c.mSub}</p>
       </div>
 
-      <div className="ls-mapwrap glass ls-rv ls" role="img" aria-label={c.mapAria}>
+      <div className="ls-mapwrap glass ls-glow ls-rv ls" role="img" aria-label={c.mapAria}>
         <div className="ls-mapgrid">
           <div className="ls-map">
             <svg viewBox="0 0 1000 620" preserveAspectRatio="none" aria-hidden="true">
@@ -70,14 +70,14 @@ export default function LiveMapSection() {
                 <path d="M4 10v10h16V10M3 10l2-6h14l2 6zM9 20v-5h6v5" />
               </svg>
             </div>
-            <span className="ls-mchip" style={{ left: "89%", top: "28%" }}>
+            <span className="ls-mchip mc-ravi" style={{ left: "89%", top: "24%" }}>
               <span className="chip chip-mint">✓ {c.st5}</span>
             </span>
-            <span className="ls-mchip" style={{ left: "70%", top: "86%" }}>
+            <span className="ls-mchip mc-imran" style={{ left: "70%", top: "83%" }}>
               <span className="chip chip-mint">✓ {c.st5}</span>
             </span>
             <Confetti className="cf-a" />
-            <div className="ls-agent" style={{ left: "50%", top: "50%" }}>
+            <div className="ls-agent mv-ravi" style={{ left: "11%", top: "79.03%" }}>
               <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <circle cx="6" cy="17" r="2.5" />
                 <circle cx="18" cy="17" r="2.5" />
@@ -87,7 +87,7 @@ export default function LiveMapSection() {
                 Ravi<em>12 min</em>
               </span>
             </div>
-            <div className="ls-agent" style={{ left: "40%", top: "79.03%" }}>
+            <div className="ls-agent mv-imran" style={{ left: "22%", top: "79.03%" }}>
               <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <circle cx="6" cy="17" r="2.5" />
                 <circle cx="18" cy="17" r="2.5" />
@@ -97,7 +97,7 @@ export default function LiveMapSection() {
                 Imran<em>6 min</em>
               </span>
             </div>
-            <div className="ls-agent" style={{ left: "76%", top: "20.97%" }}>
+            <div className="ls-agent ls-agent-walk" style={{ left: "38%", top: "20.97%" }}>
               <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <circle cx="12" cy="7" r="3.5" />
                 <path d="M5 21a7 7 0 0 1 14 0" />

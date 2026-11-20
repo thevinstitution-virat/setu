@@ -30,6 +30,98 @@ export function useInView<T extends HTMLElement>(threshold = 0.15) {
   return [ref, inView] as const;
 }
 
+const inr = new Intl.NumberFormat("en-IN");
+
+/**
+ * A number that counts up (or down, when `from` > `to`) the first time it
+ * scrolls into view. Server HTML and reduced motion show the final value.
+ */
+export function CountUp({
+  to,
+  from = 0,
+  prefix = "",
+  suffix = "",
+  duration = 1400,
+  className,
+  style,
+}: {
+  to: number;
+  from?: number;
+  prefix?: string;
+  suffix?: string;
+  duration?: number;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const ref = useRef<HTMLSpanElement | null>(null);
+  const [value, setValue] = useState(to);
+  const reduced = useReducedMotion();
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || reduced) return;
+    // Already on screen at load: leave the final value (no flash of zero).
+    const r = el.getBoundingClientRect();
+    if (r.top < window.innerHeight && r.bottom > 0) return;
+    let raf = 0;
+    setValue(from);
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        io.disconnect();
+        const start = performance.now();
+        const step = (now: number) => {
+          const t = Math.min(1, (now - start) / duration);
+          const eased = 1 - Math.pow(1 - t, 4);
+          setValue(Math.round(from + (to - from) * eased));
+          if (t < 1) raf = requestAnimationFrame(step);
+        };
+        raf = requestAnimationFrame(step);
+      },
+      { threshold: 0.4 }
+    );
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, [to, from, duration, reduced]);
+
+  return (
+    <span ref={ref} className={className} style={style}>
+      {prefix}
+      {inr.format(value)}
+      {suffix}
+    </span>
+  );
+}
+
+/**
+ * Words stacked in one grid cell (so the line never reflows), one shown at a
+ * time with a slide-up swap.
+ */
+export function RotatingWord({ words, interval = 2600 }: { words: string[]; interval?: number }) {
+  const [i, setI] = useState(0);
+  const reduced = useReducedMotion();
+  useEffect(() => {
+    if (reduced || words.length < 2) return;
+    const id = setInterval(() => {
+      if (!document.hidden) setI((n) => (n + 1) % words.length);
+    }, interval);
+    return () => clearInterval(id);
+  }, [reduced, words.length, interval]);
+
+  return (
+    <span className="ls-rot" aria-live="off">
+      {words.map((w, n) => (
+        <span key={w} className={`ls-rot-w ${n === i ? "on" : ""}`} aria-hidden={n !== i}>
+          <span className="ls-mark">{w}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
 /** 16 confetti pieces with randomized fling vectors, as CSS custom properties. */
 function confettiPieces(seed: number) {
   const pieces: { dx: number; dy: number; r: number }[] = [];

@@ -2,6 +2,7 @@
 
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import { landingContent } from "@/lib/i18n/landing-content";
+import { CountUp } from "./use-landing";
 
 export default function BillingSection() {
   const { lang } = useLanguage();
@@ -10,7 +11,7 @@ export default function BillingSection() {
   return (
     <section className="ls-sec" id="billing" style={{ paddingTop: 0 }}>
       <div className="ls-split">
-        <div className="ls-bill ls-rv" role="img" aria-label={c.billAria}>
+        <div className="ls-bill ls-float ls-media-first ls-rv" role="img" aria-label={c.billAria}>
           <div className="ls-bill-h">
             <span>
               <span style={{ fontSize: 12.5, fontWeight: 700, color: "var(--kesar-text)" }}>{c.taxInvoice}</span>
@@ -21,52 +22,52 @@ export default function BillingSection() {
               <span style={{ display: "block", fontSize: 12.5, color: "var(--muted)" }}>18 Nov 2026</span>
             </span>
           </div>
-          <div className="ls-bl">
+          <div className="ls-bl" style={{ "--i": 1 } as React.CSSProperties}>
             <span>{c.p1} × 4</span>
             <span>5%</span>
             <span className="tnum">₹2,340</span>
           </div>
-          <div className="ls-bl">
+          <div className="ls-bl" style={{ "--i": 2 } as React.CSSProperties}>
             <span>{c.p2} × 6</span>
             <span>5%</span>
             <span className="tnum">₹1,032</span>
           </div>
-          <div className="ls-bl">
+          <div className="ls-bl" style={{ "--i": 3 } as React.CSSProperties}>
             <span>{c.p4} × 4</span>
             <span>0%</span>
             <span className="tnum">₹592</span>
           </div>
-          <div className="ls-bl offer">
+          <div className="ls-bl offer" style={{ "--i": 4 } as React.CSSProperties}>
             <span>{c.offerLine}</span>
             <span />
             <span className="tnum">₹396</span>
           </div>
-          <div className="ls-bl">
+          <div className="ls-bl" style={{ "--i": 5 } as React.CSSProperties}>
             <span>GST 5%</span>
             <span />
             <span className="tnum">₹169</span>
           </div>
-          <div className="ls-bl">
+          <div className="ls-bl" style={{ "--i": 6 } as React.CSSProperties}>
             <span>GST 0%</span>
             <span />
             <span className="tnum">₹0</span>
           </div>
           <div className="ls-btot">
             <span>{c.total}</span>
-            <span className="big tnum">₹4,133</span>
+            <CountUp to={4133} prefix="₹" className="big tnum" />
           </div>
           <div className="ls-pays">
             <div className="ls-pay">
               <small>{c.cash}</small>
-              <b>₹38,420</b>
+              <b><CountUp to={38420} prefix="₹" /></b>
             </div>
             <div className="ls-pay">
               <small>{c.online}</small>
-              <b>₹21,760</b>
+              <b><CountUp to={21760} prefix="₹" /></b>
             </div>
             <div className="ls-pay">
               <small>{c.credit}</small>
-              <b>₹12,300</b>
+              <b><CountUp to={12300} prefix="₹" /></b>
             </div>
           </div>
         </div>

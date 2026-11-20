@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import { landingContent } from "@/lib/i18n/landing-content";
+import { CountUp } from "./use-landing";
 
 export default function OwnerDashboardSection() {
   const { lang } = useLanguage();
@@ -29,14 +30,14 @@ export default function OwnerDashboardSection() {
         <h2 className="ls-h2">{c.oTitle}</h2>
         <p className="ls-sub">{c.oSub}</p>
       </div>
-      <div className="ls-own glass ls-rv">
+      <div className="ls-own glass ls-glow ls-rv">
         <div className="ls-own-grid">
           <div style={{ minWidth: 0 }}>
             <div className="ls-stages">
               {stages.map((s) => (
                 <div className={`ls-sbox ${s.cls}`} key={s.label}>
                   <small>{s.label}</small>
-                  <b>{s.value}</b>
+                  <b><CountUp to={s.value} /></b>
                 </div>
               ))}
             </div>
@@ -66,7 +67,7 @@ export default function OwnerDashboardSection() {
             </div>
             <div className="ls-trow">
               <span>{c.salesAgents}</span>
-              <b>8 / 9</b>
+              <b><CountUp to={8} /> / 9</b>
             </div>
             <div className="ls-trow">
               <span>{c.delAgents}</span>
@@ -74,13 +75,13 @@ export default function OwnerDashboardSection() {
             </div>
             <div className="ls-trow">
               <span>{c.retailersOrdering}</span>
-              <b>86</b>
+              <b><CountUp to={86} /></b>
             </div>
             <div className="ls-trow">
               <span>{c.cashToday}</span>
-              <b style={{ color: "var(--genda)" }}>₹72,480</b>
+              <b style={{ color: "var(--genda)" }}><CountUp to={72480} prefix="₹" duration={1800} /></b>
             </div>
-            <Link href="#demo" className="btn btn-kesar" style={{ marginTop: 6, width: "100%" }}>
+            <Link href="/start" className="btn btn-kesar ls-shine" style={{ marginTop: 6, width: "100%" }}>
               {c.seeDash}
             </Link>
           </div>
