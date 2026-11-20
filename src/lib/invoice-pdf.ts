@@ -148,7 +148,7 @@ export async function renderInvoicePdf(doc: InvoiceDoc, opts: { accent?: string;
   const bold = await pdf.embedFont(b, { subset: true });
   pdf.setTitle(`${doc.title} ${doc.number}`);
   pdf.setAuthor(doc.seller.legalName);
-  pdf.setCreator("Seller's Setu");
+  pdf.setCreator("VBiz Pro");
   const c: Ctx = { pdf, page: pdf.addPage([W, H]), y: H - M, reg, bold, accent: hex(opts.accent) };
   const pages: PDFPage[] = [c.page];
 
@@ -345,7 +345,7 @@ export async function renderInvoicePdf(doc: InvoiceDoc, opts: { accent?: string;
   text(c, "Authorised signatory", W - M - 220, sigY, { size: 8, color: MUTED, align: "right", width: 220 });
 
   pages.forEach((p, i) => {
-    p.drawText(`Page ${i + 1} of ${pages.length} · Computer-generated ${doc.title.toLowerCase()} · Seller's Setu`, {
+    p.drawText(`Page ${i + 1} of ${pages.length} · Computer-generated ${doc.title.toLowerCase()} · VBiz Pro`, {
       x: M,
       y: 18,
       size: 7,

@@ -14,7 +14,7 @@ export const LEGAL_UPDATED = "20 November 2026";
 /** Who runs the platform, from the environment (the same names as on our invoices). */
 export function operator(env: Record<string, string | undefined> = process.env) {
   return {
-    name: env.PLATFORM_LEGAL_NAME || "Seller's Setu",
+    name: env.PLATFORM_LEGAL_NAME || "VBiz Pro",
     address: env.PLATFORM_ADDRESS || "",
     /** Grievance officer (DPDP Act §8(10)); an email or phone shown on the privacy page. */
     grievance: env.GRIEVANCE_CONTACT || "",

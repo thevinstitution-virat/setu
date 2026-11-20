@@ -582,7 +582,7 @@ export async function chargeDebit(
 }
 
 /**
- * Opening balance when moving a retailer onto Setu. Positive = they owe us
+ * Opening balance when moving a retailer onto VBiz Pro. Positive = they owe us
  * (an opening bill dated asOf); negative = advance we hold (a credit that
  * pays future bills).
  */

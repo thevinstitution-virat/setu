@@ -38,7 +38,7 @@ const IST_MS = 330 * 60 * 1000;
 /** Our own details for invoices, from the environment. */
 export function platformSeller() {
   return {
-    legalName: process.env.PLATFORM_LEGAL_NAME || "Seller's Setu",
+    legalName: process.env.PLATFORM_LEGAL_NAME || "VBiz Pro",
     gstin: process.env.PLATFORM_GSTIN || null,
     address: process.env.PLATFORM_ADDRESS || "",
     stateCode: process.env.PLATFORM_STATE_CODE || null,

@@ -14,7 +14,7 @@ export default async function PlatformLoginPage() {
         <BrandMark size={40} />
         <div>
           <p className="page-kick">Platform</p>
-          <h1 className="page-title !mt-0.5">Setu console</h1>
+          <h1 className="page-title !mt-0.5">VBiz Pro console</h1>
         </div>
       </div>
       {tenant ? (

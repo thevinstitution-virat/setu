@@ -1,5 +1,5 @@
 #!/bin/sh
-# Database backup for Seller's Setu (roadmap §8: encrypted backups, restore drill).
+# Database backup for VBiz Pro (roadmap §8: encrypted backups, restore drill).
 #
 #   BACKUP_DATABASE_URL=postgresql://setu_backup:...@host:5432/setu sh scripts/backup-db.sh
 #

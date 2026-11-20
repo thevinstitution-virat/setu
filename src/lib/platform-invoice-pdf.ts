@@ -48,7 +48,7 @@ export async function renderPlatformInvoicePdf(inv: PlatformInvoice) {
 
   page.drawRectangle({ x: 0, y: H - 6, width: W, height: 6, color: ACCENT });
   let y = H - M - 10;
-  text(page, seller.legalName ?? "Seller's Setu", M, y, { size: 15, font: bold });
+  text(page, seller.legalName ?? "VBiz Pro", M, y, { size: 15, font: bold });
   text(page, registered ? "TAX INVOICE" : "INVOICE", 0, y, { size: 13, font: bold, color: ACCENT, right: W - M });
   y -= 16;
   if (seller.address) text(page, seller.address.slice(0, 90), M, y, { size: 8.5 });

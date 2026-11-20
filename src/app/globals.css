@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "../components/landing/landing.css";
+@import "../components/landing/pro.css";
 
 :root {
   /* Ground + ink */
@@ -112,7 +113,7 @@ h3 {
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 14px 30px -20px rgba(15, 42, 42, 0.35);
 }
 
-/* App-wide buttons, matching the Seller's Setu brand */
+/* App-wide buttons, matching the VBiz Pro brand */
 .btn {
   display: inline-flex;
   align-items: center;

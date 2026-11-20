@@ -175,7 +175,7 @@ export function gstr1Sections(docs: ExportDoc[]) {
 export async function gstr1Workbook(docs: ExportDoc[]) {
   const s = gstr1Sections(docs);
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Seller's Setu";
+  wb.creator = "VBiz Pro";
   sheet(wb, "b2b", ["GSTIN/UIN of Recipient", "Receiver Name", "Invoice Number", "Invoice date", "Invoice Value", "Place Of Supply", "Reverse Charge", "Applicable % of Tax Rate", "Invoice Type", "E-Commerce GSTIN", "Rate", "Taxable Value", "Cess Amount"], s.b2b);
   sheet(wb, "b2cl", ["Invoice Number", "Invoice date", "Invoice Value", "Place Of Supply", "Applicable % of Tax Rate", "Rate", "Taxable Value", "Cess Amount", "E-Commerce GSTIN"], s.b2cl);
   sheet(wb, "b2cs", ["Type", "Place Of Supply", "Applicable % of Tax Rate", "Rate", "Taxable Value", "Cess Amount", "E-Commerce GSTIN"], s.b2cs);
@@ -191,7 +191,7 @@ export async function gstr1Workbook(docs: ExportDoc[]) {
 
 export async function salesRegisterWorkbook(docs: ExportDoc[]) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Seller's Setu";
+  wb.creator = "VBiz Pro";
   const TYPE: Record<InvoiceType, string> = { TAX_INVOICE: "Tax invoice", BILL_OF_SUPPLY: "Bill of supply", CREDIT_NOTE: "Credit note", DEBIT_NOTE: "Debit note" };
   sheet(
     wb,

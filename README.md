@@ -1,4 +1,4 @@
-# Seller's Setu
+# VBiz Pro
 
 Multi-business SaaS for distributors: orders, deliveries, GST invoices, collections and the shop ledger (khata), field sales, stock and AI helpers. Each business gets its own address (`<slug>.<PLATFORM_DOMAIN>`) and brand; shops order from their phones.
 

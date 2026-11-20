@@ -1,4 +1,4 @@
-# Coolify "Docker Compose" deployment of Seller's Setu: web + worker from one image.
+# Coolify "Docker Compose" deployment of VBiz Pro: web + worker from one image.
 # Postgres runs as its own Coolify service (or managed): point DATABASE_URL at it with the
 # NON-superuser app role (superusers bypass row-level security). Set every variable in
 # Coolify's environment screen; see .env.example and docs/DEPLOY.md.

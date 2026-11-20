@@ -13,13 +13,13 @@ import { platformSecret } from "@/lib/auth";
  *    banner while it runs, and the list under Settings → Support access;
  *  - it signs in as the business's hidden support login (User.isSupport:
  *    never listed, never a seat), so everything done is in the audit log
- *    under "Setu support";
+ *    under "VBiz Pro support";
  *  - the sign-in link is single use and lasts 5 minutes; READ sessions may
  *    not change anything (guard refuses every non-GET request).
  */
 
 const AUD = "setu-support";
-export const SUPPORT_NAME = "Setu support";
+export const SUPPORT_NAME = "VBiz Pro support";
 export const MAX_MINUTES = 120;
 
 export class SupportError extends Error {}

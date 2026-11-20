@@ -301,7 +301,7 @@ export async function sendTest(tenantId: string, endpointId: string) {
     const e = await tx.webhookEndpoint.findUnique({ where: { id: endpointId }, select: { id: true, url: true, secret: true } });
     if (!e) return null;
     const row = await tx.webhookDelivery.create({
-      data: { endpointId: e.id, event: "ping", eventKey: `ping:${Date.now()}:${token(4)}`, payload: { event: "ping", created_at: new Date().toISOString(), data: { message: "Test from Setu" } } },
+      data: { endpointId: e.id, event: "ping", eventKey: `ping:${Date.now()}:${token(4)}`, payload: { event: "ping", created_at: new Date().toISOString(), data: { message: "Test from VBiz Pro" } } },
     });
     return { row, e };
   });

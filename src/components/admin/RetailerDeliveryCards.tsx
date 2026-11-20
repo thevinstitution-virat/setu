@@ -428,7 +428,7 @@ function CountForm({
     <div className="rounded-2xl border border-[var(--line)] bg-white p-3 space-y-2.5">
       <p className="text-xs text-[var(--ink-2)]">
         {opening
-          ? "For a shop moving onto Setu: how many of each it already holds."
+          ? "For a shop moving onto VBiz Pro: how many of each it already holds."
           : "Fix the count after a recount. Given adds to what the shop holds, taken back removes."}
       </p>
       <ul className="space-y-2">

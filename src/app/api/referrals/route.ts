@@ -22,7 +22,7 @@ export async function GET() {
     const earned = rows.filter((r) => r.status === "REWARDED" && !r.note).reduce((a, r) => a + r.referrerReward, 0);
     const reward = formatINR(offer.referrerReward);
     const message =
-      `Order from ${t?.name ?? "us"} on Seller's Setu. Sign up with my code ${code}` +
+      `Order from ${t?.name ?? "us"} on VBiz Pro. Sign up with my code ${code}` +
       (offer.refereeReward ? ` and get ${formatINR(offer.refereeReward)} in your wallet` : "") +
       ` after your first order of ${formatINR(offer.minOrder)} or more: ${link}`;
     return {

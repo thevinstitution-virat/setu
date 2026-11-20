@@ -2,19 +2,19 @@ import { redirect } from "next/navigation";
 import { getSession, roleHome } from "@/lib/auth";
 import { headers } from "next/headers";
 import { classifyHost, getTenant, normaliseHost, platformDomain } from "@/lib/tenant";
-import LandingNav from "@/components/landing/LandingNav";
-import HeroSection from "@/components/landing/HeroSection";
-import BuiltForStrip from "@/components/landing/BuiltForStrip";
-import JourneySection from "@/components/landing/JourneySection";
-import GodownSection from "@/components/landing/GodownSection";
-import LiveMapSection from "@/components/landing/LiveMapSection";
-import BeatSection from "@/components/landing/BeatSection";
-import BillingSection from "@/components/landing/BillingSection";
-import OwnerDashboardSection from "@/components/landing/OwnerDashboardSection";
-import BilingualSection from "@/components/landing/BilingualSection";
-import StepsSection from "@/components/landing/StepsSection";
-import FaqSection from "@/components/landing/FaqSection";
-import CtaFooterSection from "@/components/landing/CtaFooterSection";
+import ProNav from "@/components/landing/pro/ProNav";
+import ProHero from "@/components/landing/pro/ProHero";
+import {
+  CtaBand,
+  FaqSection,
+  FeatureGrid,
+  ProblemsSection,
+  ProFooter,
+  RetailSection,
+  StatsBand,
+  StepsSection,
+  TrustStrip,
+} from "@/components/landing/pro/ProSections";
 import LandingFx from "@/components/landing/LandingFx";
 
 export default async function Home() {
@@ -28,22 +28,20 @@ export default async function Home() {
   if (classifyHost(host, platformDomain(), null).kind !== "platform" && (await getTenant())) redirect("/login");
 
   return (
-    <div className="ls flex min-h-screen flex-col overflow-x-clip" id="top">
-      <LandingNav />
+    <div className="ls vp flex min-h-screen flex-col overflow-x-clip" id="top">
+      <ProNav />
       <main className="flex flex-col">
-        <HeroSection />
-        <BuiltForStrip />
-        <JourneySection />
-        <GodownSection />
-        <LiveMapSection />
-        <BeatSection />
-        <BillingSection />
-        <OwnerDashboardSection />
-        <BilingualSection />
+        <ProHero />
+        <TrustStrip />
+        <ProblemsSection />
+        <RetailSection />
+        <StatsBand />
+        <FeatureGrid />
         <StepsSection />
         <FaqSection />
+        <CtaBand />
       </main>
-      <CtaFooterSection />
+      <ProFooter />
       <LandingFx />
     </div>
   );

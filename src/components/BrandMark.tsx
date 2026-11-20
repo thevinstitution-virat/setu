@@ -1,6 +1,26 @@
 import { APP_NAME, APP_NAME_HI } from "@/lib/brand";
 
-/** The bridge mark on a Mor tile — same mark as the landing nav. */
+/** The VBiz Pro glyph: a "V" whose right arm rises into an arrow (growth). */
+export function BrandGlyph({ size, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      style={size ? { width: size, height: size } : undefined}
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 6.5l6.2 11.5L18.6 4" />
+      <path d="M13.6 4h5v5" />
+    </svg>
+  );
+}
+
+/** The VBiz Pro mark on a Mor tile — same mark as the landing nav. */
 export function BrandMark({ size = 36 }: { size?: number }) {
   return (
     <span
@@ -13,18 +33,7 @@ export function BrandMark({ size = 36 }: { size?: number }) {
         boxShadow: "0 1px 0 rgba(255,255,255,.14) inset, 0 10px 20px -12px rgba(8,38,37,.9)",
       }}
     >
-      <svg
-        viewBox="0 0 24 24"
-        style={{ width: size * 0.56, height: size * 0.56 }}
-        aria-hidden="true"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      >
-        <path d="M2 17c4-7 16-7 20 0" />
-        <path d="M2 17h20M6 17v-3.5M10 17v-5M14 17v-5M18 17v-3.5" />
-      </svg>
+      <BrandGlyph size={size * 0.58} />
     </span>
   );
 }

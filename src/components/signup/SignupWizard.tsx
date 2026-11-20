@@ -391,7 +391,7 @@ export default function SignupWizard({ domain }: { domain: string }) {
     <Shell>
       <div className="card p-5 sm:p-7">
         <p className="page-kick">{trialDays}-day free trial · no card needed</p>
-        <h1 className="page-title">Start your business on Seller&apos;s Setu</h1>
+        <h1 className="page-title">Start your business on VBiz Pro</h1>
         <div className="mt-5 mb-6">
           <Progress steps={STEPS} active={step} />
         </div>
@@ -784,13 +784,13 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex flex-col items-center px-4 py-8 sm:py-12">
       <div className="w-full max-w-lg">
         <div className="flex items-center justify-between gap-3 mb-6">
-          <Link href="/" aria-label="Seller's Setu home" className="min-w-0">
+          <Link href="/" aria-label="VBiz Pro home" className="min-w-0">
             <BrandLockup />
           </Link>
         </div>
         {children}
         <p className="text-xs text-center text-[var(--muted)] mt-5">
-          Already on Seller&apos;s Setu? Sign in on your business&apos;s own address.
+          Already on VBiz Pro? Sign in on your business&apos;s own address.
         </p>
       </div>
     </div>

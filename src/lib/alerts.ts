@@ -25,7 +25,7 @@ export async function sendAlert(title: string, detail = ""): Promise<void> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: chat,
-        text: `🚨 Setu [${env}] ${title}\n${detail}`.slice(0, 3900),
+        text: `🚨 VBiz Pro [${env}] ${title}\n${detail}`.slice(0, 3900),
         disable_web_page_preview: true,
       }),
       signal: AbortSignal.timeout(5000),

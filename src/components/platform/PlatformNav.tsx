@@ -47,7 +47,7 @@ export default function PlatformNav({ name, role }: { name: string; role: string
         <Link href="/platform" className="flex items-center gap-2 shrink-0">
           <BrandMark size={30} />
           <span className="font-heading font-bold leading-none">
-            Setu console
+            VBiz Pro console
             <span className="block text-[11px] font-bold text-[var(--kesar-text)] mt-0.5">Platform</span>
           </span>
         </Link>

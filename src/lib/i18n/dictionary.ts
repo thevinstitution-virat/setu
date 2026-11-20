@@ -2,14 +2,14 @@ export type Lang = "en" | "hi";
 
 export const dictionary = {
   // Brand / landing
-  "brand.name": { en: "Seller's Setu", hi: "सेलर्स सेतु" },
+  "brand.name": { en: "VBiz Pro", hi: "वीबिज़ प्रो" },
   "brand.tagline": { en: "One app for retailer orders, sales visits and deliveries", hi: "रिटेलर ऑर्डर, सेल्स विज़िट और डिलीवरी के लिए एक ऐप" },
   "landing.cta": { en: "Get started", hi: "शुरू करें" },
   "landing.login": { en: "Log in", hi: "लॉग इन करें" },
   "landing.hero.title": { en: "Retailer to delivery, in one connected app", hi: "रिटेलर से डिलीवरी तक, एक ही कनेक्टेड ऐप में" },
   "landing.hero.subtitle": {
-    en: "Setu replaces three separate apps with one lucid workflow — retailer ordering, sales field activity and delivery, all in one login.",
-    hi: "सेतु तीन अलग-अलग ऐप की जगह एक सरल वर्कफ़्लो देता है — रिटेलर ऑर्डरिंग, सेल्स फील्ड गतिविधि और डिलीवरी, सब एक ही लॉगिन में।",
+    en: "VBiz Pro replaces three separate apps with one lucid workflow — retailer ordering, sales field activity and delivery, all in one login.",
+    hi: "वीबिज़ प्रो तीन अलग-अलग ऐप की जगह एक सरल वर्कफ़्लो देता है — रिटेलर ऑर्डरिंग, सेल्स फील्ड गतिविधि और डिलीवरी, सब एक ही लॉगिन में।",
   },
   "landing.feature.retailer.title": { en: "Retailer ordering", hi: "रिटेलर ऑर्डरिंग" },
   "landing.feature.retailer.desc": { en: "Browse catalogue, place orders, track status live with GST-correct billing.", hi: "कैटलॉग देखें, ऑर्डर करें, GST सही बिलिंग के साथ लाइव स्टेटस ट्रैक करें।" },
@@ -68,7 +68,7 @@ export const dictionary = {
   "shell.pausedBody": { en: "Staff and shops cannot sign in until it is back on. You can still see your bills, pay them and download your data.", hi: "जब तक यह फिर से चालू नहीं होता, स्टाफ़ और दुकानें लॉग इन नहीं कर सकतीं। आप अब भी अपने बिल देख, भर और अपना डेटा डाउनलोड कर सकते हैं।" },
   "shell.deleting": { en: "This business will be deleted on", hi: "यह बिज़नेस इस दिन मिटा दिया जाएगा:" },
   "shell.keepIt": { en: "Keep it", hi: "रखें" },
-  "shell.support": { en: "Seller's Setu support is signed in", hi: "सेलर्स सेतु सपोर्ट लॉग इन है" },
+  "shell.support": { en: "VBiz Pro support is signed in", hi: "वीबिज़ प्रो सपोर्ट लॉग इन है" },
   "shell.readOnly": { en: "read only", hi: "सिर्फ़ देखने के लिए" },
   "shell.canChange": { en: "can make changes", hi: "बदलाव कर सकता है" },
   "shell.endSupport": { en: "End session", hi: "सेशन खत्म करें" },
@@ -120,10 +120,10 @@ export const dictionary = {
   "login.error": { en: "Something went wrong", hi: "कुछ गलत हो गया" },
   "login.pausedTitle": { en: "This business is paused", hi: "यह व्यवसाय अभी रुका हुआ है" },
   "login.noBusiness": {
-    en: "This is the Seller's Setu main address. To sign in, open your business's own address.",
-    hi: "यह सेलर्स सेतु का मुख्य पता है। लॉगिन के लिए अपने व्यवसाय का अपना पता खोलें।",
+    en: "This is the VBiz Pro main address. To sign in, open your business's own address.",
+    hi: "यह वीबिज़ प्रो का मुख्य पता है। लॉगिन के लिए अपने व्यवसाय का अपना पता खोलें।",
   },
-  "login.newHere": { en: "New to Seller's Setu?", hi: "सेलर्स सेतु पर नए हैं?" },
+  "login.newHere": { en: "New to VBiz Pro?", hi: "वीबिज़ प्रो पर नए हैं?" },
   "login.startTrial": { en: "Start free trial", hi: "मुफ़्त ट्रायल शुरू करें" },
 
   // Order status

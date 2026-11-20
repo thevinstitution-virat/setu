@@ -3,7 +3,7 @@ import { getPlatformSession } from "@/lib/platform-auth";
 import PlatformNav from "@/components/platform/PlatformNav";
 
 export const metadata: Metadata = {
-  title: "Setu console",
+  title: "VBiz Pro console",
   robots: { index: false, follow: false },
 };
 

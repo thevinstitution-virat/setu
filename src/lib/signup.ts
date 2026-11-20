@@ -82,7 +82,7 @@ export async function requestSignupOtp(phoneRaw: string, ip: string | null, now 
   const code = String(randomInt(100000, 1000000));
   await prisma.signupChallenge.create({ data: { id, phone, codeHash: codeHash(id, code), ip, expiresAt: new Date(now.getTime() + OTP_TTL) } });
   try {
-    await sendOtpSms(phone, code, "Seller's Setu");
+    await sendOtpSms(phone, code, "VBiz Pro");
   } catch (e) {
     if (e instanceof OtpError) throw new SignupError(e.message, "phone", e.status);
     throw e;

@@ -1,4 +1,4 @@
-# Seller's Setu: one image for the web app and the worker (roadmap §4, owner decision 1: Coolify).
+# VBiz Pro: one image for the web app and the worker (roadmap §4, owner decision 1: Coolify).
 #   web:    npm run start:prod   (applies migrations, then serves on $PORT, default 3000)
 #   worker: npm run worker       (background jobs and schedules)
 # Build: docker build -t setu .

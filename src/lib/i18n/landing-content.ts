@@ -390,11 +390,11 @@ export const landingContent: Record<Lang, LandingContent> = {
     reBody: "About 2 days left at this week's pace. Suggested: 120 bags.",
     register: [
       { qty: "+120", dir: "in", label: "Atta 10 kg · new lot" },
-      { qty: "−6", dir: "out", label: "Mustard Oil 1 L · SETU-1042" },
-      { qty: "−4", dir: "out", label: "Basmati 5 kg · SETU-1042" },
-      { qty: "−4", dir: "out", label: "Toor Dal 1 kg · SETU-1042" },
+      { qty: "−6", dir: "out", label: "Mustard Oil 1 L · VB-1042" },
+      { qty: "−4", dir: "out", label: "Basmati 5 kg · VB-1042" },
+      { qty: "−4", dir: "out", label: "Toor Dal 1 kg · VB-1042" },
       { qty: "+2", dir: "in", label: "Basmati 5 kg · return" },
-      { qty: "−12", dir: "out", label: "Atta 10 kg · SETU-1043" },
+      { qty: "−12", dir: "out", label: "Atta 10 kg · VB-1043" },
     ],
 
     mKick: "Live GPS tracking",
@@ -472,18 +472,18 @@ export const landingContent: Record<Lang, LandingContent> = {
     g2: "Add your team & areas",
     g2d: "Sales agents, delivery agents, regions, areas and beats.",
     g3: "Send retailers a link",
-    g3d: "They open it, add Seller's Setu to the home screen and log in with an OTP.",
+    g3d: "They open it, add VBiz Pro to the home screen and log in with an OTP.",
 
     faqKick: "Questions",
     faqTitle: "Before you start",
     faq: [
       {
-        q: "Who is Seller's Setu for?",
+        q: "Who is VBiz Pro for?",
         a: "Distributors, stockists and wholesalers who sell to retailers through a sales team and their own delivery agents — and the retailers who order from them.",
       },
       {
         q: "Do retailers need to download an app?",
-        a: "No. Seller's Setu opens from a link and adds itself to the home screen, straight from the browser. Retailers log in with an OTP.",
+        a: "No. VBiz Pro opens from a link and adds itself to the home screen, straight from the browser. Retailers log in with an OTP.",
       },
       {
         q: "Can I see where my delivery agents are?",
@@ -505,7 +505,7 @@ export const landingContent: Record<Lang, LandingContent> = {
 
     ctaKick: "Free trial",
     ctaTitle: "Build the bridge to every retailer.",
-    ctaSub: "See Seller's Setu running with your own products, team and retailers.",
+    ctaSub: "See VBiz Pro running with your own products, team and retailers.",
     ctaStart: "Get started",
     ctaWa: "WhatsApp us",
     footTag: "Orders, stock, beats, billing and deliveries — in one app.",
@@ -671,11 +671,11 @@ export const landingContent: Record<Lang, LandingContent> = {
     reBody: "इस हफ़्ते की बिक्री से करीब 2 दिन का बचा है। सुझाव: 120 बोरी।",
     register: [
       { qty: "+120", dir: "in", label: "आटा 10 किलो · नया माल" },
-      { qty: "−6", dir: "out", label: "सरसों तेल · SETU-1042" },
-      { qty: "−4", dir: "out", label: "बासमती 5 किलो · SETU-1042" },
-      { qty: "−4", dir: "out", label: "अरहर दाल · SETU-1042" },
+      { qty: "−6", dir: "out", label: "सरसों तेल · VB-1042" },
+      { qty: "−4", dir: "out", label: "बासमती 5 किलो · VB-1042" },
+      { qty: "−4", dir: "out", label: "अरहर दाल · VB-1042" },
       { qty: "+2", dir: "in", label: "बासमती · वापसी" },
-      { qty: "−12", dir: "out", label: "आटा 10 किलो · SETU-1043" },
+      { qty: "−12", dir: "out", label: "आटा 10 किलो · VB-1043" },
     ],
 
     mKick: "लाइव GPS ट्रैकिंग",
@@ -753,18 +753,18 @@ export const landingContent: Record<Lang, LandingContent> = {
     g2: "टीम और एरिया जोड़ें",
     g2d: "सेल्स एजेंट, डिलीवरी एजेंट, क्षेत्र, एरिया और बीट।",
     g3: "रिटेलरों को लिंक भेजें",
-    g3d: "वे लिंक खोलें, सेलर्स सेतु को होम स्क्रीन पर लगाएं और OTP से लॉगिन करें।",
+    g3d: "वे लिंक खोलें, वीबिज़ प्रो को होम स्क्रीन पर लगाएं और OTP से लॉगिन करें।",
 
     faqKick: "सवाल",
     faqTitle: "शुरू करने से पहले",
     faq: [
       {
-        q: "सेलर्स सेतु किसके लिए है?",
+        q: "वीबिज़ प्रो किसके लिए है?",
         a: "उन डिस्ट्रीब्यूटर, स्टॉकिस्ट और होलसेलर के लिए जो सेल्स टीम और अपने डिलीवरी एजेंट के ज़रिए रिटेलरों को माल बेचते हैं — और उन रिटेलरों के लिए जो उनसे ऑर्डर करते हैं।",
       },
       {
         q: "क्या रिटेलर को कोई ऐप डाउनलोड करना होगा?",
-        a: "नहीं। सेलर्स सेतु एक लिंक से खुलता है और ब्राउज़र से ही होम स्क्रीन पर लग जाता है। रिटेलर OTP से लॉगिन करते हैं।",
+        a: "नहीं। वीबिज़ प्रो एक लिंक से खुलता है और ब्राउज़र से ही होम स्क्रीन पर लग जाता है। रिटेलर OTP से लॉगिन करते हैं।",
       },
       {
         q: "क्या मैं देख सकता हूँ कि डिलीवरी एजेंट कहाँ हैं?",
@@ -786,7 +786,7 @@ export const landingContent: Record<Lang, LandingContent> = {
 
     ctaKick: "मुफ़्त ट्रायल",
     ctaTitle: "हर रिटेलर तक अपना सेतु बनाइए।",
-    ctaSub: "सेलर्स सेतु को अपने ही उत्पाद, टीम और रिटेलरों के साथ चलता देखें।",
+    ctaSub: "वीबिज़ प्रो को अपने ही उत्पाद, टीम और रिटेलरों के साथ चलता देखें।",
     ctaStart: "शुरू करें",
     ctaWa: "WhatsApp करें",
     footTag: "ऑर्डर, स्टॉक, बीट, बिलिंग और डिलीवरी — एक ऐप में।",
