@@ -206,6 +206,8 @@ export const PATH_FEATURES: [string, Feature][] = [
   ["/team", "field"],
   ["/api/announcements", "engage"],
   ["/api/referrals", "engage"],
+  ["/api/admin/announcements", "engage"],
+  ["/api/admin/referrals", "engage"],
   ["/admin/engage", "engage"],
   ["/api/pay-requests", "gateway"],
   ["/api/admin/settings/gateway", "gateway"],

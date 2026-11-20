@@ -17,11 +17,8 @@ export async function GET(req: Request, { params }: Params) {
   if (!scope) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const sp = new URL(req.url).searchParams;
-  const range =
-    parseRange(sp) ??
-    (scope.office
-      ? { from: new Date(Date.now() - 90 * 86_400_000), to: new Date() }
-      : null);
+  // Field staff see dues before collecting, not the shop's full statement history.
+  const range = scope.office ? (parseRange(sp) ?? { from: new Date(Date.now() - 90 * 86_400_000), to: new Date() }) : null;
   const data = await withMoney(tenant.id, session.userId, async (ctx) => ({
     ...(await khataSummary(ctx, retailerId)),
     statement: range ? { ...range, ...(await statement(ctx, retailerId, range.from, range.to)) } : null,

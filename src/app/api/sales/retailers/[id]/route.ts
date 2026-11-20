@@ -13,7 +13,7 @@ export async function GET(
   const retailer = await db.retailerProfile.findUnique({
     where: { id },
     include: {
-      user: true,
+      user: { select: { id: true, name: true, phone: true, active: true } },
       area: true,
       orders: { orderBy: { createdAt: "desc" }, take: 5, include: { items: true } },
       visits: { orderBy: { checkInAt: "desc" }, take: 5 },

@@ -54,8 +54,11 @@ export function publicGateway(g: GatewaySettings) {
   };
 }
 
+/** The practice gateway pays without money: dev and demo only, unless ALLOW_GATEWAY_SIMULATOR=1. */
+export const simulatorAllowed = () => process.env.NODE_ENV !== "production" || process.env.ALLOW_GATEWAY_SIMULATOR === "1";
+
 export const gatewayOn = (g: GatewaySettings) =>
-  g.provider === "simulator" || (g.provider === "razorpay" && !!g.keyId && !!g.keySecret);
+  (g.provider === "simulator" && simulatorAllowed()) || (g.provider === "razorpay" && !!g.keyId && !!g.keySecret);
 
 const int = (v: unknown, min: number, max: number) => (typeof v === "number" && Number.isInteger(v) && v >= min && v <= max ? v : null);
 

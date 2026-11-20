@@ -20,6 +20,8 @@ import { seedField } from "./seed-field";
 import { seedEngage } from "./seed-engage";
 import { seedPayments } from "./seed-payments";
 import { seedSaas } from "./seed-saas";
+import { seedAnalytics } from "./seed-analytics";
+import { DAILY, runFeature } from "../src/lib/automation";
 
 /** Made-up GSTIN with a valid check digit (test data only). */
 const testGstin = (first14: string) => `${first14}${gstinCheckDigit(first14)}`;
@@ -375,9 +377,15 @@ async function seedDemo() {
     shops: { agarwal: retailer1.retailerProfile!.id, patel: retailer2.retailerProfile!.id, sai: retailer3.retailerProfile!.id },
     saiUserId: retailer3.id,
   });
+  await seedAnalytics(db, prisma, tenant.id);
   // Location tracking on for the demo so the team map has positions (off by default for real businesses).
   const tr = await prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { settings: true } });
   await prisma.tenant.update({ where: { id: tenant.id }, data: { settings: { ...(tr.settings as object), field: { trackLocation: true } } } });
+  // Phase 11: run the automations once over the history, so Suggestions has today's visit plans, credit and checks.
+  for (const f of [...DAILY, "credit" as const]) {
+    const r = await runFeature(tenant.id, f, "manual");
+    if (r.error) console.warn(`  automation ${f}: ${r.error}`);
+  }
 }
 
 /**

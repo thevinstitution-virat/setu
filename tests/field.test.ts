@@ -75,7 +75,9 @@ const DAY = "2026-03-02";
 const at = (day: string, hh: number, mm = 0) => new Date(istDayRange(day).from.getTime() + (hh * 60 + mm) * 60_000);
 const as = <X>(who: string, fn: Parameters<typeof withMoney<X>>[2]) => withMoney(T, who, fn);
 const W = (userId: string, role: Who["role"]): Who => ({ userId, role });
-const proof = { selfie: "t/selfie/x.jpg", lat: 19.07, lng: 72.88, accuracy: 10 };
+let shot = 0;
+/** A fresh selfie key in this business each punch (a used one is refused). */
+const proof = () => ({ selfie: `t/${T}/selfie/2026/03/test-${run}-${++shot}.jpg`, lat: 19.07, lng: 72.88, accuracy: 10 });
 
 async function setField(patch: Record<string, unknown>) {
   const t = await prisma.tenant.findUniqueOrThrow({ where: { id: T }, select: { settings: true } });
@@ -226,9 +228,9 @@ describe("attendance and positions", () => {
   it("needs a selfie and position, is late after the start time, and only once a day", async () => {
     await expect(as(u.agent, (ctx) => checkIn(ctx, u.agent, { lat: 19, lng: 72, now: at(DAY, 9, 40) }))).rejects.toThrow(/selfie/);
     await expect(as(u.agent, (ctx) => checkIn(ctx, u.agent, { selfie: "k", now: at(DAY, 9, 40) }))).rejects.toThrow(/location/);
-    const day = await as(u.agent, (ctx) => checkIn(ctx, u.agent, { ...proof, now: at(DAY, 9, 40) }));
+    const day = await as(u.agent, (ctx) => checkIn(ctx, u.agent, { ...proof(), now: at(DAY, 9, 40) }));
     expect(day.late).toBe(true);
-    const again = await as(u.agent, (ctx) => checkIn(ctx, u.agent, { ...proof, now: at(DAY, 10) }));
+    const again = await as(u.agent, (ctx) => checkIn(ctx, u.agent, { ...proof(), now: at(DAY, 10) }));
     expect(again.id).toBe(day.id);
     expect(again.checkInAt?.toISOString()).toBe(at(DAY, 9, 40).toISOString());
   });
@@ -250,12 +252,12 @@ describe("attendance and positions", () => {
 
   it("check-out waits for an open visit, then freezes hours and distance", async () => {
     const v = await as(u.agent, (ctx) => startVisit(ctx, W(u.agent, "SALES_AGENT"), shops.a, { lat: 19.1, lng: 72.85 }, at(DAY, 12)));
-    await expect(as(u.agent, (ctx) => checkOut(ctx, u.agent, { ...proof, now: at(DAY, 12, 30) }))).rejects.toThrow(/Check out of/);
+    await expect(as(u.agent, (ctx) => checkOut(ctx, u.agent, { ...proof(), now: at(DAY, 12, 30) }))).rejects.toThrow(/Check out of/);
     await as(u.agent, (ctx) => endVisit(ctx, W(u.agent, "SALES_AGENT"), v.id, { reason: "stock_enough" }, at(DAY, 12, 20)));
-    const day = await as(u.agent, (ctx) => checkOut(ctx, u.agent, { ...proof, now: at(DAY, 18) }));
+    const day = await as(u.agent, (ctx) => checkOut(ctx, u.agent, { ...proof(), now: at(DAY, 18) }));
     expect(day.minutes).toBe(8 * 60 + 20);
     expect(day.distanceM).toBeGreaterThan(700);
-    await expect(as(u.agent, (ctx) => checkIn(ctx, u.agent, { ...proof, now: at(DAY, 19) }))).rejects.toThrow(/already checked out/);
+    await expect(as(u.agent, (ctx) => checkIn(ctx, u.agent, { ...proof(), now: at(DAY, 19) }))).rejects.toThrow(/already checked out/);
     await expect(as(u.agent, (ctx) => recordPings(ctx, u.agent, [{ at: at(DAY, 18, 30), lat: 19, lng: 72, accuracy: 5, battery: null }], "app", at(DAY, 18, 31)))).rejects.toThrow(/on duty/);
   });
 

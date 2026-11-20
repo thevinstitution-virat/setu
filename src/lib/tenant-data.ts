@@ -1,7 +1,7 @@
 import { gzipSync } from "node:zlib";
 import { prisma } from "@/lib/prisma";
 import { asPlatform, withTenantTx, type Tx } from "@/lib/db";
-import { deleteTenantFiles, putFile } from "@/lib/storage";
+import { deleteFile, deleteTenantFiles, putFile } from "@/lib/storage";
 import { clearTenantCache } from "@/lib/tenant";
 import { invalidateEntitlements } from "@/lib/plans";
 import { emit } from "@/lib/jobs";
@@ -264,7 +264,12 @@ export async function runLifecycle(now = new Date()) {
     await prisma.platformAudit.create({ data: { action: "tenant.purged", targetTenantId: t.id } });
     purged.push(t.id);
   }
-  const expired = await asPlatform((tx) => tx.tenantExport.updateMany({ where: { status: "READY", expiresAt: { lte: now } }, data: { status: "EXPIRED" } }));
+  // Expired exports: the file goes too (a full copy of a business's data shouldn't outlive its link).
+  const old = await asPlatform((tx) => tx.tenantExport.findMany({ where: { status: "READY", expiresAt: { lte: now } }, select: { id: true, fileKey: true } }));
+  for (const x of old) {
+    if (x.fileKey) await deleteFile(x.fileKey).catch((e) => console.error("[lifecycle] export file", x.id, e));
+  }
+  const expired = await asPlatform((tx) => tx.tenantExport.updateMany({ where: { id: { in: old.map((x) => x.id) } }, data: { status: "EXPIRED" } }));
   return { purged, exportsExpired: expired.count };
 }
 

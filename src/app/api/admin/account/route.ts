@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { cancelDeletion, LifecycleError, queueExport, requestDeletion } from "@/lib/tenant-data";
+import { DAY, limited } from "@/lib/rate-limit";
 
 /** Is the business scheduled for deletion? */
 export async function GET() {
@@ -19,6 +20,10 @@ export async function POST(req: Request) {
   if (auth.session.supportId) return NextResponse.json({ error: "Only the owner can delete the business" }, { status: 403 });
   const body = await req.json().catch(() => null);
   if (body?.confirm !== auth.tenant.slug) return NextResponse.json({ error: `Type ${auth.tenant.slug} to confirm` }, { status: 400 });
+  // Each request makes a full copy of the data: delete → cancel → delete can't loop.
+  if (await limited("account-delete", auth.tenant.id, 3, DAY)) {
+    return NextResponse.json({ error: "Deletion was asked for several times today. Try again tomorrow, or contact support." }, { status: 429 });
+  }
   try {
     const r = await requestDeletion(auth.tenant.id, auth.session.userId);
     await queueExport(auth.tenant.id, r.exportId);

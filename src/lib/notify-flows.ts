@@ -119,10 +119,10 @@ export async function invoiceIssuedNotify(tx: Tx, tenantId: string, orderId: str
   const inv = await tx.invoice.findFirst({
     where: { orderId, type: { in: ["TAX_INVOICE", "BILL_OF_SUPPLY"] } },
     orderBy: { createdAt: "desc" },
-    select: { id: true, number: true, total: true, retailer: { select: { userId: true } } },
+    select: { id: true, number: true, total: true, shareVersion: true, retailer: { select: { userId: true } } },
   });
   if (!inv) return;
-  const token = shareToken(tenantId, inv.id);
+  const token = shareToken(tenantId, inv.id, inv.shareVersion);
   await notify(tx, tenantId, {
     event: "invoice.issued",
     to: [inv.retailer.userId],

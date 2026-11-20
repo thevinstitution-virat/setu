@@ -26,6 +26,11 @@ export function parseSupplier(b: Record<string, unknown>, partial: boolean): Rec
     d.gstin = g || null;
   }
   if ("address" in b) d.address = t(b.address, 300) || null;
+  if ("leadDays" in b) {
+    const n = Number(b.leadDays);
+    if (!Number.isInteger(n) || n < 0 || n > 90) return "Delivery time must be 0 to 90 days";
+    d.leadDays = n;
+  }
   if ("active" in b) d.active = b.active === true;
   return d;
 }
