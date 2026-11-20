@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { getDb } from "@/lib/tenant";
+import { guard } from "@/lib/guard";
+import { audit, requestIp } from "@/lib/audit";
 
 export async function GET() {
-  const regions = await prisma.region.findMany({
+  const db = await getDb();
+  const regions = await db.region.findMany({
     include: { areas: { orderBy: { name: "asc" } } },
     orderBy: { name: "asc" },
   });
@@ -11,15 +13,19 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await getSession();
-  if (!session || session.role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await guard("areas.manage");
+  if (!auth.ok) return auth.res;
+  const { session, db } = auth;
   const body = await req.json().catch(() => null);
   const { name, regionId } = body ?? {};
-  if (!name || !regionId) {
+  if (typeof name !== "string" || !name.trim() || typeof regionId !== "string" || !regionId) {
     return NextResponse.json({ error: "name and regionId are required" }, { status: 400 });
   }
-  const area = await prisma.area.create({ data: { name, regionId } });
+  // Foreign keys ignore row security: make sure the region is this tenant's.
+  if (!(await db.region.findUnique({ where: { id: regionId }, select: { id: true } }))) {
+    return NextResponse.json({ error: "Region not found" }, { status: 404 });
+  }
+  const area = await db.area.create({ data: { name: name.trim().slice(0, 80), regionId } });
+  await audit(db, { actorId: session.userId, action: "area.create", entity: "Area", entityId: area.id, after: area, ip: requestIp(req) });
   return NextResponse.json({ area });
 }

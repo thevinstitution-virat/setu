@@ -1,9 +1,13 @@
+import { formatINR } from "@/lib/money";
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
+import { getDb } from "@/lib/tenant";
+import { pageSession } from "@/lib/guard";
 import { STATUS_COLOR, STATUS_TILE } from "@/lib/orders";
 import { getServerLang, tr } from "@/lib/i18n/server";
 import type { OrderStatus } from "@/generated/prisma/client";
 import Icon, { type IconName } from "@/components/Icon";
+import StockAlertStrip from "@/components/stock/overview/StockAlertStrip";
 
 const STATUSES: OrderStatus[] = [
   "PLACED",
@@ -15,11 +19,15 @@ const STATUSES: OrderStatus[] = [
 ];
 
 export default async function AdminPipeline() {
+  // Check here, not only in the layout: a client navigation can render this page without its layout.
+  const session = await pageSession();
+  if (!session || session.role !== "ADMIN") redirect("/login");
+  const db = await getDb();
   const lang = await getServerLang();
   const [counts, recentOrders, retailerCount, salesAgentCount, deliveryAgentCount, productCount] =
     await Promise.all([
-      Promise.all(STATUSES.map((s) => prisma.order.count({ where: { status: s } }))),
-      prisma.order.findMany({
+      Promise.all(STATUSES.map((s) => db.order.count({ where: { status: s } }))),
+      db.order.findMany({
         take: 10,
         orderBy: { createdAt: "desc" },
         include: {
@@ -27,10 +35,10 @@ export default async function AdminPipeline() {
           delivery: { include: { deliveryAgent: { include: { user: true } } } },
         },
       }),
-      prisma.retailerProfile.count(),
-      prisma.salesAgentProfile.count(),
-      prisma.deliveryAgentProfile.count(),
-      prisma.product.count(),
+      db.retailerProfile.count(),
+      db.salesAgentProfile.count(),
+      db.deliveryAgentProfile.count(),
+      db.product.count(),
     ]);
 
   const countByStatus = Object.fromEntries(STATUSES.map((s, i) => [s, counts[i]]));
@@ -43,9 +51,14 @@ export default async function AdminPipeline() {
           <h1 className="page-title">Pipeline overview</h1>
           <p className="page-sub">Every order at every stage, without a phone call.</p>
         </div>
-        <Link href="/admin/orders" className="btn btn-kesar btn-sm">
-          Manage orders <Icon name="arrow" className="h-4 w-4" />
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/admin/reports" className="btn btn-outline btn-sm">
+            Reports
+          </Link>
+          <Link href="/admin/orders" className="btn btn-kesar btn-sm">
+            Manage orders <Icon name="arrow" className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
 
       <div className="card p-3 sm:p-4">
@@ -58,6 +71,8 @@ export default async function AdminPipeline() {
           ))}
         </div>
       </div>
+
+      <StockAlertStrip />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard icon="users" tint="kesar" label="Retailers" value={retailerCount} />
@@ -79,7 +94,7 @@ export default async function AdminPipeline() {
               <div className="min-w-0">
                 <p className="text-sm font-bold truncate">{o.retailer.outletName}</p>
                 <p className="text-xs text-[var(--muted)] truncate">
-                  {o.orderNumber} · {o.retailer.area.name} · ₹{o.totalAmount.toFixed(2)}
+                  {o.orderNumber} · {o.retailer.area.name} · {formatINR(o.totalAmount)}
                   {o.delivery?.deliveryAgent && ` · ${o.delivery.deliveryAgent.user.name}`}
                 </p>
               </div>

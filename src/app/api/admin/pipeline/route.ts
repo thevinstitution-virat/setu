@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { guard } from "@/lib/guard";
 import type { OrderStatus } from "@/generated/prisma/client";
 
 const STATUSES: OrderStatus[] = [
@@ -13,31 +12,30 @@ const STATUSES: OrderStatus[] = [
 ];
 
 export async function GET() {
-  const session = await getSession();
-  if (!session || session.role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const auth = await guard("orders.view_all");
+  if (!auth.ok) return auth.res;
+  const { db } = auth;
 
   const counts = Object.fromEntries(
     await Promise.all(
-      STATUSES.map(async (status) => [status, await prisma.order.count({ where: { status } })])
+      STATUSES.map(async (status) => [status, await db.order.count({ where: { status } })])
     )
   );
 
-  const recentOrders = await prisma.order.findMany({
+  const recentOrders = await db.order.findMany({
     take: 15,
     orderBy: { createdAt: "desc" },
     include: {
       retailer: { include: { user: true, area: true } },
-      delivery: { include: { deliveryAgent: { include: { user: true } } } },
+      delivery: { omit: { code: true }, include: { deliveryAgent: { include: { user: true } } } },
     },
   });
 
   const [retailerCount, salesAgentCount, deliveryAgentCount, productCount] = await Promise.all([
-    prisma.retailerProfile.count(),
-    prisma.salesAgentProfile.count(),
-    prisma.deliveryAgentProfile.count(),
-    prisma.product.count(),
+    db.retailerProfile.count(),
+    db.salesAgentProfile.count(),
+    db.deliveryAgentProfile.count(),
+    db.product.count(),
   ]);
 
   return NextResponse.json({

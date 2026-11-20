@@ -1,36 +1,32 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/auth";
+import { guard } from "@/lib/guard";
+import { audit, requestIp } from "@/lib/audit";
+import { bad, parseProduct } from "@/lib/catalogue-api";
 
+/**
+ * Product master. Staff with catalogue.manage see everything (incl. hidden
+ * and inactive products) with brand and category; other roles get the
+ * storefront from /api/catalogue, which applies their rates and visibility.
+ */
 export async function GET() {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const products = await prisma.product.findMany({ orderBy: { name: "asc" } });
+  const auth = await guard("catalogue.manage");
+  if (!auth.ok) return auth.res;
+  const products = await auth.db.product.findMany({
+    orderBy: [{ active: "desc" }, { sort: "asc" }, { name: "asc" }],
+    include: { category: { select: { id: true, name: true } }, brand: { select: { id: true, name: true } } },
+  });
   return NextResponse.json({ products });
 }
 
 export async function POST(req: Request) {
-  const session = await getSession();
-  if (!session || session.role !== "ADMIN") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const body = await req.json().catch(() => null);
-  const { name, sku, category, unit, price, mrp, gstRate, specialOffer, imageUrl } = body ?? {};
-  if (!name || !sku || !category || !unit || price == null || mrp == null) {
-    return NextResponse.json({ error: "All fields are required" }, { status: 400 });
-  }
-  const product = await prisma.product.create({
-    data: {
-      name,
-      sku,
-      category,
-      unit,
-      price: Number(price),
-      mrp: Number(mrp),
-      gstRate: gstRate != null ? Number(gstRate) : 0,
-      specialOffer: specialOffer || null,
-      imageUrl,
-    },
-  });
+  const auth = await guard("catalogue.manage");
+  if (!auth.ok) return auth.res;
+  const { session, db, tenant } = auth;
+  const body = (await req.json().catch(() => null)) ?? {};
+  const data = await parseProduct(db, tenant.id, body, false);
+  if (typeof data === "string") return bad(data);
+  if (await db.product.findFirst({ where: { sku: data.sku as string } })) return bad("That SKU already exists", 409);
+  const product = await db.product.create({ data: data as never });
+  await audit(db, { actorId: session.userId, action: "product.create", entity: "Product", entityId: product.id, after: product, ip: requestIp(req) });
   return NextResponse.json({ product });
 }
