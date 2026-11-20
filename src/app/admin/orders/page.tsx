@@ -20,6 +20,8 @@ type Order = OrderTotals & {
   creditApprovedAt: string | null;
   /** Paise reserved from the retailer's wallet for this order. */
   walletHold: number;
+  /** Sold by a driver from van stock and delivered on the spot. */
+  spot?: boolean;
   retailer: { outletName: string; area: { name: string } };
   items: OrderLineItem[];
   delivery: { deliveryAgent: { id: string; user: { name: string } } } | null;
@@ -142,7 +144,10 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
             <div key={o.id} className="card p-4 space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium">{o.retailer.outletName}</p>
+                  <p className="text-sm font-medium flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="break-words min-w-0">{o.retailer.outletName}</span>
+                    {o.spot && <span className="chip chip-genda !py-0.5 !text-[11px]">Spot sale</span>}
+                  </p>
                   <p className="text-xs text-foreground/50">
                     {o.orderNumber} · {o.retailer.area.name} · {o.items.length} items · {formatINR(o.totalAmount)}
                   </p>

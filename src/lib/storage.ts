@@ -50,6 +50,8 @@ export function keyBelongsTo(key: string, tenantId: string) {
 interface Driver {
   put(key: string, bytes: Buffer, contentType: string): Promise<void>;
   get(key: string): Promise<StoredFile | null>;
+  /** Delete every file under a prefix (tenant purge). Returns how many. */
+  removePrefix(prefix: string): Promise<number>;
 }
 
 function localDriver(): Driver {
@@ -75,11 +77,25 @@ function localDriver(): Driver {
         return null;
       }
     },
+    async removePrefix(prefix) {
+      const dir = full(prefix.replace(/\/$/, ""));
+      let n = 0;
+      const walk = async (d: string) => {
+        for (const e of await fs.readdir(d, { withFileTypes: true }).catch(() => [])) {
+          const p = path.join(d, e.name);
+          if (e.isDirectory()) await walk(p);
+          else if (!e.name.endsWith(".type")) n++;
+        }
+      };
+      await walk(dir);
+      await fs.rm(dir, { recursive: true, force: true });
+      return n;
+    },
   };
 }
 
 async function s3Driver(): Promise<Driver> {
-  const { S3Client, PutObjectCommand, GetObjectCommand } = await import("@aws-sdk/client-s3");
+  const { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } = await import("@aws-sdk/client-s3");
   const client = new S3Client({
     region: process.env.S3_REGION ?? "auto",
     endpoint: process.env.S3_ENDPOINT || undefined,
@@ -103,6 +119,20 @@ async function s3Driver(): Promise<Driver> {
         return null;
       }
     },
+    async removePrefix(prefix) {
+      let n = 0;
+      let token: string | undefined;
+      do {
+        const page = await client.send(new ListObjectsV2Command({ Bucket, Prefix: prefix, ContinuationToken: token }));
+        const keys = (page.Contents ?? []).map((o) => ({ Key: o.Key! })).filter((o) => o.Key);
+        if (keys.length) {
+          await client.send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: keys, Quiet: true } }));
+          n += keys.length;
+        }
+        token = page.IsTruncated ? page.NextContinuationToken : undefined;
+      } while (token);
+      return n;
+    },
   };
 }
 
@@ -118,4 +148,28 @@ export async function putFile(key: string, bytes: Buffer, contentType: string) {
 
 export async function getFile(key: string) {
   return (await getDriver()).get(key);
+}
+
+/** Delete one file (and the local driver's .type note beside it). */
+export async function deleteFile(key: string) {
+  const d = await getDriver();
+  await d.removePrefix(key);
+  await d.removePrefix(`${key}.type`);
+}
+
+/** Delete all of a tenant's files (DPDP purge). */
+export async function deleteTenantFiles(tenantId: string) {
+  if (!/^[a-z0-9]+$/i.test(tenantId)) throw new Error("Bad tenant id");
+  return (await getDriver()).removePrefix(`t/${tenantId}/`);
+}
+
+/** Kinds (t/<tenant>/<kind>/...) a shop must never open, and kinds never served by /api/files (data exports: owner-only route). */
+const STAFF_ONLY_KINDS = new Set(["selfie"]);
+const NOT_SERVED_KINDS = new Set(["export"]);
+
+/** May this role open this file through /api/files? (The tenant check is keyBelongsTo.) */
+export function mayOpen(key: string, role: string) {
+  const kind = key.split("/")[2] ?? "";
+  if (NOT_SERVED_KINDS.has(kind)) return false;
+  return !(role === "RETAILER" && STAFF_ONLY_KINDS.has(kind));
 }

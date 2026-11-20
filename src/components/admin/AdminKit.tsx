@@ -12,10 +12,17 @@ import { compressImage, uploadFile } from "@/lib/upload-client";
 
 // ───────────────────────────── fetch ─────────────────────────────
 
+/** A failed API call: status and the whole JSON body (e.g. stockShort on a 409). */
+export class ApiError extends Error {
+  constructor(message: string, public status: number, public data: Record<string, unknown>) {
+    super(message);
+  }
+}
+
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? "Something went wrong");
+  if (!res.ok) throw new ApiError(data.error ?? "Something went wrong", res.status, data);
   return data as T;
 }
 

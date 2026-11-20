@@ -6,6 +6,12 @@
 
 const PATHS = {
   home: "M3 10.5 12 3l9 7.5M5 9v11h5v-6h4v6h5V9",
+  bell: "M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2ZM10 21h4",
+  chat: "M4 5h16v11H9l-5 4V5ZM8 9h8M8 12h5",
+  lock: "M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z",
+  megaphone: "M3 10v4h3l7 4V6l-7 4H3ZM16 9a4 4 0 0 1 0 6M6 14l1.5 6H10",
+  gift: "M3 9h18v4H3zM5 13v8h14v-8M12 9v12M12 9S10.5 4 8 4a2.5 2.5 0 0 0 0 5M12 9s1.5-5 4-5a2.5 2.5 0 0 1 0 5",
+  star: "M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9L12 3Z",
   cart: "M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2M9.5 20.5h.01M17.5 20.5h.01",
   box: "M21 8 12 3 3 8v8l9 5 9-5V8ZM3 8l9 5 9-5M12 13v8",
   user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0",
@@ -43,6 +49,17 @@ const PATHS = {
   search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM20 20l-4-4",
   chevronLeft: "M15 6l-6 6 6 6",
   chevronRight: "M9 6l6 6-6 6",
+  phone: "M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z",
+  /** Stock: a warehouse rack. */
+  stock: "M3 21V8l9-5 9 5v13M7 21v-8h10v8M7 17h10",
+  /** Layers (batches). */
+  layers: "M12 3 2 8l10 5 10-5-10-5ZM2 13l10 5 10-5M2 18l10 5 10-5",
+  /** Clipboard (purchase orders, counts). */
+  clipboard: "M9 4h6v3H9zM8 5H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2M9 12h6M9 16h4",
+  /** Microphone (speak an order). */
+  mic: "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3ZM5 11a7 7 0 0 0 14 0M12 18v3M9 21h6",
+  /** Sparkle (questions, smart help). */
+  sparkle: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3ZM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z",
 } as const;
 
 export type IconName = keyof typeof PATHS;

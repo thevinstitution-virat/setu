@@ -1,25 +1,14 @@
-import { NextResponse } from "next/server";
-import { guard } from "@/lib/guard";
+import { stockMutation, optStr } from "@/lib/stock-api";
+import { optNum } from "@/lib/field-api";
+import { endVisit } from "@/lib/field";
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const auth = await guard("field.work");
-  if (!auth.ok) return auth.res;
-  const { session, db } = auth;
+/** Body: { reason? (needed when no order was placed on the visit), note?, lat?, lng? } */
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const agent = await db.salesAgentProfile.findUnique({ where: { userId: session.userId } });
-  const visit = await db.visit.findUnique({ where: { id } });
-  if (!agent || !visit || visit.salesAgentId !== agent.id) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  const body = await req.json().catch(() => ({}));
-  const updated = await db.visit.update({
-    where: { id },
-    data: { checkOutAt: new Date(), notes: body?.notes },
-  });
-
-  return NextResponse.json({ visit: updated });
+  return stockMutation(
+    req,
+    "visit.end",
+    (ctx, b) => endVisit(ctx, { userId: ctx.actorId!, role: "SALES_AGENT" }, id, { reason: b.reason, note: optStr(b.note ?? b.notes, 500), lat: optNum(b.lat), lng: optNum(b.lng) }),
+    { perm: "field.work", entity: "Visit", entityId: id }
+  );
 }

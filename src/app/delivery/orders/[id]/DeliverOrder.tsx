@@ -1,30 +1,34 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatINR } from "@/lib/money";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import SignaturePad from "@/components/SignaturePad";
 import { getLocation } from "@/lib/geo";
+import { FAIL_REASONS } from "@/lib/delivery-settings";
 import { compressImage, dataUrlToBlob, uploadFile } from "@/lib/upload-client";
 import Icon from "@/components/Icon";
-import OrderLines, { type OrderLineItem } from "@/components/store/OrderLines";
-import PaymentFields, { emptyPayment, paymentError, toCollectBody, type PaymentValue } from "@/components/PaymentFields";
+import { emptyPayment, paymentError, toCollectBody, type PaymentValue } from "@/components/PaymentFields";
+import PrefNote from "../../PrefNote";
+import { shopMapUrl } from "../../maps";
 import DeliveryInvoiceCard, { type DeliveryInvoice } from "./DeliveryInvoiceCard";
+import LinesCard from "./LinesCard";
+import CollectCard from "./CollectCard";
+import QrPayCard, { type OnlinePaid } from "./QrPayCard";
+import ProofCard from "./ProofCard";
+import ReturnablesCard, { cratesBody, type CrateState } from "./ReturnablesCard";
+import NotDeliveredSheet from "./NotDeliveredSheet";
+import DeliveredView from "./DeliveredView";
+import { fullLines, linesBody, linesError, orderAmount, rupees, type DeliverItem, type LineState } from "./deliver-model";
 
-type Dues = { balances: { receivable: number }; overdue: number; openBills?: { orderId: string | null; due: number }[] };
+type Dues = { balances: { receivable: number }; overdue: number };
 
-type OrderDetail = {
+export type OrderDetail = {
   id: string;
   orderNumber: string;
   status: string;
   totalAmount: number;
-  grossAmount: number;
-  discountAmount: number;
   deliveryCharge: number;
-  subtotal: number;
-  gstAmount: number;
-  couponCode: string | null;
-  deliveryDate: string | null;
+  deliveryGstRate: number;
   notes: string | null;
   retailerId: string;
   /** Paise reserved from the retailer's wallet (prepaid); paid automatically on delivery. */
@@ -32,50 +36,166 @@ type OrderDetail = {
   creditHold: boolean;
   creditHoldReason: string | null;
   creditApprovedAt: string | null;
-  retailer: { outletName: string; shopNumber: string; complexName: string; user: { phone: string | null } };
-  items: OrderLineItem[];
+  retailer: {
+    outletName: string;
+    shopNumber: string;
+    complexName: string;
+    pinCode: string;
+    lat: number | null;
+    lng: number | null;
+    deliveryPref: string | null;
+    deliveryNote: string | null;
+    area: { name: string } | null;
+    user: { phone: string | null };
+  };
+  items: DeliverItem[];
+  delivery: { state: "ASSIGNED" | "DELIVERED" | "FAILED"; codeNeeded: boolean; failReason: string | null; failNote: string | null } | null;
 };
 
-/** `invoices`: documents already issued for this order (loaded by the server page; refreshed after delivery). */
-export default function DeliverOrder({ id, invoices }: { id: string; invoices: DeliveryInvoice[] }) {
+/**
+ * Deliver one order: count each line, collect, proof, crates; or "Couldn't
+ * deliver". `invoices`: documents already issued (refreshed after delivery);
+ * `tripStatus`: the stop's trip, if it is on one.
+ */
+export default function DeliverOrder({
+  id,
+  invoices,
+  photoRequired,
+  tripStatus,
+}: {
+  id: string;
+  invoices: DeliveryInvoice[];
+  photoRequired: boolean;
+  tripStatus: "PLANNED" | "STARTED" | "CLOSED" | null;
+}) {
   const router = useRouter();
   const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [lines, setLines] = useState<LineState>({});
   const [pay, setPay] = useState<PaymentValue>(() => emptyPayment(undefined, null));
+  /** The amount box follows this figure until the driver types their own. */
+  const [follow, setFollow] = useState<"order" | "dues" | null>(null);
   const [dues, setDues] = useState<Dues | null>(null);
   const [duesError, setDuesError] = useState(false);
+  const [code, setCode] = useState("");
+  const [crates, setCrates] = useState<CrateState>({});
   const [signature, setSignature] = useState<string | null>(null);
   const [photo, setPhoto] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [failOpen, setFailOpen] = useState(false);
+  /** Paid by the shop through the gateway QR for this order. */
+  const [online, setOnline] = useState<OnlinePaid>({ paid: 0, full: false });
 
   useEffect(() => {
     fetch(`/api/orders/${id}`)
-      .then((r) => r.json())
-      .then((d: { order?: OrderDetail }) => {
-        const o = d.order;
-        if (!o) return;
+      .then(async (r) => {
+        const d = (await r.json().catch(() => ({}))) as { order?: OrderDetail; error?: string };
+        if (!r.ok || !d.order) throw new Error(d.error ?? "Could not load the order");
+        return d.order;
+      })
+      .then((o) => {
         setOrder(o);
+        setLines(fullLines(o.items));
         // Prepaid orders are paid from the wallet on delivery: nothing to collect by default.
-        setPay(o.walletHold > 0 ? emptyPayment(undefined, null) : emptyPayment(o.totalAmount, "CASH"));
+        const prepaid = o.walletHold > 0;
+        setPay(emptyPayment(undefined, prepaid ? null : "CASH"));
+        setFollow(prepaid ? null : "order");
         fetch(`/api/admin/khata/${o.retailerId}`)
           .then(async (r) => (r.ok ? setDues(await r.json()) : setDuesError(true)))
           .catch(() => setDuesError(true));
-      });
+      })
+      .catch((e) => setLoadError(e instanceof Error ? e.message : "Could not load the order"));
   }, [id]);
 
-  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Money came in online: the khata balance moved, so read the dues again.
+  const retailerId = order?.retailerId ?? null;
+  useEffect(() => {
+    if (!retailerId || online.paid === 0) return;
+    let live = true;
+    fetch(`/api/admin/khata/${retailerId}`)
+      .then(async (r) => {
+        if (r.ok && live) setDues(await r.json());
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [retailerId, online.paid]);
+
+  function handlePhoto(file: File | null) {
     setPhotoFile(file);
+    if (!file) return setPhoto(null);
     const reader = new FileReader();
     reader.onload = () => setPhoto(reader.result as string);
     reader.readAsDataURL(file);
   }
 
+  if (!order) {
+    return loadError ? (
+      <div className="card p-5 space-y-3">
+        <p className="text-sm text-[#a8281e]">{loadError}</p>
+        <Link href="/delivery" className="btn btn-outline w-full">
+          Back to my stops
+        </Link>
+      </div>
+    ) : (
+      <p className="text-sm text-foreground/50">Loading…</p>
+    );
+  }
+
+  if (order.status === "DELIVERED") return <DeliveredView order={order} invoices={invoices} />;
+
+  if (order.delivery?.state === "FAILED") {
+    const r = order.delivery.failReason;
+    return (
+      <div className="space-y-5">
+        <h1 className="page-title">{order.retailer.outletName}</h1>
+        <p className="rounded-xl bg-[#fde4e1] text-[#a8281e] p-3 text-sm font-bold">
+          Not delivered: {r && r in FAIL_REASONS ? FAIL_REASONS[r as keyof typeof FAIL_REASONS] : "no reason"}
+          {order.delivery.failNote ? ` (${order.delivery.failNote})` : ""}
+        </p>
+        <p className="text-sm text-[var(--muted)]">The office will put this order on another trip.</p>
+        <Link href="/delivery" className="btn btn-outline w-full">
+          Back to my stops
+        </Link>
+      </div>
+    );
+  }
+
+  const calc = orderAmount(order, order.items, lines, invoices);
+  const prepaid = order.walletHold > 0;
+  const onHold = order.creditHold && !order.creditApprovedAt;
+  const thisOrder = Math.max(0, calc.amount - order.walletHold - online.paid);
+  // Invoiced at dispatch: the documents so far are already in the khata balance in full, so take
+  // them out to get the old dues (the short-delivery credit is issued only on saving). Not
+  // invoiced yet: the whole balance is old dues (negative = advance). Money paid online for this
+  // order already lowered the balance: add it back here, it is taken off "This order" instead.
+  const oldDues = (dues?.balances.receivable ?? 0) - (calc.invoiced ? calc.booked : 0) + online.paid;
+  const totalDue = Math.max(0, thisOrder + oldDues);
+  const target = follow === "order" ? thisOrder : follow === "dues" ? totalDue : null;
+  const blocked = tripStatus === "PLANNED" || tripStatus === "CLOSED";
+  // Fully paid by QR: nothing to collect (the server marks the delivery paid online).
+  const paidOnline = online.full && !onHold;
+  const shownPay: PaymentValue = paidOnline ? { ...pay, method: null } : target === null ? pay : { ...pay, amount: rupees(target) };
+  const r = order.retailer;
+  const address = [r.shopNumber && `Shop ${r.shopNumber}`, r.complexName, r.area?.name, r.pinCode].filter(Boolean).join(", ");
+  const map = shopMapUrl({ lat: r.lat, lng: r.lng, address });
+
+  function onPay(v: PaymentValue) {
+    if (v.amount !== shownPay.amount) setFollow(null);
+    setPay(v);
+  }
+
   async function complete() {
+    if (!order) return;
     setError(null);
-    const bad = paymentError(pay);
+    const bad =
+      linesError(order.items, lines) ??
+      (order.delivery?.codeNeeded && !/^\d{4}$/.test(code.trim()) ? "Enter the 4-digit delivery code from the retailer" : null) ??
+      (photoRequired && !photoFile ? "Take a delivery photo first" : null) ??
+      paymentError(shownPay);
     if (bad) return setError(bad);
     setLoading(true);
     try {
@@ -84,7 +204,7 @@ export default function DeliverOrder({ id, invoices }: { id: string; invoices: D
         getLocation(),
         photoFile ? compressImage(photoFile).then((b) => uploadFile(b, "pod-photo")) : null,
         signature ? uploadFile(dataUrlToBlob(signature), "pod-signature") : null,
-        toCollectBody(pay),
+        toCollectBody(shownPay),
       ]);
       const res = await fetch(`/api/orders/${id}/deliver`, {
         method: "POST",
@@ -95,12 +215,26 @@ export default function DeliverOrder({ id, invoices }: { id: string; invoices: D
           podPhotoKey: photoKey,
           podSignatureKey: signatureKey,
           ...loc,
+          ...(order.delivery?.codeNeeded ? { code: code.trim() } : {}),
+          lines: linesBody(order.items, lines),
+          returnables: cratesBody(crates),
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      // Stay here: the invoice (issued at dispatch or just now) can be shared straight away.
-      setOrder({ ...order!, status: "DELIVERED" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Could not save. Try again.");
+      // Nothing to share: straight back to the stop list.
+      if (!data.invoice && !data.creditNote && invoices.length === 0) {
+        router.push("/delivery");
+        router.refresh();
+        return;
+      }
+      // Else stay: the invoice (issued at dispatch or just now) can be shared straight away.
+      setOrder({
+        ...order,
+        status: "DELIVERED",
+        items: order.items.map((i) => ({ ...i, deliveredQty: lines[i.id]?.qty ?? i.quantity, shortReason: lines[i.id]?.reason || null })),
+      });
+      window.scrollTo({ top: 0 });
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
@@ -109,153 +243,121 @@ export default function DeliverOrder({ id, invoices }: { id: string; invoices: D
     }
   }
 
-  if (!order) return <p className="text-sm text-foreground/50">Loading…</p>;
-
-  const paidFromWallet = order.walletHold > 0;
-  const onHold = order.creditHold && !order.creditApprovedAt;
-  // Invoiced at dispatch: the order's documents (sale + debit notes − credit notes) are already
-  // in the khata balance in full, whatever advance was allocated to them, so take them out to get
-  // the old dues. Not invoiced yet: the whole balance is old dues (negative = advance).
-  const invoiced = invoices.some((d) => d.type === "TAX_INVOICE" || d.type === "BILL_OF_SUPPLY");
-  const booked = invoices.reduce((s, d) => s + (d.type === "CREDIT_NOTE" ? -d.total : d.total), 0);
-  const thisOrder = Math.max(0, (invoiced ? booked : order.totalAmount) - order.walletHold);
-  const oldDues = (dues?.balances.receivable ?? 0) - (invoiced ? booked : 0);
-  const totalDue = Math.max(0, thisOrder + oldDues);
-  const setAmount = (p: number) =>
-    setPay({ ...pay, method: pay.method ?? "CASH", amount: (p / 100).toFixed(2).replace(/\.00$/, "") });
-
-  if (order.status === "DELIVERED") {
-    return (
-      <div className="space-y-5">
-        <div>
-          <h1 className="page-title">{order.retailer.outletName}</h1>
-          <p className="text-sm text-foreground/50">{order.orderNumber}</p>
-        </div>
-        <p className="flex items-center gap-2 rounded-xl bg-[var(--mint-tint)] text-[var(--mint-text)] p-3 text-sm font-bold">
-          <Icon name="check" className="h-4 w-4" /> Delivered
-        </p>
-        {invoices.length > 0 ? (
-          <DeliveryInvoiceCard invoices={invoices} />
-        ) : (
-          <p className="text-sm text-[var(--muted)]">The invoice will show here once it is ready.</p>
-        )}
-        <button type="button" className="btn btn-outline w-full" onClick={() => router.push("/delivery")}>
-          Back to my deliveries
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="page-title">{order.retailer.outletName}</h1>
-        <p className="text-sm text-foreground/50">
-          Shop {order.retailer.shopNumber}, {order.retailer.complexName}
-        </p>
-        {order.retailer.user.phone && (
-          <p className="text-sm text-foreground/50">📞 {order.retailer.user.phone}</p>
-        )}
+      <div className="space-y-3">
+        <div>
+          <h1 className="page-title">{r.outletName}</h1>
+          <p className="text-sm text-[var(--muted)]">{address}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {r.user.phone ? (
+            <a href={`tel:${r.user.phone}`} className="btn btn-outline">
+              <Icon name="phone" className="h-4 w-4" /> Call
+            </a>
+          ) : (
+            <span className="btn btn-outline opacity-50" aria-disabled="true">
+              No phone
+            </span>
+          )}
+          {map ? (
+            <a href={map} target="_blank" rel="noopener noreferrer" className="btn btn-outline">
+              <Icon name="map" className="h-4 w-4" /> Directions
+            </a>
+          ) : (
+            <span />
+          )}
+        </div>
+        <PrefNote pref={r.deliveryPref} note={r.deliveryNote} />
       </div>
+
+      {blocked && (
+        <div className="rounded-xl bg-[var(--genda-tint)] text-[var(--genda-text)] p-3 text-sm font-semibold space-y-2">
+          <p>{tripStatus === "PLANNED" ? "Start the trip first. Then you can deliver this order." : "This trip is closed."}</p>
+          <Link href="/delivery" className="btn btn-outline btn-sm">
+            Go to my trips
+          </Link>
+        </div>
+      )}
 
       {invoices.length > 0 && <DeliveryInvoiceCard invoices={invoices} />}
 
-      <div className="card p-4">
-        <p className="text-sm font-semibold mb-3">{order.orderNumber}</p>
-        <OrderLines items={order.items} order={order} freeCallout />
-        {order.notes && <p className="text-xs text-[var(--muted)] mt-3">Note: {order.notes}</p>}
-      </div>
+      <LinesCard
+        orderNumber={order.orderNumber}
+        items={order.items}
+        lines={lines}
+        onChangeAction={setLines}
+        full={calc.full}
+        amount={calc.amount}
+        notes={order.notes}
+      />
 
-      <div className="card p-4 space-y-4">
-        <p className="text-sm font-semibold">Payment</p>
-
-        {onHold && (
-          <p className="rounded-xl bg-[#fde4e1] text-[#a8281e] p-3 text-sm font-semibold">
-            On credit hold: {order.creditHoldReason ?? "needs approval"}. Ask the office to approve before you deliver.
-          </p>
-        )}
-
-        {paidFromWallet && (
-          <p className="flex items-center gap-2 rounded-xl bg-[var(--mint-tint)] text-[var(--mint-text)] p-3 text-sm font-bold">
-            <Icon name="wallet" className="h-4 w-4" /> Paid from wallet {formatINR(Math.min(order.walletHold, order.totalAmount))}
-          </p>
-        )}
-
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-xl bg-black/[0.04] p-2">
-            <p className="text-[11px] text-[var(--muted)]">This order</p>
-            <p className="font-bold text-sm mt-0.5">{formatINR(thisOrder, { whole: true })}</p>
-          </div>
-          <div className="rounded-xl bg-black/[0.04] p-2">
-            <p className="text-[11px] text-[var(--muted)]">{oldDues < 0 ? "Advance" : "Old dues"}</p>
-            <p className={`font-bold text-sm mt-0.5 ${dues && dues.overdue > 0 ? "text-[#a8281e]" : ""}`}>
-              {dues ? formatINR(Math.abs(oldDues), { whole: true }) : duesError ? "—" : "…"}
-            </p>
-          </div>
-          <div className="rounded-xl bg-[var(--kesar-tint)] p-2">
-            <p className="text-[11px] text-[var(--kesar-text)]">Total due</p>
-            <p className="font-bold text-sm mt-0.5 text-[var(--kesar-text)]">{formatINR(totalDue, { whole: true })}</p>
-          </div>
+      {order.delivery?.codeNeeded && (
+        <div className="card p-4 space-y-2">
+          <label className="block">
+            <span className="text-sm font-semibold">Delivery code</span>
+            <span className="block text-xs text-[var(--muted)] mt-0.5">Ask the retailer for the 4-digit code in their app.</span>
+            <input
+              className="input mt-2 !text-2xl font-heading font-bold tracking-[0.5em] text-center"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={4}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              placeholder="····"
+            />
+          </label>
         </div>
-        {dues && dues.overdue > 0 && (
-          <p className="text-xs font-semibold text-[#a8281e]">{formatINR(dues.overdue)} of the old dues is overdue.</p>
-        )}
-        {duesError && <p className="text-xs text-[var(--muted)]">Could not load old dues.</p>}
+      )}
 
-        {(thisOrder > 0 || (dues && totalDue > 0)) && (
-          <div className="flex gap-2">
-            {thisOrder > 0 && (
-              <button type="button" className="btn btn-soft btn-sm flex-1" onClick={() => setAmount(thisOrder)}>
-                This order
-              </button>
-            )}
-            {dues && totalDue > 0 && totalDue !== thisOrder && (
-              <button type="button" className="btn btn-soft btn-sm flex-1" onClick={() => setAmount(totalDue)}>
-                Full dues
-              </button>
-            )}
-          </div>
-        )}
+      <ReturnablesCard retailerId={order.retailerId} value={crates} onChangeAction={setCrates} />
 
-        <PaymentFields
-          value={pay}
-          onChangeAction={setPay}
-          allowNone
-          noneLabel={paidFromWallet ? "Nothing now" : "On credit"}
-          hint={
-            !pay.method ? (
-              <p className="text-sm text-[var(--muted)]">
-                {paidFromWallet && totalDue === 0 ? "Nothing to collect." : `${formatINR(totalDue)} stays on the khata.`}
-              </p>
-            ) : pay.method === "CASH" ? (
-              <p className="text-sm text-[var(--ink-2)]">Count the cash before you mark delivered.</p>
-            ) : null
-          }
+      <QrPayCard
+        orderId={order.id}
+        retailerId={order.retailerId}
+        amount={thisOrder}
+        askAmount={calc.anyShort || prepaid}
+        canMake={!onHold && !blocked && thisOrder > 0}
+        onChangeAction={setOnline}
+      />
+
+      {!paidOnline && (
+        <CollectCard
+          onHold={onHold}
+          holdReason={order.creditHoldReason}
+          walletPaid={prepaid ? Math.min(order.walletHold, calc.amount) : null}
+          thisOrder={thisOrder}
+          oldDues={oldDues}
+          totalDue={totalDue}
+          overdue={dues?.overdue ?? 0}
+          duesLoaded={!!dues}
+          duesError={duesError}
+          pay={shownPay}
+          onPayAction={onPay}
+          onFollowAction={setFollow}
         />
-      </div>
+      )}
 
-      <div className="card p-4 space-y-3">
-        <p className="text-sm font-semibold">Proof of delivery</p>
-        <SignaturePad onChangeAction={setSignature} />
-        <label className="block">
-          <span className="text-xs text-foreground/50">Delivery photo (optional)</span>
-          <input type="file" accept="image/*" capture="environment" onChange={handlePhoto} className="block text-sm mt-1" />
-        </label>
-        {photo && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={photo} alt="Proof of delivery" className="rounded-lg max-h-32" />
+      <ProofCard photoRequired={photoRequired} photo={photo} onPhotoAction={handlePhoto} onSignatureAction={setSignature} />
+
+      {error && (
+        <p role="alert" className="rounded-xl bg-[#fde4e1] text-[#a8281e] p-3 text-sm font-semibold">
+          {error}
+        </p>
+      )}
+
+      <div className="space-y-3">
+        <button onClick={complete} disabled={loading || onHold || blocked} className="btn btn-kesar w-full !min-h-[56px] text-base">
+          <Icon name="check" /> {loading ? "Saving…" : "Mark delivered"}
+        </button>
+        {!blocked && (
+          <button type="button" className="btn btn-outline w-full" onClick={() => setFailOpen(true)} disabled={loading}>
+            <Icon name="x" className="h-4 w-4" /> Couldn&apos;t deliver
+          </button>
         )}
       </div>
 
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
-
-      <button
-        onClick={complete}
-        disabled={loading || onHold}
-        className="btn btn-kesar w-full"
-      >
-        {loading ? "Completing…" : "Mark delivered"}
-      </button>
+      <NotDeliveredSheet orderId={order.id} open={failOpen} onCloseAction={() => setFailOpen(false)} />
     </div>
   );
 }

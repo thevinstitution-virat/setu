@@ -24,8 +24,8 @@ export default function CtaFooterSection() {
             <h2 className="ls-h2">{c.ctaTitle}</h2>
             <p className="ls-sub">{c.ctaSub}</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, justifyContent: "center", marginTop: 30 }}>
-              <Link href="/login" className="btn btn-kesar btn-lg">
-                {c.ctaStart}
+              <Link href="/start" className="btn btn-kesar btn-lg">
+                {lang === "hi" ? "मुफ़्त ट्रायल शुरू करें" : "Start free trial"}
                 <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                   <path d="M5 12h14M13 6l6 6-6 6" />
                 </svg>
@@ -62,7 +62,8 @@ export default function CtaFooterSection() {
           {c.footProduct} ·{" "}
           <a href="https://vgraphics.in" target="_blank" rel="noopener noreferrer">
             {c.footDesign}
-          </a>
+          </a>{" "}
+          · <a href="/legal/terms">Terms</a> · <a href="/legal/privacy">Privacy</a>
         </span>
       </footer>
     </>

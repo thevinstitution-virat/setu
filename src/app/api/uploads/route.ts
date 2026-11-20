@@ -3,7 +3,7 @@ import { guard } from "@/lib/guard";
 import { ALLOWED_TYPES, newKey, putFile, sniffType } from "@/lib/storage";
 
 const MAX_BYTES = 3 * 1024 * 1024;
-const KINDS = new Set(["pod-photo", "pod-signature", "product-image", "shop-photo", "payment-proof", "banner", "brand-logo", "category-image"]);
+const KINDS = new Set(["pod-photo", "pod-signature", "product-image", "shop-photo", "selfie", "store-photo", "visit-photo", "shelf-photo", "payment-proof", "banner", "brand-logo", "brand-icon", "category-image", "ticket-photo", "announcement"]);
 
 /** multipart/form-data: file, kind → { key } */
 export async function POST(req: Request) {

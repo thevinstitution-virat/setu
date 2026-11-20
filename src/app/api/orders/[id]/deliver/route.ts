@@ -1,21 +1,25 @@
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { audit, requestIp } from "@/lib/audit";
-import { emit } from "@/lib/jobs";
+import { emit, kickPhotos } from "@/lib/jobs";
 import { keyBelongsTo } from "@/lib/storage";
 import { can } from "@/lib/permissions";
-import { MoneyError, onOrderDelivered, withMoney } from "@/lib/ledger";
-import { moneyFail, parseCollect } from "@/lib/money-api";
+import { withMoney } from "@/lib/ledger";
+import { fieldNeedsCheck, moneyFail, parseCollect, referenceUsed } from "@/lib/money-api";
 import { queueEInvoice } from "@/lib/einvoice-queue";
+import { deliverOrder, type LineInput, type ReturnableInput } from "@/lib/delivery";
 
 /**
- * Mark an order delivered. Books the sale and its bill, settles a prepaid
- * order from its wallet reservation, and records anything collected on the
- * spot — all in one transaction.
+ * Mark an order delivered, line by line. Books the sale (or credits what
+ * wasn't handed over when it was invoiced at dispatch), settles a prepaid
+ * order from its wallet reservation, records crates given / taken and
+ * anything collected on the spot — all in one transaction (lib/delivery.ts).
  *
- * Body: { podPhotoKey?, podSignatureKey?, lat?, lng?,
+ * Body: { podPhotoKey?, podSignatureKey?, lat?, lng?, accuracy?, code?,
+ *         lines?: [{ itemId, quantity, reason? }]   (missing lines = delivered in full)
+ *         returnables?: [{ returnableId, given, taken }],
  *         collect?: { amount (paise), method: CASH|UPI|CHEQUE, reference?, cheque?, proofKey? } }
- * Legacy body { paymentMethod: "CASH" } (no collect) = full order total in cash.
+ * Legacy body { paymentMethod: "CASH" } (no collect, no lines) = full order total in cash.
  *
  * The assigned delivery agent can deliver; staff with orders.manage can also
  * deliver from the office (counter pickup), and their cash goes to office cash.
@@ -28,97 +32,112 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const agent = await db.deliveryAgentProfile.findUnique({ where: { userId: session.userId } });
   const office = !agent && can(session.role, "orders.manage");
-  const delivery = await db.delivery.findUnique({ where: { orderId: id } });
+  const delivery = await db.delivery.findUnique({ where: { orderId: id }, include: { trip: { select: { status: true } } } });
   if (!office && (!agent || !delivery || delivery.deliveryAgentId !== agent.id)) {
     return NextResponse.json({ error: "This order is not assigned to you" }, { status: 403 });
   }
+  if (!office && delivery?.trip && delivery.trip.status !== "STARTED") {
+    return NextResponse.json({ error: delivery.trip.status === "PLANNED" ? "Start the trip first" : "This trip is closed" }, { status: 409 });
+  }
 
   const body = await req.json().catch(() => null);
-  const lat = typeof body?.lat === "number" ? body.lat : null;
-  const lng = typeof body?.lng === "number" ? body.lng : null;
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
   const keyOrNull = (v: unknown) => (typeof v === "string" && keyBelongsTo(v, tenant.id) ? v : null);
-  const podPhotoUrl = keyOrNull(body?.podPhotoKey);
-  const podSignatureData = keyOrNull(body?.podSignatureKey);
+  const pod = {
+    photo: keyOrNull(body?.podPhotoKey),
+    signature: keyOrNull(body?.podSignatureKey),
+    lat: num(body?.lat),
+    lng: num(body?.lng),
+    accuracy: num(body?.accuracy),
+  };
+  const lines: LineInput[] | undefined = Array.isArray(body?.lines)
+    ? body.lines.map((l: Record<string, unknown>) => ({
+        itemId: String(l?.itemId ?? ""),
+        quantity: Number(l?.quantity),
+        reason: typeof l?.reason === "string" ? l.reason : null,
+      }))
+    : undefined;
+  const returnables: ReturnableInput[] = Array.isArray(body?.returnables)
+    ? body.returnables.map((r: Record<string, unknown>) => ({
+        returnableId: String(r?.returnableId ?? ""),
+        given: Number(r?.given ?? 0),
+        taken: Number(r?.taken ?? 0),
+      }))
+    : [];
 
-  const order0 = await db.order.findUnique({ where: { id } });
-  if (!order0 || order0.status === "DELIVERED" || order0.status === "CANCELLED") {
-    return NextResponse.json({ error: "This order can no longer be delivered" }, { status: 400 });
-  }
-  if (order0.creditHold && !order0.creditApprovedAt) {
-    return NextResponse.json({ error: `On credit hold: ${order0.creditHoldReason ?? "needs approval"}` }, { status: 409 });
-  }
+  const order0 = await db.order.findUnique({ where: { id }, select: { status: true, totalAmount: true, walletHold: true } });
+  if (!order0) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // What was collected. Amounts are decided by what the agent enters (or, for
-  // the legacy body, the server's order total) — never a client-sent total.
+  // What was collected. Amounts are what the agent enters (or, for the legacy
+  // body, the server's order total) — never a client-sent total.
   let collect: Exclude<ReturnType<typeof parseCollect>, string> | null = null;
   if (body?.collect) {
     const parsed = parseCollect(body.collect, tenant.id);
     if (typeof parsed === "string") return NextResponse.json({ error: parsed }, { status: 400 });
+    const used = parsed.method === "UPI" || parsed.method === "BANK" ? await referenceUsed(db, parsed.reference) : null;
+    if (used) return NextResponse.json({ error: `This reference was already used (${used.number})` }, { status: 409 });
     collect = parsed;
-  } else if (body?.paymentMethod === "CASH" && order0.walletHold === 0) {
+  } else if (body?.paymentMethod === "CASH" && order0.walletHold === 0 && !lines) {
     collect = { amount: order0.totalAmount, method: "CASH", reference: null, proofKey: null, note: null, cheque: null };
   }
 
-  const cashAmount = collect?.method === "CASH" ? collect.amount : 0;
-  const deliveryPaymentMethod = !collect ? "CREDIT" : collect.method === "CASH" ? "CASH" : "ONLINE";
+  // The delivery code is 4 digits: stop guessing after a few wrong tries.
+  const code = typeof body?.code === "string" ? body.code : null;
+  // The try is claimed in one statement before the code is compared, so
+  // parallel guesses can't all slip under the limit.
+  if (code !== null && !office) {
+    const claimed = await db.delivery.updateMany({ where: { orderId: id, codeTries: { lt: 5 } }, data: { codeTries: { increment: 1 } } });
+    if (claimed.count === 0 && (await db.delivery.count({ where: { orderId: id } })) > 0) {
+      return NextResponse.json({ error: "Too many wrong codes. Call the office: they can deliver it from their side." }, { status: 429 });
+    }
+  }
 
   let out;
   try {
-    out = await withMoney(tenant.id, session.userId, async (ctx) => {
-      const fresh = await ctx.tx.order.findUniqueOrThrow({ where: { id } });
-      if (fresh.status === "DELIVERED" || fresh.status === "CANCELLED") {
-        throw new MoneyError("This order can no longer be delivered");
-      }
-      const deliveryData = {
-        deliveredAt: new Date(),
-        podPhotoUrl,
-        podSignatureData,
-        paymentMethod: deliveryPaymentMethod,
-        paymentStatus: collect ? "COLLECTED" : "PENDING",
-        codAmount: cashAmount,
-        lat,
-        lng,
-      } as const;
-      if (delivery) {
-        await ctx.tx.delivery.update({ where: { orderId: id }, data: deliveryData });
-      } else if (agent) {
-        await ctx.tx.delivery.create({ data: { orderId: id, deliveryAgentId: agent.id, ...deliveryData } });
-      }
-      const order = await ctx.tx.order.update({
-        where: { id },
-        data: {
-          status: "DELIVERED",
-          statusEvents: {
-            create: {
-              status: "DELIVERED",
-              actorId: session.userId,
-              note: office ? "Delivered at the office" : "Delivered with proof of delivery",
-            },
-          },
-        },
-      });
-      const { payment, invoice } = await onOrderDelivered(
-        ctx,
-        fresh,
-        collect ? { ...collect, collectorId: session.userId, atOffice: office } : null
-      );
-      return { order, payment, invoice };
-    });
+    out = await withMoney(tenant.id, session.userId, (ctx) =>
+      deliverOrder(ctx, {
+        orderId: id,
+        agentId: agent?.id ?? null,
+        office,
+        lines,
+        code,
+        returnables,
+        pod,
+        collect: collect ? { ...collect, collectorId: session.userId, atOffice: office, needsVerification: fieldNeedsCheck(collect.method, office, tenant.settings) } : null,
+      })
+    );
   } catch (e) {
+    if (code && e instanceof Error && /code is wrong/.test(e.message)) {
+      await audit(db, { actorId: session.userId, action: "delivery.code_wrong", entity: "Order", entityId: id, ip: requestIp(req) });
+    }
     return moneyFail(e);
   }
 
+  const cashAmount = collect?.method === "CASH" ? collect.amount : 0;
   await audit(db, {
     actorId: session.userId,
     action: "order.deliver",
     entity: "Order",
     entityId: id,
-    before: { status: order0.status },
-    after: { status: "DELIVERED", collected: collect?.amount ?? 0, method: collect?.method ?? null, paymentId: out.payment?.id ?? null, lat, lng },
+    before: { status: order0.status, total: order0.totalAmount },
+    after: {
+      status: "DELIVERED",
+      total: out.totalAmount,
+      short: lines?.filter((l) => l.reason).map((l) => ({ itemId: l.itemId, quantity: l.quantity, reason: l.reason })) ?? [],
+      creditNote: out.creditNote?.number ?? null,
+      returnables,
+      collected: collect?.amount ?? 0,
+      method: collect?.method ?? null,
+      paymentId: out.payment?.id ?? null,
+      lat: pod.lat,
+      lng: pod.lng,
+    },
     ip: requestIp(req),
   });
-  await emit("order.delivered", { tenantId: tenant.id, orderId: id, paymentMethod: deliveryPaymentMethod, codAmount: cashAmount });
+  await emit("order.delivered", { tenantId: tenant.id, orderId: id, paymentMethod: collect?.method ?? "CREDIT", codAmount: cashAmount });
   if (out.invoice) await queueEInvoice(tenant.id, out.invoice);
+  if (out.creditNote) await queueEInvoice(tenant.id, out.creditNote);
+  if (pod.photo || collect?.proofKey) await kickPhotos(tenant.id);
 
-  return NextResponse.json(out);
+  return NextResponse.json({ order: out.order, payment: out.payment, invoice: out.invoice, creditNote: out.creditNote, total: out.totalAmount });
 }

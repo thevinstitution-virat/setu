@@ -7,6 +7,7 @@
  * Every tenant's rows are written through tenantDb(), so row-level security
  * stamps and checks tenantId exactly as the app does at runtime.
  */
+import { DELIVERY_DEFAULTS } from "../src/lib/delivery-settings";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { hashPassword } from "../src/lib/password";
 import { nextOrderNumber, priceBreakup } from "../src/lib/orders";
@@ -14,6 +15,13 @@ import { toPaise } from "../src/lib/money";
 import { issueCreditNote, onOrderDelivered, onOrderPlaced, openingBalance, recordPayment, withMoney } from "../src/lib/ledger";
 import { generateEInvoice } from "../src/lib/einvoice";
 import { gstinCheckDigit } from "../src/lib/gst";
+import { adjustStock, draftReorderPos, receiveGoods, setPoStatus } from "../src/lib/stock";
+import { seedField } from "./seed-field";
+import { seedEngage } from "./seed-engage";
+import { seedPayments } from "./seed-payments";
+import { seedSaas } from "./seed-saas";
+import { seedAnalytics } from "./seed-analytics";
+import { DAILY, runFeature } from "../src/lib/automation";
 
 /** Made-up GSTIN with a valid check digit (test data only). */
 const testGstin = (first14: string) => `${first14}${gstinCheckDigit(first14)}`;
@@ -36,7 +44,7 @@ function scoped(tenantId: string) {
   });
 }
 
-type Db = ReturnType<typeof scoped>;
+export type Db = ReturnType<typeof scoped>;
 
 async function wipe() {
   // Dev-only wipe. TRUNCATE (table owner only) is used because the audit log
@@ -44,13 +52,20 @@ async function wipe() {
   if (process.env.NODE_ENV === "production") throw new Error("Refusing to wipe a production database");
   await prisma.$executeRawUnsafe(
     `TRUNCATE ${[
+      "StockMove", "PurchaseLine", "Purchase", "PurchaseOrderLine", "PurchaseOrder", "StockLot", "StockLocation", "Supplier",
+      "ReturnableMove", "Returnable", "DutyShift", "Trip", "Vehicle",
       "InvoiceLine", "Invoice",
       "SchemeRedemption", "Scheme", "Banner", "RetailerPrice", "PriceListItem", "PriceList",
       "RetailerGroupMember", "RetailerGroup", "HsnCode", "Brand", "Category",
+      "WebhookDelivery", "WebhookEndpoint", "ApiKey", "BankLine", "BankStatement", "GatewaySettlement", "GatewayEvent", "PaymentIntent", "GeoCache",
       "PaymentAllocation", "Cheque", "CashHandover", "Payment", "Bill", "LedgerLine", "JournalEntry", "LedgerAccount",
+      "DeliveryFeedback", "TicketMessage", "Ticket", "Referral", "Announcement", "MessageTemplate", "PushSubscription", "MessageLog", "Notification",
+      "HandoffUse", "Target", "StoreLead", "LeaveRequest", "LocationPing", "BeatPlan", "BeatRetailer",
       "AuditLog", "Counter", "OtpChallenge", "Delivery", "Visit", "Attendance",
       "OrderStatusEvent", "OrderItem", "Order", "Product", "Beat",
       "RetailerProfile", "SalesAgentProfile", "DeliveryAgentProfile", "Area", "Region", "User",
+      "PlatformAudit", "PlatformAnnouncement", "SupportSession", "PlatformUser", "TenantExport", "SignupChallenge",
+      "PlatformInvoice", "PlatformCounter", "UsageCounter", "Subscription", "Plan",
       "TenantDomain", "Tenant",
     ].map((t) => `"${t}"`).join(", ")} CASCADE`
   );
@@ -191,6 +206,10 @@ async function seedDemo() {
           complexName: "Shree Complex",
           pinCode: "400058",
           gstin: testGstin("27ZZAGR0001B1Z"),
+          lat: 19.1197,
+          lng: 72.8468,
+          deliveryPref: "IN_HAND",
+          deliveryNote: "Side lane entrance after 11 AM",
           areaId: mumbai.areas[0].id,
           salesAgentId: salesUser.salesAgentProfile!.id,
         },
@@ -210,6 +229,9 @@ async function seedDemo() {
           shopNumber: "14",
           complexName: "Lotus Plaza",
           pinCode: "400050",
+          lat: 19.0544,
+          lng: 72.8402,
+          deliveryPref: "RING_BELL",
           areaId: mumbai.areas[1].id,
           salesAgentId: salesUser.salesAgentProfile!.id,
         },
@@ -227,14 +249,14 @@ async function seedDemo() {
     data: {
       orderNumber: await nextOrderNumber(db, tenant.id),
       retailerId: retailer1.retailerProfile!.id,
-      placedById: retailer1.id,
+      placedById: salesUser.id, // taken by the sales agent on a visit
       status: "DELIVERED",
       ...b1,
       grossAmount: b1.subtotal,
       items: { create: delivered },
       statusEvents: {
         create: [
-          { status: "PLACED", actorId: retailer1.id },
+          { status: "PLACED", actorId: salesUser.id },
           { status: "CONFIRMED", actorId: salesUser.id },
           { status: "PACKED", actorId: salesUser.id },
           { status: "OUT_FOR_DELIVERY", actorId: deliveryUser.id },
@@ -248,6 +270,8 @@ async function seedDemo() {
           paymentMethod: "CASH",
           paymentStatus: "COLLECTED",
           codAmount: b1.totalAmount,
+          state: "DELIVERED",
+          seq: 1,
         },
       },
     },
@@ -262,12 +286,12 @@ async function seedDemo() {
     data: {
       orderNumber: await nextOrderNumber(db, tenant.id),
       retailerId: retailer2.retailerProfile!.id,
-      placedById: retailer2.id,
+      placedById: salesUser.id,
       status: "PLACED",
       ...b2,
       grossAmount: b2.subtotal,
       items: { create: placed },
-      statusEvents: { create: { status: "PLACED", actorId: retailer2.id } },
+      statusEvents: { create: { status: "PLACED", actorId: salesUser.id } },
     },
   });
 
@@ -299,6 +323,25 @@ async function seedDemo() {
     bandraId: mumbai.areas[1].id,
   });
 
+  // Phase 4: vans and crates. Sai Super Mart has no map pin yet (taken on first delivery).
+  await db.vehicle.createMany({
+    data: [
+      { number: "MH02AB1234", name: "Tata Ace (white)", capacityKg: 750 },
+      { number: "MH04CD5678", name: "Mahindra pickup", capacityKg: 1200 },
+    ],
+  });
+  await db.returnable.createMany({
+    data: [
+      { name: "Crate", nameHi: "क्रेट", unitCharge: 15000, sort: 0 },
+      { name: "20 L jar", nameHi: "20 लीटर जार", unitCharge: 20000, sort: 1 },
+    ],
+  });
+  const tenantRow = await prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { settings: true } });
+  await prisma.tenant.update({
+    where: { id: tenant.id },
+    data: { settings: { ...(tenantRow.settings as object), delivery: { ...DELIVERY_DEFAULTS, depot: { lat: 19.0728, lng: 72.8826 }, codeAbove: 500000 } } },
+  });
+
   await seedMoney(tenant.id, {
     adminId: (await db.user.findFirstOrThrow({ where: { loginId: "admin" } })).id,
     salesUserId: salesUser.id,
@@ -307,6 +350,132 @@ async function seedDemo() {
     patel: retailer2.retailerProfile!.id,
     deliveredOrderId: deliveredOrder.id,
     placedOrderId: placedOrder.id,
+  });
+
+  await seedStock(tenant.id, (await db.user.findFirstOrThrow({ where: { loginId: "admin" } })).id);
+
+  await seedField(db, {
+    salesUserId: salesUser.id,
+    salesAgentId: salesUser.salesAgentProfile!.id,
+    deliveryUserId: deliveryUser.id,
+    adminId: (await db.user.findFirstOrThrow({ where: { loginId: "admin" } })).id,
+    areas: mumbai.areas.map((a) => a.id),
+    shops: [retailer1.retailerProfile!.id, retailer2.retailerProfile!.id, retailer3.retailerProfile!.id],
+    patelOrderId: placedOrder.id,
+  });
+  await seedEngage(db, prisma, {
+    tenantId: tenant.id,
+    adminId: (await db.user.findFirstOrThrow({ where: { loginId: "admin" } })).id,
+    salesUserId: salesUser.id,
+    shops: { agarwal: retailer1.retailerProfile!.id, patel: retailer2.retailerProfile!.id, sai: retailer3.retailerProfile!.id },
+    deliveredOrderId: deliveredOrder.id,
+    areas: mumbai.areas.map((a) => a.id),
+  });
+  await seedPayments(db, prisma, {
+    tenantId: tenant.id,
+    adminId: (await db.user.findFirstOrThrow({ where: { loginId: "admin" } })).id,
+    shops: { agarwal: retailer1.retailerProfile!.id, patel: retailer2.retailerProfile!.id, sai: retailer3.retailerProfile!.id },
+    saiUserId: retailer3.id,
+  });
+  await seedAnalytics(db, prisma, tenant.id);
+  // Location tracking on for the demo so the team map has positions (off by default for real businesses).
+  const tr = await prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { settings: true } });
+  await prisma.tenant.update({ where: { id: tenant.id }, data: { settings: { ...(tr.settings as object), field: { trackLocation: true } } } });
+  // Phase 11: run the automations once over the history, so Suggestions has today's visit plans, credit and checks.
+  for (const f of [...DAILY, "credit" as const]) {
+    const r = await runFeature(tenant.id, f, "manual");
+    if (r.error) console.warn(`  automation ${f}: ${r.error}`);
+  }
+}
+
+/**
+ * Phase 5 demo: stock tracking on (warn when short), one warehouse, five
+ * suppliers (made-up names), goods received in batches. Shows:
+ *   - Potato Chips: a batch expiring in 5 days (sold first, flagged);
+ *   - Chocolate Cookies: 10 packs already expired (to move to damaged);
+ *   - Basmati Rice and Bathing Soap: below their reorder level;
+ *   - Dish Wash Liquid: out of stock.
+ * A draft purchase order for the low items, one marked sent.
+ */
+async function seedStock(tenantId: string, adminId: string) {
+  const t = await prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { settings: true } });
+  await prisma.tenant.update({
+    where: { id: tenantId },
+    data: { settings: { ...((t.settings ?? {}) as object), inventory: { enabled: true, orderCheck: "warn", bufferPct: 10, expiryAlertDays: 7 } } },
+  });
+  const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+  await withMoney(tenantId, adminId, async (ctx) => {
+    const wh = await ctx.tx.stockLocation.create({ data: { kind: "WAREHOUSE", name: "Bhiwandi warehouse", address: "Gala 14, Shree Logistics Park, Bhiwandi 421302", isDefault: true } });
+    const sup = async (name: string, contactName: string, phone: string, gstin: string) =>
+      ctx.tx.supplier.create({ data: { name, contactName, phone, gstin: testGstin(gstin) } });
+    const sunrise = await sup("Sunrise Beverages Pvt Ltd", "Ramesh Iyer", "9820011111", "27ZZSUN0001A1Z");
+    const crunchy = await sup("Crunchy Foods Ltd", "Neha Kulkarni", "9820022222", "27ZZCRU0001A1Z");
+    const kisan = await sup("Kisan Gold Agro", "Harpreet Singh", "9820033333", "27ZZKIS0001A1Z");
+    const fresh = await sup("Fresh Smile Care", "Anita Desai", "9820044444", "27ZZFRS0001A1Z");
+    const ghar = await sup("Ghar Clean Products", "Sanjay Mehta", "9820055555", "27ZZGHR0001A1Z");
+    const product = (sku: string) => ctx.tx.product.findFirstOrThrow({ where: { sku } });
+    const set = async (sku: string, supplierId: string, reorderLevel: number, reorderQty: number | null, trackExpiry: boolean) =>
+      ctx.tx.product.update({ where: { id: (await product(sku)).id }, data: { supplierId, reorderLevel, reorderQty, trackExpiry } });
+    await set("BEV-001", sunrise.id, 48, 240, true);
+    await set("BEV-002", sunrise.id, 12, 60, true);
+    await set("SNK-001", crunchy.id, 60, 150, true);
+    await set("SNK-002", crunchy.id, 48, 120, true);
+    await set("GRO-001", kisan.id, 40, null, true);
+    await set("GRO-002", kisan.id, 50, 40, true);
+    await set("GRO-003", kisan.id, 24, 96, true);
+    await set("PC-001", fresh.id, 36, 144, false);
+    await set("PC-002", fresh.id, 24, 60, false);
+    await set("HH-001", ghar.id, 24, 96, false);
+    const id = async (sku: string) => (await product(sku)).id;
+
+    await receiveGoods(ctx, {
+      supplierId: sunrise.id,
+      locationId: wh.id,
+      billNo: "SB/2611/0417",
+      billDate: day(-6),
+      lines: [
+        { productId: await id("BEV-001"), quantity: 240, batch: "MC2611A", expiry: day(150), unitCost: 7000 },
+        { productId: await id("BEV-002"), quantity: 60, batch: "IC2610C", expiry: day(270), unitCost: 18500 },
+      ],
+    });
+    await receiveGoods(ctx, {
+      supplierId: crunchy.id,
+      locationId: wh.id,
+      billNo: "CF-88213",
+      billDate: day(-4),
+      lines: [
+        { productId: await id("SNK-001"), quantity: 90, batch: "PC0925", expiry: day(5), unitCost: 3200 },
+        { productId: await id("SNK-001"), quantity: 150, batch: "PC1105", expiry: day(60), unitCost: 3200 },
+        { productId: await id("SNK-002"), quantity: 120, batch: "CC1101", expiry: day(90), unitCost: 4800 },
+      ],
+    });
+    await receiveGoods(ctx, {
+      supplierId: kisan.id,
+      locationId: wh.id,
+      billNo: "KGA/1172",
+      billDate: day(-3),
+      lines: [
+        { productId: await id("GRO-001"), quantity: 200, batch: "TD26-41", expiry: day(240), unitCost: 12000 },
+        { productId: await id("GRO-002"), quantity: 40, batch: "BR26-09", expiry: day(330), unitCost: 46000 },
+        { productId: await id("GRO-003"), quantity: 96, batch: "SO2611", expiry: day(200), unitCost: 14500 },
+      ],
+    });
+    await receiveGoods(ctx, {
+      supplierId: fresh.id,
+      locationId: wh.id,
+      billNo: "FSC-5521",
+      billDate: day(-2),
+      lines: [
+        { productId: await id("PC-001"), quantity: 144, batch: "TP-0811", unitCost: 7200 },
+        { productId: await id("PC-002"), quantity: 12, batch: "BS-0902", unitCost: 9600 },
+      ],
+    });
+    // Ten packs of an older batch that has already expired (opening stock).
+    await adjustStock(ctx, { locationId: wh.id, productId: await id("SNK-002"), delta: 10, reason: "opening", batch: "CC0815", expiry: day(-3), unitCost: 4600, note: "Old stock" });
+    void ghar;
+
+    const { pos } = await draftReorderPos(ctx);
+    if (pos[0]) await setPoStatus(ctx, pos[0].id, "SENT");
   });
 }
 
@@ -512,6 +681,12 @@ async function seedSecond() {
   await db.user.create({
     data: { name: "Admin", loginId: "admin", passwordHash: hashPassword("second123"), role: "ADMIN" },
   });
+  // Phase 6: the demo sales agent also sells for this business (same phone,
+  // separate login): the multi-distributor switch.
+  const agent2 = await db.user.create({
+    data: { name: "Test Agent", loginId: "agent", phone: "9000000002", passwordHash: hashPassword("123456789"), role: "SALES_AGENT", salesAgentProfile: { create: {} } },
+    include: { salesAgentProfile: true },
+  });
   await seedProducts(db, [
     ["Lemon Drink 300ml (box of 24)", "LD-300", "Beverages", "box", 240, 480, 12, null],
     ["Packaged Water 1L (box of 12)", "PW-1L", "Water", "box", 120, 240, 18, null],
@@ -528,6 +703,7 @@ async function seedSecond() {
           complexName: "Kapoor Market",
           pinCode: "226010",
           areaId: lucknow.areas[0].id,
+          salesAgentId: agent2.salesAgentProfile!.id,
         },
       },
     },
@@ -535,16 +711,22 @@ async function seedSecond() {
 }
 
 async function main() {
+  // Seeding queues messages; send them here instead of waking the worker.
+  process.env.JOBS_DISABLED = "1";
   console.log("Seeding…");
   await wipe();
   await seedDemo();
   await seedSecond();
+  const saas = await seedSaas(prisma);
   console.log("Seed complete.");
   console.log("Tenant 'demo'   → http://demo.localhost:3100");
   console.log("  Admin: admin / admin123 · Sales: 'Test agent' / 123456789 · Delivery: deliveryagent@gmail.com / 123456789");
   console.log("  Retailer OTP phones: 9876543210 (Agarwal), 9123456780 (Patel), 9988776655 (Sai Super Mart)");
+  console.log("  Supervisor: supervisor / 123456789 · Second agent: ravi / 123456789 · Field OTP phones: 9000000001 (supervisor), 9000000002 (Test Agent)");
   console.log("Tenant 'second' → http://second.localhost:3100");
-  console.log("  Admin: admin / second123 · Retailer OTP phone: 9876543210");
+  console.log("  Admin: admin / second123 · Retailer OTP phone: 9876543210 · Test Agent: agent / 123456789 (same phone 9000000002)");
+  console.log("Platform console → http://platform.localhost:3100/platform");
+  console.log(`  owner@setu.local / platform123 (owner) · support@setu.local / platform123 (support) · demo invoice ${saas.invoice ?? "none"}`);
 }
 
 main()

@@ -5,6 +5,7 @@ import { formatINR, gstOn } from "@/lib/money";
 import { nextSequence } from "@/lib/orders";
 import { invoiceSettings, type InvoiceSettings } from "@/lib/invoice-settings";
 import { amountInWords, creditNoteDeadline, docNumber, fyCode, splitTax, uqc } from "@/lib/gst";
+import { invoiceWebhook } from "@/lib/webhooks";
 
 /**
  * GST documents. This module builds and stores them (numbers, parties, lines,
@@ -138,7 +139,8 @@ export function orderDrafts(
   },
   s: InvoiceSettings
 ): Draft[] {
-  const drafts: Draft[] = order.items.map((it) => {
+  // Lines cut to nothing at delivery (invoice at delivery) don't appear.
+  const drafts: Draft[] = order.items.filter((it) => it.quantity > 0).map((it) => {
     const free = !!it.freeSchemeId || it.price === 0;
     const gross = free ? 0 : it.price * it.quantity;
     const discount = free ? 0 : it.discount;
@@ -240,6 +242,7 @@ export async function issueSaleInvoice(ctx: Ctx, orderId: string, now = new Date
     },
   });
   if (invoice.total !== order.totalAmount) throw new MoneyError("Invoice total doesn't match the order total", 409);
+  await invoiceWebhook(ctx.tx, ctx.tenantId, invoice.id);
   return { invoice, created: true };
 }
 
@@ -382,6 +385,7 @@ export async function issueNoteDoc(ctx: Ctx, input: NoteInput, now = new Date())
       lines: { create: f.lines },
     },
   });
+  await invoiceWebhook(ctx.tx, ctx.tenantId, note.id);
   return { note, original };
 }
 

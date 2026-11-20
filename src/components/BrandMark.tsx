@@ -29,18 +29,28 @@ export function BrandMark({ size = 36 }: { size?: number }) {
   );
 }
 
-/** Mark + English name + Devanagari name, as on the landing page. */
-export function BrandLockup({ size = 36, sub }: { size?: number; sub?: string }) {
+/**
+ * Mark + English name + Devanagari name, as on the landing page. With a
+ * business's own name (white label, Phase 9) it shows that name and its logo
+ * instead; the Devanagari line is only for our own name.
+ */
+export function BrandLockup({ size = 36, sub, name, logoUrl }: { size?: number; sub?: string; name?: string; logoUrl?: string | null }) {
+  const own = !name || name === APP_NAME;
   return (
     <span className="flex items-center gap-2.5 min-w-0">
-      <BrandMark size={size} />
+      {logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={logoUrl} alt="" width={size} height={size} className="shrink-0 object-contain rounded-lg bg-white" style={{ width: size, height: size }} />
+      ) : (
+        <BrandMark size={size} />
+      )}
       <span className="min-w-0">
-        <span className="block font-heading font-bold text-[16px] leading-none whitespace-nowrap text-ink">
-          {APP_NAME}
+        <span className="block font-heading font-bold text-[16px] leading-none whitespace-nowrap text-ink truncate max-w-[220px]">
+          {own ? APP_NAME : name}
         </span>
         <span className="block text-[11.5px] font-bold leading-none mt-1 text-[var(--kesar-text)] whitespace-nowrap">
-          {APP_NAME_HI}
-          {sub && <span className="text-[var(--muted)] font-semibold"> · {sub}</span>}
+          {own ? APP_NAME_HI : null}
+          {sub && <span className="text-[var(--muted)] font-semibold">{own ? " · " : ""}{sub}</span>}
         </span>
       </span>
     </span>

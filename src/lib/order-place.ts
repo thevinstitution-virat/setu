@@ -21,6 +21,8 @@ export async function placeOrder(
     notes?: string | null;
     visitId?: string | null;
     now?: Date;
+    /** Spot sales check the van instead of warehouse availability. */
+    skipStockCheck?: boolean;
   }
 ) {
   const { tx } = ctx;
@@ -28,7 +30,7 @@ export async function placeOrder(
   const r = await retailerPricingCtx(tx, p.retailerId);
   if (!r) throw new MoneyError("Retailer not found", 404);
   const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { settings: true } });
-  const quote = await quoteCart(tx, tenant.settings, r, { items: p.items, coupon: p.coupon, deliveryDate: p.deliveryDate }, p.now);
+  const quote = await quoteCart(tx, tenant.settings, r, { items: p.items, coupon: p.coupon, deliveryDate: p.deliveryDate, skipStockCheck: p.skipStockCheck }, p.now);
   if (quote.problems.length) throw new MoneyError(quote.problems[0], 400);
 
   const created = await tx.order.create({
@@ -85,7 +87,11 @@ export async function placeOrder(
   }
 
   if (p.visitId) {
-    await tx.visit.updateMany({ where: { id: p.visitId, orderId: null }, data: { orderId: created.id } });
+    // Only this shop's visit, made by the person placing the order.
+    await tx.visit.updateMany({
+      where: { id: p.visitId, orderId: null, retailerId: p.retailerId, salesAgent: { userId: p.placedById } },
+      data: { orderId: created.id },
+    });
   }
   const credit = await onOrderPlaced(ctx, created);
   return { order: { ...created, creditHold: credit.hold, creditHoldReason: credit.reason }, quote };

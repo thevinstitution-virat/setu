@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { withTenantTx } from "@/lib/db";
+import { countRetailers, entitlements } from "@/lib/plans";
 import { audit, requestIp } from "@/lib/audit";
 import { emit } from "@/lib/jobs";
 import { MoneyError, openingBalance } from "@/lib/ledger";
@@ -19,6 +20,7 @@ import {
   type RetailerRow,
   type RowError,
 } from "@/lib/importers";
+import { tidyProductRows, type TidyChange, type TidyDuplicate } from "@/lib/catalogue-rules";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 
@@ -32,7 +34,7 @@ class Rollback extends Error {
   }
 }
 
-async function importRetailers(tx: Tx, rows: RetailerRow[]): Promise<Summary> {
+async function importRetailers(tx: Tx, rows: RetailerRow[], tenantId: string): Promise<Summary> {
   const s: Summary = { created: 0, updated: 0, newRegions: 0, newAreas: 0, errors: [] };
 
   const regions = new Map(
@@ -109,6 +111,12 @@ async function importRetailers(tx: Tx, rows: RetailerRow[]): Promise<Summary> {
       });
       s.created++;
     }
+  }
+  // The plan's shop limit, counted with the new shops inside this transaction.
+  const limit = (await entitlements(tenantId)).limits.retailers;
+  if (limit !== undefined && s.created) {
+    const n = await countRetailers(tx);
+    if (n > limit) s.errors.push({ row: 0, message: `Your plan allows ${limit} shops; this file would make ${n}. Move to a bigger plan under Billing, or import fewer.` });
   }
   return s;
 }
@@ -255,6 +263,8 @@ export async function POST(req: Request) {
   if (!auth.ok) return auth.res;
   const { session, tenant, db } = auth;
 
+  // Refuse a big body before reading it into memory.
+  if (Number(req.headers.get("content-length") ?? 0) > MAX_BYTES + 64 * 1024) return NextResponse.json({ error: "File is larger than 5 MB" }, { status: 413 });
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
   const type = String(form?.get("type") ?? "") as ImportType;
@@ -279,6 +289,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `At most ${MAX_ROWS} rows per file; split it` }, { status: 400 });
   }
 
+  // A13: tidy a product sheet first (names, units, GST, categories) and flag likely duplicates.
+  let tidy: { changes: TidyChange[]; changeCount: number; duplicates: TidyDuplicate[] } | null = null;
+  if (type === "products" && String(form?.get("tidy") ?? "") === "1") {
+    const existing = await withTenantTx(tenant.id, async (tx) => ({
+      products: await tx.product.findMany({ select: { name: true, sku: true } }),
+      categories: (await tx.category.findMany({ select: { name: true } })).map((c) => c.name),
+    }));
+    const t = tidyProductRows(rows, existing);
+    rows = t.rows;
+    tidy = { changes: t.changes.slice(0, 200), changeCount: t.changes.length, duplicates: t.duplicates.slice(0, 100) };
+  }
+
   const checked =
     type === "retailers"
       ? validateRetailers(rows)
@@ -297,7 +319,7 @@ export async function POST(req: Request) {
       async (tx) => {
         const s =
           type === "retailers"
-            ? await importRetailers(tx, checked.valid as RetailerRow[])
+            ? await importRetailers(tx, checked.valid as RetailerRow[], tenant.id)
             : type === "products"
               ? await importProducts(tx, checked.valid as ProductRow[])
               : type === "prices"
@@ -315,6 +337,7 @@ export async function POST(req: Request) {
         mode: "preview",
         rows: rows.length,
         committed: false,
+        tidy,
         ...e.summary,
         errors: e.summary.errors.slice(0, 200),
         errorCount: e.summary.errors.length,
@@ -327,10 +350,10 @@ export async function POST(req: Request) {
     actorId: session.userId,
     action: `import.${type}`,
     entity: "Import",
-    after: { file: file.name, rows: rows.length, created: summary.created, updated: summary.updated },
+    after: { file: file.name, rows: rows.length, created: summary.created, updated: summary.updated, tidied: tidy?.changeCount ?? 0 },
     ip: requestIp(req),
   });
   await emit("import.completed", { tenantId: tenant.id, type, created: summary.created, updated: summary.updated });
 
-  return NextResponse.json({ mode: "commit", rows: rows.length, committed: true, ...summary, errorCount: 0 });
+  return NextResponse.json({ mode: "commit", rows: rows.length, committed: true, tidy, ...summary, errorCount: 0 });
 }

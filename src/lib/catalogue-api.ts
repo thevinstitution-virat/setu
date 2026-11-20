@@ -111,6 +111,20 @@ export async function parseProduct(db: TenantDb, tenantId: string, b: Record<str
     if (!Number.isInteger(m) || m < 1 || m > 100000) return "Minimum order quantity must be at least 1";
     d.moq = m;
   }
+  // Stock (Phase 5)
+  for (const k of ["reorderLevel", "reorderQty"] as const) {
+    if (has(k)) {
+      const v = b[k] === null || b[k] === "" ? null : Number(b[k]);
+      if (v !== null && (!Number.isInteger(v) || v < (k === "reorderQty" ? 1 : 0) || v > 1_000_000)) return k === "reorderLevel" ? "Reorder level must be a whole number" : "Reorder quantity must be a whole number above 0";
+      d[k] = v;
+    }
+  }
+  if (has("supplierId")) {
+    if (b.supplierId === null || b.supplierId === "") d.supplierId = null;
+    else if (typeof b.supplierId !== "string" || !(await db.supplier.findFirst({ where: { id: b.supplierId }, select: { id: true } }))) return "Unknown supplier";
+    else d.supplierId = b.supplierId;
+  }
+  if (has("trackExpiry")) d.trackExpiry = b.trackExpiry === true;
   if (has("sort")) d.sort = Number.isInteger(b.sort) ? b.sort : 0;
   if (has("active")) d.active = b.active === true;
   if (has("specialOffer")) d.specialOffer = optText(b.specialOffer, 120);

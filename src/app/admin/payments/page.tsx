@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Icon from "@/components/Icon";
 import { formatINR } from "@/lib/money";
 
-type Method = "CASH" | "UPI" | "CHEQUE" | "BANK" | "WALLET" | "CREDIT_NOTE";
+type Method = "CASH" | "UPI" | "CHEQUE" | "BANK" | "ONLINE" | "WALLET" | "CREDIT_NOTE";
 type State = "PENDING_VERIFICATION" | "CONFIRMED" | "REJECTED" | "REVERSED";
 type ChequeStatus = "RECEIVED" | "DEPOSITED" | "CLEARED" | "BOUNCED";
 
@@ -24,7 +24,11 @@ type Payment = {
   retailer: { id: string; outletName: string; user: { name: string; phone: string } | null };
   collectedBy: { id: string; name: string; role: string } | null;
   cheque: { number: string; bank: string; chequeDate: string; status: ChequeStatus } | null;
+  photoCheck?: PhotoCheck | null;
 };
+
+/** A3: what the photo check found (only a note; a person verifies). */
+type PhotoCheck = { verdict: "ok" | "warn" | "bad"; flags: string[]; source: "rules" | "ai"; summary: string; notes: string[]; checkedAt: string };
 
 type Cheque = {
   id: string;
@@ -60,6 +64,7 @@ const METHOD_LABEL: Record<Method, string> = {
   UPI: "UPI",
   CHEQUE: "Cheque",
   BANK: "Bank transfer",
+  ONLINE: "Online (gateway)",
   WALLET: "Wallet",
   CREDIT_NOTE: "Credit note",
 };
@@ -249,6 +254,56 @@ function ProofThumb({ proofKey, onProof }: { proofKey: string | null; onProof: (
   );
 }
 
+const VERDICT_CHIP = { ok: "chip-mint", warn: "chip-genda", bad: "chip-kesar" } as const;
+
+/** The photo check under a payment to verify, with "Check again". */
+function PhotoCheckLine({ p, onChecked }: { p: Payment; onChecked: (c: PhotoCheck) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  if (!p.proofKey) return null;
+  const c = p.photoCheck;
+  async function again() {
+    setBusy(true);
+    setErr(null);
+    try {
+      const r = await post<{ photoCheck: PhotoCheck }>(`/api/payments/${p.id}/photo-check`, {});
+      onChecked(r.photoCheck);
+    } catch (e) {
+      setErr(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="rounded-xl bg-ink/5 px-3 py-2 text-sm space-y-1" aria-label="Photo check">
+      <div className="flex flex-wrap items-center gap-2">
+        {c ? (
+          <>
+            <span className={`chip text-xs ${VERDICT_CHIP[c.verdict]}`}>
+              <Icon name={c.verdict === "ok" ? "check" : "alert"} className="h-3.5 w-3.5" /> {c.verdict === "ok" ? "Photo check" : c.verdict === "bad" ? "Doesn't match" : "Look closer"}
+            </span>
+            <span className="min-w-0 flex-1 text-[var(--ink-2)]">{c.summary}</span>
+          </>
+        ) : (
+          <span className="min-w-0 flex-1 text-[var(--muted)]">Photo not checked yet</span>
+        )}
+        <button type="button" className="btn btn-quiet btn-xs" onClick={again} disabled={busy}>
+          {busy ? "Checking…" : c ? "Check again" : "Check now"}
+        </button>
+      </div>
+      {c && c.verdict !== "ok" && c.notes.length > 0 && (
+        <ul className="list-disc pl-5 text-xs text-[var(--ink-2)]">
+          {c.notes.map((n) => (
+            <li key={n}>{n}</li>
+          ))}
+        </ul>
+      )}
+      {c && <p className="text-[11px] text-[var(--muted)]">{c.source === "ai" ? "Read by AI from the photo. You still decide." : "Checked for a reused photo and UTR (AI reading is off)."}</p>}
+      {err && <p className="text-xs text-[var(--kesar-text)]">{err}</p>}
+    </div>
+  );
+}
+
 function PurposeChip({ p }: { p: Payment["purpose"] }) {
   return p === "WALLET" ? <span className="chip chip-mor">Wallet top-up</span> : <span className="chip">Dues</span>;
 }
@@ -407,6 +462,7 @@ function VerifyTab({ onCount, onProof }: { onCount: (n: number) => void; onProof
             </div>
           </div>
           {p.note && <p className="text-sm text-[var(--ink-2)]">&ldquo;{p.note}&rdquo;</p>}
+          <PhotoCheckLine p={p} onChecked={(c) => setRows((r) => (r ?? []).map((x) => (x.id === p.id ? { ...x, photoCheck: c } : x)))} />
 
           {rejecting === p.id ? (
             <ReasonForm

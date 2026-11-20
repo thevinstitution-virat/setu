@@ -4,11 +4,15 @@ import { audit, requestIp } from "@/lib/audit";
 import { issueCreditNote, issueDebitNote, withMoney } from "@/lib/ledger";
 import { moneyFail } from "@/lib/money-api";
 import { queueEInvoice } from "@/lib/einvoice-queue";
+import { restockReturn } from "@/lib/stock";
+import { isReturnCondition } from "@/lib/inventory-settings";
 
 /**
  * Issue a credit or debit note against a sale invoice.
  * Body: { type: "CREDIT_NOTE" | "DEBIT_NOTE", kind: "return" | "value" | "cancel", reason,
- *         lines: [{ lineId, quantity? (return), amount? (value, taxable paise) }] }
+ *         lines: [{ lineId, quantity? (return), amount? (value, taxable paise) }],
+ *         restock?: "good" | "damaged" | "expired" }
+ * restock (returned goods on a delivered order, stock tracking on): the goods come back into stock.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await guard("invoices.manage");
@@ -29,13 +33,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       ...(l.amount !== undefined ? { amount: Number(l.amount) } : {}),
     }));
 
+  const restock = type === "CREDIT_NOTE" && kind === "return" && isReturnCondition(b.restock) ? b.restock : null;
   let note;
+  let restocked: { productId: string; qty: number }[] = [];
   try {
-    note = await withMoney(tenant.id, session.userId, (ctx) =>
-      type === "CREDIT_NOTE"
-        ? issueCreditNote(ctx, { invoiceId: id, kind, reason, lines })
-        : issueDebitNote(ctx, { invoiceId: id, reason, lines })
-    );
+    note = await withMoney(tenant.id, session.userId, async (ctx) => {
+      if (type !== "CREDIT_NOTE") return issueDebitNote(ctx, { invoiceId: id, reason, lines });
+      const n = await issueCreditNote(ctx, { invoiceId: id, kind, reason, lines });
+      if (restock) restocked = await restockReturn(ctx, n.id, restock);
+      return n;
+    });
   } catch (e) {
     return moneyFail(e);
   }
@@ -44,9 +51,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     action: type === "CREDIT_NOTE" ? "invoice.credit_note" : "invoice.debit_note",
     entity: "Invoice",
     entityId: note.id,
-    after: { number: note.number, original: id, kind, reason, total: note.total },
+    after: { number: note.number, original: id, kind, reason, total: note.total, restock, restocked },
     ip: requestIp(req),
   });
   await queueEInvoice(tenant.id, note);
-  return NextResponse.json({ note });
+  return NextResponse.json({ note, restocked });
 }
