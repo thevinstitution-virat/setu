@@ -16,6 +16,12 @@ import { issueCreditNote, onOrderDelivered, onOrderPlaced, openingBalance, recor
 import { generateEInvoice } from "../src/lib/einvoice";
 import { gstinCheckDigit } from "../src/lib/gst";
 import { adjustStock, draftReorderPos, receiveGoods, setPoStatus } from "../src/lib/stock";
+import { seedField } from "./seed-field";
+import { seedEngage } from "./seed-engage";
+import { seedPayments } from "./seed-payments";
+import { seedSaas } from "./seed-saas";
+import { seedAnalytics } from "./seed-analytics";
+import { DAILY, runFeature } from "../src/lib/automation";
 
 /** Made-up GSTIN with a valid check digit (test data only). */
 const testGstin = (first14: string) => `${first14}${gstinCheckDigit(first14)}`;
@@ -38,7 +44,7 @@ function scoped(tenantId: string) {
   });
 }
 
-type Db = ReturnType<typeof scoped>;
+export type Db = ReturnType<typeof scoped>;
 
 async function wipe() {
   // Dev-only wipe. TRUNCATE (table owner only) is used because the audit log
@@ -51,10 +57,15 @@ async function wipe() {
       "InvoiceLine", "Invoice",
       "SchemeRedemption", "Scheme", "Banner", "RetailerPrice", "PriceListItem", "PriceList",
       "RetailerGroupMember", "RetailerGroup", "HsnCode", "Brand", "Category",
+      "WebhookDelivery", "WebhookEndpoint", "ApiKey", "BankLine", "BankStatement", "GatewaySettlement", "GatewayEvent", "PaymentIntent", "GeoCache",
       "PaymentAllocation", "Cheque", "CashHandover", "Payment", "Bill", "LedgerLine", "JournalEntry", "LedgerAccount",
+      "DeliveryFeedback", "TicketMessage", "Ticket", "Referral", "Announcement", "MessageTemplate", "PushSubscription", "MessageLog", "Notification",
+      "HandoffUse", "Target", "StoreLead", "LeaveRequest", "LocationPing", "BeatPlan", "BeatRetailer",
       "AuditLog", "Counter", "OtpChallenge", "Delivery", "Visit", "Attendance",
       "OrderStatusEvent", "OrderItem", "Order", "Product", "Beat",
       "RetailerProfile", "SalesAgentProfile", "DeliveryAgentProfile", "Area", "Region", "User",
+      "PlatformAudit", "PlatformAnnouncement", "SupportSession", "PlatformUser", "TenantExport", "SignupChallenge",
+      "PlatformInvoice", "PlatformCounter", "UsageCounter", "Subscription", "Plan",
       "TenantDomain", "Tenant",
     ].map((t) => `"${t}"`).join(", ")} CASCADE`
   );
@@ -238,14 +249,14 @@ async function seedDemo() {
     data: {
       orderNumber: await nextOrderNumber(db, tenant.id),
       retailerId: retailer1.retailerProfile!.id,
-      placedById: retailer1.id,
+      placedById: salesUser.id, // taken by the sales agent on a visit
       status: "DELIVERED",
       ...b1,
       grossAmount: b1.subtotal,
       items: { create: delivered },
       statusEvents: {
         create: [
-          { status: "PLACED", actorId: retailer1.id },
+          { status: "PLACED", actorId: salesUser.id },
           { status: "CONFIRMED", actorId: salesUser.id },
           { status: "PACKED", actorId: salesUser.id },
           { status: "OUT_FOR_DELIVERY", actorId: deliveryUser.id },
@@ -275,12 +286,12 @@ async function seedDemo() {
     data: {
       orderNumber: await nextOrderNumber(db, tenant.id),
       retailerId: retailer2.retailerProfile!.id,
-      placedById: retailer2.id,
+      placedById: salesUser.id,
       status: "PLACED",
       ...b2,
       grossAmount: b2.subtotal,
       items: { create: placed },
-      statusEvents: { create: { status: "PLACED", actorId: retailer2.id } },
+      statusEvents: { create: { status: "PLACED", actorId: salesUser.id } },
     },
   });
 
@@ -342,6 +353,39 @@ async function seedDemo() {
   });
 
   await seedStock(tenant.id, (await db.user.findFirstOrThrow({ where: { loginId: "admin" } })).id);
+
+  await seedField(db, {
+    salesUserId: salesUser.id,
+    salesAgentId: salesUser.salesAgentProfile!.id,
+    deliveryUserId: deliveryUser.id,
+    adminId: (await db.user.findFirstOrThrow({ where: { loginId: "admin" } })).id,
+    areas: mumbai.areas.map((a) => a.id),
+    shops: [retailer1.retailerProfile!.id, retailer2.retailerProfile!.id, retailer3.retailerProfile!.id],
+    patelOrderId: placedOrder.id,
+  });
+  await seedEngage(db, prisma, {
+    tenantId: tenant.id,
+    adminId: (await db.user.findFirstOrThrow({ where: { loginId: "admin" } })).id,
+    salesUserId: salesUser.id,
+    shops: { agarwal: retailer1.retailerProfile!.id, patel: retailer2.retailerProfile!.id, sai: retailer3.retailerProfile!.id },
+    deliveredOrderId: deliveredOrder.id,
+    areas: mumbai.areas.map((a) => a.id),
+  });
+  await seedPayments(db, prisma, {
+    tenantId: tenant.id,
+    adminId: (await db.user.findFirstOrThrow({ where: { loginId: "admin" } })).id,
+    shops: { agarwal: retailer1.retailerProfile!.id, patel: retailer2.retailerProfile!.id, sai: retailer3.retailerProfile!.id },
+    saiUserId: retailer3.id,
+  });
+  await seedAnalytics(db, prisma, tenant.id);
+  // Location tracking on for the demo so the team map has positions (off by default for real businesses).
+  const tr = await prisma.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: { settings: true } });
+  await prisma.tenant.update({ where: { id: tenant.id }, data: { settings: { ...(tr.settings as object), field: { trackLocation: true } } } });
+  // Phase 11: run the automations once over the history, so Suggestions has today's visit plans, credit and checks.
+  for (const f of [...DAILY, "credit" as const]) {
+    const r = await runFeature(tenant.id, f, "manual");
+    if (r.error) console.warn(`  automation ${f}: ${r.error}`);
+  }
 }
 
 /**
@@ -637,6 +681,12 @@ async function seedSecond() {
   await db.user.create({
     data: { name: "Admin", loginId: "admin", passwordHash: hashPassword("second123"), role: "ADMIN" },
   });
+  // Phase 6: the demo sales agent also sells for this business (same phone,
+  // separate login): the multi-distributor switch.
+  const agent2 = await db.user.create({
+    data: { name: "Test Agent", loginId: "agent", phone: "9000000002", passwordHash: hashPassword("123456789"), role: "SALES_AGENT", salesAgentProfile: { create: {} } },
+    include: { salesAgentProfile: true },
+  });
   await seedProducts(db, [
     ["Lemon Drink 300ml (box of 24)", "LD-300", "Beverages", "box", 240, 480, 12, null],
     ["Packaged Water 1L (box of 12)", "PW-1L", "Water", "box", 120, 240, 18, null],
@@ -653,6 +703,7 @@ async function seedSecond() {
           complexName: "Kapoor Market",
           pinCode: "226010",
           areaId: lucknow.areas[0].id,
+          salesAgentId: agent2.salesAgentProfile!.id,
         },
       },
     },
@@ -660,16 +711,22 @@ async function seedSecond() {
 }
 
 async function main() {
+  // Seeding queues messages; send them here instead of waking the worker.
+  process.env.JOBS_DISABLED = "1";
   console.log("Seeding…");
   await wipe();
   await seedDemo();
   await seedSecond();
+  const saas = await seedSaas(prisma);
   console.log("Seed complete.");
   console.log("Tenant 'demo'   → http://demo.localhost:3100");
   console.log("  Admin: admin / admin123 · Sales: 'Test agent' / 123456789 · Delivery: deliveryagent@gmail.com / 123456789");
   console.log("  Retailer OTP phones: 9876543210 (Agarwal), 9123456780 (Patel), 9988776655 (Sai Super Mart)");
+  console.log("  Supervisor: supervisor / 123456789 · Second agent: ravi / 123456789 · Field OTP phones: 9000000001 (supervisor), 9000000002 (Test Agent)");
   console.log("Tenant 'second' → http://second.localhost:3100");
-  console.log("  Admin: admin / second123 · Retailer OTP phone: 9876543210");
+  console.log("  Admin: admin / second123 · Retailer OTP phone: 9876543210 · Test Agent: agent / 123456789 (same phone 9000000002)");
+  console.log("Platform console → http://platform.localhost:3100/platform");
+  console.log(`  owner@setu.local / platform123 (owner) · support@setu.local / platform123 (support) · demo invoice ${saas.invoice ?? "none"}`);
 }
 
 main()

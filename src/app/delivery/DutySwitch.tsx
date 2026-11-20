@@ -4,11 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getLocation } from "@/lib/geo";
 import Icon from "@/components/Icon";
+import { fieldChanged } from "@/components/field/kit";
 import { istTime } from "./maps";
 
 /**
  * On / off duty, one big tap target. The phone asks for location only here
- * (start and end of duty); the server refuses "off" while a trip is running.
+ * (start and end of duty; DutyTracker in the layout records positions while
+ * on duty when the business turned tracking on); the server refuses "off"
+ * while a trip is running. Going on duty also checks the driver in.
  */
 export default function DutySwitch({ onDuty: on0, since: since0 }: { onDuty: boolean; since: string | null }) {
   const router = useRouter();
@@ -29,6 +32,7 @@ export default function DutySwitch({ onDuty: on0, since: since0 }: { onDuty: boo
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.error ?? "Could not change duty. Try again.");
       setDuty({ onDuty: !!d.onDuty, since: d.since ?? null });
+      fieldChanged();
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
@@ -69,7 +73,10 @@ export default function DutySwitch({ onDuty: on0, since: since0 }: { onDuty: boo
         </span>
       </button>
       {error && <p className="text-sm text-[#a8281e]">{error}</p>}
-      <p className="text-xs text-[var(--muted)] px-1">Your location is saved only when you go on or off duty.</p>
+      <p className="text-xs text-[var(--muted)] px-1">
+        Your location is saved when you go on or off duty. While you are on duty it is also saved every few minutes, but
+        only if your business has turned location tracking on. Never off duty. Check out on Attendance to end your day.
+      </p>
     </div>
   );
 }

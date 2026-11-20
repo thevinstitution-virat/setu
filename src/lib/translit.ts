@@ -62,7 +62,7 @@ export function plainKey(s: string): string {
 }
 
 /** Loose sound key of one word: first letter kept, then consonants only, doubles collapsed. */
-function soundWord(w: string): string {
+export function soundWord(w: string): string {
   const x = w
     .replace(/ph/g, "f")
     .replace(/w/g, "v")

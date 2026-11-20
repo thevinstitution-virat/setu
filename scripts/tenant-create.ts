@@ -1,17 +1,17 @@
 /**
- * Create a new tenant (distributor) with its first admin.
+ * Create a new tenant (distributor) with its first admin and a free trial.
  *
  *   npm run tenant:create -- --slug agarwal --name "Agarwal Enterprises" \
- *     --admin-login owner --admin-password '<strong password>' [--admin-name "Owner"] [--state 27] [--gstin ...]
+ *     --admin-login owner --admin-password '<strong password>' [--admin-name "Owner"] [--state 27] [--gstin ...] [--plan growth]
  *
- * The tenant is then live at https://<slug>.<PLATFORM_DOMAIN>.
- * (A web console for this comes in Phase 9; this is the safe first step.)
+ * The tenant is then live at https://<slug>.<PLATFORM_DOMAIN>. Businesses
+ * normally sign up themselves at /start on the platform address (Phase 9);
+ * this is for the platform team.
  */
 import "dotenv/config";
-import { PrismaClient } from "../src/generated/prisma/client";
-import { hashPassword } from "../src/lib/password";
-
-const RESERVED = new Set(["www", "app", "api", "admin", "platform", "static", "cdn", "mail", "demo", "second"]);
+import { asPlatform } from "../src/lib/db";
+import { createTenantRecord, slugProblem } from "../src/lib/signup";
+import { prisma } from "../src/lib/prisma";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -29,36 +29,27 @@ async function main() {
   const adminLogin = arg("admin-login");
   const adminPassword = arg("admin-password");
   const adminName = arg("admin-name") ?? "Owner";
+  const planCode = arg("plan") ?? null;
 
-  if (!/^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$/.test(slug)) fail("--slug: 3–30 letters, digits or dashes");
-  if (RESERVED.has(slug)) fail(`--slug "${slug}" is reserved`);
+  const problem = await slugProblem(slug);
+  if (problem) fail(`--slug: ${problem}`);
   if (!name) fail("--name is required");
   if (!adminLogin) fail("--admin-login is required");
   if (!adminPassword || adminPassword.length < 10) fail("--admin-password must be at least 10 characters");
+  if (planCode && !(await prisma.plan.findUnique({ where: { code: planCode } }))) fail(`--plan "${planCode}" does not exist`);
 
-  const prisma = new PrismaClient();
-  try {
-    if (await prisma.tenant.findUnique({ where: { slug } })) fail(`A tenant "${slug}" already exists`);
+  const { tenant } = await asPlatform((tx) =>
+    createTenantRecord(tx, { slug, name, stateCode: arg("state") ?? null, gstin: arg("gstin") ?? null, planCode }, { name: adminName, loginId: adminLogin, password: adminPassword })
+  );
 
-    const tenant = await prisma.tenant.create({
-      data: { slug, name, stateCode: arg("state"), gstin: arg("gstin"), status: "TRIAL" },
-    });
-    await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenant.id}, TRUE)`;
-      await tx.user.create({
-        data: { name: adminName, loginId: adminLogin, passwordHash: hashPassword(adminPassword), role: "ADMIN" },
-      });
-    });
-
-    const domain = process.env.PLATFORM_DOMAIN ?? "localhost";
-    const port = domain === "localhost" ? ":3100" : "";
-    const scheme = domain === "localhost" ? "http" : "https";
-    console.log(`✔ Tenant "${name}" created`);
-    console.log(`  URL:   ${scheme}://${slug}.${domain}${port}`);
-    console.log(`  Admin: ${adminLogin}`);
-  } finally {
-    await prisma.$disconnect();
-  }
+  const domain = process.env.PLATFORM_DOMAIN ?? "localhost";
+  const port = domain === "localhost" ? ":3100" : "";
+  const scheme = domain === "localhost" ? "http" : "https";
+  console.log(`✔ Tenant "${tenant.name}" created (free trial${planCode ? `, then ${planCode}` : ""})`);
+  console.log(`  URL:   ${scheme}://${slug}.${domain}${port}`);
+  console.log(`  Admin: ${adminLogin}`);
 }
 
-main().catch((e) => fail(e instanceof Error ? e.message : String(e)));
+main()
+  .catch((e) => fail(e instanceof Error ? e.message : String(e)))
+  .finally(() => prisma.$disconnect());

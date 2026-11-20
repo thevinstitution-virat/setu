@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import Icon from "@/components/Icon";
 import { formatINR, toPaise } from "@/lib/money";
 import type { CartSettings } from "@/lib/cart-settings";
@@ -11,6 +12,13 @@ import type { DeliverySettings as DeliveryRules } from "@/lib/delivery-settings"
 import DeliverySettings from "@/components/admin/DeliverySettings";
 import type { InventorySettings } from "@/lib/inventory-settings";
 import StockSettings from "@/components/admin/StockSettings";
+import type { FieldSettings as FieldRules } from "@/lib/field-settings";
+import FieldSettings from "@/components/admin/FieldSettings";
+import type { NotifySettings, ReferralSettings as ReferralRules, SupportSettings as SupportRules } from "@/lib/engage-settings";
+import MessageSettings, { type ChannelStatus } from "@/components/admin/MessageSettings";
+import SupportSettings from "@/components/admin/SupportSettings";
+import ReferralSettings from "@/components/admin/ReferralSettings";
+import GatewaySettings from "@/components/admin/GatewaySettings";
 
 type Mode = "PREPAID" | "POSTPAID";
 
@@ -23,6 +31,7 @@ type Money = {
   chequeBouncePenalty: number;
   upiVpa: string;
   upiPayeeName: string;
+  checkFieldDigital: boolean;
 };
 
 /** Form values as typed (₹ and days as text). */
@@ -35,6 +44,7 @@ type Form = {
   chequeBouncePenalty: string;
   upiVpa: string;
   upiPayeeName: string;
+  checkFieldDigital: boolean;
 };
 
 /** Field names in server messages → words the owner knows. */
@@ -57,6 +67,7 @@ function toForm(m: Money): Form {
     chequeBouncePenalty: rupees(m.chequeBouncePenalty),
     upiVpa: m.upiVpa,
     upiPayeeName: m.upiPayeeName,
+    checkFieldDigital: m.checkFieldDigital ?? true,
   };
 }
 
@@ -92,6 +103,7 @@ function toPatch(f: Form): Money | string {
     chequeBouncePenalty: penalty,
     upiVpa: f.upiVpa.trim(),
     upiPayeeName: f.upiPayeeName.trim(),
+    checkFieldDigital: f.checkFieldDigital,
   };
 }
 
@@ -218,6 +230,8 @@ export default function SettingsPage() {
   const [gst, setGst] = useState<{ invoice: InvoiceSettings; business: Business } | null>(null);
   const [delivery, setDelivery] = useState<DeliveryRules | null>(null);
   const [inventory, setInventory] = useState<InventorySettings | null>(null);
+  const [field, setField] = useState<FieldRules | null>(null);
+  const [engage, setEngage] = useState<{ notify: NotifySettings; channels: ChannelStatus; support: SupportRules; referral: ReferralRules } | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/settings")
@@ -234,12 +248,14 @@ export default function SettingsPage() {
         setGst({ invoice: data.invoice, business: data.business });
         setDelivery(data.delivery);
         setInventory(data.inventory);
+        setField(data.field);
+        setEngage({ notify: data.notify, channels: data.channels, support: data.support, referral: data.referral });
       })
       .catch((e) => setLoadError(e instanceof Error ? e.message : "Could not load settings"));
   }, []);
 
   if (loadError) return <p className="text-sm text-[#a8281e]">{loadError}</p>;
-  if (!form || !saved || !cart || !cartSaved || !cartRaw || !gst || !delivery || !inventory) return <p className="text-sm text-[var(--muted)]">Loading…</p>;
+  if (!form || !saved || !cart || !cartSaved || !cartRaw || !gst || !delivery || !inventory || !field || !engage) return <p className="text-sm text-[var(--muted)]">Loading…</p>;
 
   const moneyDirty = JSON.stringify(form) !== JSON.stringify(saved);
   const cartDirty = JSON.stringify(cart) !== JSON.stringify(cartSaved);
@@ -310,10 +326,10 @@ export default function SettingsPage() {
       <form onSubmit={save} className="space-y-5">
         <div>
           <p className="page-kick">Settings</p>
-          <h1 className="page-title">Money, cart, GST, delivery and stock rules</h1>
+          <h1 className="page-title">Business settings</h1>
           <p className="page-sub">
-            Defaults for new retailers, how payments work, what an order needs, and how invoices are made. You can change terms for one retailer
-            from their khata.
+            Defaults for new retailers, how payments work, what an order needs, how invoices are made, and which messages go out. You can change
+            terms for one retailer from their khata.
           </p>
           <div className="flex flex-wrap gap-2 mt-3">
             <a href="#money" className="chip">
@@ -321,6 +337,9 @@ export default function SettingsPage() {
             </a>
             <a href="#cart" className="chip">
               Cart rules
+            </a>
+            <a href="#online" className="chip">
+              Online payments
             </a>
             <a href="#gst" className="chip">
               GST &amp; invoices
@@ -331,6 +350,32 @@ export default function SettingsPage() {
             <a href="#stock" className="chip">
               Stock
             </a>
+            <a href="#field" className="chip">
+              Field team
+            </a>
+            <a href="#messages" className="chip">
+              Messages
+            </a>
+            <a href="#complaints" className="chip">
+              Complaints
+            </a>
+            <a href="#referral" className="chip">
+              Refer &amp; earn
+            </a>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            <Link href="/admin/settings/brand" className="chip chip-kesar">
+              Brand <Icon name="arrow" className="h-3.5 w-3.5" />
+            </Link>
+            <Link href="/admin/settings/domains" className="chip chip-kesar">
+              Web address <Icon name="arrow" className="h-3.5 w-3.5" />
+            </Link>
+            <Link href="/admin/account" className="chip chip-kesar">
+              Your data <Icon name="arrow" className="h-3.5 w-3.5" />
+            </Link>
+            <Link href="/admin/settings/automation" className="chip chip-kesar">
+              Automation <Icon name="arrow" className="h-3.5 w-3.5" />
+            </Link>
           </div>
         </div>
 
@@ -422,6 +467,33 @@ export default function SettingsPage() {
               onChange={(e) => set("overdueGraceDays", e.target.value)}
             />
             <span className="block text-xs text-[var(--muted)] mt-1">Extra days after the due date before the hold starts.</span>
+          </label>
+        </section>
+
+        <section className="card p-5 space-y-4">
+          <p className="font-heading font-bold">UPI and bank taken in the field</p>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="sr-only peer"
+              checked={form.checkFieldDigital}
+              onChange={(e) => set("checkFieldDigital", e.target.checked)}
+            />
+            <span
+              aria-hidden="true"
+              className={`mt-0.5 shrink-0 h-6 w-11 rounded-full p-0.5 transition peer-focus-visible:ring-2 peer-focus-visible:ring-mor ${
+                form.checkFieldDigital ? "bg-mor" : "bg-ink/15"
+              }`}
+            >
+              <span className={`block h-5 w-5 rounded-full bg-white shadow transition ${form.checkFieldDigital ? "translate-x-5" : ""}`} />
+            </span>
+            <span>
+              <span className="block text-sm font-medium">Check them before they count</span>
+              <span className="block text-xs text-[var(--muted)]">
+                A UPI or bank payment entered by a salesperson or driver waits in Payments → To verify until someone in the office sees it in the bank.
+                Turned off, it counts at once. Cash and cheques are checked at handover and deposit either way.
+              </span>
+            </span>
           </label>
         </section>
 
@@ -653,9 +725,14 @@ export default function SettingsPage() {
           </div>
         </div>
       </form>
+      <GatewaySettings />
       <GstSettings invoice={gst.invoice} business={gst.business} />
       <DeliverySettings delivery={delivery} />
       <StockSettings inventory={inventory} />
+      <FieldSettings field={field} />
+      <MessageSettings notify={engage.notify} channels={engage.channels} />
+      <SupportSettings support={engage.support} />
+      <ReferralSettings referral={engage.referral} />
     </div>
   );
 }

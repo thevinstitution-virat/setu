@@ -2,6 +2,7 @@ import Link from "next/link";
 import { formatINR } from "@/lib/money";
 import { directionsUrl, type TripStop } from "@/lib/trip-api";
 import Icon from "@/components/Icon";
+import RouteEstimate from "@/components/dispatch/RouteEstimate";
 import StopCard, { PlannedStopRow } from "./StopCard";
 import { SortStopsButton, StartTripButton } from "./TripActions";
 
@@ -73,11 +74,15 @@ function VanLinks({ sell }: { sell: boolean }) {
   );
 }
 
+/** Stop order as a string: the distance is read again when it changes (e.g. after "Sort by distance"). */
+const stopsKey = (stops: TripStop[]) => stops.map((s) => s.orderId).join(",");
+
 /** A trip that hasn't left: its stops and the big Start button. */
 function PlannedTrip({ trip, stock }: { trip: DriverTrip; stock: boolean }) {
   return (
     <section className="card p-4 space-y-4">
       <TripHead trip={trip} />
+      {trip.stops.length > 0 && <RouteEstimate tripId={trip.id} stopsKey={stopsKey(trip.stops)} />}
       <ul className="divide-y divide-[var(--line)]">
         {trip.stops.map((s) => (
           <PlannedStopRow key={s.orderId} stop={s} />
@@ -103,6 +108,7 @@ function RunningTrip({ trip, stock }: { trip: DriverTrip; stock: boolean }) {
       <div className="card p-4 space-y-4">
         <TripHead trip={trip} />
         <Progress stops={trip.stops} />
+        {open.length > 0 && <RouteEstimate tripId={trip.id} stopsKey={stopsKey(trip.stops)} />}
         {open.length > 0 && (
           <div className="grid grid-cols-2 gap-2 items-start">
             {route ? (

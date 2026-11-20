@@ -13,6 +13,7 @@ import { shopMapUrl } from "../../maps";
 import DeliveryInvoiceCard, { type DeliveryInvoice } from "./DeliveryInvoiceCard";
 import LinesCard from "./LinesCard";
 import CollectCard from "./CollectCard";
+import QrPayCard, { type OnlinePaid } from "./QrPayCard";
 import ProofCard from "./ProofCard";
 import ReturnablesCard, { cratesBody, type CrateState } from "./ReturnablesCard";
 import NotDeliveredSheet from "./NotDeliveredSheet";
@@ -84,6 +85,8 @@ export default function DeliverOrder({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [failOpen, setFailOpen] = useState(false);
+  /** Paid by the shop through the gateway QR for this order. */
+  const [online, setOnline] = useState<OnlinePaid>({ paid: 0, full: false });
 
   useEffect(() => {
     fetch(`/api/orders/${id}`)
@@ -105,6 +108,21 @@ export default function DeliverOrder({
       })
       .catch((e) => setLoadError(e instanceof Error ? e.message : "Could not load the order"));
   }, [id]);
+
+  // Money came in online: the khata balance moved, so read the dues again.
+  const retailerId = order?.retailerId ?? null;
+  useEffect(() => {
+    if (!retailerId || online.paid === 0) return;
+    let live = true;
+    fetch(`/api/admin/khata/${retailerId}`)
+      .then(async (r) => {
+        if (r.ok && live) setDues(await r.json());
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [retailerId, online.paid]);
 
   function handlePhoto(file: File | null) {
     setPhotoFile(file);
@@ -149,15 +167,18 @@ export default function DeliverOrder({
   const calc = orderAmount(order, order.items, lines, invoices);
   const prepaid = order.walletHold > 0;
   const onHold = order.creditHold && !order.creditApprovedAt;
-  const thisOrder = Math.max(0, calc.amount - order.walletHold);
+  const thisOrder = Math.max(0, calc.amount - order.walletHold - online.paid);
   // Invoiced at dispatch: the documents so far are already in the khata balance in full, so take
   // them out to get the old dues (the short-delivery credit is issued only on saving). Not
-  // invoiced yet: the whole balance is old dues (negative = advance).
-  const oldDues = (dues?.balances.receivable ?? 0) - (calc.invoiced ? calc.booked : 0);
+  // invoiced yet: the whole balance is old dues (negative = advance). Money paid online for this
+  // order already lowered the balance: add it back here, it is taken off "This order" instead.
+  const oldDues = (dues?.balances.receivable ?? 0) - (calc.invoiced ? calc.booked : 0) + online.paid;
   const totalDue = Math.max(0, thisOrder + oldDues);
   const target = follow === "order" ? thisOrder : follow === "dues" ? totalDue : null;
-  const shownPay: PaymentValue = target === null ? pay : { ...pay, amount: rupees(target) };
   const blocked = tripStatus === "PLANNED" || tripStatus === "CLOSED";
+  // Fully paid by QR: nothing to collect (the server marks the delivery paid online).
+  const paidOnline = online.full && !onHold;
+  const shownPay: PaymentValue = paidOnline ? { ...pay, method: null } : target === null ? pay : { ...pay, amount: rupees(target) };
   const r = order.retailer;
   const address = [r.shopNumber && `Shop ${r.shopNumber}`, r.complexName, r.area?.name, r.pinCode].filter(Boolean).join(", ");
   const map = shopMapUrl({ lat: r.lat, lng: r.lng, address });
@@ -291,20 +312,31 @@ export default function DeliverOrder({
 
       <ReturnablesCard retailerId={order.retailerId} value={crates} onChangeAction={setCrates} />
 
-      <CollectCard
-        onHold={onHold}
-        holdReason={order.creditHoldReason}
-        walletPaid={prepaid ? Math.min(order.walletHold, calc.amount) : null}
-        thisOrder={thisOrder}
-        oldDues={oldDues}
-        totalDue={totalDue}
-        overdue={dues?.overdue ?? 0}
-        duesLoaded={!!dues}
-        duesError={duesError}
-        pay={shownPay}
-        onPayAction={onPay}
-        onFollowAction={setFollow}
+      <QrPayCard
+        orderId={order.id}
+        retailerId={order.retailerId}
+        amount={thisOrder}
+        askAmount={calc.anyShort || prepaid}
+        canMake={!onHold && !blocked && thisOrder > 0}
+        onChangeAction={setOnline}
       />
+
+      {!paidOnline && (
+        <CollectCard
+          onHold={onHold}
+          holdReason={order.creditHoldReason}
+          walletPaid={prepaid ? Math.min(order.walletHold, calc.amount) : null}
+          thisOrder={thisOrder}
+          oldDues={oldDues}
+          totalDue={totalDue}
+          overdue={dues?.overdue ?? 0}
+          duesLoaded={!!dues}
+          duesError={duesError}
+          pay={shownPay}
+          onPayAction={onPay}
+          onFollowAction={setFollow}
+        />
+      )}
 
       <ProofCard photoRequired={photoRequired} photo={photo} onPhotoAction={handlePhoto} onSignatureAction={setSignature} />
 

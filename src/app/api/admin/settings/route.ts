@@ -7,6 +7,19 @@ import { cartSettings, parseCartSettings } from "@/lib/cart-settings";
 import { invoiceSettings, parseInvoiceSettings } from "@/lib/invoice-settings";
 import { deliverySettings, parseDeliverySettings } from "@/lib/delivery-settings";
 import { inventorySettings, parseInventorySettings } from "@/lib/inventory-settings";
+import { fieldSettings, parseFieldSettings } from "@/lib/field-settings";
+import {
+  notifySettings,
+  parseNotifySettings,
+  parseReferralSettings,
+  parseSupportSettings,
+  referralSettings,
+  supportSettings,
+} from "@/lib/engage-settings";
+import { parseReportSettings, reportSettings } from "@/lib/report-settings";
+import { automationSettings, parseAutomationSettings } from "@/lib/automation-settings";
+import { aiSettings, parseAiSettings } from "@/lib/ai-settings";
+import { channelStatus } from "@/lib/outbox";
 import { isStateCode, normaliseGstin, validGstin } from "@/lib/gst";
 import { invalidateTenantCache } from "@/lib/tenant";
 
@@ -14,7 +27,9 @@ const BUSINESS = { name: true, legalName: true, gstin: true, stateCode: true, ad
 
 /**
  * Business settings: money rules (settings.money), cart rules (settings.cart),
- * invoice / GST rules (settings.invoice), delivery rules (settings.delivery), stock rules (settings.inventory) and the business's legal identity
+ * invoice / GST rules (settings.invoice), delivery rules (settings.delivery), stock rules (settings.inventory),
+ * field team (settings.field), messages (settings.notify), complaints (settings.support),
+ * refer & earn (settings.referral), reports (settings.reports) and the business's legal identity
  * (Tenant columns: legal name, GSTIN, state, address, phone).
  */
 export async function GET() {
@@ -22,7 +37,7 @@ export async function GET() {
   if (!auth.ok) return auth.res;
   const t = await asPlatform((tx) => tx.tenant.findUniqueOrThrow({ where: { id: auth.tenant.id }, select: { settings: true, ...BUSINESS } }));
   const { settings, ...business } = t;
-  return NextResponse.json({ money: moneySettings(settings), cart: cartSettings(settings), invoice: invoiceSettings(settings), delivery: deliverySettings(settings), inventory: inventorySettings(settings), business });
+  return NextResponse.json({ money: moneySettings(settings), cart: cartSettings(settings), invoice: invoiceSettings(settings), delivery: deliverySettings(settings), inventory: inventorySettings(settings), field: fieldSettings(settings), notify: notifySettings(settings), support: supportSettings(settings), referral: referralSettings(settings), reports: reportSettings(settings), automation: automationSettings(settings), channels: channelStatus(), business });
 }
 
 const SECTIONS = {
@@ -31,6 +46,13 @@ const SECTIONS = {
   invoice: { read: invoiceSettings, parse: (i: Record<string, unknown>, s: unknown) => parseInvoiceSettings(i, invoiceSettings(s)) },
   delivery: { read: deliverySettings, parse: (i: Record<string, unknown>) => parseDeliverySettings(i) },
   inventory: { read: inventorySettings, parse: (i: Record<string, unknown>) => parseInventorySettings(i) },
+  field: { read: fieldSettings, parse: (i: Record<string, unknown>) => parseFieldSettings(i) },
+  notify: { read: notifySettings, parse: (i: Record<string, unknown>) => parseNotifySettings(i) },
+  support: { read: supportSettings, parse: (i: Record<string, unknown>) => parseSupportSettings(i) },
+  referral: { read: referralSettings, parse: (i: Record<string, unknown>) => parseReferralSettings(i) },
+  reports: { read: reportSettings, parse: (i: Record<string, unknown>) => parseReportSettings(i) },
+  automation: { read: automationSettings, parse: (i: Record<string, unknown>) => parseAutomationSettings(i) },
+  ai: { read: aiSettings, parse: (i: Record<string, unknown>) => parseAiSettings(i) },
 } as const;
 
 function parseBusiness(b: Record<string, unknown>) {
@@ -57,7 +79,7 @@ function parseBusiness(b: Record<string, unknown>) {
   return out;
 }
 
-/** Body: { money?, cart?, invoice?, delivery?, inventory?, business? } — only the fields sent change. */
+/** Body: { money?, cart?, invoice?, delivery?, inventory?, field?, notify?, support?, referral?, reports?, business? } — only the fields sent change. */
 export async function PATCH(req: Request) {
   const auth = await guard("settings.manage");
   if (!auth.ok) return auth.res;

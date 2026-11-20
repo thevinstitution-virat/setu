@@ -4,7 +4,7 @@ import { cache } from "react";
 import { getTenant } from "@/lib/tenant";
 import { tenantDb } from "@/lib/db";
 import { loadInvoiceDoc } from "@/lib/invoice";
-import { readShareToken } from "@/lib/invoice-api";
+import { openShareToken } from "@/lib/invoice-api";
 import { formatINR } from "@/lib/money";
 import Icon from "@/components/Icon";
 import { InvoiceView, type InvoiceJson } from "@/components/invoice/InvoiceView";
@@ -18,13 +18,13 @@ import { InvoiceView, type InvoiceJson } from "@/components/invoice/InvoiceView"
 const load = cache(async (token: string) => {
   const tenant = await getTenant();
   if (!tenant) return null;
-  const id = readShareToken(tenant.id, token);
+  const id = await openShareToken(tenantDb(tenant.id), tenant.id, token);
   if (!id) return null;
   const doc = await loadInvoiceDoc(tenantDb(tenant.id) as never, id);
   if (!doc) return null;
   // Only what the document shows: no internal ids, settings or e-invoice errors.
-  const { settings: _s, tenantId: _t, entryId: _e, createdById: _c, signedQr: _q, einvAttempts: _a, ...rest } = doc;
-  void [_s, _t, _e, _c, _q, _a];
+  const { settings: _s, tenantId: _t, entryId: _e, createdById: _c, signedQr: _q, einvAttempts: _a, shareVersion: _v, ...rest } = doc;
+  void [_s, _t, _e, _c, _q, _a, _v];
   const json = JSON.parse(
     JSON.stringify({ ...rest, lines: rest.lines.map(({ tenantId: _lt, ...line }) => (void _lt, line)) })
   ) as InvoiceJson;

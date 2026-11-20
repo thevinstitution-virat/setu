@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { audit, requestIp } from "@/lib/audit";
+import { withMoney } from "@/lib/ledger";
+import { checkIn } from "@/lib/field";
 
 /**
- * Driver on / off duty. Location is taken only when duty starts or ends —
- * never in between (DPDP: location on duty only, and only what we need).
+ * Driver on / off duty. Location is taken when duty starts or ends, and in
+ * between only when the business turned on location tracking (Settings ->
+ * Field team); never off duty (DPDP: location on duty only).
  */
 export async function GET() {
   const auth = await guard("delivery.work");
@@ -27,6 +30,8 @@ export async function POST(req: Request) {
   if (body?.on === true) {
     if (open) return NextResponse.json({ onDuty: true, since: open.startAt });
     const shift = await db.dutyShift.create({ data: { userId: session.userId, startLat: lat, startLng: lng } });
+    // Going on duty marks the day present (no selfie asked; the day's check-out still needs one).
+    await withMoney(auth.tenant.id, session.userId, (ctx) => checkIn(ctx, session.userId, { lat, lng }, { auto: true }));
     await audit(db, { actorId: session.userId, action: "duty.on", entity: "DutyShift", entityId: shift.id, ip: requestIp(req) });
     return NextResponse.json({ onDuty: true, since: shift.startAt });
   }

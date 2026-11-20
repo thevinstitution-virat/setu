@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
+import { mayServeRetailer } from "@/lib/cart-api";
 
 export async function GET(
   _req: Request,
@@ -9,18 +10,17 @@ export async function GET(
   if (!auth.ok) return auth.res;
   const { session, db } = auth;
   const { id } = await params;
-  const agent = await db.salesAgentProfile.findUnique({ where: { userId: session.userId } });
   const retailer = await db.retailerProfile.findUnique({
     where: { id },
     include: {
-      user: true,
+      user: { select: { id: true, name: true, phone: true, active: true } },
       area: true,
       orders: { orderBy: { createdAt: "desc" }, take: 5, include: { items: true } },
       visits: { orderBy: { checkInAt: "desc" }, take: 5 },
     },
   });
 
-  if (!agent || !retailer || retailer.salesAgentId !== agent.id) {
+  if (!retailer || !(await mayServeRetailer(db, session, retailer.salesAgentId))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

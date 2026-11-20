@@ -1,4 +1,5 @@
 import { MoneyError, cashInHand, type Ctx } from "@/lib/ledger";
+import { checkIn } from "@/lib/field";
 import { docNumber, fyCode, istDate } from "@/lib/gst";
 import { nextSequence } from "@/lib/orders";
 import { deliverySettings } from "@/lib/delivery-settings";
@@ -48,6 +49,8 @@ export async function createTrip(
 }
 
 async function openTrip(ctx: Ctx, tripId: string) {
+  // Lock the trip row: two "start" or "close" requests at once run one after the other.
+  await ctx.tx.$executeRaw`SELECT 1 FROM "Trip" WHERE id = ${tripId} FOR UPDATE`;
   const trip = await ctx.tx.trip.findUnique({ where: { id: tripId } });
   if (!trip) throw new MoneyError("Trip not found", 404);
   if (trip.status === "CLOSED") throw new MoneyError("This trip is closed");
@@ -180,7 +183,33 @@ export function sequenceStops(points: RoutePoint[], start: { lat: number; lng: n
     out.push(next);
     here = next;
   }
-  return [...out, ...rest];
+  return [...twoOpt(out, start ?? located[0] ?? null), ...rest];
+}
+
+/**
+ * Untangle the nearest-neighbour route: reverse any stretch that makes the
+ * path shorter (2-opt), from the start point, with no return leg.
+ */
+export function twoOpt<T extends { lat: number | null; lng: number | null }>(path: T[], start: { lat: number; lng: number } | null): T[] {
+  if (path.length < 3 || !start) return path;
+  const p = [...path] as (T & { lat: number; lng: number })[];
+  const at = (i: number) => (i < 0 ? start : p[i]);
+  let improved = true;
+  for (let round = 0; improved && round < 50; round++) {
+    improved = false;
+    for (let i = 0; i < p.length - 1; i++) {
+      for (let j = i + 1; j < p.length; j++) {
+        // Edges (i-1 → i) and (j → j+1) become (i-1 → j) and (i → j+1).
+        const before = km(at(i - 1), p[i]) + (j + 1 < p.length ? km(p[j], p[j + 1]) : 0);
+        const after = km(at(i - 1), p[j]) + (j + 1 < p.length ? km(p[i], p[j + 1]) : 0);
+        if (after + 1e-9 < before) {
+          p.splice(i, j - i + 1, ...p.slice(i, j + 1).reverse());
+          improved = true;
+        }
+      }
+    }
+  }
+  return p;
 }
 
 /** Re-order the stops still to be visited; done stops keep their place at the front. */
@@ -222,6 +251,7 @@ export async function startTrip(ctx: Ctx, tripId: string, now = new Date(), opts
   const driver = await ctx.tx.deliveryAgentProfile.findUniqueOrThrow({ where: { id: trip.driverId }, select: { userId: true } });
   const onDuty = await ctx.tx.dutyShift.findFirst({ where: { userId: driver.userId, endAt: null } });
   if (!onDuty) await ctx.tx.dutyShift.create({ data: { userId: driver.userId, startAt: now } });
+  await checkIn(ctx, driver.userId, { now }, { auto: true });
   return { docs, orderIds: stops.map((s) => s.orderId) };
 }
 

@@ -8,6 +8,8 @@ import { tripStops } from "@/lib/trip-api";
 import { deliverySettings, slotLabel } from "@/lib/delivery-settings";
 import { inventorySettings } from "@/lib/inventory-settings";
 import Icon from "@/components/Icon";
+import WorkspaceSwitcher from "@/components/field/WorkspaceSwitcher";
+import AnnouncementCards from "@/components/engage/AnnouncementCards";
 import DutySwitch from "./DutySwitch";
 import TripCard, { ClosedTripRow, type DriverTrip } from "./TripCard";
 
@@ -79,11 +81,15 @@ export default async function DeliveryHome() {
         <h1 className="page-title">Today&apos;s deliveries</h1>
       </div>
 
+      <WorkspaceSwitcher />
+
       <DutySwitch
         key={`${!!shift}-${shift?.startAt.toISOString() ?? ""}`}
         onDuty={!!shift}
         since={shift?.startAt.toISOString() ?? null}
       />
+
+      <AnnouncementCards />
 
       <div className="panel-dark p-5 grid grid-cols-2 gap-4">
         <div>

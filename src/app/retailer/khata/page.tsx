@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { formatINR, toPaise } from "@/lib/money";
 import { upiLink } from "@/lib/money-settings";
@@ -8,6 +8,8 @@ import { compressImage, uploadFile } from "@/lib/upload-client";
 import Icon from "@/components/Icon";
 import Link from "next/link";
 import CratesCard from "./CratesCard";
+import { OnlinePayPanel, OnlineRequests } from "./OnlinePay";
+import { listPayRequests, type PayList } from "@/components/pay/PayKit";
 
 type Bill = {
   id: string;
@@ -74,6 +76,7 @@ const METHOD: Record<string, string> = {
   UPI: "UPI",
   CHEQUE: "Cheque",
   BANK: "Bank",
+  ONLINE: "Paid online",
   WALLET: "Wallet",
   CREDIT_NOTE: "Credit note",
 };
@@ -99,13 +102,26 @@ function PaymentChip({ p }: { p: Payment }) {
   return <span className="chip chip-mint">Confirmed</span>;
 }
 
-export default function KhataPage() {
+/** Re-reads after the gateway sends the shop back (?paid=1): the webhook may take a little while. */
+const PAID_RELOADS = [4_000, 10_000, 18_000, 30_000];
+
+export default function KhataPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ paid?: string | string[]; razorpay_payment_link_status?: string | string[] }>;
+}) {
+  const { paid, razorpay_payment_link_status: gatewayStatus } = use(searchParams);
+  const backFromGateway = paid === "1";
+  // Razorpay adds its own status to the address it sends the shop back to.
+  const notFinished = backFromGateway && typeof gatewayStatus === "string" && gatewayStatus !== "paid";
   const [from, setFrom] = useState(() => istToday().slice(0, 8) + "01");
   const [to, setTo] = useState(istToday);
   const [data, setData] = useState<Khata | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
   const [thanks, setThanks] = useState<string | null>(null);
+  const [online, setOnline] = useState<PayList | null>(null);
+  const [payingOnline, setPayingOnline] = useState(false);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -122,6 +138,41 @@ export default function KhataPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Online payments are extra: the khata works without them.
+  const loadOnline = useCallback(
+    () =>
+      listPayRequests({ take: "5" })
+        .then(setOnline)
+        .catch(() => {}),
+    []
+  );
+
+  useEffect(() => {
+    let live = true;
+    listPayRequests({ take: "5" })
+      .then((d) => live && setOnline(d))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  // Back from the gateway: read the khata again a few times while the payment comes in.
+  const reload = useRef(load);
+  useEffect(() => {
+    reload.current = load;
+  }, [load]);
+  useEffect(() => {
+    if (!backFromGateway) return;
+    const timers = PAID_RELOADS.map((ms) =>
+      setTimeout(() => {
+        reload.current();
+        loadOnline();
+      }, ms)
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [backFromGateway, loadOnline]);
 
   if (!data) {
     return loadError ? (
@@ -141,6 +192,7 @@ export default function KhataPage() {
   const owes = balances.receivable;
   const creditUsed = Math.max(0, owes);
   const usedPct = terms.creditLimit ? Math.min(100, Math.round((creditUsed / terms.creditLimit) * 100)) : 0;
+  const canPayOnline = !!online?.on && online.retailerPay;
 
   return (
     <div className="space-y-5">
@@ -207,12 +259,37 @@ export default function KhataPage() {
           </p>
         )}
 
-        {!paying && (
-          <button className="btn btn-kesar w-full !min-h-[52px] text-base" onClick={() => { setPaying(true); setThanks(null); }}>
-            <Icon name="wallet" /> Pay now
-          </button>
+        {!paying && !payingOnline && (
+          <div className="space-y-2">
+            <button className="btn btn-kesar w-full !min-h-[52px] text-base" onClick={() => { setPaying(true); setThanks(null); }}>
+              <Icon name="wallet" /> Pay now
+            </button>
+            {canPayOnline && (
+              <>
+                <button className="btn btn-outline w-full !min-h-[52px] text-base" onClick={() => { setPayingOnline(true); setThanks(null); }}>
+                  <Icon name="card" /> Pay online
+                </button>
+                <p className="text-xs text-center text-white/60">Card, UPI or net banking. No UTR to type.</p>
+              </>
+            )}
+          </div>
         )}
       </div>
+
+      {notFinished ? (
+        <p className="rounded-xl bg-[var(--genda-tint)] text-[var(--genda-text)] p-3 text-sm font-semibold print:hidden" role="status">
+          The online payment was not finished. You can try again.
+        </p>
+      ) : backFromGateway && (
+        <div className="card p-4 flex items-start gap-3 print:hidden" role="status">
+          <span className="icon-tile bg-[var(--mint-tint)] text-[var(--mint-text)]">
+            <Icon name="check" />
+          </span>
+          <p className="text-sm text-[var(--ink-2)] pt-2">
+            <b>Payment received</b> — it shows here in a minute.
+          </p>
+        </div>
+      )}
 
       {thanks && (
         <div className="card p-4 flex items-start gap-3 print:hidden">
@@ -234,6 +311,12 @@ export default function KhataPage() {
           }}
         />
       )}
+
+      {payingOnline && (
+        <OnlinePayPanel dues={Math.max(0, owes)} prepaid={prepaid} onCancelAction={() => setPayingOnline(false)} />
+      )}
+
+      {online && <OnlineRequests requests={online.requests.slice(0, 5)} />}
 
       <CratesCard />
 
