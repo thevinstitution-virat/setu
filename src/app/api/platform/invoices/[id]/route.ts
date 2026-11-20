@@ -13,6 +13,8 @@ export async function PATCH(req: Request, ctx: RouteContext<"/api/platform/invoi
   try {
     let inv;
     if (body?.action === "paid") {
+      // Marking our own bill paid is money: owner only (support could otherwise give free service).
+      if (g.session.role !== "OWNER") return NextResponse.json({ error: "Only the platform owner can mark invoices paid" }, { status: 403 });
       const ref = String(body.ref ?? "").trim();
       if (!ref) return NextResponse.json({ error: "Enter the payment reference (UTR / UPI ref)" }, { status: 400 });
       inv = await markInvoicePaid(id, { ref, via: String(body.via ?? "bank transfer") });

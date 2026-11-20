@@ -20,6 +20,8 @@ export type MoneySettings = {
   /** UPI ID shown to retailers for "Pay now" (e.g. agency@okaxis). */
   upiVpa: string;
   upiPayeeName: string;
+  /** UPI and bank payments taken by field staff wait in "To verify" until the office checks the bank. */
+  checkFieldDigital: boolean;
 };
 
 export const MONEY_DEFAULTS: MoneySettings = {
@@ -31,6 +33,7 @@ export const MONEY_DEFAULTS: MoneySettings = {
   chequeBouncePenalty: 0,
   upiVpa: "",
   upiPayeeName: "",
+  checkFieldDigital: true,
 };
 
 export function moneySettings(settings: unknown): MoneySettings {
@@ -78,6 +81,7 @@ export function parseMoneySettings(input: Record<string, unknown>): Partial<Mone
   ])
     if (err) return err;
   if ("holdOnOverdue" in input) out.holdOnOverdue = !!input.holdOnOverdue;
+  if ("checkFieldDigital" in input) out.checkFieldDigital = !!input.checkFieldDigital;
   if ("upiVpa" in input) {
     const v = String(input.upiVpa ?? "").trim();
     if (v && !/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(v)) return "UPI ID looks wrong (example: agency@okaxis)";

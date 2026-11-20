@@ -17,6 +17,8 @@ import {
   supportSettings,
 } from "@/lib/engage-settings";
 import { parseReportSettings, reportSettings } from "@/lib/report-settings";
+import { automationSettings, parseAutomationSettings } from "@/lib/automation-settings";
+import { aiSettings, parseAiSettings } from "@/lib/ai-settings";
 import { channelStatus } from "@/lib/outbox";
 import { isStateCode, normaliseGstin, validGstin } from "@/lib/gst";
 import { invalidateTenantCache } from "@/lib/tenant";
@@ -35,7 +37,7 @@ export async function GET() {
   if (!auth.ok) return auth.res;
   const t = await asPlatform((tx) => tx.tenant.findUniqueOrThrow({ where: { id: auth.tenant.id }, select: { settings: true, ...BUSINESS } }));
   const { settings, ...business } = t;
-  return NextResponse.json({ money: moneySettings(settings), cart: cartSettings(settings), invoice: invoiceSettings(settings), delivery: deliverySettings(settings), inventory: inventorySettings(settings), field: fieldSettings(settings), notify: notifySettings(settings), support: supportSettings(settings), referral: referralSettings(settings), reports: reportSettings(settings), channels: channelStatus(), business });
+  return NextResponse.json({ money: moneySettings(settings), cart: cartSettings(settings), invoice: invoiceSettings(settings), delivery: deliverySettings(settings), inventory: inventorySettings(settings), field: fieldSettings(settings), notify: notifySettings(settings), support: supportSettings(settings), referral: referralSettings(settings), reports: reportSettings(settings), automation: automationSettings(settings), channels: channelStatus(), business });
 }
 
 const SECTIONS = {
@@ -49,6 +51,8 @@ const SECTIONS = {
   support: { read: supportSettings, parse: (i: Record<string, unknown>) => parseSupportSettings(i) },
   referral: { read: referralSettings, parse: (i: Record<string, unknown>) => parseReferralSettings(i) },
   reports: { read: reportSettings, parse: (i: Record<string, unknown>) => parseReportSettings(i) },
+  automation: { read: automationSettings, parse: (i: Record<string, unknown>) => parseAutomationSettings(i) },
+  ai: { read: aiSettings, parse: (i: Record<string, unknown>) => parseAiSettings(i) },
 } as const;
 
 function parseBusiness(b: Record<string, unknown>) {

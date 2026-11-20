@@ -131,6 +131,15 @@ export default function LoginCard({
             </Link>
           </p>
         )}
+        <p className="text-xs text-center text-[var(--muted)] mt-4">
+          <Link href="/legal/terms" className="hover:underline">
+            Terms
+          </Link>{" "}
+          ·{" "}
+          <Link href="/legal/privacy" className="hover:underline">
+            Privacy
+          </Link>
+        </p>
       </div>
     </div>
   );

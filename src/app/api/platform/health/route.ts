@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { asPlatform } from "@/lib/db";
 import { platformGuard } from "@/lib/platform-auth";
+import { goLiveReport } from "@/lib/golive";
 
 /**
  * Platform health: database, background jobs (failed in the last day, oldest
  * waiting), and per business the things that went wrong in the last day
  * (messages failed, webhooks given up, e-invoices failed), overdue bills and
- * pending deletions.
+ * pending deletions. Readiness: the go-live checks (src/lib/golive.ts).
  */
 export async function GET() {
   const g = await platformGuard();
@@ -54,5 +55,6 @@ export async function GET() {
   for (const r of data.hooks) row(r.tenantId).webhooksDead = r._count;
   for (const r of data.einv) row(r.tenantId).einvoiceFailed = r._count;
   for (const r of data.overdue) row(r.tenantId).overduePaise = r._sum.total ?? 0;
-  return NextResponse.json({ db: { ok: true, ms: dbMs }, jobs, tenants: [...issues.values()], deleting: data.deleting, paused: data.paused });
+  const readiness = await goLiveReport();
+  return NextResponse.json({ db: { ok: true, ms: dbMs }, jobs, readiness, tenants: [...issues.values()], deleting: data.deleting, paused: data.paused });
 }

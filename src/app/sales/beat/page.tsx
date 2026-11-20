@@ -7,6 +7,7 @@ import { ErrorBox, errText, useFetch } from "@/components/admin/AdminKit";
 import { addDay, istDay } from "@/lib/field-math";
 import { shopMapUrl } from "@/app/delivery/maps";
 import { NoOrderSheet, endVisit, reasonLabel, startVisit } from "@/components/field/VisitKit";
+import { VISIT_REASON, type VisitReason } from "@/lib/automation-math";
 import { FIELD_EVENT, clock, dayText, rupees, telHref, type DayRoute, type RouteShop, type Visit, type VisitsToday } from "@/components/field/kit";
 
 type FieldShop = { id: string; outletName: string; pinCode: string; area: string; phone: string | null; mine: boolean };
@@ -64,7 +65,7 @@ export default function BeatPage() {
     }
   }
 
-  const shown = new Set<string>([...(r?.route ?? []).map((s) => s.visit?.id), ...(r?.offRoute ?? []).map((v) => v.id)].filter(Boolean) as string[]);
+  const shown = new Set<string>([...(r?.route ?? []).map((s) => s.visit?.id), ...(r?.extra ?? []).map((s) => s.visit?.id), ...(r?.offRoute ?? []).map((v) => v.id)].filter(Boolean) as string[]);
   const actions = {
     isToday,
     open,
@@ -150,6 +151,23 @@ export default function BeatPage() {
                 <RouteRow key={s.retailer.id} shop={s} {...actions} />
               ))}
             </ol>
+          )}
+
+          {(r.extra?.length ?? 0) > 0 && (
+            <section className="space-y-2">
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="font-bold text-base">Also visit today</h2>
+                <span className="text-xs text-[var(--muted)]">
+                  {r.extraCovered ?? 0} of {r.extra!.length} visited
+                </span>
+              </div>
+              <p className="text-xs text-[var(--muted)]">Added by the office: shops that need you today.</p>
+              <ol className="space-y-3">
+                {r.extra!.map((s, i) => (
+                  <RouteRow key={s.retailer.id} shop={{ ...s, seq: r.route.length + i }} {...actions} />
+                ))}
+              </ol>
+            </section>
           )}
 
           {r.offRoute.length > 0 && (
@@ -254,6 +272,9 @@ function RouteRow({ shop, ...a }: { shop: RouteShop } & Actions) {
           <p className="text-xs text-[var(--muted)] truncate">
             {s.shopNumber}, {s.complexName} · {s.area?.name}
           </p>
+          {!!shop.reasons?.length && (
+            <p className="text-xs font-semibold text-[var(--kesar-text)] mt-0.5">{shop.reasons.map((x) => VISIT_REASON[x as VisitReason] ?? x).join(" · ")}</p>
+          )}
           {visit && (
             <p className="text-xs text-[var(--ink-2)] mt-0.5">
               In {clock(visit.checkInAt)}

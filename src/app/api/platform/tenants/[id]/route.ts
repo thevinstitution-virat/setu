@@ -89,6 +89,7 @@ export async function PATCH(req: Request, ctx: RouteContext<"/api/platform/tenan
       done.push(`plan → ${plan.code}`);
     }
     if (body.extendTrialDays !== undefined) {
+      if (!owner) return NextResponse.json({ error: "Only the platform owner can extend trials" }, { status: 403 });
       const days = Number(body.extendTrialDays);
       if (!Number.isInteger(days) || days < 1 || days > 60) return NextResponse.json({ error: "Extend by 1–60 days" }, { status: 400 });
       await asPlatform(async (tx) => {
@@ -128,6 +129,7 @@ export async function PATCH(req: Request, ctx: RouteContext<"/api/platform/tenan
       await setSuspended(id, true, String((body.suspend as { reason?: unknown }).reason ?? ""));
       done.push("suspended");
     } else if (body.reactivate === true) {
+      if (!owner) return NextResponse.json({ error: "Only the platform owner can un-pause a business" }, { status: 403 });
       await setSuspended(id, false, null);
       done.push("reactivated");
     }

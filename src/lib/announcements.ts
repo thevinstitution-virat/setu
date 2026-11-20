@@ -4,6 +4,7 @@ import type { Ctx } from "@/lib/ledger";
 import { MoneyError } from "@/lib/money-error";
 import { notify } from "@/lib/notify";
 import type { Channel } from "@/lib/engage-settings";
+import { keyBelongsTo } from "@/lib/storage";
 
 /**
  * Announcements: a notice to retailers in some areas / groups, or to staff
@@ -42,7 +43,8 @@ function parse(input: AnnouncementInput, now: Date) {
   const audience = (AUDIENCES as string[]).includes(String(input.audience)) ? (input.audience as AnnouncementAudience) : "RETAILERS";
   const roles = ids(input.roles).filter((r): r is Role => (STAFF_ROLES as string[]).includes(r));
   const link = text(input.link, 200) || null;
-  if (link && !link.startsWith("/")) throw fail("Link must be a page in this app, like /retailer/catalogue");
+  // A page in this app: "/x", never "//host" or "/\host" (browsers read those as another site).
+  if (link && !/^\/(?![/\\])/.test(link)) throw fail("Link must be a page in this app, like /retailer/catalogue");
   const startsAt = input.startsAt ? new Date(String(input.startsAt)) : now;
   const endsAt = input.endsAt ? new Date(String(input.endsAt)) : null;
   if (Number.isNaN(startsAt.getTime()) || (endsAt && Number.isNaN(endsAt.getTime()))) throw fail("Pick valid dates");
@@ -67,7 +69,7 @@ function parse(input: AnnouncementInput, now: Date) {
 
 export async function saveAnnouncement(ctx: Ctx, by: string, id: string | null, input: AnnouncementInput, now = new Date()) {
   const data = parse(input, now);
-  if (data.imageKey && !data.imageKey.startsWith(`t/${ctx.tenantId}/`)) throw fail("Bad image");
+  if (data.imageKey && !keyBelongsTo(data.imageKey, ctx.tenantId)) throw fail("Bad image");
   if (!id) return ctx.tx.announcement.create({ data: { ...data, createdById: by } });
   const a = await ctx.tx.announcement.findUnique({ where: { id } });
   if (!a) throw fail("Announcement not found", 404);
