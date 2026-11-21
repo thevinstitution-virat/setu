@@ -2,7 +2,10 @@
 
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import { landingContent } from "@/lib/i18n/landing-content";
+import { Logo } from "@/components/BrandMark";
 import { Confetti, CountUp } from "./use-landing";
+import { Phone } from "./pro/Devices";
+import { Toast } from "./pro/ProHero";
 
 /**
  * The product mock-ups shown beside the "problems we solve" tabs. They are
@@ -34,57 +37,80 @@ const Clock = () => (
   </svg>
 );
 
-/** Retailer's phone: catalogue, offer applied, place order. */
+/**
+ * "Orders by phone": the retailer types the list in a chat with the
+ * distributor's VBiz Pro order desk and gets a priced cart back to confirm.
+ */
 export function OrderVisual() {
   const { lang } = useLanguage();
   const c = landingContent[lang];
+  const hi = lang === "hi";
   return (
     <div className="vp-ordervis" role="img" aria-label={c.catalogue}>
-      <div className="vp-chat">
-        <span className="vp-bubble in">
-          {lang === "hi" ? "बासमती 4, सरसों तेल 6, अरहर दाल 4" : "Basmati 4, mustard oil 6, toor dal 4"}
-          <small>9:41</small>
-        </span>
-        <span className="vp-bubble out">
-          <b>VB-1042 · ₹4,133</b>
-          {c.offerApplied}
-          <small>9:41 ✓✓</small>
-        </span>
-      </div>
-      <div className="ls-phone vp-mini-phone">
-        <div className="ls-pscr">
-          <b style={{ fontSize: 13 }}>{c.shop}</b>
-          <small style={{ color: "rgba(255,255,255,.6)" }}>{c.catalogue}</small>
-          <div className="item">
-            <span className="thumb chip-kesar">🧺</span>
-            <span>
-              <b>{c.p1}</b>
-              <small>× 4</small>
-            </span>
-          </div>
-          <div className="item">
-            <span className="thumb chip-kesar">🛢️</span>
-            <span>
-              <b>{c.p2}</b>
-              <small>× 6</small>
-            </span>
-          </div>
-          <div className="item">
-            <span className="thumb chip-kesar">🫘</span>
-            <span>
-              <b>{c.p4}</b>
-              <small>× 4</small>
-            </span>
-          </div>
-          <small style={{ color: "var(--mint)" }}>{c.offerApplied}</small>
-          <div className="bigbtn">
-            {c.placeOrder}
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M5 12h14M13 6l6 6-6 6" />
+      <Phone bar={false} className="vp-phone-lg">
+        <div className="vp-chatapp">
+          <div className="vp-chat-h">
+            <svg className="vp-chat-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+              <path d="M15 5l-7 7 7 7" />
             </svg>
+            <span className="vp-chat-av">
+              <Logo kind="mark" height={14} />
+            </span>
+            <span>
+              <b>
+                {hi ? "ऑर्डर डेस्क" : "Order desk"}
+                <svg className="vp-chat-ok" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M7.5 12.5l3 3 6-6.5" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </b>
+              <small>{hi ? "VBiz Pro · तुरंत जवाब" : "VBiz Pro · replies instantly"}</small>
+            </span>
+          </div>
+          <div className="vp-chat-log">
+            <span className="vp-chat-day">{hi ? "आज" : "Today"}</span>
+            <span className="vp-msg out" style={{ "--i": 0 } as React.CSSProperties}>
+              {hi ? "बासमती 4, सरसों तेल 6, अरहर दाल 4" : "Basmati 4, mustard oil 6, toor dal 4"}
+              <small>9:41 ✓✓</small>
+            </span>
+            <div className="vp-msg in vp-msg-card" style={{ "--i": 1 } as React.CSSProperties}>
+              <span className="vp-msg-k">{hi ? "आपका कार्ट · VB-1042" : "Your cart · VB-1042"}</span>
+              {[
+                ["🧺", c.p1, 4],
+                ["🛢️", c.p2, 6],
+                ["🫘", c.p4, 4],
+              ].map(([e, n, q]) => (
+                <span className="vp-msg-line" key={n as string}>
+                  <i>{e}</i>
+                  <span>{n}</span>
+                  <em>× {q}</em>
+                </span>
+              ))}
+              <span className="vp-msg-offer">{c.offerApplied}</span>
+              <span className="vp-msg-tot">
+                <span>{hi ? "कुल (GST सहित)" : "Total (incl. GST)"}</span>
+                <b className="tnum">₹4,133</b>
+              </span>
+              <span className="vp-msg-btn">{hi ? "ऑर्डर पक्का करें" : "Confirm order"}</span>
+              <small>9:41</small>
+            </div>
+            <span className="vp-msg in vp-msg-done" style={{ "--i": 2 } as React.CSSProperties}>
+              {hi ? "✓ ऑर्डर पक्का · कल सुबह 11 बजे तक डिलीवरी" : "✓ Order confirmed · delivery by 11 am tomorrow"}
+              <small>9:42</small>
+            </span>
+          </div>
+          <div className="vp-chat-in" aria-hidden="true">
+            <span>{hi ? "संदेश लिखें या बोलें…" : "Type or say your order…"}</span>
+            <i>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                <rect x="9" y="3" width="6" height="11" rx="3" />
+                <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+              </svg>
+            </i>
           </div>
         </div>
-      </div>
+      </Phone>
+      <Toast t={[hi ? "ऑफ़िस में नया ऑर्डर" : "New order in the office", "VB-1042 · ₹4,133"]} side="r" icon="bell" />
     </div>
   );
 }

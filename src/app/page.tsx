@@ -6,6 +6,7 @@ import ProNav from "@/components/landing/pro/ProNav";
 import ProHero from "@/components/landing/pro/ProHero";
 import {
   CtaBand,
+  DeviceSuite,
   FaqSection,
   FeatureGrid,
   ProblemsSection,
@@ -36,6 +37,7 @@ export default async function Home() {
         <ProblemsSection />
         <RetailSection />
         <StatsBand />
+        <DeviceSuite />
         <FeatureGrid />
         <StepsSection />
         <FaqSection />

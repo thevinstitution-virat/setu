@@ -33,6 +33,7 @@ export type ProContent = {
   problems: { kick: string; title: string; sub: string; tabs: { tab: string; title: string; body: string; points: string[] }[] };
   retail: { kick: string; title: string; sub: string; items: { icon: IconKey; t: string; d: string }[] };
   statsKick: string;
+  suite: { kick: string; title: string; sub: string; live: string; counter: string; devices: { t: string; d: string }[] };
   grid: { kick: string; title: string; sub: string; items: { icon: IconKey; t: string; d: string }[] };
   steps: { kick: string; title: string };
   cta: { title: string; sub: string; primary: string; secondary: string };
@@ -159,6 +160,18 @@ export const proContent: Record<Lang, ProContent> = {
       ],
     },
     statsKick: "By design",
+    suite: {
+      kick: "Any screen",
+      title: "One app on every device",
+      sub: "The owner on a laptop, the office on a tablet, the field team on their phones — the same VBiz Pro, live on all of them. Nothing to install: open it in the browser or add it to the home screen.",
+      live: "Live on every device",
+      counter: "Counter tablet",
+      devices: [
+        { t: "Laptop and desktop", d: "The full dashboard, reports and billing" },
+        { t: "Tablet", d: "Dispatch board at the godown or the counter" },
+        { t: "Phone", d: "Beats, deliveries and orders on the road" },
+      ],
+    },
     grid: {
       kick: "Everything in one place",
       title: "Everything a distributor needs",
@@ -306,6 +319,18 @@ export const proContent: Record<Lang, ProContent> = {
       ],
     },
     statsKick: "बनावट से ही",
+    suite: {
+      kick: "हर स्क्रीन",
+      title: "हर डिवाइस पर एक ही ऐप",
+      sub: "मालिक लैपटॉप पर, ऑफ़िस टैबलेट पर, फ़ील्ड टीम फ़ोन पर — वही VBiz Pro, सब पर एक साथ लाइव। कुछ इंस्टॉल नहीं करना: ब्राउज़र में खोलें या होम स्क्रीन पर जोड़ें।",
+      live: "हर डिवाइस पर लाइव",
+      counter: "काउंटर टैबलेट",
+      devices: [
+        { t: "लैपटॉप और डेस्कटॉप", d: "पूरा डैशबोर्ड, रिपोर्ट और बिलिंग" },
+        { t: "टैबलेट", d: "गोदाम या काउंटर पर डिस्पैच बोर्ड" },
+        { t: "फ़ोन", d: "रास्ते में बीट, डिलीवरी और ऑर्डर" },
+      ],
+    },
     grid: {
       kick: "सब कुछ एक जगह",
       title: "डिस्ट्रीब्यूटर को जो चाहिए, सब",

@@ -9,6 +9,7 @@ import { Logo } from "@/components/BrandMark";
 import { useInView, useReducedMotion } from "../use-landing";
 import { Arrow, Check, Icon } from "./Icon";
 import { Coin, Dot, Mark, Parcel, RouteHub } from "./Deco";
+import { Phone } from "./Devices";
 
 const TICK = 6500;
 
@@ -129,7 +130,7 @@ function Showcase() {
           ) : (
             <div className="vp-phone-row">
               <Toast t={role.toasts[0]} side="l" icon={role.key === "retailer" ? "tag" : "pin"} />
-              <Phone>{role.key === "sales" ? <SalesScreen /> : role.key === "delivery" ? <DeliveryScreen /> : <RetailerScreen />}</Phone>
+              <Phone sub={role.label}>{role.key === "sales" ? <SalesScreen /> : role.key === "delivery" ? <DeliveryScreen /> : <RetailerScreen />}</Phone>
               <Toast t={role.toasts[1]} side="r" icon={role.key === "delivery" ? "wallet" : role.key === "retailer" ? "truck" : "cart"} />
             </div>
           )}
@@ -179,15 +180,6 @@ function Browser({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Phone({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="vp-phone">
-      <span className="vp-phone-notch" aria-hidden="true" />
-      <div className="vp-phone-scr">{children}</div>
-    </div>
-  );
-}
-
 function AppShell({ active, title, children }: { active: number; title: string; children: React.ReactNode }) {
   const { lang } = useLanguage();
   const m = proContent[lang].mock;
@@ -218,7 +210,7 @@ function AppShell({ active, title, children }: { active: number; title: string; 
 type St = "placed" | "packed" | "onWay" | "delivered";
 const ST_CLASS: Record<St, string> = { placed: "chip-mor", packed: "chip-genda", onWay: "chip-kesar", delivered: "chip-mint" };
 
-function OwnerScreen() {
+export function OwnerScreen() {
   const { lang } = useLanguage();
   const m = proContent[lang].mock;
   const c = landingContent[lang];
@@ -288,7 +280,7 @@ function OwnerScreen() {
   );
 }
 
-function OfficeScreen() {
+export function OfficeScreen() {
   const { lang } = useLanguage();
   const m = proContent[lang].mock;
   const c = landingContent[lang];
@@ -331,7 +323,7 @@ function OfficeScreen() {
   );
 }
 
-function SalesScreen() {
+export function SalesScreen() {
   const { lang } = useLanguage();
   const m = proContent[lang].mock;
   const c = landingContent[lang];

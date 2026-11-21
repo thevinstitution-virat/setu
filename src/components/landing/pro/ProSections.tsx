@@ -10,7 +10,8 @@ import { CountUp } from "../use-landing";
 import { BeatVisual, BillVisual, InventoryVisual, MapVisual, OrderVisual } from "../Visuals";
 import { Arrow, Check, Icon } from "./Icon";
 import { ProLogo } from "./ProNav";
-import { Phone, RetailerScreen, Toast } from "./ProHero";
+import { OfficeScreen, OwnerScreen, RetailerScreen, SalesScreen, Toast } from "./ProHero";
+import { AppBar, Laptop, Phone, Tablet } from "./Devices";
 import { Coin, Dot, Mark, Parcel, RouteHub, TrendLine } from "./Deco";
 
 const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
@@ -116,7 +117,10 @@ export function RetailSection() {
         <div className="vp-retail-vis ls-rv">
           <RouteHub className="vp-retail-hub" />
           <Parcel className="vp-retail-parcel" />
-          <Phone>
+          <Tablet className="vp-retail-tab">
+            <CounterScreen />
+          </Tablet>
+          <Phone sub={retailer.label}>
             <RetailerScreen />
           </Phone>
           <Toast t={retailer.toasts[0]} side="tl" icon="tag" />
@@ -140,6 +144,125 @@ export function RetailSection() {
             ))}
           </ul>
         </div>
+      </div>
+    </section>
+  );
+}
+
+/** The retailer's catalogue on a counter tablet: product tiles and the cart. */
+function CounterScreen() {
+  const { lang } = useLanguage();
+  const c = landingContent[lang];
+  const m = proContent[lang].mock;
+  const items = [
+    { e: "🧺", n: c.p1, pr: "₹585", q: 4 },
+    { e: "🛢️", n: c.p2, pr: "₹172", q: 6 },
+    { e: "🌾", n: c.p3, pr: "₹412", q: 0 },
+    { e: "🫘", n: c.p4, pr: "₹148", q: 4 },
+    { e: "🧂", n: lang === "hi" ? "नमक 1 किलो" : "Salt 1 kg", pr: "₹24", q: 0 },
+    { e: "🍵", n: lang === "hi" ? "चाय पत्ती 500 ग्रा" : "Tea 500 g", pr: "₹265", q: 0 },
+  ];
+  return (
+    <div className="vp-counter">
+      <AppBar sub={`${c.shop} · ${proContent[lang].suite.counter}`} />
+      <div className="vp-counter-in">
+        <div>
+          <div className="vp-counter-h">
+            <b>{c.catalogue}</b>
+            <span className="vp-ps-offer">
+              <Icon name="tag" />
+              {m.offer}
+            </span>
+          </div>
+          <div className="vp-counter-grid">
+            {items.map((it, k) => (
+              <div className={`vp-counter-card ${it.q ? "on" : ""}`} key={it.n} style={{ "--i": k } as React.CSSProperties}>
+                <span className="vp-counter-th">{it.e}</span>
+                <b>{it.n}</b>
+                <span className="vp-counter-row">
+                  <small>{it.pr}</small>
+                  {it.q ? <em>× {it.q}</em> : <i>+</i>}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <aside className="vp-counter-cart">
+          <b>{m.cart}</b>
+          {items
+            .filter((it) => it.q)
+            .map((it) => (
+              <span key={it.n}>
+                <span>{it.n}</span>
+                <em>× {it.q}</em>
+              </span>
+            ))}
+          <small>{c.offerApplied}</small>
+          <span className="vp-counter-tot">
+            <span>{c.total}</span>
+            <b className="tnum">₹4,133</b>
+          </span>
+          <span className="vp-ps-btn">{m.placeOrder}</span>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+const DEVICE_ICONS = [
+  <svg key="l" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="4" y="4" width="16" height="11" rx="1.5" />
+    <path d="M2 19h20" />
+  </svg>,
+  <svg key="t" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
+    <path d="M18.5 12h.01" />
+  </svg>,
+  <svg key="p" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="7" y="2.5" width="10" height="19" rx="2.5" />
+    <path d="M11 18.5h2" />
+  </svg>,
+];
+
+/** The same app on a laptop, a tablet and a phone at once. */
+export function DeviceSuite() {
+  const { lang } = useLanguage();
+  const s = proContent[lang].suite;
+  const roles = proContent[lang].roles;
+  return (
+    <section className="vp-sec vp-suite-sec" id="devices">
+      <div className="vp-wrap">
+        <div className="vp-head center ls-rv">
+          <span className="vp-kick">{s.kick}</span>
+          <h2 className="vp-h2">{s.title}</h2>
+          <p className="vp-sub">{s.sub}</p>
+        </div>
+        <div className="vp-suite ls-rv" role="img" aria-label={s.title}>
+          <span className="vp-suite-live">
+            <span className="ls-ldot" />
+            {s.live}
+          </span>
+          <Laptop className="vp-suite-laptop">
+            <OwnerScreen />
+          </Laptop>
+          <Tablet className="vp-suite-tablet">
+            <OfficeScreen />
+          </Tablet>
+          <Phone className="vp-suite-phone" sub={roles.find((r) => r.key === "sales")!.label}>
+            <SalesScreen />
+          </Phone>
+        </div>
+        <ul className="vp-suite-list ls-rv">
+          {s.devices.map((d, k) => (
+            <li key={d.t} style={{ "--i": k } as React.CSSProperties}>
+              <span className="vp-suite-ic">{DEVICE_ICONS[k]}</span>
+              <span>
+                <b>{d.t}</b>
+                <small>{d.d}</small>
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );
