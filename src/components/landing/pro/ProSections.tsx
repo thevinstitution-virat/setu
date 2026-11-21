@@ -9,7 +9,8 @@ import LanguageToggle from "@/components/LanguageToggle";
 import { CountUp } from "../use-landing";
 import { BeatVisual, BillVisual, InventoryVisual, MapVisual, OrderVisual } from "../Visuals";
 import { Arrow, Check, Icon } from "./Icon";
-import { ProLogo } from "./ProNav";
+import { Logo } from "@/components/BrandMark";
+import { APP_NAME } from "@/lib/brand";
 import { OfficeScreen, OwnerScreen, RetailerScreen, SalesScreen, Toast } from "./ProHero";
 import { AppBar, Laptop, Phone, Tablet } from "./Devices";
 import { Coin, Dot, Mark, Parcel, RouteHub, TrendLine } from "./Deco";
@@ -409,54 +410,131 @@ export function CtaBand() {
   );
 }
 
+const CONTACT_PHONE = process.env.NEXT_PUBLIC_CONTACT_PHONE || "+91 93109 59596";
+
+function FootIcon({ d }: { d: string }) {
+  return (
+    <span className="vp-foot-ic" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d={d} />
+      </svg>
+    </span>
+  );
+}
+
+const ICON = {
+  phone: "M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z",
+  chat: "M21 11.5a8.4 8.4 0 0 1-12.3 7.4L3 21l2.1-5.6A8.4 8.4 0 1 1 21 11.5z",
+  mail: "M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM3 7l9 6 9-6",
+  pin: "M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21zM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z",
+};
+
 export function ProFooter() {
   const { lang } = useLanguage();
-  const c = landingContent[lang];
   const p = proContent[lang];
+  const f = p.foot;
+  const year = new Date().getFullYear();
+  const product = [
+    { href: "#product", label: p.nav.features },
+    { href: "#solutions", label: p.nav.problems },
+    { href: "#features", label: p.grid.kick },
+    { href: "#devices", label: f.devices },
+    { href: "#how", label: p.nav.how },
+    { href: "#faq", label: p.nav.faq },
+  ];
   return (
-    <footer className="vp-foot">
+    <footer className="vp-foot" id="contact">
+      <Mark className="vp-foot-wm" light />
       <div className="vp-wrap vp-foot-grid">
         <div className="vp-foot-brand">
-          <ProLogo stacked />
-          <p>{c.footTag}</p>
-          <LanguageToggle />
+          <a href="#top" className="vp-foot-logo" aria-label={APP_NAME}>
+            <Logo kind="onDark" height={38} />
+          </a>
+          <p>{f.about}</p>
+          <ul className="vp-foot-chips">
+            {f.chips.map((c) => (
+              <li key={c}>{c}</li>
+            ))}
+          </ul>
+          <span className="vp-foot-badge">
+            <i aria-hidden="true" />
+            {f.badge}
+          </span>
+          <div className="vp-foot-lang">
+            <LanguageToggle />
+          </div>
         </div>
-        <nav aria-label={c.footExplore}>
-          <h3>{c.footExplore}</h3>
-          <a href="#product">{p.nav.features}</a>
-          <a href="#solutions">{p.nav.problems}</a>
-          <a href="#features">{p.grid.kick}</a>
-          <a href="#how">{p.nav.how}</a>
+        <nav aria-label={f.product}>
+          <h3>{f.product}</h3>
+          {product.map((l) => (
+            <a key={l.href} href={l.href}>
+              {l.label}
+            </a>
+          ))}
         </nav>
-        <nav aria-label={c.footStart}>
-          <h3>{c.footStart}</h3>
+        <div>
+          <h3>{f.builtFor}</h3>
+          <ul className="vp-foot-list">
+            {p.trust.items.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        </div>
+        <nav aria-label={f.start}>
+          <h3>{f.start}</h3>
           <Link href="/start">{p.hero.cta1}</Link>
-          <Link href="/login">{c.signIn}</Link>
-          <a href="#faq">{p.nav.faq}</a>
+          <Link href="/login">{landingContent[lang].signIn}</Link>
+          <Link href="/legal/terms">{f.terms}</Link>
+          <Link href="/legal/privacy">{f.privacy}</Link>
         </nav>
-        {(WHATSAPP_NUMBER || CONTACT_EMAIL) && (
-          <nav aria-label={c.footTalk}>
-            <h3>{c.footTalk}</h3>
-            {WHATSAPP_NUMBER && (
-              <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noopener noreferrer">
-                {c.ctaWa}
-              </a>
-            )}
-            {CONTACT_EMAIL && <a href={`mailto:${CONTACT_EMAIL}`}>{c.footEmail}</a>}
-          </nav>
-        )}
+        <div className="vp-foot-contact">
+          <h3>{f.contact}</h3>
+          <a href={`tel:${CONTACT_PHONE.replace(/\s/g, "")}`}>
+            <FootIcon d={ICON.phone} />
+            <span>
+              <small>{f.call}</small>
+              {CONTACT_PHONE}
+            </span>
+          </a>
+          {WHATSAPP_NUMBER && (
+            <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noopener noreferrer">
+              <FootIcon d={ICON.chat} />
+              <span>
+                <small>{f.whatsapp}</small>+{WHATSAPP_NUMBER}
+              </span>
+            </a>
+          )}
+          {CONTACT_EMAIL && (
+            <a href={`mailto:${CONTACT_EMAIL}`}>
+              <FootIcon d={ICON.mail} />
+              <span>
+                <small>{f.email}</small>
+                {CONTACT_EMAIL}
+              </span>
+            </a>
+          )}
+          <p>
+            <FootIcon d={ICON.pin} />
+            <span>{f.address}</span>
+          </p>
+        </div>
       </div>
       <div className="vp-wrap vp-foot-bar">
-        <span>
-          © {new Date().getFullYear()} {c.footProduct}
-        </span>
+        <span>{f.brandLine}</span>
         <span className="vp-foot-links">
-          <a href="https://vgraphics.in" target="_blank" rel="noopener noreferrer">
-            {c.footDesign}
-          </a>
-          <a href="/legal/terms">Terms</a>
-          <a href="/legal/privacy">Privacy</a>
+          <Link href="/legal/terms">{f.terms}</Link>
+          <Link href="/legal/privacy">{f.privacy}</Link>
+          <Link href="/login">{landingContent[lang].signIn}</Link>
         </span>
+      </div>
+      <div className="vp-wrap vp-foot-legal">
+        <p>PAN: AAMCV2938B · GSTIN: 07AAMCV2938B1ZA · ISO 9001:2015 Certified</p>
+        <p>
+          © {year} VPD Vastus Ventures Pvt. Ltd. {f.rights} · {f.designedBy}{" "}
+          <a href="https://vgraphics.in" target="_blank" rel="noopener noreferrer">
+            VGraphics.in
+          </a>
+        </p>
       </div>
     </footer>
   );

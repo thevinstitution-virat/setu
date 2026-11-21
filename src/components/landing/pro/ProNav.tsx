@@ -10,10 +10,10 @@ import { Logo } from "@/components/BrandMark";
 import { APP_NAME } from "@/lib/brand";
 import { Arrow } from "./Icon";
 
-export function ProLogo({ stacked }: { stacked?: boolean }) {
+export function ProLogo() {
   return (
-    <a className={`vp-logo ${stacked ? "stacked" : ""}`} href="#top" aria-label={APP_NAME}>
-      {stacked ? <Logo kind="stacked" height={96} /> : <Logo kind="wide" height={34} priority />}
+    <a className="vp-logo" href="#top" aria-label={APP_NAME}>
+      <Logo kind="wide" height={34} priority />
     </a>
   );
 }

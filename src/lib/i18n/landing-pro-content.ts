@@ -34,6 +34,25 @@ export type ProContent = {
   retail: { kick: string; title: string; sub: string; items: { icon: IconKey; t: string; d: string }[] };
   statsKick: string;
   suite: { kick: string; title: string; sub: string; live: string; counter: string; devices: { t: string; d: string }[] };
+  foot: {
+    about: string;
+    chips: string[];
+    badge: string;
+    product: string;
+    devices: string;
+    builtFor: string;
+    start: string;
+    contact: string;
+    call: string;
+    whatsapp: string;
+    email: string;
+    address: string;
+    terms: string;
+    privacy: string;
+    brandLine: string;
+    rights: string;
+    designedBy: string;
+  };
   grid: { kick: string; title: string; sub: string; items: { icon: IconKey; t: string; d: string }[] };
   steps: { kick: string; title: string };
   cta: { title: string; sub: string; primary: string; secondary: string };
@@ -160,6 +179,25 @@ export const proContent: Record<Lang, ProContent> = {
       ],
     },
     statsKick: "By design",
+    foot: {
+      about: "Distribution management software for distributors, stockists and wholesalers — orders, stock, sales beats, GST billing, delivery and payments in one app, for the whole team.",
+      chips: ["GST-ready billing", "English + हिंदी", "Laptop, tablet and phone"],
+      badge: "Made in India, for Indian distribution",
+      product: "Product",
+      devices: "Every device",
+      builtFor: "Built for",
+      start: "Get started",
+      contact: "Contact",
+      call: "Call us",
+      whatsapp: "WhatsApp us",
+      email: "Email us",
+      address: "VPD Vastus Ventures Pvt. Ltd., 2nd Floor, Property No. 44, Regal Building, Connaught Place, New Delhi — 110090",
+      terms: "Terms of use",
+      privacy: "Privacy policy",
+      brandLine: "VBiz Pro is a product of VPD Vastus Ventures Private Limited.",
+      rights: "All rights reserved.",
+      designedBy: "Designed by",
+    },
     suite: {
       kick: "Any screen",
       title: "One app on every device",
@@ -319,6 +357,25 @@ export const proContent: Record<Lang, ProContent> = {
       ],
     },
     statsKick: "बनावट से ही",
+    foot: {
+      about: "डिस्ट्रीब्यूटर, स्टॉकिस्ट और होलसेलर के लिए डिस्ट्रीब्यूशन मैनेजमेंट सॉफ़्टवेयर — ऑर्डर, स्टॉक, सेल्स बीट, GST बिलिंग, डिलीवरी और पेमेंट, पूरी टीम के लिए एक ऐप में।",
+      chips: ["GST वाली बिलिंग", "English + हिंदी", "लैपटॉप, टैबलेट और फ़ोन"],
+      badge: "भारत में बना, भारतीय डिस्ट्रीब्यूशन के लिए",
+      product: "प्रोडक्ट",
+      devices: "हर डिवाइस",
+      builtFor: "किनके लिए",
+      start: "शुरू करें",
+      contact: "संपर्क",
+      call: "कॉल करें",
+      whatsapp: "WhatsApp करें",
+      email: "ईमेल करें",
+      address: "VPD Vastus Ventures Pvt. Ltd., दूसरी मंज़िल, प्रॉपर्टी नं. 44, रीगल बिल्डिंग, कनॉट प्लेस, नई दिल्ली — 110090",
+      terms: "उपयोग की शर्तें",
+      privacy: "प्राइवेसी नीति",
+      brandLine: "VBiz Pro, VPD Vastus Ventures Private Limited का एक प्रोडक्ट है।",
+      rights: "सर्वाधिकार सुरक्षित।",
+      designedBy: "डिज़ाइन",
+    },
     suite: {
       kick: "हर स्क्रीन",
       title: "हर डिवाइस पर एक ही ऐप",

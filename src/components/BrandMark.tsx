@@ -5,13 +5,15 @@ import { APP_NAME } from "@/lib/brand";
  * VBiz Pro logo files (public/brand), vector, viewBox trimmed to the artwork.
  * Two colours only: saffron #DB5C17 + ink #0F2A2A. The brand uses no tagline.
  * - vbiz-logo.svg          V mark + "VBiz Pro" on one line (headers)
- * - vbiz-logo-white.svg    same, all white (dark backgrounds)
+ * - vbiz-logo-white.svg    same, all white (one-colour use)
+ * - vbiz-logo-ondark.svg   saffron V + white name (dark backgrounds)
  * - vbiz-logo-stacked.svg  mark above the name (footer)
  * - vbiz-mark.svg          the V mark alone (tiles, small spots)
  */
 export const LOGO = {
   wide: { src: "/brand/vbiz-logo.svg", w: 380, h: 74.4 },
   white: { src: "/brand/vbiz-logo-white.svg", w: 380, h: 74.4 },
+  onDark: { src: "/brand/vbiz-logo-ondark.svg", w: 380, h: 74.4 },
   stacked: { src: "/brand/vbiz-logo-stacked.svg", w: 227, h: 180.4 },
   mark: { src: "/brand/vbiz-mark.svg", w: 82, h: 66.8 },
 } as const;
