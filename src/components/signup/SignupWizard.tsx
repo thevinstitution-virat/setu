@@ -785,7 +785,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <div className="w-full max-w-lg">
         <div className="flex items-center justify-between gap-3 mb-6">
           <Link href="/" aria-label="VBiz Pro home" className="min-w-0">
-            <BrandLockup tagline />
+            <BrandLockup large />
           </Link>
         </div>
         {children}

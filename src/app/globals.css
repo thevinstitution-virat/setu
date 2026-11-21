@@ -113,8 +113,8 @@ h3 {
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 14px 30px -20px rgba(15, 42, 42, 0.35);
 }
 
-/* Brand artwork in a card's corners (sign-in, sign-up): the logo's sun + cart
-   top-right and its rising "V" bottom-left, faint, behind the content. */
+/* Brand artwork in a card's corners (sign-in, sign-up): a route hub (one
+   distributor, many shops) top-right and the V mark bottom-left, faint. */
 .card-deco {
   position: relative;
   overflow: hidden;
@@ -134,15 +134,15 @@ h3 {
   top: -22px;
   width: 132px;
   height: 116px;
-  background-image: url("/brand/deco-cart.svg");
-  opacity: 0.16;
+  background-image: url("/brand/deco-hub.svg");
+  opacity: 0.14;
 }
 .card-deco::after {
   left: -18px;
   bottom: -22px;
   width: 84px;
   height: 84px;
-  background-image: url("/brand/deco-rise.svg");
+  background-image: url("/brand/deco-mark.svg");
   opacity: 0.1;
 }
 

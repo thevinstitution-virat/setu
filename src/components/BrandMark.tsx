@@ -2,17 +2,18 @@ import Image from "next/image";
 import { APP_NAME } from "@/lib/brand";
 
 /**
- * VBiz Pro logo files (public/brand), cut from the master artwork:
- * - vbiz-logo.png          cart + "VbIZ PRO", no tagline (headers, 653×192)
- * - vbiz-logo-tagline.png  same with "Uttiṣṭhata ✻ Jāgrata ✻ Prāpya" (sign-in pages, 759×240)
- * - vbiz-logo-stacked.png  cart above the name, with tagline (footer, 597×400)
- * - vbiz-mark.png          the "V" with its dot, for small square spots (234×256)
+ * VBiz Pro logo files (public/brand), vector, viewBox trimmed to the artwork.
+ * Two colours only: saffron #DB5C17 + ink #0F2A2A. The brand uses no tagline.
+ * - vbiz-logo.svg          V mark + "VBiz Pro" on one line (headers)
+ * - vbiz-logo-white.svg    same, all white (dark backgrounds)
+ * - vbiz-logo-stacked.svg  mark above the name (footer)
+ * - vbiz-mark.svg          the V mark alone (tiles, small spots)
  */
 export const LOGO = {
-  wide: { src: "/brand/vbiz-logo.png", w: 653, h: 192 },
-  tagline: { src: "/brand/vbiz-logo-tagline.png", w: 759, h: 240 },
-  stacked: { src: "/brand/vbiz-logo-stacked.png", w: 597, h: 400 },
-  mark: { src: "/brand/vbiz-mark.png", w: 234, h: 256 },
+  wide: { src: "/brand/vbiz-logo.svg", w: 380, h: 74.4 },
+  white: { src: "/brand/vbiz-logo-white.svg", w: 380, h: 74.4 },
+  stacked: { src: "/brand/vbiz-logo-stacked.svg", w: 227, h: 180.4 },
+  mark: { src: "/brand/vbiz-mark.svg", w: 82, h: 66.8 },
 } as const;
 
 type LogoKind = keyof typeof LOGO;
@@ -28,6 +29,7 @@ export function Logo({ kind = "wide", height, className, priority }: { kind?: Lo
       width={width}
       height={height}
       priority={priority}
+      unoptimized
       className={className}
       style={{ width, height, maxWidth: "100%", objectFit: "contain" }}
     />
@@ -47,7 +49,7 @@ export function BrandMark({ size = 36 }: { size?: number }) {
         boxShadow: "0 8px 18px -12px rgba(15,42,42,.45)",
       }}
     >
-      <Image src={LOGO.mark.src} alt="" width={Math.round(size * 0.62)} height={Math.round(size * 0.68)} style={{ width: "auto", height: size * 0.68 }} />
+      <Image src={LOGO.mark.src} alt="" unoptimized width={Math.round(size * 0.62)} height={Math.round(size * 0.5)} style={{ width: "auto", height: size * 0.5 }} />
     </span>
   );
 }
@@ -55,26 +57,26 @@ export function BrandMark({ size = 36 }: { size?: number }) {
 /**
  * Our own logo, or — for a business on its own brand (white label, Phase 9) —
  * that business's logo and name. `sub` is a small label beside our logo (the
- * signed-in role); `tagline` uses the logo with the tagline line.
+ * signed-in role); `large` is the bigger size for sign-in pages.
  */
 export function BrandLockup({
   size = 36,
   sub,
   name,
   logoUrl,
-  tagline,
+  large,
 }: {
   size?: number;
   sub?: string;
   name?: string;
   logoUrl?: string | null;
-  tagline?: boolean;
+  large?: boolean;
 }) {
   const own = !name || name === APP_NAME;
   if (own && !logoUrl) {
     return (
       <span className="flex items-center gap-3 min-w-0">
-        <Logo kind={tagline ? "tagline" : "wide"} height={tagline ? Math.round(size * 1.45) : Math.round(size * 1.05)} priority />
+        <Logo kind="wide" height={Math.round(size * (large ? 0.95 : 0.78))} priority />
         {sub && (
           <span className="hidden sm:block border-l border-[var(--line)] pl-3 text-[12px] font-bold leading-tight text-[var(--muted)] whitespace-nowrap">
             {sub}

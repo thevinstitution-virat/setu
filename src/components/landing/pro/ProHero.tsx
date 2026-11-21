@@ -8,7 +8,7 @@ import { proContent } from "@/lib/i18n/landing-pro-content";
 import { Logo } from "@/components/BrandMark";
 import { useInView, useReducedMotion } from "../use-landing";
 import { Arrow, Check, Icon } from "./Icon";
-import { CartSun, Coin, Dot, Parcel, RiseArrow } from "./Deco";
+import { Coin, Dot, Mark, Parcel, RouteHub } from "./Deco";
 
 const TICK = 6500;
 
@@ -20,8 +20,8 @@ export default function ProHero() {
     <header className="vp-hero" id="top-hero">
       <div className="vp-hero-bg" aria-hidden="true" />
       <div className="vp-hero-deco" aria-hidden="true">
-        <CartSun className="d1" />
-        <RiseArrow className="d2" />
+        <RouteHub className="d1" />
+        <Mark className="d2" />
         <Coin className="d3" />
         <Parcel className="d4" />
         <Dot className="d5" />
@@ -195,7 +195,7 @@ function AppShell({ active, title, children }: { active: number; title: string; 
     <div className="vp-app">
       <aside className="vp-side" aria-hidden="true">
         <span className="vp-side-logo">
-          <Logo kind="mark" height={22} />
+          <Logo kind="mark" height={17} />
         </span>
         {m.menu.map((x, k) => (
           <span key={x} className={k === active ? "on" : ""}>

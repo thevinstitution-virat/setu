@@ -13,7 +13,7 @@ import { Arrow } from "./Icon";
 export function ProLogo({ stacked }: { stacked?: boolean }) {
   return (
     <a className={`vp-logo ${stacked ? "stacked" : ""}`} href="#top" aria-label={APP_NAME}>
-      {stacked ? <Logo kind="stacked" height={112} /> : <Logo kind="wide" height={56} priority />}
+      {stacked ? <Logo kind="stacked" height={96} /> : <Logo kind="wide" height={34} priority />}
     </a>
   );
 }

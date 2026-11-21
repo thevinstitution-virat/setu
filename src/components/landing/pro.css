@@ -145,7 +145,7 @@ html.ls-scrolled .vp-nav {
 }
 @media (max-width: 760px) {
   .vp-nav .vp-logo img {
-    height: 46px !important;
+    height: 28px !important;
     width: auto !important;
   }
 }
@@ -559,7 +559,7 @@ html.ls-scrolled .vp-nav {
 }
 .vp-side-logo img {
   width: auto !important;
-  height: 22px !important;
+  height: 17px !important;
 }
 .vp-side > span:not(.vp-side-logo) {
   padding: 9px 12px;
@@ -2244,19 +2244,14 @@ html.ls-ready .vp-steps.ls-rv[data-in] li::before {
 }
 
 /* ==========================================================================
-   Logo-language artwork (Deco.tsx): sun + cart, rising V, coin, parcel, dot
+   Logo-language artwork (Deco.tsx): V mark, route hub, coin, parcel, dot —
+   saffron + ink only, like the logo
    ========================================================================== */
-.vp {
-  --vb-red: #ed3237;
-  --vb-blue: #054099;
-  --vb-yellow: #fbac26;
-  --vb-violet: #721cc8;
-}
 .vp-dot {
   display: block;
   border-radius: 50%;
-  background: linear-gradient(135deg, #3f8cff, #721cc8);
-  box-shadow: 0 10px 20px -8px rgba(114, 28, 200, 0.6);
+  background: linear-gradient(135deg, #f0803f, var(--kesar-mid));
+  box-shadow: 0 10px 20px -8px rgba(219, 92, 23, 0.6);
 }
 @keyframes vp-float {
   50% {
@@ -2343,8 +2338,8 @@ html.ls-ready .vp-steps.ls-rv[data-in] li::before {
   animation: vp-float 5s ease-in-out infinite;
 }
 
-/* Retail: sun + cart behind the phone, parcel top-right */
-.vp-retail-sun {
+/* Retail: route hub behind the phone, parcel top-right */
+.vp-retail-hub {
   position: absolute;
   left: -22px;
   bottom: -18px;
@@ -2366,7 +2361,7 @@ html.ls-ready .vp-steps.ls-rv[data-in] li::before {
   z-index: 1;
 }
 
-/* Stats: trend line drawn on reveal + faint cart */
+/* Stats: trend line drawn on reveal + faint route hub */
 .vp-stats-trend {
   position: absolute;
   left: 0;
@@ -2374,8 +2369,8 @@ html.ls-ready .vp-steps.ls-rv[data-in] li::before {
   bottom: 18px;
   width: 100%;
   height: 120px;
-  color: var(--genda);
-  opacity: 0.35;
+  color: var(--kesar);
+  opacity: 0.45;
 }
 .vp-stats-trend path {
   stroke-dasharray: 1;
@@ -2385,30 +2380,29 @@ html.ls-ready .vp-steps.ls-rv[data-in] li::before {
 html.ls-ready .vp-stats.ls-rv:not([data-in]) .vp-stats-trend path {
   stroke-dashoffset: 1;
 }
-.vp-stats-cart {
+.vp-stats-hub {
   position: absolute;
   right: -30px;
   top: -24px;
   width: 260px;
-  opacity: 0.1;
-  filter: grayscale(1) brightness(3);
+  opacity: 0.16;
 }
 
-/* Feature cards: a colour from the logo per card + a big faint icon */
+/* Feature cards: saffron and teal by turn + a big faint icon */
 .vp-gcard {
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  --tone: var(--vb-red);
+  --tone: var(--kesar);
 }
 .vp-gcard[data-tone="1"] {
-  --tone: var(--vb-blue);
+  --tone: var(--mor);
 }
 .vp-gcard[data-tone="2"] {
-  --tone: #d98a00;
+  --tone: var(--kesar-dark);
 }
 .vp-gcard[data-tone="3"] {
-  --tone: var(--vb-violet);
+  --tone: var(--ink);
 }
 .vp-gcard::before {
   content: "";
@@ -2474,19 +2468,19 @@ html.ls-ready .vp-stats.ls-rv:not([data-in]) .vp-stats-trend path {
 }
 
 /* CTA band */
-.vp-cta-in > :not(.vp-cta-cart):not(.vp-cta-rise):not(.vp-cta-dot) {
+.vp-cta-in > :not(.vp-cta-hub):not(.vp-cta-mark):not(.vp-cta-dot) {
   position: relative;
   z-index: 1;
 }
-.vp-cta-cart {
+.vp-cta-hub {
   position: absolute;
   right: -10px;
   bottom: -26px;
   width: 230px;
-  opacity: 0.95;
+  opacity: 0.55;
   animation: vp-float 8s ease-in-out infinite;
 }
-.vp-cta-rise {
+.vp-cta-mark {
   position: absolute;
   left: 36px;
   top: 30px;
@@ -2503,11 +2497,11 @@ html.ls-ready .vp-stats.ls-rv:not([data-in]) .vp-stats-trend path {
   animation: vp-float 5s ease-in-out infinite;
 }
 @media (max-width: 900px) {
-  .vp-cta-cart {
+  .vp-cta-hub {
     width: 140px;
-    opacity: 0.35;
+    opacity: 0.3;
   }
-  .vp-cta-rise {
+  .vp-cta-mark {
     width: 56px;
     opacity: 0.5;
     left: 16px;
@@ -2517,6 +2511,6 @@ html.ls-ready .vp-stats.ls-rv:not([data-in]) .vp-stats-trend path {
 
 /* Footer stacked logo */
 .vp-logo.stacked img {
-  height: 112px;
+  height: 96px;
   width: auto;
 }

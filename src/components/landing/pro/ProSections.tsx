@@ -11,7 +11,7 @@ import { BeatVisual, BillVisual, InventoryVisual, MapVisual, OrderVisual } from 
 import { Arrow, Check, Icon } from "./Icon";
 import { ProLogo } from "./ProNav";
 import { Phone, RetailerScreen, Toast } from "./ProHero";
-import { CartSun, Coin, Dot, Parcel, RiseArrow, TrendLine } from "./Deco";
+import { Coin, Dot, Mark, Parcel, RouteHub, TrendLine } from "./Deco";
 
 const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
 const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL;
@@ -114,7 +114,7 @@ export function RetailSection() {
     <section className="vp-sec" id="retailers">
       <div className="vp-wrap vp-split">
         <div className="vp-retail-vis ls-rv">
-          <CartSun className="vp-retail-sun" />
+          <RouteHub className="vp-retail-hub" />
           <Parcel className="vp-retail-parcel" />
           <Phone>
             <RetailerScreen />
@@ -151,7 +151,7 @@ export function StatsBand() {
   return (
     <section className="vp-stats ls-rv" aria-label={proContent[lang].statsKick}>
       <TrendLine className="vp-stats-trend" />
-      <CartSun className="vp-stats-cart" />
+      <RouteHub className="vp-stats-hub" light />
       <div className="vp-wrap vp-stats-grid">
         {c.stats.map((s, i) => (
           <div className="vp-stat" key={i} style={{ "--i": i } as React.CSSProperties}>
@@ -261,8 +261,8 @@ export function CtaBand() {
   return (
     <section className="vp-cta" id="demo">
       <div className="vp-cta-in ls-rv">
-        <CartSun className="vp-cta-cart" />
-        <RiseArrow className="vp-cta-rise" />
+        <RouteHub className="vp-cta-hub" light />
+        <Mark className="vp-cta-mark" light />
         <Dot className="vp-cta-dot" />
         <h2 className="vp-h2">{k.title}</h2>
         <p className="vp-sub">{k.sub}</p>

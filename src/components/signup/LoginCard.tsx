@@ -76,7 +76,7 @@ export default function LoginCard({
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-between gap-3 mb-8">
           <Link href="/" aria-label={name} className="min-w-0">
-            <BrandLockup name={brand.business ? brand.appName : undefined} logoUrl={brand.logoUrl} tagline />
+            <BrandLockup name={brand.business ? brand.appName : undefined} logoUrl={brand.logoUrl} large />
           </Link>
           <LanguageToggle />
         </div>
