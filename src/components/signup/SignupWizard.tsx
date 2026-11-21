@@ -116,6 +116,31 @@ function gstinProblem(raw: string): string | null {
 
 const STATE_OPTIONS = Object.entries(STATES).sort((a, b) => a[1].localeCompare(b[1]));
 
+/**
+ * A new business address gets its certificate from the proxy a little after
+ * sign-up (the server syncs new addresses every few seconds, then Let's Encrypt
+ * issues). Until then the browser would show a certificate warning, so wait
+ * until the address answers over a trusted connection. An opaque no-cors
+ * response is enough: fetch only rejects on network or TLS failure.
+ */
+async function waitForAddress(url: string, maxMs = 90_000): Promise<void> {
+  let origin: string;
+  try {
+    origin = new URL(url).origin;
+  } catch {
+    return;
+  }
+  const until = Date.now() + maxMs;
+  while (Date.now() < until) {
+    try {
+      await fetch(`${origin}/api/health`, { mode: "no-cors", cache: "no-store", signal: AbortSignal.timeout(5_000) });
+      return;
+    } catch {
+      await new Promise((r) => setTimeout(r, 2_000));
+    }
+  }
+}
+
 export default function SignupWizard({ domain }: { domain: string }) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<Form>(EMPTY);
@@ -357,7 +382,9 @@ export default function SignupWizard({ domain }: { domain: string }) {
         host = new URL(r.url).host;
       } catch {}
       setMade({ url: r.url, host });
-      // The welcome link signs the owner in on the new address and opens the set-up checklist.
+      // The welcome link (valid 10 minutes) signs the owner in on the new address and
+      // opens the set-up checklist. Wait for the address's certificate first.
+      await waitForAddress(r.url);
       window.location.assign(r.url);
     } catch (e) {
       setBusy(false);
@@ -377,7 +404,7 @@ export default function SignupWizard({ domain }: { domain: string }) {
             <Icon name="check" className="h-6 w-6" />
           </span>
           <h1 className="page-title mt-3">Your business is ready</h1>
-          <p className="page-sub">Opening {made.host} and signing you in…</p>
+          <p className="page-sub">Securing {made.host} and signing you in. The first time can take up to a minute…</p>
           <a href={made.url} className="btn btn-kesar w-full mt-6">
             Open my business
             <Icon name="arrow" className="h-4 w-4" />

@@ -135,6 +135,8 @@ export async function tlsAllowed(host: string) {
 export async function requestCertificate(host: string): Promise<string> {
   const provider = process.env.TLS_PROVIDER;
   if (provider === "caddy") return "caddy: issued on first visit";
+  // A job on the server reads verified hosts from the database and adds proxy routes.
+  if (provider === "sync") return "proxy sync: certificate within a minute";
   if (provider !== "coolify") return "manual: add the domain to the proxy";
   const base = process.env.COOLIFY_API_URL;
   const tokenValue = process.env.COOLIFY_API_TOKEN;

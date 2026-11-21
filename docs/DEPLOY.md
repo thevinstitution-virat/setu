@@ -23,8 +23,8 @@ Migrations run on every web start (`npm run start:prod` = `prisma migrate deploy
 
 ## 2. Coolify application
 
-1. New resource → **Docker Compose** → this repository, branch `main`, compose file `docker-compose.yml`.
-2. Domains on the **web** service: `https://<PLATFORM_DOMAIN>`, `https://www.<PLATFORM_DOMAIN>`, `https://platform.<PLATFORM_DOMAIN>` and the wildcard `https://*.<PLATFORM_DOMAIN>`, port 3000. The wildcard needs a DNS `*` record to the server and a wildcard certificate (DNS challenge in Coolify's Traefik settings). The worker gets no domain.
+1. New resource → **Docker Compose** → this repository, branch `master`, compose file `docker-compose.yml`.
+2. Domains on the **web** service: `https://<PLATFORM_DOMAIN>`, `https://www.<PLATFORM_DOMAIN>`, `https://platform.<PLATFORM_DOMAIN>`, port 3000, with `https://<PLATFORM_DOMAIN>` **first**. The worker gets no domain. Coolify (4.7) can't route a wildcard to an app, so business addresses are routed by the proxy sync below.
 3. Environment (Coolify → Environment variables). Everything is listed in `.env.example`; the ones that matter on day one:
 
 | Variable | Value |
@@ -49,7 +49,17 @@ Migrations run on every web start (`npm run start:prod` = `prisma migrate deploy
 5. On the web container's terminal: `npm run golive:check`. Every **FAIL** must be fixed before real use; **warn** lines are choices (no WhatsApp yet, no maps key…).
 6. Create our console owner on the web terminal: `npm run platform:user -- --email <you> --name "<name>" --password '<strong>' --role OWNER` (never run `prisma db seed` in production: it adds the demo business and test logins). Sign in at `https://platform.<PLATFORM_DOMAIN>/platform`. Console → Health shows the same readiness list.
 
-Custom domains for businesses: `TLS_PROVIDER=coolify` with `COOLIFY_API_URL`, `COOLIFY_API_TOKEN`, `COOLIFY_APP_UUID` adds each verified domain to the app (not yet tried on a real proxy, see PHASE9.md).
+### Business addresses and custom domains (proxy sync)
+
+Every business lives at `<slug>.<PLATFORM_DOMAIN>`, and Premium businesses can add a verified custom domain. Both are served by `scripts/proxy-sync-tenants.sh`, run on the Docker host as root by a systemd service every 5 seconds. It reads the open businesses and verified domains from the database and writes one Traefik router per address to `/data/coolify/proxy/dynamic/setu-tenants.yaml`, only when the list changes. Traefik then gets each certificate with the ordinary HTTP check, about 15 s after a new address appears. No DNS-provider token is needed, but each address uses one certificate. Let's Encrypt allows 50 new certificates a week per registered domain, so past roughly 40 sign-ups a week switch to a wildcard certificate (DNS challenge).
+
+- DNS: a `*` record for `<PLATFORM_DOMAIN>` pointing to the server, DNS only (not proxied).
+- App env: `TLS_PROVIDER=sync`, so a verified custom domain shows "certificate within a minute".
+- Sign-up waits for the new address to answer over a trusted connection before opening it, for up to 90 s.
+- Server files (Webyne): the script and `proxy-sync.env` (`SETU_DB_CONTAINER`, `PLATFORM_DOMAIN`, `SETU_SERVICE`) are in `/root/setu/`, and the unit is `/etc/systemd/system/setu-proxy-sync.service`. Logs: `journalctl -u setu-proxy-sync`.
+- `SETU_SERVICE` is Coolify's Traefik service for the first domain, `https-0-<app uuid>-web-<hash>@docker` (read it from the web container's labels). It stays the same across deploys, but it changes if `https://<PLATFORM_DOMAIN>` stops being the first domain.
+- After changing the script in the repo, copy it to `/root/setu/`. The service picks it up within 5 s.
+- The old `TLS_PROVIDER=coolify` path (`COOLIFY_API_*`) is still in the code but untested, and it would need a redeploy for every domain. Don't use it.
 
 ## 3. Backups and the restore drill
 

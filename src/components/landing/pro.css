@@ -391,6 +391,7 @@ html.ls-scrolled .vp-nav {
   padding: 0 24px;
 }
 .vp-tabs {
+  position: relative; /* offsetParent for the active-tab scroll in ProHero */
   display: inline-flex;
   gap: 4px;
   padding: 5px;
@@ -406,6 +407,9 @@ html.ls-scrolled .vp-nav {
 }
 .vp-tab {
   position: relative;
+  /* overflow:hidden makes flex min-width 0, so without this the tabs
+     shrink and clip on phones instead of letting the strip scroll. */
+  flex-shrink: 0;
   overflow: hidden;
   padding: 10px 20px;
   border-radius: 999px;
