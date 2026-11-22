@@ -2,21 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession, roleHome } from "@/lib/auth";
 import { headers } from "next/headers";
 import { classifyHost, getTenant, normaliseHost, platformDomain } from "@/lib/tenant";
-import ProNav from "@/components/landing/pro/ProNav";
-import ProHero from "@/components/landing/pro/ProHero";
-import {
-  CtaBand,
-  DeviceSuite,
-  FaqSection,
-  FeatureGrid,
-  ProblemsSection,
-  ProFooter,
-  RetailSection,
-  StatsBand,
-  StepsSection,
-  TrustStrip,
-} from "@/components/landing/pro/ProSections";
-import LandingFx from "@/components/landing/LandingFx";
+import BtLanding from "@/components/landing/bt/BtLanding";
 
 export default async function Home() {
   const session = await getSession();
@@ -28,23 +14,5 @@ export default async function Home() {
   const host = normaliseHost(h.get("x-forwarded-host") ?? h.get("host"));
   if (classifyHost(host, platformDomain(), null).kind !== "platform" && (await getTenant())) redirect("/login");
 
-  return (
-    <div className="ls vp flex min-h-screen flex-col overflow-x-clip" id="top">
-      <ProNav />
-      <main className="flex flex-col">
-        <ProHero />
-        <TrustStrip />
-        <ProblemsSection />
-        <RetailSection />
-        <StatsBand />
-        <DeviceSuite />
-        <FeatureGrid />
-        <StepsSection />
-        <FaqSection />
-        <CtaBand />
-      </main>
-      <ProFooter />
-      <LandingFx />
-    </div>
-  );
+  return <BtLanding />;
 }
