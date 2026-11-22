@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Sansation, Funnel_Sans, Anek_Devanagari } from "next/font/google";
+import { Geist_Mono, Funnel_Display, Funnel_Sans, Anek_Devanagari } from "next/font/google";
 import "./globals.css";
 import { APP_NAME } from "@/lib/brand";
 import { currentBrand } from "@/lib/branding-server";
@@ -7,11 +7,10 @@ import { appNameOf, themeColour, themeCss } from "@/lib/branding";
 import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
 import { getServerLang } from "@/lib/i18n/server";
 
-const sansation = Sansation({
+const funnelDisplay = Funnel_Display({
   variable: "--font-heading",
   subsets: ["latin"],
-  weight: ["300", "400", "700"],
-  style: ["normal", "italic"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 const funnelSans = Funnel_Sans({
@@ -69,7 +68,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang={lang}
-      className={`${sansation.variable} ${funnelSans.variable} ${anekDevanagari.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${funnelDisplay.variable} ${funnelSans.variable} ${anekDevanagari.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       {theme && (

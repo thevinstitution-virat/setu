@@ -60,6 +60,11 @@ const PATHS = {
   mic: "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3ZM5 11a7 7 0 0 0 14 0M12 18v3M9 21h6",
   /** Sparkle (questions, smart help). */
   sparkle: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3ZM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z",
+  /** Menu (the phone "More" tab). */
+  menu: "M4 6h16M4 12h16M4 18h16",
+  /** Dashboard tiles. */
+  grid: "M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z",
+  chevronDown: "M6 9l6 6 6-6",
 } as const;
 
 export type IconName = keyof typeof PATHS;

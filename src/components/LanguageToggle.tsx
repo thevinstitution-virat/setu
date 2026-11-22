@@ -7,7 +7,7 @@ export default function LanguageToggle() {
 
   return (
     <div
-      className="inline-flex rounded-xl p-[3px] text-xs font-bold bg-white/60 border border-ink/10"
+      className="inline-flex shrink-0 rounded-[10px] p-[3px] text-xs font-bold bg-[#eef2f1]"
       role="group"
       aria-label="Language"
     >
@@ -15,8 +15,8 @@ export default function LanguageToggle() {
         type="button"
         onClick={() => setLang("en")}
         aria-pressed={lang === "en"}
-        className={`px-2.5 py-1 rounded-lg transition ${
-          lang === "en" ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "text-ink-2"
+        className={`min-w-9 h-8 px-2 rounded-[8px] transition ${
+          lang === "en" ? "bg-white text-ink shadow-[0_1px_2px_rgba(15,42,42,.14)]" : "text-ink-2 hover:text-ink"
         }`}
       >
         EN
@@ -25,8 +25,8 @@ export default function LanguageToggle() {
         type="button"
         onClick={() => setLang("hi")}
         aria-pressed={lang === "hi"}
-        className={`px-2.5 py-1 rounded-lg transition ${
-          lang === "hi" ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "text-ink-2"
+        className={`min-w-9 h-8 px-2 rounded-[8px] transition ${
+          lang === "hi" ? "bg-white text-ink shadow-[0_1px_2px_rgba(15,42,42,.14)]" : "text-ink-2 hover:text-ink"
         }`}
       >
         हिं

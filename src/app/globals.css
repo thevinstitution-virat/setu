@@ -427,3 +427,259 @@ h3 {
 .tile-delivered {
   background: var(--mint-tint);
 }
+
+/* ───────── App shell (signed-in pages): grouped sidebar, tablet rail, phone tabs ───────── */
+
+:root {
+  --app-ground: #f4f6f5;
+  --app-line: #e3e8e6;
+  --app-line-2: #dce3e1;
+}
+
+.app-shell {
+  background: var(--app-ground);
+}
+
+.app-side {
+  background: var(--mor-mid);
+  border-right: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.side-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.side-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+
+@media (min-width: 1024px) {
+  .side-link {
+    justify-content: flex-start;
+    height: 38px;
+  }
+}
+
+.side-link:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+}
+
+.side-link:focus-visible {
+  outline: 2px solid var(--genda);
+  outline-offset: -2px;
+}
+
+.side-link.is-on {
+  background: var(--mor);
+  color: #fff;
+  font-weight: 600;
+}
+
+.side-ic {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+.side-link.is-on .side-ic {
+  color: var(--genda);
+}
+
+.app-top {
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--app-line);
+}
+
+.app-tabs {
+  background: #fff;
+  border-top: 1px solid var(--app-line);
+  padding-bottom: calc(6px + env(safe-area-inset-bottom));
+}
+
+.tab-link {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: none;
+  border: 0;
+}
+
+.tab-link.is-on {
+  color: var(--kesar-text);
+}
+
+.tab-ic {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 28px;
+  border-radius: 14px;
+  transition: background 0.15s;
+}
+
+.tab-link.is-on .tab-ic {
+  background: var(--kesar-tint);
+}
+
+.menu-sheet {
+  animation: sheet-up 0.22s ease-out;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-sheet {
+    animation: none;
+  }
+}
+
+/* Inside the app: solid working surfaces instead of the landing's glass. */
+.app-shell .card {
+  background: #fff;
+  backdrop-filter: none;
+  border: 1px solid var(--app-line);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15, 42, 42, 0.04);
+}
+
+.app-shell .glass {
+  background: #fff;
+  backdrop-filter: none;
+  border: 1px solid var(--app-line);
+  box-shadow: 0 1px 2px rgba(15, 42, 42, 0.04);
+}
+
+.app-shell .btn {
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.app-shell .btn-kesar,
+.app-shell .btn-primary {
+  background: var(--kesar-mid);
+  box-shadow: 0 1px 2px rgba(110, 30, 0, 0.25);
+}
+
+.app-shell .btn-kesar:hover,
+.app-shell .btn-primary:hover {
+  filter: none;
+  background: var(--kesar-dark);
+}
+
+.app-shell .btn-mor,
+.app-shell .btn-secondary {
+  background: var(--mor);
+  box-shadow: 0 1px 2px rgba(8, 38, 37, 0.3);
+}
+
+.app-shell .btn-glass,
+.app-shell .btn-outline {
+  background: #fff;
+  backdrop-filter: none;
+  border: 1px solid var(--app-line-2);
+  font-weight: 600;
+}
+
+.app-shell .btn-glass:hover,
+.app-shell .btn-outline:hover {
+  background: #f8faf9;
+  border-color: #c9d3d0;
+}
+
+.app-shell .chip {
+  background: #fff;
+  border-color: var(--app-line-2);
+}
+
+.app-shell .page-kick {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.app-shell .page-title {
+  font-size: clamp(24px, 2.6vw, 28px);
+  letter-spacing: -0.01em;
+}
+
+.app-shell .input {
+  border-radius: 10px;
+  border-color: var(--app-line-2);
+}
+
+/* Data tables in the app */
+.dt {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.dt th {
+  background: #f8faf9;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 10px 12px;
+  white-space: nowrap;
+}
+
+.dt td {
+  padding: 12px;
+  border-top: 1px solid #eef2f1;
+  vertical-align: middle;
+}
+
+.dt th:first-child,
+.dt td:first-child {
+  padding-left: 20px;
+}
+
+.dt th:last-child,
+.dt td:last-child {
+  padding-right: 20px;
+}
+
+.dt tbody tr:hover {
+  background: #f8faf9;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sideways strips (status tabs): scroll by touch or wheel, no bar. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
