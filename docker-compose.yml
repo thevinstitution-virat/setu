@@ -9,6 +9,8 @@ services:
       args:
         # Inlined into the browser code at build time.
         NEXT_PUBLIC_WHATSAPP_NUMBER: ${NEXT_PUBLIC_WHATSAPP_NUMBER:-}
+        # GlitchTip project vbiz-frontend (browser errors).
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
     command: ["npm", "run", "start:prod"]
     environment: &env
       DATABASE_URL: ${DATABASE_URL}
@@ -27,6 +29,9 @@ services:
       SMS_PROVIDER: ${SMS_PROVIDER:-}
       # Demo servers only: shows sign-in codes on screen (golive check fails while on).
       OTP_DEV_MODE: ${OTP_DEV_MODE:-}
+      # GlitchTip project vbiz-backend (server and worker errors).
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SOURCE_COMMIT: ${SOURCE_COMMIT:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}

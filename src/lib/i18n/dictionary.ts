@@ -102,6 +102,16 @@ export const dictionary = {
   "common.logout": { en: "Log out", hi: "लॉग आउट" },
   "common.placeOrder": { en: "Place order", hi: "ऑर्डर करें" },
 
+  // Error page (app/error.tsx)
+  "error.title": { en: "Something went wrong", hi: "कुछ गड़बड़ हो गई" },
+  "error.body": {
+    en: "This page didn't load properly. We've been told about it. Please try again.",
+    hi: "यह पेज ठीक से नहीं खुला। हमें इसकी जानकारी मिल गई है। कृपया फिर से कोशिश करें।",
+  },
+  "error.retry": { en: "Try again", hi: "फिर से कोशिश करें" },
+  "error.home": { en: "Go to home", hi: "होम पर जाएँ" },
+  "error.ref": { en: "Reference", hi: "रेफ़रेंस" },
+
   // Login
   "login.title": { en: "Sign in", hi: "लॉगिन करें" },
   "login.retailerTab": { en: "Retailer", hi: "रिटेलर" },

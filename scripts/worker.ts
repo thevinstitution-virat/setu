@@ -6,6 +6,7 @@ import "dotenv/config";
 import { getBoss } from "../src/lib/jobs";
 import { handlers, schedules } from "../src/jobs/handlers";
 import { sendAlert } from "../src/lib/alerts";
+import { reportServerError } from "../src/lib/error-report-server";
 
 async function main() {
   const boss = await getBoss();
@@ -16,6 +17,7 @@ async function main() {
         try {
           await handler!(job as never);
         } catch (e) {
+          await reportServerError(e, { source: "worker", job: name });
           await sendAlert(`Job ${name} failed`, e instanceof Error ? e.message : String(e));
           throw e; // pg-boss retries with backoff
         }
