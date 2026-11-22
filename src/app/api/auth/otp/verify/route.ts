@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getTenant } from "@/lib/tenant";
 import { tenantDb } from "@/lib/db";
 import { verifyOtp, consumeVerifiedPhone, OtpError } from "@/lib/otp";
-import { createSessionCookie, roleHome } from "@/lib/auth";
+import { finishSignIn } from "@/lib/mfa";
 import { isFieldRole } from "@/lib/field-settings";
 import { requestIp } from "@/lib/audit";
 import { HOUR, limited } from "@/lib/rate-limit";
@@ -50,15 +50,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "This account has been deactivated" }, { status: 403 });
     }
     await consumeVerifiedPhone(db, phone);
-    await createSessionCookie({
-      userId: existing.id,
-      tenantId: tenant.id,
-      role: existing.role,
-      name: existing.name,
-      via: "otp",
-      phone,
-    });
-    return NextResponse.json({ status: "login", redirect: roleHome(existing.role) });
+    // Staff (and shops that turned it on) still need the code from their authenticator app.
+    const redirect = await finishSignIn(tenant.id, existing.id, "otp", { phone });
+    return NextResponse.json({ status: "login", redirect });
   }
 
   return NextResponse.json({ status: "new", phone });

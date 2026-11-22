@@ -2,6 +2,7 @@ import { noticeText } from "@/lib/login-notices";
 import { currentBrand } from "@/lib/branding-server";
 import { appNameOf } from "@/lib/branding";
 import LoginCard from "@/components/signup/LoginCard";
+import { googleConfigured } from "@/lib/google";
 
 type Query = Promise<Record<string, string | string[] | undefined>>;
 
@@ -35,6 +36,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Query 
       linkError={noticeText(one(q.error))}
       notice={noticeText(one(q.notice))}
       initialRef={normaliseRef(one(q.ref))}
+      google={googleConfigured()}
     />
   );
 }

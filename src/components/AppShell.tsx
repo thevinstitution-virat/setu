@@ -180,6 +180,14 @@ export default function AppShell({
             <span className="block text-sm font-semibold truncate">{userName}</span>
             <span className="block text-xs text-white/70 truncate">{role}</span>
           </span>
+          <Link
+            href="/account/security"
+            className="grid place-items-center h-10 w-10 shrink-0 rounded-[10px] text-white/80 hover:bg-white/10 hover:text-white transition"
+            aria-label={t("sec.title")}
+            title={t("sec.title")}
+          >
+            <Icon name="lock" className="h-[18px] w-[18px]" />
+          </Link>
           <button
             type="button"
             onClick={logout}
@@ -408,6 +416,13 @@ function MenuSheet({
             </section>
           ))}
 
+          <Link
+            href="/account/security"
+            className="w-full flex items-center justify-center gap-2 min-h-[48px] rounded-2xl bg-white border border-[var(--app-line)] font-semibold mb-2"
+          >
+            <Icon name="lock" className="h-5 w-5" />
+            {t("sec.title")}
+          </Link>
           <button
             type="button"
             onClick={onLogout}

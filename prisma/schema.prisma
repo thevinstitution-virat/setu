@@ -182,22 +182,22 @@ model Tenant {
 
 /// Custom domains a tenant has verified (e.g. order.agencyname.in).
 model TenantDomain {
-  id         String    @id @default(cuid())
-  tenantId   String
-  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id           String    @id @default(cuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   /// Several businesses may claim the same address while unverified (each gets its own
   /// token), so nobody can squat it; the first to prove it in DNS wins (verifiedHost).
-  host       String
+  host         String
   /// = host once verified, else null. Unique: one business per live address.
-  verifiedHost String?  @unique
+  verifiedHost String?   @unique
   /// Value the owner puts in a TXT record at _setu-verify.<host>.
-  token      String    @default(cuid())
-  verifiedAt DateTime?
-  checkedAt  DateTime?
-  lastError  String?
+  token        String    @default(cuid())
+  verifiedAt   DateTime?
+  checkedAt    DateTime?
+  lastError    String?
   /// Certificate / proxy hook result.
-  tlsStatus  String?
-  createdAt  DateTime  @default(now())
+  tlsStatus    String?
+  createdAt    DateTime  @default(now())
 
   @@unique([tenantId, host])
   @@index([tenantId])
@@ -207,25 +207,25 @@ model TenantDomain {
 // ───────────────────────────── Tenant tables ─────────────────────────────
 
 model User {
-  id           String   @id @default(cuid())
-  tenantId     String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant       Tenant   @relation(fields: [tenantId], references: [id])
-  name         String
-  phone        String?
-  email        String?
-  loginId      String?
-  passwordHash String?
-  role         Role
-  active       Boolean  @default(true)
+  id             String   @id @default(cuid())
+  tenantId       String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  name           String
+  phone          String?
+  email          String?
+  loginId        String?
+  passwordHash   String?
+  role           Role
+  active         Boolean  @default(true)
   /// The hidden login platform support uses inside this business (audited support sessions). Not a seat, never listed.
-  isSupport    Boolean  @default(false)
+  isSupport      Boolean  @default(false)
   /// Bumped to end every signed-in session of this person ("sign out everywhere"); sessions carry it as sv.
-  sessionVersion Int    @default(0)
-  createdAt    DateTime @default(now())
+  sessionVersion Int      @default(0)
+  createdAt      DateTime @default(now())
   /// The supervisor this person reports to (field staff). Supervisors see and manage their team.
-  supervisorId String?
-  supervisor   User?    @relation("Team", fields: [supervisorId], references: [id])
-  team         User[]   @relation("Team")
+  supervisorId   String?
+  supervisor     User?    @relation("Team", fields: [supervisorId], references: [id])
+  team           User[]   @relation("Team")
 
   retailerProfile      RetailerProfile?
   salesAgentProfile    SalesAgentProfile?
@@ -259,7 +259,19 @@ model User {
   apiKeys           ApiKey[]
   webhookEndpoints  WebhookEndpoint[]
 
+  /// Google account linked for "Continue with Google" (the Google user id, and the address shown back to them).
+  googleSub     String?
+  googleEmail   String?
+  /// Two-step sign-in (authenticator app). Secret is encrypted (lib/secrets); required for staff, optional for shops.
+  totpSecret    String?
+  totpEnabledAt DateTime?
+  /// Last 30-second step accepted, so one code can't be used twice.
+  totpLastStep  Int?
+  /// One-time recovery codes, stored as SHA-256 hashes; each is removed when used.
+  recoveryCodes String[]  @default([])
+
   @@unique([tenantId, phone])
+  @@unique([tenantId, googleSub])
   @@unique([tenantId, email])
   @@unique([tenantId, loginId])
   @@index([tenantId, role])
@@ -2529,14 +2541,21 @@ model PlatformCounter {
 
 /// People who run the platform (us). Separate from tenant users.
 model PlatformUser {
-  id           String       @id @default(cuid())
-  name         String
-  email        String       @unique
-  passwordHash String
-  role         PlatformRole @default(SUPPORT)
-  active       Boolean      @default(true)
-  lastLoginAt  DateTime?
-  createdAt    DateTime     @default(now())
+  id            String       @id @default(cuid())
+  name          String
+  email         String       @unique
+  passwordHash  String
+  role          PlatformRole @default(SUPPORT)
+  active        Boolean      @default(true)
+  /// Same two-step sign-in and Google link as business users; mandatory for every console login.
+  googleSub     String?      @unique
+  googleEmail   String?
+  totpSecret    String?
+  totpEnabledAt DateTime?
+  totpLastStep  Int?
+  recoveryCodes String[]     @default([])
+  lastLoginAt   DateTime?
+  createdAt     DateTime     @default(now())
 
   supportSessions SupportSession[]
   audits          PlatformAudit[]
@@ -2857,4 +2876,12 @@ model AuthAttempt {
 
   @@index([scope, key, createdAt])
   @@index([ip, createdAt])
+}
+
+/// Single-use sign-in tickets (Google hand-back to a business address). A replay hits the primary key. Platform table.
+model AuthTicketUse {
+  id     String   @id
+  usedAt DateTime @default(now())
+
+  @@index([usedAt])
 }

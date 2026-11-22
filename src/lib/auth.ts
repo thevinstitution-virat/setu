@@ -29,13 +29,15 @@ export type SessionPayload = {
   role: Role;
   name: string;
   /** How this session was opened. Only OTP / handoff sessions may hop to another business (Phase 6 multi-distributor). */
-  via?: "password" | "otp" | "handoff" | "welcome" | "support";
+  via?: "password" | "otp" | "handoff" | "welcome" | "support" | "google";
   /** Support sessions (Phase 9): the SupportSession id; checked on every request. */
   supportId?: string;
   /** Verified phone (OTP / handoff sessions). */
   phone?: string;
   /** The user's sessionVersion when this session was made; a bump ends it (guard / pageSession). */
   sv?: number;
+  /** Passed the second step (authenticator, recovery or SMS code). Required for staff; see lib/mfa.ts. */
+  mfa?: boolean;
 };
 
 const AUDIENCE = "setu-tenant";

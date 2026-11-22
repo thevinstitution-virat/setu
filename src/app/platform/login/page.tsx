@@ -3,8 +3,13 @@ import { getTenant } from "@/lib/tenant";
 import { getPlatformSession } from "@/lib/platform-auth";
 import { BrandMark } from "@/components/BrandMark";
 import LoginForm from "@/components/platform/LoginForm";
+import GoogleButton from "@/components/auth/GoogleButton";
+import { googleConfigured } from "@/lib/google";
+import { noticeText } from "@/lib/login-notices";
 
-export default async function PlatformLoginPage() {
+export default async function PlatformLoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const q = await searchParams;
+  const notice = noticeText(typeof q.notice === "string" ? q.notice : null);
   const tenant = await getTenant();
   if (!tenant && (await getPlatformSession())) redirect("/platform");
 
@@ -23,7 +28,11 @@ export default async function PlatformLoginPage() {
           <p className="text-sm text-[var(--muted)]">This address belongs to a business. Open the console on the platform&apos;s own address, without a business name in front.</p>
         </div>
       ) : (
-        <LoginForm />
+        <>
+          {notice && <p role="status" className="text-sm rounded-lg bg-ink/5 text-[var(--ink-2)] px-3 py-2 break-words">{notice}</p>}
+          {googleConfigured() && <GoogleButton href="/api/platform/auth/google/start" label="Continue with Google" />}
+          <LoginForm />
+        </>
       )}
     </div>
   );

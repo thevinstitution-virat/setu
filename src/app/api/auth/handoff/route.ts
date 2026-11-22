@@ -3,9 +3,9 @@ import { noticeCode } from "@/lib/login-notices";
 import { localRedirect } from "@/lib/redirect";
 import { guard } from "@/lib/guard";
 import { audit, requestIp } from "@/lib/audit";
-import { createSessionCookie, roleHome } from "@/lib/auth";
 import { getTenant } from "@/lib/tenant";
 import { tenantDb } from "@/lib/db";
+import { finishSignIn } from "@/lib/mfa";
 import { consumeHandoff, HandoffError, signHandoff, workspaceUrl, workspacesFor } from "@/lib/handoff";
 
 /** Body: { slug } → { url } to open. Signed hop for OTP sessions, else the other business's login page. */
@@ -36,9 +36,10 @@ export async function GET(req: Request) {
   const token = new URL(req.url).searchParams.get("t") ?? "";
   try {
     const { user, phone } = await consumeHandoff(token, tenant.id);
-    await createSessionCookie({ userId: user.id, tenantId: tenant.id, role: user.role, name: user.name, via: "handoff", phone });
+    // Each business keeps its own two-step set-up: the login here asks for its own code.
+    const next = await finishSignIn(tenant.id, user.id, "handoff", { phone });
     await audit(tenantDb(tenant.id), { actorId: user.id, action: "auth.handoff_in", entity: "User", entityId: user.id, ip: requestIp(req) });
-    return localRedirect(roleHome(user.role), 303);
+    return localRedirect(next, 303);
   } catch (e) {
     if (!(e instanceof HandoffError)) throw e;
     return localRedirect(`/login?error=${noticeCode(e.message, "switch")}`, 303);

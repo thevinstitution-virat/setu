@@ -3,6 +3,7 @@
  *
  *   npm run platform:user -- --email you@company.in --name "Your name" --password '<strong password>' [--role OWNER|SUPPORT]
  *   npm run platform:user -- --email someone@company.in --deactivate
+ *   npm run platform:user -- --email someone@company.in --reset-2fa   (lost phone: set the authenticator up again at next sign-in)
  *
  * The console lives on the platform address: https://platform.<PLATFORM_DOMAIN>/platform
  * (or the bare domain when PLATFORM_DOMAIN has no tenant subdomain).
@@ -25,6 +26,16 @@ function fail(msg: string): never {
 async function main() {
   const email = (arg("email") ?? "").trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail("--email is required");
+
+  if (flag("reset-2fa")) {
+    const u = await prisma.platformUser
+      .update({ where: { email }, data: { totpSecret: null, totpEnabledAt: null, totpLastStep: null, recoveryCodes: [] } })
+      .catch(() => null);
+    if (!u) fail(`No console login ${email}`);
+    await prisma.platformAudit.create({ data: { actorId: u.id, action: "auth.mfa_reset_by_script" } });
+    console.log(`✔ Two-step sign-in reset for ${email}: they set up the authenticator app at their next sign-in`);
+    return;
+  }
 
   if (flag("deactivate")) {
     const u = await prisma.platformUser.update({ where: { email }, data: { active: false } }).catch(() => null);

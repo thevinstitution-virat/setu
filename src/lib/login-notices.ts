@@ -17,12 +17,24 @@ export const LOGIN_NOTICES = {
   "switch-wrong": "This link is not for this business.",
   "switch-no-login": "You don't have an active login in this business.",
   "switch-used": "This link was already used. Switch again from the other business.",
+  "google-expired": "This Google sign-in has expired. Please try again.",
+  "google-wrong": "This Google sign-in is not for this business.",
+  "google-used": "This Google sign-in was already used. Please try again.",
+  "google-failed": "Google didn't confirm the sign-in. Please try again.",
+  "google-unverified": "That Google account has no verified email address.",
+  "google-none": "No login here uses this Google account. Sign in another way, then connect Google under Security.",
+  "google-inactive": "This account has been deactivated",
+  "google-paused": "This business is paused. Please contact the office.",
+  "google-off": "Google sign-in isn't switched on yet.",
+  "google-taken": "That Google account is already connected to another login here.",
+  "google-linked": "Google account connected. Next time you can use Continue with Google.",
+  "mfa-expired": "Your sign-in took too long. Please sign in again.",
 } as const;
 
 export type LoginNotice = keyof typeof LOGIN_NOTICES;
 
 /** The code for one of our messages (the redirect side), or a general one. */
-export function noticeCode(message: string, prefix: "support" | "welcome" | "switch"): LoginNotice | "link-failed" {
+export function noticeCode(message: string, prefix: "support" | "welcome" | "switch" | "google"): LoginNotice | "link-failed" {
   const hit = (Object.entries(LOGIN_NOTICES) as [LoginNotice, string][]).find(([k, v]) => k.startsWith(`${prefix}-`) && v === message);
   return hit ? hit[0] : "link-failed";
 }

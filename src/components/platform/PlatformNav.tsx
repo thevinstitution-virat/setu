@@ -14,6 +14,7 @@ const LINKS = [
   { href: "/platform/usage", label: "Usage" },
   { href: "/platform/health", label: "Health" },
   { href: "/platform/audit", label: "Audit" },
+  { href: "/platform/security", label: "Security" },
 ];
 
 function isActive(path: string, href: string) {

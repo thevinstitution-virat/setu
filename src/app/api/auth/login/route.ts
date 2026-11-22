@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getTenant } from "@/lib/tenant";
 import { tenantDb } from "@/lib/db";
 import { burnPasswordCheck, verifyPassword } from "@/lib/password";
-import { createSessionCookie, roleHome } from "@/lib/auth";
+import { finishSignIn } from "@/lib/mfa";
 import { requestIp } from "@/lib/audit";
 import { lockedMessage, loginLocked, recordLogin } from "@/lib/login-limit";
 
@@ -43,7 +43,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "This business is paused. Please contact the office.", code: "paused" }, { status: 423 });
   }
 
-  await createSessionCookie({ userId: user.id, tenantId: tenant.id, role: user.role, name: user.name, via: "password" });
-
-  return NextResponse.json({ ok: true, redirect: roleHome(user.role) });
+  const redirect = await finishSignIn(tenant.id, user.id, "password");
+  return NextResponse.json({ ok: true, redirect });
 }

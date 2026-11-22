@@ -8,6 +8,7 @@ import Link from "next/link";
 import { APP_NAME } from "@/lib/brand";
 import { BrandLockup } from "@/components/BrandMark";
 import Icon from "@/components/Icon";
+import GoogleButton from "@/components/auth/GoogleButton";
 
 type Region = { id: string; name: string; areas: { id: string; name: string }[] };
 
@@ -60,8 +61,11 @@ export default function LoginCard({
   linkError = null,
   notice = null,
   initialRef = "",
+  google = false,
 }: {
   brand: LoginBrand;
+  /** Show "Continue with Google" (GOOGLE_CLIENT_ID / SECRET are set). */
+  google?: boolean;
   initialPhone?: string;
   linkError?: string | null;
   notice?: string | null;
@@ -100,6 +104,17 @@ export default function LoginCard({
 
           {!brand.business && (
             <p className="text-sm rounded-lg bg-ink/5 text-[var(--ink-2)] px-3 py-2 mb-4">{t("login.noBusiness")}</p>
+          )}
+
+          {google && brand.business && (
+            <>
+              <GoogleButton href="/api/auth/google/start" label={t("google.continue")} />
+              <div className="flex items-center gap-3 my-5 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                <span className="h-px flex-1 bg-[var(--line)]" aria-hidden />
+                {t("google.or")}
+                <span className="h-px flex-1 bg-[var(--line)]" aria-hidden />
+              </div>
+            </>
           )}
 
           <div className="flex rounded-2xl p-1 mb-6 bg-ink/5" role="tablist">

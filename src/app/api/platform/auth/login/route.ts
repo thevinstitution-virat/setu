@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getTenant } from "@/lib/tenant";
 import { verifyPassword } from "@/lib/password";
 import { requestIp } from "@/lib/audit";
-import { createPlatformCookie, platformAudit } from "@/lib/platform-auth";
+import { platformAudit } from "@/lib/platform-auth";
+import { setPlatformPending } from "@/lib/platform-mfa";
 import { lockedMessage, loginLocked, recordLogin } from "@/lib/login-limit";
 
 /** Platform console sign-in. Body: { email, password }. Wrong tries are limited (lib/login-limit.ts). */
@@ -22,8 +23,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Wrong email or password" }, { status: 401 });
   }
   await recordLogin("platform", email, ip, true);
-  await prisma.platformUser.update({ where: { id: u.id }, data: { lastLoginAt: new Date() } });
-  await createPlatformCookie({ platformUserId: u.id, name: u.name, role: u.role });
-  await platformAudit(u.id, "auth.login", { ip: ip ?? undefined });
-  return NextResponse.json({ ok: true, redirect: "/platform" });
+  // Step one only: the console opens after the authenticator code (lib/platform-mfa.ts).
+  await setPlatformPending({ platformUserId: u.id, via: "password" });
+  await platformAudit(u.id, "auth.password_ok", { ip: ip ?? undefined });
+  return NextResponse.json({ ok: true, redirect: "/platform/login/2fa" });
 }

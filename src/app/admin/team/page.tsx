@@ -18,6 +18,8 @@ type TeamUser = {
   supervisorId: string | null;
   supervisor: { id: string; name: string } | null;
   salesAgentProfile: { id: string } | null;
+  /** When they set up the authenticator app (null: they will be asked at their next sign-in). */
+  totpEnabledAt?: string | null;
 };
 
 type Retailer = {
@@ -145,6 +147,21 @@ export default function AdminTeamPage() {
     try {
       await send(`/api/admin/users/${u.id}`, "PATCH", { signOut: true });
       setRowError({ id: u.id, text: `${u.name} is signed out everywhere.` });
+    } catch (e) {
+      setRowError({ id: u.id, text: errText(e) });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function resetTwoStep(u: TeamUser) {
+    if (!window.confirm(`Reset two-step sign-in for ${u.name}? Use this when they lost their phone. They are signed out everywhere and set up the authenticator app again at their next sign-in.`)) return;
+    setRowError(null);
+    setBusyId(u.id);
+    try {
+      await send(`/api/admin/users/${u.id}`, "PATCH", { resetMfa: true });
+      setRowError({ id: u.id, text: `Two-step sign-in reset for ${u.name}. They set it up again when they next sign in.` });
+      reload();
     } catch (e) {
       setRowError({ id: u.id, text: errText(e) });
     } finally {
@@ -297,6 +314,17 @@ export default function AdminTeamPage() {
                         title="End their sessions on every device (a lost phone)"
                       >
                         Sign out
+                      </button>
+                    )}
+                    {u.active && u.totpEnabledAt && (
+                      <button
+                        type="button"
+                        onClick={() => resetTwoStep(u)}
+                        disabled={busyId === u.id}
+                        className="min-h-[44px] text-xs font-medium rounded-lg px-3 bg-black/5 text-[var(--ink-2)]"
+                        title="Lost phone: clear their authenticator app so they set it up again"
+                      >
+                        Reset 2-step
                       </button>
                     )}
                   </div>
