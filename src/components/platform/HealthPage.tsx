@@ -127,7 +127,7 @@ export default function HealthPage() {
                           <Link href={`/platform/tenants/${t.tenantId}`} className="font-semibold text-[var(--mor)] hover:underline">
                             {t.name}
                           </Link>
-                          <span className="block text-xs font-mono text-[var(--muted)]">{t.slug}</span>
+                          <span className="block text-xs text-[var(--muted)]">{t.slug}</span>
                         </td>
                         <td className={`!text-right tabular-nums ${bad(t.messagesFailed)}`}>{num(t.messagesFailed)}</td>
                         <td className={`!text-right tabular-nums ${bad(t.webhooksDead)}`}>{num(t.webhooksDead)}</td>

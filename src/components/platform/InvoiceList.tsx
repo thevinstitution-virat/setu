@@ -76,7 +76,7 @@ function InvoiceRow({ inv, onChanged, showTenant }: { inv: PlatformInvoice; onCh
     <li className="py-3 space-y-2">
       <div className="flex flex-wrap items-start gap-x-4 gap-y-1">
         <div className="min-w-0 flex-1">
-          <p className="font-semibold font-mono text-sm">{inv.number}</p>
+          <p className="font-semibold text-sm tabular-nums">{inv.number}</p>
           {showTenant && inv.tenant && (
             <Link href={`/platform/tenants/${inv.tenantId}`} className="text-sm text-[var(--mor)] hover:underline">
               {inv.tenant.name}

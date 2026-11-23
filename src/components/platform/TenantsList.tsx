@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import Icon from "@/components/Icon";
 import { ErrorBox, useFetch } from "@/components/admin/AdminKit";
-import { StatusChip, TableWrap, ago, inr, num, when } from "./kit";
+import { Kpi, StatusChip, TableWrap, ago, inr, num, when } from "./kit";
 import NewBusiness from "./NewBusiness";
+
+type Summary = { byStatus: Partial<Record<"TRIAL" | "ACTIVE" | "SUSPENDED" | "CLOSED", number>>; orders30d: number; overduePaise: number; overdueInvoices: number };
 
 type Row = {
   id: string;
@@ -48,16 +50,38 @@ export default function TenantsList() {
   if (status) sp.set("status", status);
   sp.set("take", String(take));
   const url = `/api/platform/tenants?${sp}`;
-  const { data, error, reload } = useFetch<{ tenants: Row[] }>(url);
+  const { data, error, reload } = useFetch<{ tenants: Row[]; summary: Summary }>(url);
   const rows = data?.tenants ?? [];
+  const s = data?.summary;
+  const count = (k: keyof Summary["byStatus"]) => s?.byStatus[k] ?? 0;
+  const pick = (v: string) => setStatus(status === v ? "" : v);
 
   return (
     <div className="space-y-5 pb-16">
-      <div>
-        <p className="page-kick">Platform</p>
-        <h1 className="page-title">Tenants</h1>
-        <p className="page-sub">Every business on the platform, newest first.</p>
+      <div className="page-head">
+        <div>
+          <p className="page-kick">Customers</p>
+          <h1 className="page-title">Businesses</h1>
+          <p className="page-sub">Every business on the platform, newest first.</p>
+        </div>
       </div>
+
+      <section aria-label="Platform at a glance" className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi icon="check" tone="mint" label="Paying" value={s ? num(count("ACTIVE")) : "…"} note="Active businesses" onClick={() => pick("ACTIVE")} active={status === "ACTIVE"} />
+        <Kpi icon="clock" tone="genda" label="On trial" value={s ? num(count("TRIAL")) : "…"} note="Free trial running" onClick={() => pick("TRIAL")} active={status === "TRIAL"} />
+        <Kpi
+          icon="alert"
+          tone="red"
+          label="Paused"
+          value={s ? num(count("SUSPENDED")) : "…"}
+          note={s?.overdueInvoices ? `${num(s.overdueInvoices)} overdue · ${inr(s.overduePaise)}` : "No overdue bills"}
+          noteTone={s?.overdueInvoices ? "red" : undefined}
+          onClick={() => pick("SUSPENDED")}
+          active={status === "SUSPENDED"}
+        />
+        <Kpi icon="box" tone="kesar" label="Orders, 30 days" value={s ? num(s.orders30d) : "…"} note="Across every business" />
+      </section>
+
       <NewBusiness onMade={reload} />
 
       <div className="flex flex-wrap gap-2">
@@ -102,7 +126,7 @@ export default function TenantsList() {
                       <Link href={`/platform/tenants/${t.id}`} className="font-semibold text-[var(--mor)] hover:underline break-words">
                         {t.name}
                       </Link>
-                      <span className="block text-xs text-[var(--muted)] font-mono">{t.slug}</span>
+                      <span className="block text-xs text-[var(--muted)]">{t.slug}</span>
                       {t.suspendReason && <span className="block text-xs text-[#a8281e]">{t.suspendReason}</span>}
                       {t.deleteAfter && <span className="block text-xs text-[#a8281e]">Deletes {when(t.deleteAfter)}</span>}
                     </td>
@@ -110,9 +134,9 @@ export default function TenantsList() {
                       <StatusChip value={t.status} />
                     </td>
                     <td>
-                      <span className="font-mono text-xs">{t.subscription?.planCode ?? t.plan}</span>
+                      <span className="font-semibold capitalize">{t.subscription?.planCode ?? t.plan}</span>
                       {t.subscription?.nextPlanCode && <span className="block text-xs text-[var(--muted)]">then {t.subscription.nextPlanCode}</span>}
-                      {t.subscription && (
+                      {t.subscription && t.subscription.status !== t.status && (
                         <span className="block mt-0.5">
                           <StatusChip value={t.subscription.status} />
                         </span>

@@ -13,16 +13,32 @@ import { NOTIFY_EVENT } from "@/components/engage/kit";
 import ShellNotices from "@/components/ShellNotices";
 import type { Chrome } from "@/lib/chrome";
 
-export type NavGroup = "overview" | "sell" | "deliver" | "money" | "setup";
+export type NavGroup = "overview" | "sell" | "deliver" | "money" | "setup" | "businesses" | "operate" | "safety";
 
 /**
  * One menu entry. `group` sorts long menus (the office) into sections; `tab`
  * puts the entry in the phone's bottom bar (without any, the first four go
  * there, or all of them when there are five or fewer).
  */
-export type NavItem = { href: string; labelKey: DictKey; icon: IconName; group?: NavGroup; tab?: boolean };
+export type NavItem = { href: string; labelKey?: DictKey; label?: string; icon: IconName; group?: NavGroup; tab?: boolean };
 
-const GROUP_ORDER: NavGroup[] = ["overview", "sell", "deliver", "money", "setup"];
+const GROUP_ORDER: NavGroup[] = ["overview", "sell", "deliver", "money", "setup", "businesses", "operate", "safety"];
+
+/** The console's sections: English only, like the rest of the console. */
+const PLAIN_GROUPS: Partial<Record<NavGroup, string>> = { businesses: "Customers", operate: "Platform", safety: "Safety" };
+
+type T = (k: DictKey) => string;
+/** A menu entry's text: its plain label (console) or its dictionary key (business apps). */
+const itemLabel = (t: T, i: NavItem) => i.label ?? (i.labelKey ? t(i.labelKey) : i.href);
+const groupLabel = (t: T, g: NavGroup) => PLAIN_GROUPS[g] ?? t(`nav.group.${g}` as DictKey);
+
+/**
+ * Where the signed-in person's own links go. Business apps: their Security
+ * page, the bell and the language switch; the platform console has its own
+ * sign-out and Security page and no notifications.
+ */
+export type ShellAccount = { securityHref: string; logoutUrl: string; loginHref: string; bell: boolean; language: boolean };
+const BUSINESS_ACCOUNT: ShellAccount = { securityHref: "/account/security", logoutUrl: "/api/auth/logout", loginHref: "/login", bell: true, language: true };
 
 /**
  * The nav item for the current page: the longest href that is the path itself
@@ -72,12 +88,17 @@ export default function AppShell({
   nav,
   userName,
   roleKey,
+  roleLabel,
+  account = BUSINESS_ACCOUNT,
   chrome,
 }: {
   children: React.ReactNode;
   nav: NavItem[];
   userName: string;
-  roleKey: DictKey;
+  roleKey?: DictKey;
+  /** Plain role text (the console); otherwise `roleKey` is looked up. */
+  roleLabel?: string;
+  account?: ShellAccount;
   /** Brand, banners and plan locks for this business (Phase 9). */
   chrome?: Chrome | null;
 }) {
@@ -95,18 +116,18 @@ export default function AppShell({
   const currentItem = nav.find((i) => i.href === current);
   const currentGroup = currentItem?.group;
   const home = nav[0]?.href ?? "/";
-  const role = t(roleKey);
+  const role = roleLabel ?? (roleKey ? t(roleKey) : "");
 
   async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+    await fetch(account.logoutUrl, { method: "POST" });
+    router.push(account.loginHref);
     router.refresh();
   }
 
   const q = query.trim().toLowerCase();
   const filtered = q
     ? sections
-        .map((s) => ({ ...s, items: s.items.filter((i) => t(i.labelKey).toLowerCase().includes(q)) }))
+        .map((s) => ({ ...s, items: s.items.filter((i) => itemLabel(t, i).toLowerCase().includes(q)) }))
         .filter((s) => s.items.length)
     : sections;
 
@@ -151,7 +172,7 @@ export default function AppShell({
               {s.group && (
                 <>
                   <p className="hidden lg:block px-2.5 mb-1.5 text-[11px] font-bold uppercase tracking-[.08em] text-white/65">
-                    {t(`nav.group.${s.group}` as DictKey)}
+                    {groupLabel(t, s.group)}
                   </p>
                   {idx > 0 && <hr className="lg:hidden mx-2 mb-4 border-white/10" />}
                 </>
@@ -181,7 +202,7 @@ export default function AppShell({
             <span className="block text-xs text-white/70 truncate">{role}</span>
           </span>
           <Link
-            href="/account/security"
+            href={account.securityHref}
             className="grid place-items-center h-10 w-10 shrink-0 rounded-[10px] text-white/80 hover:bg-white/10 hover:text-white transition"
             aria-label={t("sec.title")}
             title={t("sec.title")}
@@ -210,16 +231,16 @@ export default function AppShell({
               <nav aria-label="Breadcrumb" className="hidden md:flex items-center gap-2 min-w-0 text-sm">
                 {currentGroup && (
                   <>
-                    <span className="text-[var(--muted)]">{t(`nav.group.${currentGroup}` as DictKey)}</span>
+                    <span className="text-[var(--muted)]">{groupLabel(t, currentGroup)}</span>
                     <span className="text-[var(--muted)]" aria-hidden="true">/</span>
                   </>
                 )}
-                <span className="font-semibold text-ink truncate">{t(currentItem.labelKey)}</span>
+                <span className="font-semibold text-ink truncate">{itemLabel(t, currentItem)}</span>
               </nav>
             )}
             <span className="flex-1" />
-            <LanguageToggle />
-            <Bell href={`${home}/notifications`} active={pathname.endsWith("/notifications")} />
+            {account.language && <LanguageToggle />}
+            {account.bell && <Bell href={`${home}/notifications`} active={pathname.endsWith("/notifications")} />}
             <button
               type="button"
               onClick={() => setSheetOpen(true)}
@@ -270,6 +291,7 @@ export default function AppShell({
           locked={locked}
           userName={userName}
           role={role}
+          securityHref={account.securityHref}
           onClose={() => setSheetOpen(false)}
           onLogout={logout}
         />
@@ -308,7 +330,7 @@ function SideBrand({ name, logoUrl }: { name?: string; logoUrl?: string | null }
 
 function SideLink({ item, active, locked }: { item: NavItem; active: boolean; locked?: boolean }) {
   const { t } = useLanguage();
-  const label = t(item.labelKey);
+  const label = itemLabel(t, item);
   return (
     <Link
       href={item.href}
@@ -331,7 +353,7 @@ function TabLink({ item, active, locked }: { item: NavItem; active: boolean; loc
       <span className="tab-ic">
         <Icon name={locked ? "lock" : item.icon} className="h-[22px] w-[22px]" strokeWidth={1.8} />
       </span>
-      <span className="max-w-full truncate px-0.5">{t(item.labelKey)}</span>
+      <span className="max-w-full truncate px-0.5">{itemLabel(t, item)}</span>
     </Link>
   );
 }
@@ -343,6 +365,7 @@ function MenuSheet({
   locked,
   userName,
   role,
+  securityHref,
   onClose,
   onLogout,
 }: {
@@ -351,6 +374,7 @@ function MenuSheet({
   locked: Set<string>;
   userName: string;
   role: string;
+  securityHref: string;
   onClose: () => void;
   onLogout: () => void;
 }) {
@@ -388,7 +412,7 @@ function MenuSheet({
           {sections.map((s, idx) => (
             <section key={s.group ?? `s${idx}`} className="rounded-2xl bg-white border border-[var(--app-line)] px-2 pt-2.5 pb-1.5">
               {s.group && (
-                <h2 className="px-2 mb-1 text-[11px] font-bold uppercase tracking-[.08em] text-[var(--muted)]">{t(`nav.group.${s.group}` as DictKey)}</h2>
+                <h2 className="px-2 mb-1 text-[11px] font-bold uppercase tracking-[.08em] text-[var(--muted)]">{groupLabel(t, s.group)}</h2>
               )}
               <ul className="grid grid-cols-4 gap-0.5">
                 {s.items.map((item) => {
@@ -407,7 +431,7 @@ function MenuSheet({
                         <span className={`grid place-items-center h-10 w-10 rounded-[11px] ${on ? "bg-white" : "bg-[#eef2f1] text-[var(--mor)]"}`}>
                           <Icon name={isLocked ? "lock" : item.icon} className="h-5 w-5" strokeWidth={1.8} />
                         </span>
-                        {t(item.labelKey)}
+                        {itemLabel(t, item)}
                       </Link>
                     </li>
                   );
@@ -417,7 +441,7 @@ function MenuSheet({
           ))}
 
           <Link
-            href="/account/security"
+            href={securityHref}
             className="w-full flex items-center justify-center gap-2 min-h-[48px] rounded-2xl bg-white border border-[var(--app-line)] font-semibold mb-2"
           >
             <Icon name="lock" className="h-5 w-5" />

@@ -111,10 +111,10 @@ export default function PlansPage() {
   const [flash, setFlash] = useState<string | null>(null);
 
   return (
-    <div className="space-y-5 pb-16 max-w-4xl">
+    <div className="space-y-5 pb-16">
       <div className="page-head">
         <div>
-          <p className="page-kick">Platform</p>
+          <p className="page-kick">Customers</p>
           <h1 className="page-title">Plans</h1>
           <p className="page-sub">Prices are per month. A price change applies from the next invoice of every business on the plan.</p>
         </div>
@@ -136,7 +136,7 @@ export default function PlansPage() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-heading font-bold text-lg">{p.name}</p>
-                  <p className="text-xs font-mono text-[var(--muted)]">
+                  <p className="text-xs text-[var(--muted)]">
                     {p.code} · order {p.sortOrder} · {num(p._count.subscriptions)} on it
                   </p>
                 </div>
@@ -166,7 +166,7 @@ export default function PlansPage() {
               <div className="flex flex-wrap gap-1">
                 {p.features.length ? (
                   p.features.map((f) => (
-                    <span key={f} className="chip !py-0.5 !px-2 !text-[11px] font-mono" title={data.features[f]}>
+                    <span key={f} className="chip !py-0.5 !px-2 !text-[11px]" title={data.features[f]}>
                       {f}
                     </span>
                   ))

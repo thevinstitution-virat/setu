@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { ErrorBox, useFetch } from "@/components/admin/AdminKit";
 import RunBilling from "./RunBilling";
-import { TableWrap, inr, num } from "./kit";
+import { Kpi, TableWrap, inr, num } from "./kit";
+import type { IconName } from "@/components/Icon";
 
 type Data = {
   period: string;
@@ -14,6 +15,11 @@ type Data = {
 
 const LABEL: Record<string, string> = { ai_credits: "AI credits", messages: "Messages", api_calls: "API calls" };
 const BASE = ["ai_credits", "messages", "api_calls"];
+const TILE: Record<string, { icon: IconName; tone: "kesar" | "mor" | "blue" }> = {
+  ai_credits: { icon: "sparkle", tone: "kesar" },
+  messages: { icon: "chat", tone: "mor" },
+  api_calls: { icon: "share", tone: "blue" },
+};
 
 export default function UsagePage() {
   const [period, setPeriod] = useState("");
@@ -41,18 +47,12 @@ export default function UsagePage() {
 
       {data && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <section aria-label="This month's totals" className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
             {metrics.slice(0, 3).map((m) => (
-              <div key={m} className="card p-3 sm:p-4">
-                <p className="stat-num !text-2xl">{num(data.totals.metrics[m])}</p>
-                <p className="stat-lbl">{LABEL[m] ?? m}</p>
-              </div>
+              <Kpi key={m} icon={TILE[m]?.icon ?? "chart"} tone={TILE[m]?.tone ?? "mor"} label={LABEL[m] ?? m} value={num(data.totals.metrics[m])} note={`Every business, ${data.period}`} />
             ))}
-            <div className="card p-3 sm:p-4">
-              <p className="stat-num !text-2xl">{inr(data.totals.costPaise)}</p>
-              <p className="stat-lbl">Our AI cost</p>
-            </div>
-          </div>
+            <Kpi icon="rupee" tone="red" label="Our AI cost" value={inr(data.totals.costPaise)} note="What the AI provider charges us" />
+          </section>
 
           <div className="card p-0 sm:p-1 overflow-hidden">
             {data.tenants.length === 0 ? (
@@ -78,9 +78,9 @@ export default function UsagePage() {
                         <Link href={`/platform/tenants/${t.tenantId}`} className="font-semibold text-[var(--mor)] hover:underline">
                           {t.name}
                         </Link>
-                        <span className="block text-xs font-mono text-[var(--muted)]">{t.slug}</span>
+                        <span className="block text-xs text-[var(--muted)]">{t.slug}</span>
                       </td>
-                      <td className="font-mono text-xs">{t.plan}</td>
+                      <td className="capitalize">{t.plan}</td>
                       {metrics.map((m) => (
                         <td key={m} className="!text-right tabular-nums">
                           {num(t.metrics[m])}

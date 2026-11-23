@@ -105,14 +105,15 @@ export default function AnnouncementsPage() {
   }
 
   return (
-    <div className="space-y-5 pb-16 max-w-3xl">
+    <div className="space-y-5 pb-16">
       <div>
         <p className="page-kick">Platform</p>
         <h1 className="page-title">Announcements</h1>
         <p className="page-sub">A banner in the office app of businesses: maintenance, new features, billing notices.</p>
       </div>
 
-      <form onSubmit={save} className="card p-4 sm:p-5 space-y-4">
+      <div className="grid gap-5 xl:grid-cols-2 items-start">
+      <form onSubmit={save} className="card p-4 sm:p-5 space-y-4 xl:sticky xl:top-20">
         <p className="font-heading font-bold">{replacing ? `Edit “${replacing.title}”` : "New announcement"}</p>
         {replacing && <p className="text-sm text-[var(--muted)]">Saving publishes this as a new announcement and ends the old one, so the record keeps both.</p>}
         <Field label="Title" hint="3–100 characters">
@@ -169,6 +170,8 @@ export default function AnnouncementsPage() {
         <Flash text={flash} />
       </form>
 
+      <div className="space-y-3 min-w-0">
+      <p className="font-heading font-bold">Sent so far</p>
       {error && <ErrorBox message={error} onRetry={reload} />}
       {!data && !error && <p className="text-sm text-[var(--muted)]">Loading…</p>}
       {data && (
@@ -210,6 +213,8 @@ export default function AnnouncementsPage() {
           })}
         </div>
       )}
+      </div>
+      </div>
     </div>
   );
 }

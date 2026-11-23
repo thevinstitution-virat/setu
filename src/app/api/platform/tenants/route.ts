@@ -46,9 +46,25 @@ export async function GET(req: Request) {
       tx.platformInvoice.groupBy({ by: ["tenantId"], where: { tenantId: { in: ids }, status: "ISSUED", dueAt: { lte: new Date() } }, _sum: { total: true } }),
     ]);
   });
+  // Tiles over the list: the whole platform, whatever the filter.
+  const [byStatus, ordersAll, overdueAll] = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('app.bypass_rls', 'on', TRUE)`;
+    return Promise.all([
+      tx.tenant.groupBy({ by: ["status"], _count: true }),
+      tx.order.count({ where: { createdAt: { gte: since } } }),
+      tx.platformInvoice.aggregate({ where: { status: "ISSUED", dueAt: { lte: new Date() } }, _sum: { total: true }, _count: true }),
+    ]);
+  });
+  const summary = {
+    byStatus: Object.fromEntries(byStatus.map((r) => [r.status, r._count])) as Partial<Record<TenantStatus, number>>,
+    orders30d: ordersAll,
+    overduePaise: overdueAll._sum.total ?? 0,
+    overdueInvoices: overdueAll._count,
+  };
   const m = <T extends { tenantId: string }>(rows: T[]) => new Map(rows.map((r) => [r.tenantId, r]));
   const [ms, mr, mo, ml, md] = [m(staff), m(shops), m(orders), m(lastOrder), m(overdue)];
   return NextResponse.json({
+    summary,
     tenants: tenants.map((t) => ({
       ...t,
       staff: ms.get(t.id)?._count ?? 0,

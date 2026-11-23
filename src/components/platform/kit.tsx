@@ -7,6 +7,8 @@
  */
 
 import { createContext, useContext, useState } from "react";
+import Link from "next/link";
+import Icon, { type IconName } from "@/components/Icon";
 
 export type PlatformRole = "OWNER" | "SUPPORT";
 
@@ -214,6 +216,55 @@ export function Section({ title, sub, children, right }: { title: string; sub?: 
       {children}
     </section>
   );
+}
+
+const KPI_TONES = {
+  kesar: "bg-[var(--kesar-tint)] text-[var(--kesar-text)]",
+  mor: "bg-[#e1eeec] text-[var(--mor)]",
+  genda: "bg-[var(--genda-tint)] text-[var(--genda-text)]",
+  mint: "bg-[var(--mint-tint)] text-[var(--mint-text)]",
+  red: "bg-[#fde4e1] text-[#a8281e]",
+  blue: "bg-[#e3eef8] text-[#1f4e79]",
+};
+
+/** A number tile, the same as the office dashboard's (app/admin/page.tsx). With `href` the tile is a link. */
+export function Kpi({
+  icon,
+  tone,
+  label,
+  value,
+  note,
+  noteTone,
+  href,
+  onClick,
+  active,
+}: {
+  icon: IconName;
+  tone: keyof typeof KPI_TONES;
+  label: string;
+  value: string;
+  note?: React.ReactNode;
+  noteTone?: "red";
+  href?: string;
+  onClick?: () => void;
+  active?: boolean;
+}) {
+  const body = (
+    <>
+      <span className="flex items-center justify-between gap-2">
+        <span className="text-[13px] font-semibold text-[var(--muted)]">{label}</span>
+        <span className={`hidden sm:grid place-items-center h-8 w-8 rounded-lg ${KPI_TONES[tone]}`}>
+          <Icon name={icon} className="h-[17px] w-[17px]" />
+        </span>
+      </span>
+      <span className="text-[22px] sm:text-[28px] font-bold leading-tight num tracking-[-0.02em] truncate">{value}</span>
+      {note != null && <span className={`text-xs sm:text-[13px] ${noteTone === "red" ? "text-[#a8281e]" : "text-[var(--muted)]"}`}>{note}</span>}
+    </>
+  );
+  const cls = `card p-4 sm:p-[18px] flex flex-col gap-1.5 min-w-0 text-left transition ${href || onClick ? "hover:border-[#c9d3d0]" : ""} ${active ? "!border-[var(--mor)] ring-1 ring-[var(--mor)]" : ""}`;
+  if (href) return <Link href={href} className={cls}>{body}</Link>;
+  if (onClick) return <button type="button" onClick={onClick} aria-pressed={active} className={cls}>{body}</button>;
+  return <div className={cls}>{body}</div>;
 }
 
 /** Wide table that scrolls sideways on phones. */

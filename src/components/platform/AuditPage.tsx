@@ -29,6 +29,14 @@ const ACTIONS = [
   { v: "platform.", label: "Billing runs" },
 ];
 
+/** "tenant.admin_email" → the section ("Business changes") and "Admin email". */
+function readable(action: string) {
+  const dot = action.indexOf(".");
+  const group = ACTIONS.find((a) => a.v && action.startsWith(a.v))?.label ?? null;
+  const rest = (dot >= 0 ? action.slice(dot + 1) : action).replace(/[._]/g, " ").trim();
+  return { group, text: rest ? rest[0].toUpperCase() + rest.slice(1) : action };
+}
+
 export default function AuditPage() {
   const tenants = useFetch<{ tenants: { id: string; name: string }[] }>("/api/platform/tenants?take=500");
   const [action, setAction] = useState("");
@@ -67,8 +75,8 @@ export default function AuditPage() {
   return (
     <div className="space-y-5 pb-16">
       <div>
-        <p className="page-kick">Platform</p>
-        <h1 className="page-title">Audit</h1>
+        <p className="page-kick">Safety</p>
+        <h1 className="page-title">Audit log</h1>
         <p className="page-sub">Everything done in this console, newest first.</p>
       </div>
 
@@ -98,7 +106,10 @@ export default function AuditPage() {
           {rows.map((r) => (
             <li key={r.id} className="py-2.5 text-sm space-y-0.5">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <span className={`font-mono font-semibold ${r.action.endsWith("failed") ? "text-[#a8281e]" : ""}`}>{r.action}</span>
+                <span className={`font-semibold ${r.action.endsWith("failed") ? "text-[#a8281e]" : ""}`} title={r.action}>
+                  {readable(r.action).text}
+                </span>
+                {readable(r.action).group && <span className="chip !py-0.5 !px-2 !text-[11px]">{readable(r.action).group}</span>}
                 {r.tenantId && (
                   <Link href={`/platform/tenants/${r.tenantId}`} className="text-[var(--mor)] hover:underline">
                     {r.tenantName ?? r.tenantId}
@@ -126,10 +137,29 @@ export default function AuditPage() {
   );
 }
 
+/** "adminId" → "admin id". */
+const words = (k: string) => k.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/_/g, " ").toLowerCase();
+
 function Detail({ value }: { value: unknown }) {
   const text = JSON.stringify(value);
   if (!text || text === "{}") return null;
-  if (text.length <= 140) return <p className="font-mono text-[11.5px] text-[var(--ink-2)] break-all">{text}</p>;
+  // A flat record reads as "key value · key value"; anything deeper keeps the raw view.
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length <= 6 && entries.every(([, v]) => v === null || ["string", "number", "boolean"].includes(typeof v))) {
+      return (
+        <p className="text-xs text-[var(--ink-2)] break-words">
+          {entries.map(([k, v], i) => (
+            <span key={k}>
+              {i > 0 && <span className="text-[var(--muted)]"> · </span>}
+              <span className="text-[var(--muted)]">{words(k)}</span> {v === true ? "yes" : v === false ? "no" : v === null ? "—" : String(v)}
+            </span>
+          ))}
+        </p>
+      );
+    }
+  }
+  if (text.length <= 140) return <p className="text-xs text-[var(--ink-2)] break-all">{text}</p>;
   return (
     <details>
       <summary className="cursor-pointer text-xs font-bold text-[var(--kesar-text)]">Details</summary>

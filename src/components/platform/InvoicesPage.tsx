@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ErrorBox, TabBar, useFetch } from "@/components/admin/AdminKit";
 import InvoiceList, { type PlatformInvoice } from "./InvoiceList";
-import { inr, num } from "./kit";
+import { Kpi, inr, num } from "./kit";
 
 type Totals = { status: "ISSUED" | "PAID" | "VOID"; _sum: { total: number | null }; _count: number }[];
 
@@ -17,7 +17,11 @@ const TABS = [
 
 type Tab = (typeof TABS)[number]["key"];
 
-const TOTAL_LABEL = { ISSUED: "Unpaid", PAID: "Paid", VOID: "Void" } as const;
+const TOTAL_TILE = {
+  ISSUED: { label: "Unpaid", icon: "receipt", tone: "kesar", tab: "ISSUED" },
+  PAID: { label: "Paid", icon: "check", tone: "mint", tab: "PAID" },
+  VOID: { label: "Void", icon: "x", tone: "mor", tab: "VOID" },
+} as const;
 
 export default function InvoicesPage() {
   const [tab, setTab] = useState<Tab>("all");
@@ -25,27 +29,33 @@ export default function InvoicesPage() {
   const { data, error, reload } = useFetch<{ invoices: PlatformInvoice[]; totals: Totals }>(url);
 
   return (
-    <div className="space-y-5 pb-16 max-w-4xl">
+    <div className="space-y-5 pb-16">
       <div>
-        <p className="page-kick">Platform</p>
+        <p className="page-kick">Customers</p>
         <h1 className="page-title">Invoices</h1>
         <p className="page-sub">Our GST invoices to businesses for their subscription. The latest 200 are shown.</p>
       </div>
 
       {data && (
-        <div className="grid grid-cols-3 gap-3">
+        <section aria-label="Totals" className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
           {(["ISSUED", "PAID", "VOID"] as const).map((s) => {
             const t = data.totals.find((x) => x.status === s);
+            const tile = TOTAL_TILE[s];
+            const n = t?._count ?? 0;
             return (
-              <div key={s} className="card p-3 sm:p-4 min-w-0">
-                <p className="stat-num !text-lg sm:!text-2xl truncate">{inr(t?._sum.total ?? 0)}</p>
-                <p className="stat-lbl">
-                  {TOTAL_LABEL[s]} · {num(t?._count ?? 0)}
-                </p>
-              </div>
+              <Kpi
+                key={s}
+                icon={tile.icon}
+                tone={tile.tone}
+                label={tile.label}
+                value={inr(t?._sum.total ?? 0)}
+                note={`${num(n)} invoice${n === 1 ? "" : "s"}`}
+                onClick={() => setTab(tab === tile.tab ? "all" : tile.tab)}
+                active={tab === tile.tab}
+              />
             );
           })}
-        </div>
+        </section>
       )}
 
       <TabBar tabs={TABS} value={tab} onChange={setTab} />

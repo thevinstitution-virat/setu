@@ -10,7 +10,7 @@ import TenantSupport from "./TenantSupport";
 import TenantAdmins from "./TenantAdmins";
 import TenantAndroid from "./TenantAndroid";
 import TenantDataPanel from "./TenantDataPanel";
-import { Section, StatusChip, TableWrap, ago, inr, num, when } from "./kit";
+import { Kpi, Section, StatusChip, TableWrap, ago, inr, num, when } from "./kit";
 import type { TenantData } from "./tenant-types";
 
 const METRIC_LABEL: Record<string, string> = { ai_credits: "AI credits", messages: "Messages", api_calls: "API calls" };
@@ -35,7 +35,7 @@ export default function TenantDetail({ id }: { id: string }) {
       <BackLink />
       <div className="page-head">
         <div className="min-w-0">
-          <p className="page-kick font-mono !normal-case !tracking-normal">{t.slug}</p>
+          <p className="page-kick">Business · {t.slug}</p>
           <h1 className="page-title break-words">{t.name}</h1>
           <div className="flex flex-wrap gap-1.5 mt-2">
             <StatusChip value={t.status} />
@@ -48,12 +48,12 @@ export default function TenantDetail({ id }: { id: string }) {
       </div>
       {error && <ErrorBox message={error} onRetry={reload} />}
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Stat value={`${num(data.limits.staff.used)}${data.limits.staff.limit !== null ? ` / ${num(data.limits.staff.limit)}` : ""}`} label="Staff logins" />
-        <Stat value={`${num(data.limits.retailers.used)}${data.limits.retailers.limit !== null ? ` / ${num(data.limits.retailers.limit)}` : ""}`} label="Shops" />
-        <Stat value={num(h.orders30d)} label="Orders, 30 days" />
-        <Stat value={ago(h.lastOrderAt)} label="Last order" />
-      </div>
+      <section aria-label="At a glance" className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+        <Kpi icon="users" tone="mor" label="Staff logins" value={num(data.limits.staff.used)} note={data.limits.staff.limit !== null ? `of ${num(data.limits.staff.limit)} on the plan` : "No limit"} />
+        <Kpi icon="cart" tone="blue" label="Shops" value={num(data.limits.retailers.used)} note={data.limits.retailers.limit !== null ? `of ${num(data.limits.retailers.limit)} on the plan` : "No limit"} />
+        <Kpi icon="box" tone="kesar" label="Orders, 30 days" value={num(h.orders30d)} note="Placed in the last 30 days" />
+        <Kpi icon="clock" tone="mint" label="Last order" value={ago(h.lastOrderAt)} note={h.lastOrderAt ? when(h.lastOrderAt, true) : "No orders yet"} />
+      </section>
 
       {(h.messagesFailed24h > 0 || h.webhooksDead24h > 0 || h.einvoiceFailed > 0) && (
         <div className="card p-4 !bg-[#fde4e1]/70 flex flex-wrap gap-x-5 gap-y-1 text-sm text-[#a8281e]">
@@ -115,17 +115,8 @@ export default function TenantDetail({ id }: { id: string }) {
 function BackLink() {
   return (
     <Link href="/platform" className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--mor)] hover:underline">
-      <Icon name="chevronLeft" className="h-4 w-4" /> All tenants
+      <Icon name="chevronLeft" className="h-4 w-4" /> All businesses
     </Link>
-  );
-}
-
-function Stat({ value, label }: { value: string; label: string }) {
-  return (
-    <div className="card p-3 sm:p-4 min-w-0">
-      <p className="stat-num !text-xl sm:!text-2xl truncate">{value}</p>
-      <p className="stat-lbl">{label}</p>
-    </div>
   );
 }
 

@@ -13,7 +13,7 @@ export default async function PlatformSecurityPage({ searchParams }: { searchPar
   if (!u) redirect("/platform/login");
   return (
     <>
-      <main className="mx-auto w-full max-w-lg px-4 py-8">
+      <div className="w-full max-w-lg">
         <SecurityPanel
           status={{ required: true, enabled: !!u.totpEnabledAt, recoveryLeft: u.recoveryCodes.length, googleEmail: u.googleEmail, googleAvailable: googleConfigured() }}
           endpoint="/api/platform/auth/security"
@@ -22,7 +22,7 @@ export default async function PlatformSecurityPage({ searchParams }: { searchPar
           selfHref="/platform/security"
           notice={noticeText(typeof q.notice === "string" ? q.notice : null)}
         />
-      </main>
+      </div>
     </>
   );
 }
