@@ -3,6 +3,10 @@ import { getTenant } from "@/lib/tenant";
 import { getPlatformSession } from "@/lib/platform-auth";
 import { BrandMark } from "@/components/BrandMark";
 import LoginForm from "@/components/platform/LoginForm";
+import EmailLinkForm from "@/components/auth/EmailLinkForm";
+
+/** For now the console signs in by emailed link (or Google); the password form comes back by setting this to true. */
+const SHOW_PASSWORD = false;
 import GoogleButton from "@/components/auth/GoogleButton";
 import { googleConfigured } from "@/lib/google";
 import { noticeText } from "@/lib/login-notices";
@@ -31,7 +35,14 @@ export default async function PlatformLoginPage({ searchParams }: { searchParams
         <>
           {notice && <p role="status" className="text-sm rounded-lg bg-ink/5 text-[var(--ink-2)] px-3 py-2 break-words">{notice}</p>}
           {googleConfigured() && <GoogleButton href="/api/platform/auth/google/start" label="Continue with Google" />}
-          <LoginForm />
+          {SHOW_PASSWORD ? (
+            <LoginForm />
+          ) : (
+            <div className="card p-5 space-y-3">
+              <EmailLinkForm />
+              <p className="text-xs text-[var(--muted)]">After the link, the console asks for the code from your authenticator app.</p>
+            </div>
+          )}
         </>
       )}
     </div>

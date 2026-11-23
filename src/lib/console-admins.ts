@@ -106,6 +106,8 @@ export async function createBusiness(raw: { slug?: unknown; name?: unknown; plan
         loginId: admin.loginId,
         phone: admin.phone,
         email: admin.email,
+        // The super-admin vouches for the address: it is how they sign in for now.
+        emailConfirmed: !!admin.email,
       },
     ),
   ).catch((e: unknown) => {
@@ -138,12 +140,17 @@ export async function addAdmin(tenantId: string, raw: NewAdmin) {
       if (e instanceof LimitError) throw new ConsoleAdminError(e.message, 402);
       throw e;
     }
+    if (a.email && (await tx.user.findFirst({ where: { email: { equals: a.email, mode: "insensitive" } }, select: { id: true } }))) {
+      throw new ConsoleAdminError("Another login here already uses that email address");
+    }
     return tx.user.create({
       data: {
         name: a.name,
         loginId: a.loginId,
         phone: a.phone,
         email: a.email,
+        // The super-admin vouches for the address: it is how they sign in for now.
+        emailVerifiedAt: a.email ? new Date() : null,
         role: "ADMIN",
       },
       select: { id: true },
@@ -159,6 +166,20 @@ export async function adminPasswordLink(tenantId: string, userId: string) {
   const u = await adminOf(tenantId, userId);
   if (!u.active) throw new ConsoleAdminError("Switch this admin on first");
   return passwordLink(tenantId, t.slug, t.name, u.id, u.email);
+}
+
+/** Set (or clear) an admin's email as confirmed: the super-admin vouches for it. They sign in with it. */
+export async function setAdminEmail(tenantId: string, userId: string, raw: unknown) {
+  await openTenant(tenantId);
+  await adminOf(tenantId, userId);
+  const email = typeof raw === "string" && raw.trim() ? normaliseEmail(raw) : null;
+  if (email && !validEmail(email)) throw new ConsoleAdminError("Enter a real email address");
+  await withTenantTx(tenantId, async (tx) => {
+    if (email && (await tx.user.findFirst({ where: { email: { equals: email, mode: "insensitive" }, id: { not: userId } }, select: { id: true } }))) {
+      throw new ConsoleAdminError("Another login here already uses that email address");
+    }
+    await tx.user.update({ where: { id: userId }, data: { email, emailVerifiedAt: email ? new Date() : null } });
+  });
 }
 
 /** Lost phone: clear the authenticator app and sign them out everywhere. */

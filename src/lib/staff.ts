@@ -5,12 +5,25 @@ import { validMobile } from "@/lib/field-math";
  * Optional staff fields from an admin form: phone (OTP sign-in and the
  * multi-business switch) and supervisor. Only the keys present change.
  */
+export type StaffFields = { phone?: string | null; supervisorId?: string | null; email?: string | null; emailVerifiedAt?: Date | null };
+
 export async function checkStaffFields(
   db: TenantDb,
   userId: string | null,
   body: Record<string, unknown> | null
-): Promise<{ data: { phone?: string | null; supervisorId?: string | null } } | { error: string }> {
-  const data: { phone?: string | null; supervisorId?: string | null } = {};
+): Promise<{ data: StaffFields } | { error: string }> {
+  const data: StaffFields = {};
+  // An email the admin types in counts as confirmed (they vouch for their staff, as with passwords): it is how staff sign in for now.
+  if (body && "email" in body) {
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    if (email) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || email.length > 200) return { error: "Enter a real email address" };
+      const clash = await db.user.findFirst({ where: { email: { equals: email, mode: "insensitive" }, ...(userId ? { id: { not: userId } } : {}) }, select: { name: true } });
+      if (clash) return { error: `${clash.name} already uses this email address` };
+    }
+    data.email = email || null;
+    data.emailVerifiedAt = email ? new Date() : null;
+  }
   if (body && "phone" in body) {
     const phone = typeof body.phone === "string" ? body.phone.replace(/\D/g, "") : "";
     if (phone) {

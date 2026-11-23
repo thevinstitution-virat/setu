@@ -108,6 +108,7 @@ export default function TenantAdmins({ tenantId, closed }: { tenantId: string; c
   } | null>(null);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState(EMPTY_ADMIN);
+  const [mail, setMail] = useState<{ id: string; value: string } | null>(null);
 
   async function act(key: string, body: Record<string, unknown>, done?: (r: { url?: string; emailed?: boolean }) => void) {
     setBusy(key);
@@ -188,8 +189,37 @@ export default function TenantAdmins({ tenantId, closed }: { tenantId: string; c
               <p className="text-xs text-[var(--muted)] break-words">
                 {a.loginId ?? "No login ID"} · {a.phone ?? "No mobile"} · {a.email ? `${a.email}${a.emailVerifiedAt ? " (confirmed)" : " (not confirmed)"}` : "No email"} · since {when(a.createdAt)}
               </p>
+              {owner && !closed && mail?.id === a.id && (
+                <form
+                  className="flex flex-wrap items-end gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const value = mail.value.trim().toLowerCase();
+                    act(`mail-${a.id}`, { action: "email", userId: a.id, email: value }, () => {
+                      setMail(null);
+                      setNote(value ? `${a.name} can now sign in with ${value}.` : `${a.name}'s email was removed.`);
+                    });
+                  }}
+                >
+                  <label className="block flex-1 min-w-[220px]">
+                    <span className="block text-xs font-medium text-[var(--muted)] mb-1">Email they sign in with (counts as confirmed)</span>
+                    <input className="input" type="email" autoComplete="off" value={mail.value} onChange={(e) => setMail({ id: a.id, value: e.target.value })} placeholder="name@example.com" />
+                  </label>
+                  <button type="submit" className="btn btn-primary btn-sm" disabled={busy === `mail-${a.id}`}>
+                    {busy === `mail-${a.id}` ? "Saving…" : "Save email"}
+                  </button>
+                  <button type="button" className="btn btn-quiet btn-sm" onClick={() => setMail(null)}>
+                    Cancel
+                  </button>
+                </form>
+              )}
               {owner && !closed && (
                 <div className="flex flex-wrap gap-2">
+                  {a.active && mail?.id !== a.id && (
+                    <button type="button" className="btn btn-quiet btn-xs" disabled={!!busy} onClick={() => setMail({ id: a.id, value: a.email ?? "" })}>
+                      {a.email ? (a.emailVerifiedAt ? "Change email" : "Confirm email") : "Set email"}
+                    </button>
+                  )}
                   {a.active && (
                     <button
                       type="button"

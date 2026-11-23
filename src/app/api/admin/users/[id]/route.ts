@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { audit, requestIp } from "@/lib/audit";
-import { checkStaffFields } from "@/lib/staff";
+import { checkStaffFields, type StaffFields } from "@/lib/staff";
 import { checkLimit, LimitError } from "@/lib/plans";
 import { hashPassword } from "@/lib/password";
 import { passwordProblem } from "@/lib/email-auth";
@@ -32,7 +32,7 @@ export async function PATCH(
   if (body.password !== undefined) actions.push("password");
   if (body.resetMfa === true) actions.push("resetMfa");
   if (body.signOut === true) actions.push("signOut");
-  if (["name", "phone", "supervisorId"].some((k) => k in body)) actions.push("edit");
+  if (["name", "phone", "supervisorId", "email"].some((k) => k in body)) actions.push("edit");
   for (const a of actions) {
     const refused = changeProblem({ userId: session.userId, ...me }, target, a);
     if (refused) return NextResponse.json({ error: refused }, { status: a === "deactivate" && id === session.userId ? 400 : 403 });
@@ -46,7 +46,7 @@ export async function PATCH(
 
   const extra = await checkStaffFields(db, id, body);
   if ("error" in extra) return NextResponse.json({ error: extra.error }, { status: 400 });
-  const data: { active?: boolean; name?: string; phone?: string | null; supervisorId?: string | null } = { ...extra.data };
+  const data: StaffFields & { active?: boolean; name?: string } = { ...extra.data };
   if (typeof body.active === "boolean") data.active = body.active;
   if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim().slice(0, 80);
 
@@ -74,5 +74,5 @@ export async function PATCH(
 
   await audit(db, { actorId: session.userId, action: "user.update", entity: "User", entityId: id, after: { ...data, ...(body.signOut === true ? { signedOut: true } : {}), ...(resetMfa ? { mfaReset: true } : {}), ...(newHash ? { passwordSet: true } : {}) }, ip: requestIp(req) });
 
-  return NextResponse.json({ user: { id: user.id, active: user.active, name: user.name, phone: user.phone, supervisorId: user.supervisorId } });
+  return NextResponse.json({ user: { id: user.id, active: user.active, name: user.name, phone: user.phone, email: user.email, supervisorId: user.supervisorId } });
 }

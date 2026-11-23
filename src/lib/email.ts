@@ -74,6 +74,8 @@ export type MailBody = {
   code?: string;
   /** A button (and the same link written out, for mail apps that hide buttons). */
   link?: { label: string; url: string };
+  /** Several buttons (one per business, for sign-in links). */
+  links?: { label: string; url: string }[];
   /** Small print at the end ("didn't ask for this?"). */
   footer?: string;
   /** Who it's from, e.g. the business name. */
@@ -81,12 +83,14 @@ export type MailBody = {
 };
 
 export function renderMail(b: MailBody): { text: string; html: string } {
+  const links = [...(b.link ? [b.link] : []), ...(b.links ?? [])];
   const text = [
     b.title,
     "",
     ...b.lines,
     ...(b.code ? ["", b.code, ""] : []),
-    ...(b.link ? ["", `${b.link.label}: ${b.link.url}`, ""] : []),
+    ...links.flatMap((l) => ["", `${l.label}: ${l.url}`]),
+    ...(links.length ? [""] : []),
     ...(b.footer ? ["", b.footer] : []),
     "",
     `— ${b.brand}`,
@@ -99,12 +103,12 @@ export function renderMail(b: MailBody): { text: string; html: string } {
 <h1 style="margin:0 0 16px;font-size:20px;color:#0f2a2a">${esc(b.title)}</h1>
 ${b.lines.map(p).join("\n")}
 ${b.code ? `<p style="margin:20px 0;font-size:32px;font-weight:700;letter-spacing:.3em;color:#0f2a2a;font-family:Menlo,Consolas,monospace">${esc(b.code)}</p>` : ""}
-${
-  b.link
-    ? `<p style="margin:20px 0"><a href="${esc(b.link.url)}" style="display:inline-block;background:#db5c17;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:10px">${esc(b.link.label)}</a></p>
-<p style="margin:0 0 12px;font-size:12px;color:#5b6b6a;word-break:break-all">${esc(b.link.url)}</p>`
-    : ""
-}
+${links
+  .map(
+    (l) => `<p style="margin:20px 0 6px"><a href="${esc(l.url)}" style="display:inline-block;background:#db5c17;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:10px">${esc(l.label)}</a></p>
+<p style="margin:0 0 12px;font-size:12px;color:#5b6b6a;word-break:break-all">${esc(l.url)}</p>`
+  )
+  .join("\n")}
 ${b.footer ? `<p style="margin:20px 0 0;font-size:12px;color:#5b6b6a">${esc(b.footer)}</p>` : ""}
 </div></body></html>`;
   return { text, html };

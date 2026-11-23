@@ -31,6 +31,7 @@ export const LOGIN_NOTICES = {
   "mfa-expired": "Your sign-in took too long. Please sign in again.",
   "password-reset": "Password changed. Sign in with the new one.",
   "password-set": "Password saved. Sign in with your login ID and the new password.",
+  "link-expired": "That sign-in link has expired or was already used. Ask for a new one.",
 } as const;
 
 export type LoginNotice = keyof typeof LOGIN_NOTICES;

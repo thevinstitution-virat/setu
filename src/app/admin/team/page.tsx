@@ -13,6 +13,9 @@ type TeamUser = {
   name: string;
   loginId: string | null;
   phone: string | null;
+  /** The address they sign in with (an admin typing it in counts as confirming it). */
+  email?: string | null;
+  emailVerifiedAt?: string | null;
   role: Role;
   active: boolean;
   /** The business owner: nobody else here can change their login. */
@@ -81,7 +84,9 @@ function SupervisorSelect({
   );
 }
 
-const EMPTY = { name: "", loginId: "", password: "", role: "SALES_AGENT" as Role, phone: "", supervisorId: "" };
+const EMPTY = { name: "", loginId: "", password: "", role: "SALES_AGENT" as Role, phone: "", email: "", supervisorId: "" };
+const EMAIL_HINT = "They sign in with this address: a code is emailed to them.";
+const looksLikeEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
 
 export default function AdminTeamPage() {
   const { data, error: loadError, reload } = useFetch<{ users: TeamUser[]; retailers: Retailer[]; me?: Me }>("/api/admin/users");
@@ -119,6 +124,10 @@ export default function AdminTeamPage() {
       setError("Enter a 10-digit mobile number");
       return;
     }
+    if (form.email.trim() && !looksLikeEmail(form.email)) {
+      setError("Enter a real email address");
+      return;
+    }
     setLoading(true);
     try {
       await send("/api/admin/users", "POST", {
@@ -127,6 +136,7 @@ export default function AdminTeamPage() {
         password: form.password,
         role: form.role,
         ...(form.phone ? { phone: form.phone } : {}),
+        ...(form.email.trim() ? { email: form.email.trim() } : {}),
         ...(form.role !== "SUPERVISOR" && form.role !== "ADMIN" && form.supervisorId ? { supervisorId: form.supervisorId } : {}),
       });
       setFlash(`${form.name.trim()} added`);
@@ -240,6 +250,9 @@ export default function AdminTeamPage() {
               onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "").slice(0, 10) })}
             />
           </Field>
+          <Field label="Email" hint={EMAIL_HINT}>
+            <input className="input" type="email" autoCapitalize="none" autoComplete="off" placeholder="name@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </Field>
           {form.role !== "SUPERVISOR" && form.role !== "ADMIN" && (
             <Field label="Supervisor" hint={supervisors.length ? undefined : "Add a supervisor first to build a team."}>
               <SupervisorSelect value={form.supervisorId} onChange={(id) => setForm({ ...form, supervisorId: id })} options={supervisors} />
@@ -290,7 +303,8 @@ export default function AdminTeamPage() {
                         </span>
                       ) : (
                         "No mobile"
-                      )}
+                      )}{" "}
+                      · {u.email && u.emailVerifiedAt ? u.email : u.email ? `${u.email} (not confirmed: can't sign in with it)` : "No email: can't sign in yet"}
                     </p>
                     <p className="text-xs text-[var(--ink-2)]">
                       {u.isOwner
@@ -457,6 +471,7 @@ function EditStaff({
 }) {
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone ?? "");
+  const [email, setEmail] = useState(user.email ?? "");
   const [supervisorId, setSupervisorId] = useState(user.supervisorId ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -467,11 +482,14 @@ function EditStaff({
 
   async function save() {
     setError(null);
-    const patch: { name?: string; phone?: string | null; supervisorId?: string | null } = {};
+    const patch: { name?: string; phone?: string | null; email?: string | null; supervisorId?: string | null } = {};
     if (!name.trim()) return setError("Enter a name");
     if (name.trim() !== user.name) patch.name = name.trim();
     if (phone && !validMobile(phone)) return setError("Enter a 10-digit mobile number");
     if (phone !== (user.phone ?? "")) patch.phone = phone || null;
+    if (email.trim() && !looksLikeEmail(email)) return setError("Enter a real email address");
+    // Saving an unconfirmed address as is confirms it (the admin vouches for it).
+    if (email.trim().toLowerCase() !== (user.email ?? "") || (email.trim() && !user.emailVerifiedAt)) patch.email = email.trim() || null;
     if (user.role !== "SUPERVISOR" && supervisorId !== (user.supervisorId ?? "")) patch.supervisorId = supervisorId || null;
     if (!Object.keys(patch).length) return onClose();
     setBusy(true);
@@ -518,6 +536,9 @@ function EditStaff({
           value={phone}
           onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
         />
+      </Field>
+      <Field label="Email" hint={`${EMAIL_HINT} Leave blank to remove.`}>
+        <input className="input" type="email" autoCapitalize="none" autoComplete="off" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
       </Field>
       {user.role === "ADMIN" ? null : user.role !== "SUPERVISOR" ? (
         <Field label="Supervisor" hint={options.length ? "Their supervisor sees their day, visits and leave." : "Add a supervisor first to build a team."}>

@@ -102,48 +102,82 @@ const splitToken = (token: unknown) => {
   return id && secret && extra === undefined && id.length <= 40 && secret.length <= 64 ? { id, secret } : null;
 };
 
-/** The open reset challenge a link token belongs to, or null (wrong, expired or used). */
-export async function readResetToken(db: TenantDb, token: unknown, now = Date.now()) {
+type LinkPurpose = "RESET" | "LINK";
+
+async function readLinkToken(db: TenantDb, token: unknown, purpose: LinkPurpose, now: number) {
   const t = splitToken(token);
   if (!t) return null;
   const c = await db.emailChallenge.findUnique({ where: { id: t.id } });
-  if (!c || c.purpose !== "RESET" || c.usedAt || c.expiresAt.getTime() <= now) return null;
+  if (!c || c.purpose !== purpose || c.usedAt || c.expiresAt.getTime() <= now) return null;
   return sameHex(c.codeHash, linkHash("user", c.id, t.secret)) ? c : null;
 }
 
-/** Uses a reset link up (only one of two parallel uses wins); also closes this person's other open links. */
-export async function spendResetToken(db: TenantDb, id: string, userId: string, now = Date.now()) {
-  const won = await db.emailChallenge.updateMany({ where: { id, usedAt: null }, data: { usedAt: new Date(now) } });
+async function spendLinkToken(db: TenantDb, id: string, userId: string, purpose: LinkPurpose, now: number) {
+  const won = await db.emailChallenge.updateMany({ where: { id, purpose, usedAt: null }, data: { usedAt: new Date(now) } });
   if (won.count !== 1) return false;
-  await db.emailChallenge.updateMany({ where: { userId, purpose: "RESET", usedAt: null }, data: { usedAt: new Date(now) } });
+  await db.emailChallenge.updateMany({ where: { userId, purpose, usedAt: null }, data: { usedAt: new Date(now) } });
   return true;
 }
+
+/** The open reset challenge a link token belongs to, or null (wrong, expired or used). */
+export const readResetToken = (db: TenantDb, token: unknown, now = Date.now()) => readLinkToken(db, token, "RESET", now);
+
+/** Uses a reset link up (only one of two parallel uses wins); also closes this person's other open links. */
+export const spendResetToken = (db: TenantDb, id: string, userId: string, now = Date.now()) => spendLinkToken(db, id, userId, "RESET", now);
+
+// ---- One-click sign-in links (business logins) -----------------------------
+
+const SIGN_IN_LINK_TTL_MS = 15 * 60_000;
+
+/** A sign-in link token for this login (15 minutes, once), for an address it confirmed. */
+export async function issueSignInLink(db: TenantDb, userId: string, email: string, now = Date.now()): Promise<string> {
+  const recent = await db.emailChallenge.count({ where: { userId, purpose: "LINK", createdAt: { gte: new Date(now - SEND_WINDOW_MS) } } });
+  if (recent >= MAX_SENDS) throw new EmailAuthError("Too many sign-in emails asked for. Please wait 10 minutes and try again.", 429);
+  const secret = randomBytes(32).toString("base64url");
+  const row = await db.emailChallenge.create({ data: { userId, email, purpose: "LINK", codeHash: "pending", expiresAt: new Date(now + SIGN_IN_LINK_TTL_MS) } });
+  await db.emailChallenge.update({ where: { id: row.id }, data: { codeHash: linkHash("user", row.id, secret) } });
+  return `${row.id}.${secret}`;
+}
+
+export const readSignInLink = (db: TenantDb, token: unknown, now = Date.now()) => readLinkToken(db, token, "LINK", now);
+export const spendSignInLink = (db: TenantDb, id: string, userId: string, now = Date.now()) => spendLinkToken(db, id, userId, "LINK", now);
 
 // ---- Console password-reset links -----------------------------------------
 
-export async function issuePlatformResetToken(platformUserId: string, now = Date.now()): Promise<string> {
-  const recent = await prisma.platformPasswordReset.count({ where: { platformUserId, createdAt: { gte: new Date(now - SEND_WINDOW_MS) } } });
-  if (recent >= MAX_SENDS) throw new EmailAuthError("Too many reset emails asked for. Please wait 10 minutes and try again.", 429);
+type PlatformLinkPurpose = "reset" | "link";
+
+async function issuePlatformToken(platformUserId: string, purpose: PlatformLinkPurpose, now: number, ttlMs: number): Promise<string> {
+  const recent = await prisma.platformPasswordReset.count({ where: { platformUserId, purpose, createdAt: { gte: new Date(now - SEND_WINDOW_MS) } } });
+  if (recent >= MAX_SENDS) throw new EmailAuthError("Too many emails asked for. Please wait 10 minutes and try again.", 429);
   const secret = randomBytes(32).toString("base64url");
   const id = randomBytes(12).toString("base64url");
-  await prisma.platformPasswordReset.create({ data: { id, platformUserId, tokenHash: linkHash("platform", id, secret), expiresAt: new Date(now + RESET_TTL_MS) } });
+  await prisma.platformPasswordReset.create({ data: { id, platformUserId, purpose, tokenHash: linkHash("platform", id, secret), expiresAt: new Date(now + ttlMs) } });
   return `${id}.${secret}`;
 }
 
-export async function readPlatformResetToken(token: unknown, now = Date.now()) {
+async function readPlatformToken(token: unknown, purpose: PlatformLinkPurpose, now: number) {
   const t = splitToken(token);
   if (!t) return null;
   const r = await prisma.platformPasswordReset.findUnique({ where: { id: t.id } });
-  if (!r || r.usedAt || r.expiresAt.getTime() <= now) return null;
+  if (!r || r.purpose !== purpose || r.usedAt || r.expiresAt.getTime() <= now) return null;
   return sameHex(r.tokenHash, linkHash("platform", r.id, t.secret)) ? r : null;
 }
 
-export async function spendPlatformResetToken(id: string, platformUserId: string, now = Date.now()) {
-  const won = await prisma.platformPasswordReset.updateMany({ where: { id, usedAt: null }, data: { usedAt: new Date(now) } });
+async function spendPlatformToken(id: string, platformUserId: string, purpose: PlatformLinkPurpose, now: number) {
+  const won = await prisma.platformPasswordReset.updateMany({ where: { id, purpose, usedAt: null }, data: { usedAt: new Date(now) } });
   if (won.count !== 1) return false;
-  await prisma.platformPasswordReset.updateMany({ where: { platformUserId, usedAt: null }, data: { usedAt: new Date(now) } });
+  await prisma.platformPasswordReset.updateMany({ where: { platformUserId, purpose, usedAt: null }, data: { usedAt: new Date(now) } });
   return true;
 }
+
+export const issuePlatformResetToken = (platformUserId: string, now = Date.now()) => issuePlatformToken(platformUserId, "reset", now, RESET_TTL_MS);
+export const readPlatformResetToken = (token: unknown, now = Date.now()) => readPlatformToken(token, "reset", now);
+export const spendPlatformResetToken = (id: string, platformUserId: string, now = Date.now()) => spendPlatformToken(id, platformUserId, "reset", now);
+
+/** Console one-click sign-in links (15 minutes, once); the authenticator code still follows. */
+export const issuePlatformSignInLink = (platformUserId: string, now = Date.now()) => issuePlatformToken(platformUserId, "link", now, SIGN_IN_LINK_TTL_MS);
+export const readPlatformSignInLink = (token: unknown, now = Date.now()) => readPlatformToken(token, "link", now);
+export const spendPlatformSignInLink = (id: string, platformUserId: string, now = Date.now()) => spendPlatformToken(id, platformUserId, "link", now);
 
 // ---- New passwords -----------------------------------------------------------
 

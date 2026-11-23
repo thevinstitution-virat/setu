@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requestIp } from "@/lib/audit";
 import { platformAudit, platformGuard } from "@/lib/platform-auth";
-import { addAdmin, adminPasswordLink, ConsoleAdminError, listAdmins, makeOwner, resetAdminTwoStep, setAdminActive } from "@/lib/console-admins";
+import { addAdmin, adminPasswordLink, ConsoleAdminError, listAdmins, makeOwner, resetAdminTwoStep, setAdminActive, setAdminEmail } from "@/lib/console-admins";
 
 /** The business's admins (owner first). */
 export async function GET(_req: Request, ctx: RouteContext<"/api/platform/tenants/[id]/admins">) {
@@ -18,6 +18,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/platform/tenant
  *   reset2fa { userId }                        clear their authenticator app, sign them out
  *   active   { userId, active }                switch an admin off or on (never the owner)
  *   owner    { userId }                        make this admin the business owner
+ *   email    { userId, email }                 set (or clear, "") their confirmed email: how they sign in for now
  */
 export async function POST(req: Request, ctx: RouteContext<"/api/platform/tenants/[id]/admins">) {
   const g = await platformGuard("OWNER");
@@ -59,6 +60,10 @@ export async function POST(req: Request, ctx: RouteContext<"/api/platform/tenant
           userId,
           active: body.active === true,
         });
+        return NextResponse.json({ ok: true });
+      case "email":
+        await setAdminEmail(id, userId, body.email);
+        await audit("tenant.admin_email", { userId, set: !!(typeof body.email === "string" && body.email.trim()) });
         return NextResponse.json({ ok: true });
       case "owner":
         await makeOwner(id, userId);

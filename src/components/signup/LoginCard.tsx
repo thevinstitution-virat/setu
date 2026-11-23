@@ -9,6 +9,15 @@ import { APP_NAME } from "@/lib/brand";
 import { BrandLockup } from "@/components/BrandMark";
 import Icon from "@/components/Icon";
 import GoogleButton from "@/components/auth/GoogleButton";
+import EmailLinkForm from "@/components/auth/EmailLinkForm";
+
+/**
+ * For now sign-in is email (and Google once its keys are set): no
+ * Retailer/Staff tabs, passwords or mobile OTP on screen (there is no SMS
+ * provider yet). Set to false to bring the full card back; the routes behind
+ * it are all still there.
+ */
+const EMAIL_AND_GOOGLE_ONLY = true;
 
 type Region = { id: string; name: string; areas: { id: string; name: string }[] };
 
@@ -86,7 +95,7 @@ export default function LoginCard({
         </div>
 
         <div className="card card-deco p-6 sm:p-7">
-          <p className="page-kick">{mode === "retailer" ? t("login.retailerTab") : t("login.teamTab")}</p>
+          {!EMAIL_AND_GOOGLE_ONLY && <p className="page-kick">{mode === "retailer" ? t("login.retailerTab") : t("login.teamTab")}</p>}
           <h1 className="page-title">{t("login.title")}</h1>
           <p className="page-sub mb-6">{brand.tagline || t("brand.tagline")}</p>
 
@@ -102,6 +111,10 @@ export default function LoginCard({
             </p>
           )}
 
+          {EMAIL_AND_GOOGLE_ONLY ? (
+            <SimpleSignIn business={brand.business} google={google} />
+          ) : (
+            <>
           {!brand.business && (
             <p className="text-sm rounded-lg bg-ink/5 text-[var(--ink-2)] px-3 py-2 mb-4">{t("login.noBusiness")}</p>
           )}
@@ -136,6 +149,8 @@ export default function LoginCard({
           </div>
 
           {mode === "retailer" ? <RetailerLogin initialRef={initialRef} /> : <TeamLogin initialPhone={initialPhone} />}
+            </>
+          )}
         </div>
 
         {!brand.business && (
@@ -156,6 +171,45 @@ export default function LoginCard({
           </Link>
         </p>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The card for now: on a business's address Google (when set up) and an
+ * emailed code; on the main address one email with a sign-in link for each
+ * business the confirmed address belongs to (and the console).
+ */
+function SimpleSignIn({ business, google }: { business: boolean; google: boolean }) {
+  const { t } = useLanguage();
+  if (!business) {
+    return (
+      <EmailLinkForm
+        text={{
+          label: t("login.emailLabel"),
+          send: t("link.send"),
+          wait: t("login.wait"),
+          sent: t("link.sent"),
+          again: t("link.again"),
+          hint: t("link.hint"),
+          bad: t("login.error"),
+        }}
+      />
+    );
+  }
+  return (
+    <div className="space-y-4">
+      {google && (
+        <>
+          <GoogleButton href="/api/auth/google/start" label={t("google.continue")} />
+          <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            <span className="h-px flex-1 bg-[var(--line)]" aria-hidden />
+            {t("google.or")}
+            <span className="h-px flex-1 bg-[var(--line)]" aria-hidden />
+          </div>
+        </>
+      )}
+      <EmailCodeLogin />
     </div>
   );
 }

@@ -914,6 +914,8 @@ enum EmailPurpose {
   SIGN_IN
   VERIFY
   RESET
+  /// A one-click sign-in link (sent from the main address, one per business the address is confirmed on).
+  LINK
 }
 
 /// Codes and links sent by email (lib/email-auth.ts): a sign-in code, the code that proves a new
@@ -2934,6 +2936,8 @@ model PlatformPasswordReset {
   platformUserId String
   platformUser   PlatformUser @relation(fields: [platformUserId], references: [id], onDelete: Cascade)
   tokenHash      String       @unique
+  /// "reset" (choose a new password) or "link" (one-click sign-in; the authenticator code still follows).
+  purpose        String       @default("reset")
   expiresAt      DateTime
   usedAt         DateTime?
   createdAt      DateTime     @default(now())

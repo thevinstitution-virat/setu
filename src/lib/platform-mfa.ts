@@ -18,7 +18,7 @@ const COOKIE = "setu_platform_mfa";
 const AUD = "setu-platform-mfa";
 const SECONDS = 10 * 60;
 
-export type PlatformPending = { platformUserId: string; via: "password" | "google" };
+export type PlatformPending = { platformUserId: string; via: "password" | "google" | "email" };
 
 export async function setPlatformPending(p: PlatformPending) {
   const token = await new SignJWT({ ...p }).setProtectedHeader({ alg: "HS256" }).setAudience(AUD).setIssuedAt().setExpirationTime("10m").sign(platformSecret());
@@ -31,7 +31,7 @@ export async function readPlatformPending(): Promise<PlatformPending | null> {
   try {
     const { payload } = await jwtVerify(token, platformSecret(), { audience: AUD, algorithms: ["HS256"] });
     if (typeof payload.platformUserId !== "string") return null;
-    return { platformUserId: payload.platformUserId, via: payload.via === "google" ? "google" : "password" };
+    return { platformUserId: payload.platformUserId, via: payload.via === "google" ? "google" : payload.via === "email" ? "email" : "password" };
   } catch {
     return null;
   }
