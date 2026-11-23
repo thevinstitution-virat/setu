@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getTenant } from "@/lib/tenant";
 import { getPlatformSession } from "@/lib/platform-auth";
 import LoginForm from "@/components/platform/LoginForm";
-import EmailLinkForm, { EMAIL_LINK_EN } from "@/components/auth/EmailLinkForm";
+import EmailLinkForm from "@/components/auth/EmailLinkForm";
 import ConsoleAuthFrame from "@/components/platform/ConsoleAuthFrame";
 import GoogleButton from "@/components/auth/GoogleButton";
 import { googleConfigured } from "@/lib/google";
@@ -43,7 +43,7 @@ export default async function PlatformLoginPage({ searchParams }: { searchParams
             </div>
           </>
         )}
-        {SHOW_PASSWORD ? <LoginForm /> : <EmailLinkForm text={{ ...EMAIL_LINK_EN, hint: "We email a one-click link to the console login with this address. It works once, for 15 minutes." }} />}
+        {SHOW_PASSWORD ? <LoginForm /> : <EmailLinkForm hint="We email a one-click link to the console login with this address. It works once, for 15 minutes." />}
       </div>
     </ConsoleAuthFrame>
   );

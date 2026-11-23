@@ -19,7 +19,7 @@ export const EMAIL_LINK_EN: EmailLinkText = {
  * one-click link per place the address may sign in. The answer never says
  * whether the address has a login.
  */
-export default function EmailLinkForm({ text = EMAIL_LINK_EN }: { text?: EmailLinkText }) {
+export default function EmailLinkForm({ text = EMAIL_LINK_EN, hint }: { text?: EmailLinkText; /** Replaces the line under the button (a server page can't spread EMAIL_LINK_EN: it is a client module). */ hint?: string }) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -79,7 +79,7 @@ export default function EmailLinkForm({ text = EMAIL_LINK_EN }: { text?: EmailLi
       <button type="submit" className="btn btn-kesar w-full" disabled={busy || !email.trim()}>
         {busy ? text.wait : text.send}
       </button>
-      <p className="text-xs text-[var(--muted)]">{text.hint}</p>
+      <p className="text-xs text-[var(--muted)]">{hint ?? text.hint}</p>
     </form>
   );
 }
