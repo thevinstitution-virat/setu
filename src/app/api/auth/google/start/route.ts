@@ -21,7 +21,7 @@ export async function GET(req: Request) {
     uid = s.userId;
   }
   const h = await headers();
-  const host = (h.get("x-forwarded-host") ?? h.get("host") ?? "").split(",")[0].trim().toLowerCase();
+  const host = (h.get("host") ?? "").split(",")[0].trim().toLowerCase();
   const url = await googleStartUrl({ k: "tenant", intent, tenantId: tenant.id, host, uid });
   return NextResponse.redirect(url, 303);
 }

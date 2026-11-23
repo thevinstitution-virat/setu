@@ -1,5 +1,6 @@
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import type { TenantDb } from "@/lib/db";
+import { appSecret } from "@/lib/app-secret";
 
 /**
  * Phone OTP, stored hashed in OtpChallenge (per tenant, row-level secured).
@@ -16,10 +17,8 @@ const MAX_ATTEMPTS = 5;
 const MAX_SENDS_PER_WINDOW = 3;
 const SEND_WINDOW_MS = 10 * 60 * 1000;
 
-const pepper = process.env.SESSION_SECRET ?? "setu-dev-secret-change-me";
-
 function hash(phone: string, code: string) {
-  return createHmac("sha256", pepper).update(`${phone}:${code}`).digest("hex");
+  return createHmac("sha256", appSecret("SESSION_SECRET")).update(`${phone}:${code}`).digest("hex");
 }
 
 export function otpDevMode() {

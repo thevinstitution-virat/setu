@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { devOrTest } from "@/lib/app-secret";
 
 /**
  * Secrets a business gives us (gateway key secret, webhook secrets) are kept
@@ -14,7 +15,7 @@ function key(): Buffer {
     if (b.length !== 32) throw new Error("SECRETS_KEY must be 32 bytes (64 hex characters or base64)");
     return b;
   }
-  if (process.env.NODE_ENV === "production") throw new Error("SECRETS_KEY must be set in production");
+  if (!devOrTest()) throw new Error("SECRETS_KEY must be set (64 hex characters)");
   // Dev / tests only: a fixed key derived from the session secret.
   return createHash("sha256").update(`setu-dev-secrets:${process.env.SESSION_SECRET ?? ""}`).digest();
 }
@@ -31,8 +32,11 @@ export function decryptSecret(stored: string | null | undefined): string | null 
   const [v, iv, tag, data] = stored.split(":");
   if (v !== "v1" || !iv || !tag || data === undefined) return null;
   try {
-    const d = createDecipheriv("aes-256-gcm", key(), Buffer.from(iv, "base64url"));
-    d.setAuthTag(Buffer.from(tag, "base64url"));
+    // A full 16-byte tag only: a shortened one would make forging a stored secret far easier.
+    const authTag = Buffer.from(tag, "base64url");
+    if (authTag.length !== 16) return null;
+    const d = createDecipheriv("aes-256-gcm", key(), Buffer.from(iv, "base64url"), { authTagLength: 16 });
+    d.setAuthTag(authTag);
     return Buffer.concat([d.update(Buffer.from(data, "base64url")), d.final()]).toString("utf8");
   } catch {
     return null;

@@ -44,7 +44,7 @@ Migrations run on every web start (`npm run start:prod` = `prisma migrate deploy
 | `NEXT_PUBLIC_WHATSAPP_NUMBER` | a **build** argument: changing it needs a rebuild |
 | `TRUST_PROXY_HOPS` | `1` behind Coolify's Traefik; `2` if a CDN (e.g. Cloudflare proxy) sits in front. Wrong = rate limits and audit IPs use the wrong address |
 
-   Leave empty in production: `DEFAULT_TENANT_SLUG`, `OTP_DEV_MODE`, `ALLOW_GATEWAY_SIMULATOR`, `ALLOW_PRIVATE_WEBHOOKS`, `JOBS_DISABLED`, and `AI_PROVIDER=fake`.
+   Leave empty in production: `DEFAULT_TENANT_SLUG`, `OTP_DEV_MODE`, `ALLOW_GATEWAY_SIMULATOR`, `ALLOW_EINVOICE_SANDBOX`, `ALLOW_PRIVATE_WEBHOOKS`, `JOBS_DISABLED`, and `AI_PROVIDER=fake`.
 4. Deploy. Health check: `GET /api/health` (database ping), already in the image.
 5. On the web container's terminal: `npm run golive:check`. Every **FAIL** must be fixed before real use; **warn** lines are choices (no WhatsApp yet, no maps key…).
 6. Create our console owner on the web terminal: `npm run platform:user -- --email <you> --name "<name>" --password '<strong>' --role OWNER` (never run `prisma db seed` in production: it adds the demo business and test logins). Sign in at `https://platform.<PLATFORM_DOMAIN>/platform`. Console → Health shows the same readiness list.

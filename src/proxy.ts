@@ -2,11 +2,9 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { crossSiteRefused } from "@/lib/security";
+import { appSecret } from "@/lib/app-secret";
 
 const SESSION_COOKIE = "setu_session";
-const secret = new TextEncoder().encode(
-  process.env.SESSION_SECRET ?? "setu-dev-secret-change-me"
-);
 
 const roleHomes: Record<string, string> = {
   ADMIN: "/admin",
@@ -39,7 +37,8 @@ export async function proxy(request: NextRequest) {
   // Stay on the visitor's own address: build it from the Host header (request.url can carry the
   // server's own host under `next start` / a proxy). The proxy layer refuses a relative Location
   // ("Invalid URL"), so this must be absolute.
-  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  // The Host header only: X-Forwarded-Host is whatever the client sent unless a proxy rewrote it (lib/tenant.ts).
+  const host = request.headers.get("host");
   const proto = (request.headers.get("x-forwarded-proto") ?? request.nextUrl.protocol.replace(":", "")).split(",")[0].trim();
   const to = (path: string) => NextResponse.redirect(new URL(path, host ? `${proto}://${host}` : request.url), 307);
 
@@ -56,7 +55,7 @@ export async function proxy(request: NextRequest) {
   }
 
   try {
-    const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(appSecret("SESSION_SECRET")), { algorithms: ["HS256"] });
     const role = payload.role as string;
     if (role !== protectedPrefixes[matchedPrefix]) {
       return to(roleHomes[role] ?? "/login");

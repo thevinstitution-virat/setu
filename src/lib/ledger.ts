@@ -408,6 +408,15 @@ export async function recordPayment(ctx: Ctx, p: PaymentInput) {
         ? { cheque: { create: { number: p.cheque!.number, bank: p.cheque!.bank, chequeDate: p.cheque!.date } } }
         : {}),
     },
+  }).catch((e: unknown) => {
+    // Payment_reference_used_once: the same UTR is already waiting or counted
+    // (the routes' own look-up lost a race with a second request). Prisma
+    // doesn't name a partial index in the error, but for a UPI/bank payment
+    // it's the only unique key left (numbers come from a locked counter;
+    // gateway ids are for online payments).
+    const refIndex = (p.method === "UPI" || p.method === "BANK") && !!p.reference && !p.gateway;
+    if (refIndex && (e as { code?: string })?.code === "P2002") throw new MoneyError("This reference was already used", 409);
+    throw e;
   });
 
   if (!p.needsVerification) await postPayment(ctx, payment.id, p);

@@ -3,24 +3,18 @@ import { cookies } from "next/headers";
 import type { Role } from "@/generated/prisma/client";
 import { getTenant } from "@/lib/tenant";
 import { tenantDb } from "@/lib/db";
+import { appSecret } from "@/lib/app-secret";
 
 const SESSION_COOKIE = "setu_session";
 
+/** Signs business sessions (and OTP hashes, share links, sign-in tickets). See lib/app-secret.ts. */
 export function sessionSecret() {
-  const s = process.env.SESSION_SECRET;
-  if (!s && process.env.NODE_ENV === "production") {
-    throw new Error("SESSION_SECRET must be set in production");
-  }
-  return new TextEncoder().encode(s ?? "setu-dev-secret-change-me");
+  return new TextEncoder().encode(appSecret("SESSION_SECRET"));
 }
 
 /** Signs console cookies and support links: never the businesses' secret. */
 export function platformSecret() {
-  const s = process.env.PLATFORM_SESSION_SECRET;
-  if (!s && process.env.NODE_ENV === "production") {
-    throw new Error("PLATFORM_SESSION_SECRET must be set in production");
-  }
-  return new TextEncoder().encode(s ?? "setu-dev-platform-secret");
+  return new TextEncoder().encode(appSecret("PLATFORM_SESSION_SECRET"));
 }
 
 export type SessionPayload = {

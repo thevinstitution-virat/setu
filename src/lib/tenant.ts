@@ -109,10 +109,18 @@ export function clearTenantCache() {
   cache.clear();
 }
 
-/** The tenant for the current request, or null on the platform site. */
+/**
+ * The tenant for the current request, or null on the platform site.
+ *
+ * Read from the Host header only. X-Forwarded-Host is whatever the client
+ * typed unless the edge rewrote it, so trusting it first let a request to
+ * one business act on another's sign-in, OTP or sign-up pages (security
+ * report 23 Nov, finding 2). Our proxy (Traefik) passes the visitor's Host
+ * through unchanged.
+ */
 export async function getTenant(): Promise<CurrentTenant | null> {
   const h = await headers();
-  return resolveTenantByHost(normaliseHost(h.get("x-forwarded-host") ?? h.get("host")));
+  return resolveTenantByHost(normaliseHost(h.get("host")));
 }
 
 export class NoTenantError extends Error {

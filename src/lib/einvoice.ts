@@ -119,6 +119,8 @@ export interface EInvoiceProvider {
 const b64url = (s: string | Buffer) => Buffer.from(s).toString("base64url");
 
 /** Local test provider: real IRN formula, test acknowledgement, QR clearly marked SANDBOX. */
+const SANDBOX_QR_KEY = "setu-einvoice-sandbox";
+
 export const sandboxProvider: EInvoiceProvider = {
   name: "sandbox",
   async generate(doc) {
@@ -140,7 +142,8 @@ export const sandboxProvider: EInvoiceProvider = {
     };
     const head = b64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
     const body = b64url(JSON.stringify({ data: JSON.stringify(claims) }));
-    const sig = createHmac("sha256", "setu-einvoice-sandbox").update(`${head}.${body}`).digest("base64url");
+    // Not a secret: the sandbox QR is marked invalid and is never accepted by GSTN.
+    const sig = createHmac("sha256", SANDBOX_QR_KEY).update(`${head}.${body}`).digest("base64url");
     return { irn, ackNo, ackDate, signedQr: `${head}.${body}.${sig}` };
   },
   async cancel() {},
@@ -155,8 +158,19 @@ export const sandboxProvider: EInvoiceProvider = {
   },
 };
 
+/**
+ * Test IRNs printed on real tax invoices would look like e-invoices that
+ * were never filed, so the sandbox runs only in development and the tests,
+ * or where ALLOW_EINVOICE_SANDBOX=1 is set on purpose (a demo copy).
+ */
+export const einvoiceSandboxAllowed = (env: Record<string, string | undefined> = process.env) =>
+  env.NODE_ENV === "development" || env.NODE_ENV === "test" || env.ALLOW_EINVOICE_SANDBOX === "1";
+
 export function providerFor(s: InvoiceSettings): EInvoiceProvider {
-  if (s.einvoice.provider === "sandbox") return sandboxProvider;
+  if (s.einvoice.provider === "sandbox") {
+    if (einvoiceSandboxAllowed()) return sandboxProvider;
+    throw new MoneyError("E-invoice test mode is for trial copies only. Connect a GST provider in Settings → GST & invoices to make real IRNs.", 409);
+  }
   throw new MoneyError("No GST provider is set up for e-invoicing yet. Choose one in Settings → GST & invoices.", 409);
 }
 

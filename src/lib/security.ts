@@ -24,6 +24,25 @@ export function crossSiteRefused(o: { method: string; path: string; origin: stri
   }
 }
 
+/** The fuller policy, report-only for now (security report 23 Nov, finding 8). */
+export const REPORT_ONLY_CSP = [
+  "default-src 'self'",
+  // Next inlines its start-up scripts; no outside scripts.
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  // Uploaded files may come from the storage host (signed links).
+  "img-src 'self' data: blob: https:",
+  "media-src 'self' blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' https:",
+  "worker-src 'self' blob:",
+  "frame-src 'self'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join("; ");
+
 /** Security headers for every response (see next.config.ts). */
 export const SECURITY_HEADERS: { key: string; value: string }[] = [
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -34,6 +53,13 @@ export const SECURITY_HEADERS: { key: string; value: string }[] = [
   // No script rules (Next inlines its own); this only stops framing, plugins, <base> tricks and forms posting elsewhere.
   { key: "Content-Security-Policy", value: "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'" },
   { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+  // Our files and pictures are only for our own pages (business addresses are subdomains: same site).
+  { key: "Cross-Origin-Resource-Policy", value: "same-site" },
+  // A page opened from ours can't reach back into it; popups we open (payments) still work.
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
+  // The full policy, watched before it is enforced: the browser reports what it would block
+  // (console) and blocks nothing. Enforce it once a few weeks show no real page tripping it.
+  { key: "Content-Security-Policy-Report-Only", value: REPORT_ONLY_CSP },
 ];
 
 /** A session secret fit for production: set, at least 32 characters, not the development default. */

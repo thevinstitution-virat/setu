@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { SessionPayload } from "@/lib/auth";
 import type { TenantDb } from "@/lib/db";
 import { can } from "@/lib/permissions";
+import { appSecret } from "@/lib/app-secret";
 import { moneySettings } from "@/lib/money-settings";
 import { formatINR } from "@/lib/money";
 import type { InvoiceDoc } from "@/lib/invoice";
@@ -36,7 +37,7 @@ export async function canSeeInvoice(db: TenantDb, session: SessionPayload, inv: 
   return false;
 }
 
-const secret = () => process.env.SESSION_SECRET ?? "setu-dev-secret-change-me";
+const secret = () => appSecret("SESSION_SECRET");
 const DAY = 86_400_000;
 /** A shared link works this many days; the shop can always open the document in the app. */
 export const SHARE_DAYS = 90;
@@ -101,7 +102,7 @@ export function shareInfo(origin: string, tenantId: string, doc: Pick<InvoiceDoc
 /** Origin the browser used (tenant subdomain or custom domain). */
 export function originOf(req: Request) {
   const u = new URL(req.url);
-  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? u.host;
+  const host = req.headers.get("host") ?? u.host;
   const proto = req.headers.get("x-forwarded-proto") ?? u.protocol.replace(":", "");
   return `${proto}://${host}`;
 }

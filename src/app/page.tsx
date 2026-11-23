@@ -11,7 +11,7 @@ export default async function Home() {
   // marketing site. The bare platform address keeps the marketing site even
   // when DEFAULT_TENANT_SLUG points it at a business (local dev).
   const h = await headers();
-  const host = normaliseHost(h.get("x-forwarded-host") ?? h.get("host"));
+  const host = normaliseHost(h.get("host"));
   if (classifyHost(host, platformDomain(), null).kind !== "platform" && (await getTenant())) redirect("/login");
 
   return <BtLanding />;

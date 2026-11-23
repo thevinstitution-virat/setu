@@ -195,6 +195,12 @@ export type ProductRow = {
 
 const GST_RATES = new Set([0, 0.25, 3, 5, 12, 18, 28, 40]);
 
+/** "18", "18%", " 18 % " → 18. Every % and space goes, not just the first; NaN when nothing is left. */
+export function parseGstRate(text: string): number {
+  const clean = text.replace(/[%\s]/g, "");
+  return clean ? Number(clean) : NaN;
+}
+
 function missing(r: Row, required: string[]) {
   return required.filter((k) => !r[k]);
 }
@@ -245,7 +251,7 @@ export function validateProducts(rows: Row[]): { valid: ProductRow[]; errors: Ro
     }
     if (price <= 0 || mrp <= 0) return errors.push({ row, message: "price and mrp must be more than 0" });
     if (price > mrp) return errors.push({ row, message: `price ₹${r.price} is above MRP ₹${r.mrp}` });
-    const gstRate = r.gst_rate ? Number(r.gst_rate.replace("%", "")) : 0;
+    const gstRate = r.gst_rate ? parseGstRate(r.gst_rate) : 0;
     if (!GST_RATES.has(gstRate)) return errors.push({ row, message: `GST rate "${r.gst_rate}" is not a valid GST slab` });
     const sku = r.sku;
     const skuKey = sku.toUpperCase();

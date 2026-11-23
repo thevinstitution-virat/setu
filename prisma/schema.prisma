@@ -1147,6 +1147,8 @@ model Payment {
 
   @@unique([tenantId, number])
   @@unique([tenantId, gatewayPaymentId])
+  // Also "Payment_reference_used_once" (raw SQL, partial): one live UPI/BANK
+  // payment per reference. See migration 20261123120000_payment_reference_once.
   @@index([tenantId, retailerId, collectedAt])
   @@index([tenantId, state])
   @@index([tenantId, collectedById, collectedAt])

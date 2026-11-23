@@ -21,7 +21,7 @@ export const onRequestError: Instrumentation.onRequestError = async (err, reques
   const [{ sendAlert }, { reportServerError }] = await Promise.all([import("@/lib/alerts"), import("@/lib/error-report-server")]);
   const message = err instanceof Error ? err.message : String(err);
   const digest = typeof err === "object" && err !== null && "digest" in err ? String(err.digest) : "";
-  const host = request.headers["x-forwarded-host"] ?? request.headers["host"] ?? "";
+  const host = request.headers["host"] ?? "";
   await reportServerError(err, {
     source: "request",
     method: request.method,

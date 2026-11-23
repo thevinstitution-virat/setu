@@ -156,7 +156,7 @@ describe("postpaid sales, payments and FIFO", () => {
     await placeAndDeliver(r, 50_000); // ₹500
     expect((await bal(r)).receivable).toBe(168_000);
 
-    await money((ctx) => recordPayment(ctx, { retailerId: r, amount: 130_000, method: "BANK", reference: "NEFT1", atOffice: true }));
+    await money((ctx) => recordPayment(ctx, { retailerId: r, amount: 130_000, method: "BANK", reference: `NEFT1-${run}`, atOffice: true }));
     const bills = await tenantDb(T).bill.findMany({ where: { retailerId: r }, orderBy: { date: "asc" } });
     expect(bills.map((b) => [b.paid, b.settled])).toEqual([
       [118_000, true],
@@ -178,7 +178,7 @@ describe("postpaid sales, payments and FIFO", () => {
 
   it("overpayment is held as advance and pays the next bill", async () => {
     const r = await newRetailer({ paymentMode: "POSTPAID" });
-    await money((ctx) => recordPayment(ctx, { retailerId: r, amount: 10_000, method: "UPI", reference: "UTR123456", atOffice: true }));
+    await money((ctx) => recordPayment(ctx, { retailerId: r, amount: 10_000, method: "UPI", reference: `UTR123456-${run}`, atOffice: true }));
     expect((await bal(r)).receivable).toBe(-10_000);
     await placeAndDeliver(r, 25_000);
     const bill = await tenantDb(T).bill.findFirstOrThrow({ where: { retailerId: r } });
@@ -189,7 +189,7 @@ describe("postpaid sales, payments and FIFO", () => {
   it("a reported UPI payment counts only after it is verified", async () => {
     const r = await newRetailer({ paymentMode: "POSTPAID" });
     await placeAndDeliver(r, 40_000);
-    const p = await money((ctx) => recordPayment(ctx, { retailerId: r, amount: 40_000, method: "UPI", reference: "UTR999", needsVerification: true, collectorId: null }));
+    const p = await money((ctx) => recordPayment(ctx, { retailerId: r, amount: 40_000, method: "UPI", reference: `UTR999-${run}`, needsVerification: true, collectorId: null }));
     expect(p.state).toBe("PENDING_VERIFICATION");
     expect((await bal(r)).receivable).toBe(40_000);
     await money((ctx) => verifyPayment(ctx, p.id, true));
@@ -260,7 +260,7 @@ describe("cheques", () => {
 describe("prepaid wallet", () => {
   it("reserves on order, refuses when short, releases on cancel, settles on delivery", async () => {
     const r = await newRetailer({ paymentMode: "PREPAID" });
-    await money((ctx) => recordPayment(ctx, { retailerId: r, amount: 100_000, method: "UPI", purpose: "WALLET", reference: "UTRW1", atOffice: true }));
+    await money((ctx) => recordPayment(ctx, { retailerId: r, amount: 100_000, method: "UPI", purpose: "WALLET", reference: `UTRW1-${run}`, atOffice: true }));
     expect(await bal(r)).toMatchObject({ walletAvailable: 100_000, walletReserved: 0, receivable: 0 });
 
     const o1 = await money(async (ctx) => {
