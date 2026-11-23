@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { asPlatform } from "@/lib/db";
-import { platformGuard } from "@/lib/platform-auth";
+import { platformAudit, platformGuard } from "@/lib/platform-auth";
+import { requestIp } from "@/lib/audit";
+import { ConsoleAdminError, createBusiness } from "@/lib/console-admins";
 import type { Prisma, TenantStatus } from "@/generated/prisma/client";
 
 const STATUSES: TenantStatus[] = ["TRIAL", "ACTIVE", "SUSPENDED", "CLOSED"];
@@ -56,4 +58,24 @@ export async function GET(req: Request) {
       overduePaise: md.get(t.id)?._sum.total ?? 0,
     })),
   });
+}
+
+/**
+ * Super-admin only: a new business with its owner admin (no password yet).
+ * Body { slug, name, planCode?, admin: { name, loginId, phone?, email? } } → { tenant, url, emailed }:
+ * url is the owner's set-password link (3 days, once); it is emailed too when an address is given.
+ */
+export async function POST(req: Request) {
+  const g = await platformGuard("OWNER");
+  if (!g.ok) return g.res;
+  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!body) return NextResponse.json({ error: "Send the business as JSON" }, { status: 400 });
+  try {
+    const r = await createBusiness({ slug: body.slug, name: body.name, planCode: body.planCode, admin: (body.admin ?? {}) as Record<string, unknown> });
+    await platformAudit(g.session.platformUserId, "tenant.create", { tenantId: r.tenant.id, detail: { slug: r.tenant.slug, adminId: r.adminId, emailed: r.emailed }, ip: requestIp(req) });
+    return NextResponse.json({ tenant: r.tenant, url: r.url, emailed: r.emailed }, { status: 201 });
+  } catch (e) {
+    if (e instanceof ConsoleAdminError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
 }

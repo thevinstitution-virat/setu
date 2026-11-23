@@ -7,6 +7,7 @@ import InvoiceList from "./InvoiceList";
 import TenantPlanPanel from "./TenantPlanPanel";
 import TenantOverrides from "./TenantOverrides";
 import TenantSupport from "./TenantSupport";
+import TenantAdmins from "./TenantAdmins";
 import TenantAndroid from "./TenantAndroid";
 import TenantDataPanel from "./TenantDataPanel";
 import { Section, StatusChip, TableWrap, ago, inr, num, when } from "./kit";
@@ -98,6 +99,7 @@ export default function TenantDetail({ id }: { id: string }) {
         </div>
 
         <div className="space-y-5 min-w-0">
+          <TenantAdmins tenantId={t.id} closed={t.status === "CLOSED"} />
           <TenantSupport data={data} onChanged={reload} />
           <Section title="Invoices" sub="The latest 24.">
             <InvoiceList invoices={data.invoices} onChanged={reload} showTenant={false} />

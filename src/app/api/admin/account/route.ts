@@ -18,6 +18,8 @@ export async function POST(req: Request) {
   const auth = await guard("settings.manage");
   if (!auth.ok) return auth.res;
   if (auth.session.supportId) return NextResponse.json({ error: "Only the owner can delete the business" }, { status: 403 });
+  const me = await auth.db.user.findUnique({ where: { id: auth.session.userId }, select: { isOwner: true } });
+  if (!me?.isOwner) return NextResponse.json({ error: "Only the business owner can delete the business" }, { status: 403 });
   const body = await req.json().catch(() => null);
   if (body?.confirm !== auth.tenant.slug) return NextResponse.json({ error: `Type ${auth.tenant.slug} to confirm` }, { status: 400 });
   // Each request makes a full copy of the data: delete → cancel → delete can't loop.

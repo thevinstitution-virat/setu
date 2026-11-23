@@ -30,6 +30,7 @@ export const LOGIN_NOTICES = {
   "google-linked": "Google account connected. Next time you can use Continue with Google.",
   "mfa-expired": "Your sign-in took too long. Please sign in again.",
   "password-reset": "Password changed. Sign in with the new one.",
+  "password-set": "Password saved. Sign in with your login ID and the new password.",
 } as const;
 
 export type LoginNotice = keyof typeof LOGIN_NOTICES;

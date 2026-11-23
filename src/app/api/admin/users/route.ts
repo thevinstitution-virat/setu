@@ -4,13 +4,18 @@ import { hashPassword } from "@/lib/password";
 import { audit, requestIp } from "@/lib/audit";
 import { checkStaffFields } from "@/lib/staff";
 import { checkLimit, entitlements, LimitError } from "@/lib/plans";
+import { addProblem, managesAdmins } from "@/lib/team-rules";
+import { passwordProblem } from "@/lib/email-auth";
+
+const STAFF_ROLES = ["ADMIN", "SALES_AGENT", "DELIVERY_AGENT", "SUPERVISOR"] as const;
 
 export async function GET() {
   const auth = await guard("team.view");
   if (!auth.ok) return auth.res;
-  const { db } = auth;
+  const { db, session } = auth;
+  const me = await db.user.findUniqueOrThrow({ where: { id: session.userId }, select: { id: true, isOwner: true, isSupport: true } });
   const users = await db.user.findMany({
-    where: { role: { in: ["SALES_AGENT", "DELIVERY_AGENT", "SUPERVISOR"] } },
+    where: { role: { in: [...STAFF_ROLES] }, isSupport: false },
     omit: { passwordHash: true },
     include: { salesAgentProfile: true, deliveryAgentProfile: true, supervisor: { select: { id: true, name: true } } },
     orderBy: { createdAt: "desc" },
@@ -24,7 +29,7 @@ export async function GET() {
     },
     orderBy: { outletName: "asc" },
   });
-  return NextResponse.json({ users, retailers });
+  return NextResponse.json({ users, retailers, me: { id: me.id, isOwner: me.isOwner, managesAdmins: managesAdmins({ userId: me.id, isOwner: me.isOwner, isSupport: me.isSupport }) } });
 }
 
 export async function POST(req: Request) {
@@ -34,9 +39,14 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const { name, loginId, password, role } = body ?? {};
 
-  if (!name || !loginId || !password || !["SALES_AGENT", "DELIVERY_AGENT", "SUPERVISOR"].includes(role)) {
+  if (!name || !loginId || !password || !(STAFF_ROLES as readonly string[]).includes(role)) {
     return NextResponse.json({ error: "name, loginId, password and a valid role are required" }, { status: 400 });
   }
+  const me = await db.user.findUniqueOrThrow({ where: { id: session.userId }, select: { isOwner: true, isSupport: true } });
+  const refused = addProblem({ userId: session.userId, ...me }, role);
+  if (refused) return NextResponse.json({ error: refused }, { status: 403 });
+  const weak = passwordProblem(password, loginId);
+  if (weak) return NextResponse.json({ error: weak }, { status: 400 });
   if (role === "SUPERVISOR" && !(await entitlements(auth.tenant.id)).features.has("field")) {
     return NextResponse.json({ error: "Supervisors come with the Field team module. Move to a plan that has it under Billing.", code: "upgrade", feature: "field" }, { status: 402 });
   }

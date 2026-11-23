@@ -55,7 +55,7 @@ export default function PlatformNav({ name, role }: { name: string; role: string
         <div className="ml-auto flex items-center gap-2 min-w-0 sm:order-3">
           <span className="text-right min-w-0">
             <span className="block text-sm font-semibold truncate max-w-[140px] sm:max-w-[200px]">{name}</span>
-            <span className="block text-[11px] font-bold text-[var(--muted)]">{role === "OWNER" ? "Owner" : "Support"}</span>
+            <span className="block text-[11px] font-bold text-[var(--muted)]">{role === "OWNER" ? "Super-admin" : "Support"}</span>
           </span>
           <button type="button" className="btn btn-quiet btn-xs" onClick={signOut} disabled={busy}>
             <Icon name="logout" className="h-3.5 w-3.5" />

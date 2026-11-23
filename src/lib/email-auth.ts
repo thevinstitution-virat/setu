@@ -18,6 +18,8 @@ import { appSecret } from "@/lib/app-secret";
 
 const CODE_TTL_MS = 10 * 60_000;
 const RESET_TTL_MS = 30 * 60_000;
+/** A set-password link the platform console makes for a business admin (sent by WhatsApp or email): 3 days. */
+export const SET_PASSWORD_TTL_MS = 72 * 3_600_000;
 const MAX_ATTEMPTS = 5;
 const MAX_SENDS = 3;
 const SEND_WINDOW_MS = 10 * 60_000;
@@ -84,12 +86,12 @@ export async function checkEmailCode(
 
 // ---- Password-reset links (business logins) --------------------------------
 
-/** A reset link token for this login (returned for the caller to put in the link). */
-export async function issueResetToken(db: TenantDb, userId: string, email: string, now = Date.now()): Promise<string> {
+/** A reset link token for this login (returned for the caller to put in the link). `email` may be "" (a console-made link). */
+export async function issueResetToken(db: TenantDb, userId: string, email: string, now = Date.now(), ttlMs = RESET_TTL_MS): Promise<string> {
   const recent = await db.emailChallenge.count({ where: { userId, purpose: "RESET", createdAt: { gte: new Date(now - SEND_WINDOW_MS) } } });
   if (recent >= MAX_SENDS) throw new EmailAuthError("Too many reset emails asked for. Please wait 10 minutes and try again.", 429);
   const secret = randomBytes(32).toString("base64url");
-  const row = await db.emailChallenge.create({ data: { userId, email, purpose: "RESET", codeHash: "pending", expiresAt: new Date(now + RESET_TTL_MS) } });
+  const row = await db.emailChallenge.create({ data: { userId, email, purpose: "RESET", codeHash: "pending", expiresAt: new Date(now + ttlMs) } });
   await db.emailChallenge.update({ where: { id: row.id }, data: { codeHash: linkHash("user", row.id, secret) } });
   return `${row.id}.${secret}`;
 }

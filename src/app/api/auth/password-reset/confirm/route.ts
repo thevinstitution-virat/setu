@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
   const c = await readResetToken(db, body?.token);
   if (!c) return NextResponse.json({ error: "This link has expired or was already used. Ask for a new one." }, { status: 400 });
-  const user = await db.user.findUnique({ where: { id: c.userId }, select: { id: true, loginId: true, email: true, active: true } });
+  const user = await db.user.findUnique({ where: { id: c.userId }, select: { id: true, loginId: true, email: true, emailVerifiedAt: true, active: true, passwordHash: true } });
   if (!user || !user.active) return NextResponse.json({ error: "This account has been deactivated" }, { status: 403 });
 
   const problem = passwordProblem(body?.password, user.loginId);
@@ -39,6 +39,8 @@ export async function POST(req: Request) {
   await db.user.update({ where: { id: user.id }, data: { passwordHash: hashPassword(body.password), sessionVersion: { increment: 1 } } });
   await audit(db, { actorId: user.id, action: "auth.password_reset", entity: "User", entityId: user.id, ip: requestIp(req) });
   // Telling them is a courtesy: the reset already happened, so a mail failure doesn't undo it.
-  await sendEmail(passwordChangedMail(user.email ?? c.email, tenant.name)).catch(() => null);
-  return NextResponse.json({ ok: true, redirect: "/login?notice=password-reset" });
+  const to = (user.emailVerifiedAt && user.email) || c.email;
+  if (to) await sendEmail(passwordChangedMail(to, tenant.name)).catch(() => null);
+  // A first password (a login the console made) reads differently from a reset.
+  return NextResponse.json({ ok: true, redirect: user.passwordHash ? "/login?notice=password-reset" : "/login?notice=password-set" });
 }

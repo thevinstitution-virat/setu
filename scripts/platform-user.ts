@@ -4,6 +4,10 @@
  *   npm run platform:user -- --email you@company.in --name "Your name" --password '<strong password>' [--role OWNER|SUPPORT]
  *   npm run platform:user -- --email someone@company.in --deactivate
  *   npm run platform:user -- --email someone@company.in --reset-2fa   (lost phone: set the authenticator up again at next sign-in)
+ *   npm run platform:user -- --email old@company.in --new-email new@company.in   (move a login to another address; signs it out)
+ *
+ * OWNER is the super-admin: there is only ever one (a database index enforces it). To hand it to
+ * someone else, move the existing OWNER login to their address with --new-email.
  *
  * The console lives on the platform address: https://platform.<PLATFORM_DOMAIN>/platform
  * (or the bare domain when PLATFORM_DOMAIN has no tenant subdomain).
@@ -37,6 +41,19 @@ async function main() {
     return;
   }
 
+  const newEmail = (arg("new-email") ?? "").trim().toLowerCase();
+  if (newEmail) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) fail("--new-email is not an email address");
+    if (await prisma.platformUser.findUnique({ where: { email: newEmail } })) fail(`${newEmail} already has a console login`);
+    const u = await prisma.platformUser
+      .update({ where: { email }, data: { email: newEmail, sessionVersion: { increment: 1 } } })
+      .catch(() => null);
+    if (!u) fail(`No console login ${email}`);
+    await prisma.platformAudit.create({ data: { actorId: u.id, action: "auth.email_moved_by_script", detail: { from: email, to: newEmail } } });
+    console.log(`✔ ${email} is now ${newEmail} (${u.role}); signed out everywhere`);
+    return;
+  }
+
   if (flag("deactivate")) {
     const u = await prisma.platformUser.update({ where: { email }, data: { active: false } }).catch(() => null);
     if (!u) fail(`No console login ${email}`);
@@ -49,6 +66,11 @@ async function main() {
   const password = arg("password");
   const name = arg("name");
   const existing = await prisma.platformUser.findUnique({ where: { email } });
+  if (role === "OWNER") {
+    const owner = await prisma.platformUser.findFirst({ where: { role: "OWNER" }, select: { email: true } });
+    if (owner && owner.email !== email) fail(`There is already a super-admin (${owner.email}). Move it with --email ${owner.email} --new-email ${email}`);
+  }
+  if (existing?.role === "OWNER" && role !== "OWNER") fail("This is the super-admin; it can't be turned into a support login");
   if (!existing && (!password || !name)) fail("A new login needs --name and --password");
   if (password && password.length < 12) fail("--password must be at least 12 characters");
 

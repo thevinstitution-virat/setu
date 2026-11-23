@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Icon from "@/components/Icon";
 import { ErrorBox, useFetch } from "@/components/admin/AdminKit";
 import { StatusChip, TableWrap, ago, inr, num, when } from "./kit";
+import NewBusiness from "./NewBusiness";
 
 type Row = {
   id: string;
@@ -57,6 +58,7 @@ export default function TenantsList() {
         <h1 className="page-title">Tenants</h1>
         <p className="page-sub">Every business on the platform, newest first.</p>
       </div>
+      <NewBusiness onMade={reload} />
 
       <div className="flex flex-wrap gap-2">
         <div className="relative flex-1 min-w-[200px]">

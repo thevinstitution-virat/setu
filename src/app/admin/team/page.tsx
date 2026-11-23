@@ -6,7 +6,7 @@ import Icon from "@/components/Icon";
 import { ErrorBox, Field, Flash, Sheet, TabBar, errText, send, useFetch } from "@/components/admin/AdminKit";
 import { validMobile } from "@/lib/field-math";
 
-type Role = "SALES_AGENT" | "DELIVERY_AGENT" | "SUPERVISOR";
+type Role = "ADMIN" | "SALES_AGENT" | "DELIVERY_AGENT" | "SUPERVISOR";
 
 type TeamUser = {
   id: string;
@@ -15,6 +15,8 @@ type TeamUser = {
   phone: string | null;
   role: Role;
   active: boolean;
+  /** The business owner: nobody else here can change their login. */
+  isOwner?: boolean;
   supervisorId: string | null;
   supervisor: { id: string; name: string } | null;
   salesAgentProfile: { id: string } | null;
@@ -33,6 +35,7 @@ const ROLES: readonly { role: Role; label: string; plural: string; chip: string 
   { role: "SALES_AGENT", label: "Sales agent", plural: "Sales agents", chip: "chip-kesar" },
   { role: "DELIVERY_AGENT", label: "Delivery agent", plural: "Delivery agents", chip: "chip-mor" },
   { role: "SUPERVISOR", label: "Supervisor", plural: "Supervisors", chip: "chip-genda" },
+  { role: "ADMIN", label: "Admin", plural: "Admins", chip: "chip-mint" },
 ];
 const roleInfo = (r: Role) => ROLES.find((x) => x.role === r) ?? ROLES[0];
 
@@ -41,9 +44,19 @@ const showPhone = (p: string) => (p.length === 10 ? `${p.slice(0, 5)} ${p.slice(
 
 const PHONE_HINT = "Used to sign in with an OTP and to switch between businesses they work for.";
 
-function RoleChip({ role }: { role: Role }) {
+function RoleChip({ role, owner }: { role: Role; owner?: boolean }) {
   const r = roleInfo(role);
-  return <span className={`chip ${r.chip} !py-0.5 !px-2 !text-[11.5px]`}>{r.label}</span>;
+  return <span className={`chip ${owner ? "chip-kesar" : r.chip} !py-0.5 !px-2 !text-[11.5px]`}>{owner ? "Owner" : r.label}</span>;
+}
+
+type Me = { id: string; isOwner: boolean; managesAdmins: boolean };
+
+/** What the signed-in admin may do to this row (the API checks again: lib/team-rules.ts). */
+function rowRights(me: Me | undefined, u: TeamUser) {
+  const self = me?.id === u.id;
+  if (u.isOwner) return { edit: self, password: false, toggle: false, signOut: self, mfa: false };
+  if (u.role === "ADMIN" && !self && !me?.managesAdmins) return { edit: false, password: false, toggle: false, signOut: false, mfa: false };
+  return { edit: true, password: true, toggle: !self, signOut: true, mfa: true };
 }
 
 /** Supervisor <select>: "No supervisor" plus the given supervisors. */
@@ -71,7 +84,7 @@ function SupervisorSelect({
 const EMPTY = { name: "", loginId: "", password: "", role: "SALES_AGENT" as Role, phone: "", supervisorId: "" };
 
 export default function AdminTeamPage() {
-  const { data, error: loadError, reload } = useFetch<{ users: TeamUser[]; retailers: Retailer[] }>("/api/admin/users");
+  const { data, error: loadError, reload } = useFetch<{ users: TeamUser[]; retailers: Retailer[]; me?: Me }>("/api/admin/users");
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
@@ -79,6 +92,7 @@ export default function AdminTeamPage() {
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<"all" | Role>("all");
   const [editing, setEditing] = useState<TeamUser | null>(null);
+  const [passwordFor, setPasswordFor] = useState<TeamUser | null>(null);
   const [rowError, setRowError] = useState<{ id: string; text: string } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -86,6 +100,8 @@ export default function AdminTeamPage() {
   if (!data) return <p className="text-sm text-[var(--muted)]">Loading…</p>;
 
   const users = data.users ?? [];
+  const me = data.me;
+  const addable = ROLES.filter((r) => r.role !== "ADMIN" || me?.managesAdmins);
   const retailers = data.retailers ?? [];
   const salesAgents = users.filter((u) => u.role === "SALES_AGENT");
   const supervisors = users.filter((u) => u.role === "SUPERVISOR" && u.active);
@@ -111,7 +127,7 @@ export default function AdminTeamPage() {
         password: form.password,
         role: form.role,
         ...(form.phone ? { phone: form.phone } : {}),
-        ...(form.role !== "SUPERVISOR" && form.supervisorId ? { supervisorId: form.supervisorId } : {}),
+        ...(form.role !== "SUPERVISOR" && form.role !== "ADMIN" && form.supervisorId ? { supervisorId: form.supervisorId } : {}),
       });
       setFlash(`${form.name.trim()} added`);
       setForm({ ...EMPTY, role: form.role, supervisorId: form.supervisorId });
@@ -185,7 +201,7 @@ export default function AdminTeamPage() {
         <p className="page-kick">Team</p>
         <h1 className="page-title">Staff</h1>
         <p className="page-sub">
-          Sales agents, delivery agents and supervisors. Supervisors see their own team in{" "}
+          Admins, sales agents, delivery agents and supervisors. {me?.managesAdmins ? "As the owner you also add and manage admins." : "Only the business owner adds or changes admins."} Supervisors see their own team in{" "}
           <Link href="/team" className="font-semibold underline">
             Field team
           </Link>
@@ -201,7 +217,7 @@ export default function AdminTeamPage() {
           </Field>
           <Field label="Role">
             <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
-              {ROLES.map((r) => (
+              {addable.map((r) => (
                 <option key={r.role} value={r.role}>
                   {r.label}
                 </option>
@@ -211,7 +227,7 @@ export default function AdminTeamPage() {
           <Field label="Login ID">
             <input className="input" autoCapitalize="none" value={form.loginId} onChange={(e) => setForm({ ...form, loginId: e.target.value })} />
           </Field>
-          <Field label="Password">
+          <Field label="Password" hint="At least 10 characters, not the login ID.">
             <input className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
           </Field>
           <Field label="Mobile number (optional)" hint={PHONE_HINT}>
@@ -224,7 +240,7 @@ export default function AdminTeamPage() {
               onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "").slice(0, 10) })}
             />
           </Field>
-          {form.role !== "SUPERVISOR" && (
+          {form.role !== "SUPERVISOR" && form.role !== "ADMIN" && (
             <Field label="Supervisor" hint={supervisors.length ? undefined : "Add a supervisor first to build a team."}>
               <SupervisorSelect value={form.supervisorId} onChange={(id) => setForm({ ...form, supervisorId: id })} options={supervisors} />
             </Field>
@@ -254,13 +270,16 @@ export default function AdminTeamPage() {
           <div className="card p-4 text-sm text-[var(--muted)]">{users.length ? "No one with this role yet." : "No staff yet. Add your first person above."}</div>
         ) : (
           <div className="space-y-2">
-            {shown.map((u) => (
+            {shown.map((u) => {
+              const can = rowRights(me, u);
+              return (
               <div key={u.id} className="card p-3 space-y-2">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <p className="text-sm font-bold truncate">{u.name}</p>
-                      <RoleChip role={u.role} />
+                      <RoleChip role={u.role} owner={u.isOwner} />
+                      {me?.id === u.id && <span className="text-xs text-[var(--muted)]">(you)</span>}
                     </div>
                     <p className="text-xs text-[var(--muted)] break-words">
                       {u.loginId ?? "No login ID"} ·{" "}
@@ -274,14 +293,19 @@ export default function AdminTeamPage() {
                       )}
                     </p>
                     <p className="text-xs text-[var(--ink-2)]">
-                      {u.role === "SUPERVISOR"
+                      {u.isOwner
+                        ? "Business owner: only they change their own sign-in"
+                        : u.role === "ADMIN"
+                        ? "Admin: everything except changing the owner"
+                        : u.role === "SUPERVISOR"
                         ? `Team of ${teamSize(u.id)}`
                         : u.supervisor
                           ? `Supervisor: ${u.supervisor.name}`
                           : "No supervisor"}
                     </p>
                   </div>
-                  <div className="flex gap-2 shrink-0">
+                  <div className="flex flex-wrap gap-2 shrink-0">
+                    {can.edit && (
                     <button
                       type="button"
                       className="btn btn-quiet btn-sm min-h-[44px]"
@@ -294,6 +318,8 @@ export default function AdminTeamPage() {
                       <Icon name="edit" className="h-4 w-4" />
                       Edit
                     </button>
+                    )}
+                    {can.toggle ? (
                     <button
                       type="button"
                       onClick={() => toggleActive(u)}
@@ -305,7 +331,24 @@ export default function AdminTeamPage() {
                     >
                       {busyId === u.id ? "…" : u.active ? "Active" : "Inactive"}
                     </button>
-                    {u.active && (
+                    ) : (
+                      <span className={`min-h-[44px] inline-flex items-center text-xs rounded-lg px-3 ${u.active ? "bg-[var(--mint-tint)] text-[var(--mint-text)] font-bold" : "bg-black/5 text-foreground/50"}`}>{u.active ? "Active" : "Inactive"}</span>
+                    )}
+                    {u.active && can.password && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRowError(null);
+                          setPasswordFor(u);
+                        }}
+                        disabled={busyId === u.id}
+                        className="min-h-[44px] text-xs font-medium rounded-lg px-3 bg-black/5 text-[var(--ink-2)]"
+                        title="They forgot their password: choose a new one and tell them"
+                      >
+                        Set password
+                      </button>
+                    )}
+                    {u.active && can.signOut && (
                       <button
                         type="button"
                         onClick={() => signOutEverywhere(u)}
@@ -316,7 +359,7 @@ export default function AdminTeamPage() {
                         Sign out
                       </button>
                     )}
-                    {u.active && u.totpEnabledAt && (
+                    {u.active && can.mfa && u.totpEnabledAt && (
                       <button
                         type="button"
                         onClick={() => resetTwoStep(u)}
@@ -331,7 +374,8 @@ export default function AdminTeamPage() {
                 </div>
                 {rowError?.id === u.id && <p className="text-xs text-[#a8281e]">{rowError.text}</p>}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -370,6 +414,18 @@ export default function AdminTeamPage() {
           </div>
         )}
       </div>
+
+      {passwordFor && (
+        <SetPassword
+          key={passwordFor.id}
+          user={passwordFor}
+          onClose={() => setPasswordFor(null)}
+          onSaved={(name) => {
+            setPasswordFor(null);
+            setListFlash(`New password saved for ${name}. They were signed out everywhere; tell them the new password.`);
+          }}
+        />
+      )}
 
       {editing && (
         <EditStaff
@@ -463,13 +519,59 @@ function EditStaff({
           onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
         />
       </Field>
-      {user.role !== "SUPERVISOR" ? (
+      {user.role === "ADMIN" ? null : user.role !== "SUPERVISOR" ? (
         <Field label="Supervisor" hint={options.length ? "Their supervisor sees their day, visits and leave." : "Add a supervisor first to build a team."}>
           <SupervisorSelect value={supervisorId} onChange={setSupervisorId} options={options} />
         </Field>
       ) : (
         <p className="text-xs text-[var(--muted)]">To build this supervisor&apos;s team, edit each sales or delivery agent and pick them as supervisor.</p>
       )}
+    </Sheet>
+  );
+}
+
+/** Choose a new password for someone who forgot theirs (they're signed out everywhere). */
+function SetPassword({ user, onClose, onSaved }: { user: TeamUser; onClose: () => void; onSaved: (name: string) => void }) {
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    setError(null);
+    setBusy(true);
+    try {
+      await send(`/api/admin/users/${user.id}`, "PATCH", { password });
+      onSaved(user.name);
+    } catch (e) {
+      setError(errText(e));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Sheet
+      title={`New password for ${user.name}`}
+      onClose={onClose}
+      footer={
+        <div className="space-y-2">
+          {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+          <div className="flex gap-2 justify-end">
+            <button type="button" className="btn btn-quiet btn-sm" onClick={onClose} disabled={busy}>
+              Cancel
+            </button>
+            <button type="button" className="btn btn-kesar btn-sm" onClick={save} disabled={busy || password.length < 10}>
+              {busy ? "Saving…" : "Save password"}
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <p className="text-sm text-[var(--ink-2)]">
+        Login ID: <span className="font-semibold">{user.loginId ?? "none"}</span>. They are signed out on every device and sign in with this password. Tell it to them in person or on a call.
+      </p>
+      <Field label="New password" hint="At least 10 characters, not the login ID.">
+        <input className="input" type="text" autoComplete="off" autoCapitalize="none" value={password} onChange={(e) => setPassword(e.target.value)} />
+      </Field>
     </Sheet>
   );
 }

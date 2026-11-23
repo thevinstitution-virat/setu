@@ -46,6 +46,20 @@ export function resetLinkMail(to: string, brand: string, url: string): Mail {
   };
 }
 
+export function setPasswordMail(to: string, brand: string, url: string): Mail {
+  return {
+    to,
+    subject: `Set your ${brand} password`,
+    ...renderMail({
+      brand,
+      title: "Choose your password",
+      lines: [`VBiz Pro made an admin login for you at ${brand}.`, "Open the link to choose your password. It works for 3 days, once."],
+      link: { label: "Choose your password", url },
+      footer: "If you weren't expecting this, ignore this email and tell the business owner.",
+    }),
+  };
+}
+
 export function passwordChangedMail(to: string, brand: string): Mail {
   return {
     to,

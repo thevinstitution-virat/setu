@@ -136,7 +136,7 @@ async function seedDemo() {
   });
 
   await db.user.create({
-    data: { name: "Admin", loginId: "admin", passwordHash: hashPassword("admin123"), role: "ADMIN" },
+    data: { name: "Admin", loginId: "admin", passwordHash: hashPassword("admin123"), role: "ADMIN", isOwner: true },
   });
 
   const salesUser = await db.user.create({
@@ -679,7 +679,7 @@ async function seedSecond() {
   // Same admin login and same retailer phone as the demo tenant, on purpose:
   // identities are per tenant, so these must not collide.
   await db.user.create({
-    data: { name: "Admin", loginId: "admin", passwordHash: hashPassword("second123"), role: "ADMIN" },
+    data: { name: "Admin", loginId: "admin", passwordHash: hashPassword("second123"), role: "ADMIN", isOwner: true },
   });
   // Phase 6: the demo sales agent also sells for this business (same phone,
   // separate login): the multi-distributor switch.

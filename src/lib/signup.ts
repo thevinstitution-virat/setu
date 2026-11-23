@@ -167,7 +167,7 @@ export function checkSignup(raw: Record<string, unknown>): Omit<SignupInput, "ch
 export async function createTenantRecord(
   tx: Tx,
   p: { slug: string; name: string; legalName?: string | null; gstin?: string | null; stateCode?: string | null; address?: string | null; phone?: string | null; planCode?: string | null; now?: Date },
-  admin: { name: string; loginId: string; password: string; phone?: string | null }
+  admin: { name: string; loginId: string; password?: string | null; phone?: string | null; email?: string | null }
 ) {
   const now = p.now ?? new Date();
   const tenant = await tx.tenant.create({
@@ -186,7 +186,8 @@ export async function createTenantRecord(
   });
   await startTrial(tx, tenant.id, now, p.planCode ?? null);
   const user = await tx.user.create({
-    data: { tenantId: tenant.id, name: admin.name, loginId: admin.loginId, phone: admin.phone ?? null, passwordHash: hashPassword(admin.password), role: "ADMIN" },
+    // The first admin is the business owner. No password: they choose one through a set-password link.
+    data: { tenantId: tenant.id, name: admin.name, loginId: admin.loginId, phone: admin.phone ?? null, email: admin.email ?? null, passwordHash: admin.password ? hashPassword(admin.password) : null, role: "ADMIN", isOwner: true },
     select: { id: true, name: true, role: true },
   });
   return { tenant, user };

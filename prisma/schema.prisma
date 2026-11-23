@@ -223,6 +223,10 @@ model User {
   active          Boolean   @default(true)
   /// The hidden login platform support uses inside this business (audited support sessions). Not a seat, never listed.
   isSupport       Boolean   @default(false)
+  /// The business owner: the admin who signed the business up. One per business (partial unique index
+  /// User_one_owner_per_business). Only the owner (or VBiz Pro support) adds, switches off or resets other
+  /// admins, and nobody inside the business can change the owner; the platform console can.
+  isOwner         Boolean   @default(false)
   /// Bumped to end every signed-in session of this person ("sign out everywhere"); sessions carry it as sv.
   sessionVersion  Int       @default(0)
   createdAt       DateTime  @default(now())
@@ -2579,6 +2583,7 @@ model PlatformUser {
   name           String
   email          String       @unique
   passwordHash   String
+  /// OWNER is the super-admin: at most one row (partial unique index PlatformUser_one_owner).
   role           PlatformRole @default(SUPPORT)
   active         Boolean      @default(true)
   /// Same two-step sign-in and Google link as business users; mandatory for every console login.
