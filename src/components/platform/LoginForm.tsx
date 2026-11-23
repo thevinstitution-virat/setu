@@ -40,6 +40,11 @@ export default function LoginForm() {
       <button type="submit" className="btn btn-primary w-full" disabled={busy || !email || !password}>
         {busy ? "Signing in…" : "Sign in"}
       </button>
+      <p className="text-center">
+        <a href="/platform/login/forgot" className="text-sm font-semibold text-[var(--kesar-text)] hover:underline">
+          Forgot password?
+        </a>
+      </p>
       <p className="text-xs text-[var(--muted)]">For the people who run the platform. Five wrong tries lock the address for 15 minutes.</p>
     </form>
   );

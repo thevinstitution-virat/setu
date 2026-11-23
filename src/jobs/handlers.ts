@@ -1,5 +1,6 @@
 import type PgBoss from "pg-boss";
 import { asPlatform } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 import type { JobData, QueueName } from "@/lib/jobs";
 import { generateEInvoice } from "@/lib/einvoice";
 import { MoneyError } from "@/lib/money-error";
@@ -85,8 +86,10 @@ export const handlers: Partial<Record<QueueName, Handler>> = {
   "otp.cleanup": async () => {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const res = await asPlatform((tx) => tx.otpChallenge.deleteMany({ where: { createdAt: { lt: cutoff } } }));
+    const mails = await asPlatform((tx) => tx.emailChallenge.deleteMany({ where: { createdAt: { lt: cutoff } } }));
+    const resets = await prisma.platformPasswordReset.deleteMany({ where: { createdAt: { lt: cutoff } } });
     const tries = await purgeLoginAttempts();
-    console.log(`[job] otp.cleanup removed ${res.count} codes, ${tries} sign-in tries`);
+    console.log(`[job] otp.cleanup removed ${res.count} codes, ${mails.count + resets.count} email codes and links, ${tries} sign-in tries`);
   },
   "pings.cleanup": async () => {
     // Each business keeps positions for its own retention period (Settings -> Field team).

@@ -17,11 +17,15 @@ const AUD = "setu-platform";
 
 export type PlatformSession = { platformUserId: string; name: string; role: PlatformRole };
 
-/** Console cookies are only made after the second step (lib/platform-mfa.ts); this claim marks that. */
-type PlatformClaims = PlatformSession & { mfa: true };
+/**
+ * Console cookies are only made after the second step (lib/platform-mfa.ts); mfa marks that.
+ * sv is the login's sessionVersion: a password reset bumps it and ends every console session.
+ */
+type PlatformClaims = PlatformSession & { mfa: true; sv: number };
 
 export async function createPlatformCookie(s: PlatformSession) {
-  const claims: PlatformClaims = { ...s, mfa: true };
+  const u = await prisma.platformUser.findUnique({ where: { id: s.platformUserId }, select: { sessionVersion: true } });
+  const claims: PlatformClaims = { ...s, mfa: true, sv: u?.sessionVersion ?? 0 };
   const token = await new SignJWT({ ...claims }).setProtectedHeader({ alg: "HS256" }).setAudience(AUD).setIssuedAt().setExpirationTime("12h").sign(platformSecret());
   (await cookies()).set(COOKIE, token, { httpOnly: true, sameSite: "strict", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 12 * 3600 });
 }
@@ -40,8 +44,9 @@ export async function getPlatformSession(): Promise<PlatformSession | null> {
     const id = payload.platformUserId;
     // Every console login has a second step; cookies from before it existed no longer count.
     if (typeof id !== "string" || payload.mfa !== true) return null;
-    const u = await prisma.platformUser.findUnique({ where: { id }, select: { id: true, name: true, role: true, active: true } });
+    const u = await prisma.platformUser.findUnique({ where: { id }, select: { id: true, name: true, role: true, active: true, sessionVersion: true } });
     if (!u?.active) return null;
+    if ((typeof payload.sv === "number" ? payload.sv : 0) !== u.sessionVersion) return null;
     return { platformUserId: u.id, name: u.name, role: u.role };
   } catch {
     return null;

@@ -105,6 +105,7 @@ model Tenant {
   attendance         Attendance[]
   deliveries         Delivery[]
   otpChallenges      OtpChallenge[]
+  emailChallenges    EmailChallenge[]
   counters           Counter[]
   auditLogs          AuditLog[]
   ledgerAccounts     LedgerAccount[]
@@ -207,25 +208,28 @@ model TenantDomain {
 // ───────────────────────────── Tenant tables ─────────────────────────────
 
 model User {
-  id             String   @id @default(cuid())
-  tenantId       String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant         Tenant   @relation(fields: [tenantId], references: [id])
-  name           String
-  phone          String?
-  email          String?
-  loginId        String?
-  passwordHash   String?
-  role           Role
-  active         Boolean  @default(true)
+  id              String    @id @default(cuid())
+  tenantId        String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  name            String
+  phone           String?
+  email           String?
+  /// Set once the person proved the address (a code sent to it, from Security). Only verified
+  /// addresses get sign-in codes and password-reset links; one verified owner per address per business.
+  emailVerifiedAt DateTime?
+  loginId         String?
+  passwordHash    String?
+  role            Role
+  active          Boolean   @default(true)
   /// The hidden login platform support uses inside this business (audited support sessions). Not a seat, never listed.
-  isSupport      Boolean  @default(false)
+  isSupport       Boolean   @default(false)
   /// Bumped to end every signed-in session of this person ("sign out everywhere"); sessions carry it as sv.
-  sessionVersion Int      @default(0)
-  createdAt      DateTime @default(now())
+  sessionVersion  Int       @default(0)
+  createdAt       DateTime  @default(now())
   /// The supervisor this person reports to (field staff). Supervisors see and manage their team.
-  supervisorId   String?
-  supervisor     User?    @relation("Team", fields: [supervisorId], references: [id])
-  team           User[]   @relation("Team")
+  supervisorId    String?
+  supervisor      User?     @relation("Team", fields: [supervisorId], references: [id])
+  team            User[]    @relation("Team")
 
   retailerProfile      RetailerProfile?
   salesAgentProfile    SalesAgentProfile?
@@ -258,6 +262,7 @@ model User {
   bankStatements    BankStatement[]
   apiKeys           ApiKey[]
   webhookEndpoints  WebhookEndpoint[]
+  emailChallenges   EmailChallenge[]
 
   /// Google account linked for "Continue with Google" (the Google user id, and the address shown back to them).
   googleSub     String?
@@ -899,6 +904,33 @@ model OtpChallenge {
   createdAt  DateTime  @default(now())
 
   @@index([tenantId, phone, createdAt])
+}
+
+enum EmailPurpose {
+  SIGN_IN
+  VERIFY
+  RESET
+}
+
+/// Codes and links sent by email (lib/email-auth.ts): a sign-in code, the code that proves a new
+/// address (VERIFY), or a password-reset link (RESET; codeHash is then the link's secret, hashed).
+model EmailChallenge {
+  id        String       @id @default(cuid())
+  tenantId  String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant       @relation(fields: [tenantId], references: [id])
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Lower-cased address the code went to.
+  email     String
+  purpose   EmailPurpose
+  codeHash  String
+  attempts  Int          @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime     @default(now())
+
+  @@index([tenantId, email, purpose, createdAt])
+  @@index([tenantId, userId, purpose, createdAt])
 }
 
 /// Gap-free per-tenant sequences (order numbers, later invoice series per FY).
@@ -2543,23 +2575,26 @@ model PlatformCounter {
 
 /// People who run the platform (us). Separate from tenant users.
 model PlatformUser {
-  id            String       @id @default(cuid())
-  name          String
-  email         String       @unique
-  passwordHash  String
-  role          PlatformRole @default(SUPPORT)
-  active        Boolean      @default(true)
+  id             String       @id @default(cuid())
+  name           String
+  email          String       @unique
+  passwordHash   String
+  role           PlatformRole @default(SUPPORT)
+  active         Boolean      @default(true)
   /// Same two-step sign-in and Google link as business users; mandatory for every console login.
-  googleSub     String?      @unique
-  googleEmail   String?
-  totpSecret    String?
-  totpEnabledAt DateTime?
-  totpLastStep  Int?
-  recoveryCodes String[]     @default([])
-  lastLoginAt   DateTime?
-  createdAt     DateTime     @default(now())
+  googleSub      String?      @unique
+  googleEmail    String?
+  totpSecret     String?
+  totpEnabledAt  DateTime?
+  totpLastStep   Int?
+  recoveryCodes  String[]     @default([])
+  lastLoginAt    DateTime?
+  /// Bumped by a password reset: console cookies carry it as sv and stop working when it changes.
+  sessionVersion Int          @default(0)
+  createdAt      DateTime     @default(now())
 
   supportSessions SupportSession[]
+  passwordResets  PlatformPasswordReset[]
   audits          PlatformAudit[]
   announcements   PlatformAnnouncement[]
 }
@@ -2886,4 +2921,17 @@ model AuthTicketUse {
   usedAt DateTime @default(now())
 
   @@index([usedAt])
+}
+
+/// A console password-reset link (the link's secret is only kept hashed). 30 minutes, once.
+model PlatformPasswordReset {
+  id             String       @id @default(cuid())
+  platformUserId String
+  platformUser   PlatformUser @relation(fields: [platformUserId], references: [id], onDelete: Cascade)
+  tokenHash      String       @unique
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([platformUserId, createdAt])
 }

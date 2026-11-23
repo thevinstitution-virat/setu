@@ -23,7 +23,7 @@ export type SessionPayload = {
   role: Role;
   name: string;
   /** How this session was opened. Only OTP / handoff sessions may hop to another business (Phase 6 multi-distributor). */
-  via?: "password" | "otp" | "handoff" | "welcome" | "support" | "google";
+  via?: "password" | "otp" | "handoff" | "welcome" | "support" | "google" | "email";
   /** Support sessions (Phase 9): the SupportSession id; checked on every request. */
   supportId?: string;
   /** Verified phone (OTP / handoff sessions). */

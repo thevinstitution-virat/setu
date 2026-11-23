@@ -176,7 +176,21 @@ function FailureNote({ failure }: { failure: LoginFailure | null }) {
   );
 }
 
+/** Shops: mobile OTP (and sign-up) by default, or a code to the email they confirmed. */
 function RetailerLogin({ initialRef = "" }: { initialRef?: string }) {
+  const { t } = useLanguage();
+  const [viaEmail, setViaEmail] = useState(false);
+  return (
+    <div className="space-y-4">
+      {viaEmail ? <EmailCodeLogin /> : <RetailerPhoneLogin initialRef={initialRef} />}
+      <button type="button" className="text-sm text-[var(--kesar-text)] w-full text-center min-h-[44px]" onClick={() => setViaEmail(!viaEmail)}>
+        {viaEmail ? t("login.usePhone") : t("login.useEmail")}
+      </button>
+    </div>
+  );
+}
+
+function RetailerPhoneLogin({ initialRef = "" }: { initialRef?: string }) {
   const router = useRouter();
   const { t } = useLanguage();
   const [step, setStep] = useState<"phone" | "otp" | "register">("phone");
@@ -461,12 +475,12 @@ function useReferralCheck(active: boolean, code: string): ReferralCheck {
 
 function TeamLogin({ initialPhone = "" }: { initialPhone?: string }) {
   const { t } = useLanguage();
-  const [method, setMethod] = useState<"password" | "otp">(initialPhone ? "otp" : "password");
+  const [method, setMethod] = useState<"password" | "otp" | "email">(initialPhone ? "otp" : "password");
 
   return (
     <div className="space-y-4">
       <div className="flex rounded-2xl p-1 bg-ink/5" role="radiogroup" aria-label={t("login.teamTab")}>
-        {(["password", "otp"] as const).map((m) => (
+        {(["password", "otp", "email"] as const).map((m) => (
           <button
             key={m}
             type="button"
@@ -477,11 +491,11 @@ function TeamLogin({ initialPhone = "" }: { initialPhone?: string }) {
               method === m ? "bg-white text-[var(--ink)] shadow-sm" : "text-[var(--ink-2)]"
             }`}
           >
-            {m === "password" ? t("login.methodPassword") : t("login.methodOtp")}
+            {m === "password" ? t("login.methodPassword") : m === "otp" ? t("login.methodOtp") : t("login.methodEmail")}
           </button>
         ))}
       </div>
-      {method === "password" ? <PasswordLogin /> : <StaffOtpLogin initialPhone={initialPhone} />}
+      {method === "password" ? <PasswordLogin /> : method === "otp" ? <StaffOtpLogin initialPhone={initialPhone} /> : <EmailCodeLogin />}
     </div>
   );
 }
@@ -534,6 +548,122 @@ function PasswordLogin() {
       <Button onClick={submit} loading={loading}>
         {t("login.loginButton")}
       </Button>
+      <FailureNote failure={error} />
+      <p className="text-center">
+        <Link href="/login/forgot" className="text-sm font-semibold text-[var(--kesar-text)] hover:underline inline-block min-h-[44px] leading-[44px]">
+          {t("login.forgot")}
+        </Link>
+      </p>
+    </div>
+  );
+}
+
+/** Anyone with a confirmed email on their login: a 6-digit code by email (staff then do step two). */
+function EmailCodeLogin() {
+  const router = useRouter();
+  const { t } = useLanguage();
+  const [step, setStep] = useState<"email" | "code">("email");
+  const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [devCode, setDevCode] = useState<string | null>(null);
+  const [error, setError] = useState<LoginFailure | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function send() {
+    setError(null);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) {
+      setError({ text: t("login.error"), paused: false });
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await postJson<{ devCode?: string }>("/api/auth/email-code/request", { email }, t("login.error"));
+      setDevCode(data.devCode ?? null);
+      setCode("");
+      setStep("code");
+    } catch (e) {
+      setError(failureOf(e, t("login.error")));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function verify() {
+    setError(null);
+    setLoading(true);
+    try {
+      const data = await postJson<{ redirect: string }>("/api/auth/email-code/verify", { email, code }, t("login.error"));
+      router.push(data.redirect);
+    } catch (e) {
+      setError(failureOf(e, t("login.error")));
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {step === "email" ? (
+        <>
+          <Field label={t("login.emailLabel")}>
+            <input
+              className="input"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !loading) send();
+              }}
+              placeholder="you@example.com"
+            />
+          </Field>
+          <Button onClick={send} loading={loading}>
+            {t("login.sendEmailCode")}
+          </Button>
+          <p className="text-xs text-[var(--muted)]">{t("login.emailHint")}</p>
+        </>
+      ) : (
+        <>
+          {devCode ? (
+            <p className="text-xs rounded-lg bg-[var(--genda-tint)] text-[var(--genda-text)] px-3 py-2">
+              {t("login.demoEmail")} <span className="font-semibold">{devCode}</span>.
+            </p>
+          ) : (
+            <p role="status" className="text-sm rounded-lg bg-ink/5 text-[var(--ink-2)] px-3 py-2">
+              {t("login.emailSent")}
+            </p>
+          )}
+          <Field label={`${t("login.emailCodeLabel")} (${email.trim()})`}>
+            <input
+              className="input tracking-[0.3em] text-center"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              placeholder="••••••"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !loading && code.length === 6) verify();
+              }}
+            />
+          </Field>
+          <Button onClick={verify} loading={loading}>
+            {t("login.verify")}
+          </Button>
+          <button
+            type="button"
+            className="text-sm text-[var(--kesar-text)] w-full text-center min-h-[44px]"
+            onClick={() => {
+              setStep("email");
+              setError(null);
+            }}
+          >
+            {t("login.changeEmail")}
+          </button>
+        </>
+      )}
       <FailureNote failure={error} />
     </div>
   );

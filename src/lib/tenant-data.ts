@@ -28,7 +28,7 @@ import { emit } from "@/lib/jobs";
 /** Our own records about the tenant, kept after a purge. */
 export const KEEP_AFTER_PURGE = new Set(["PlatformInvoice", "Subscription", "UsageCounter"]);
 /** Tables not worth exporting (codes, tokens, caches). */
-const SKIP_EXPORT = new Set(["OtpChallenge", "HandoffUse", "GeoCache", "TenantExport", "SupportSession"]);
+const SKIP_EXPORT = new Set(["OtpChallenge", "EmailChallenge", "HandoffUse", "GeoCache", "TenantExport", "SupportSession"]);
 /** Columns never exported. */
 const REDACT: Record<string, string[]> = {
   User: ["passwordHash"],
