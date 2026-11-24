@@ -174,12 +174,12 @@ export function CompanyBlocks({ companies, totals }: { companies: CompanyBlock[]
   return (
     <div className="space-y-4">
       <section className="card overflow-x-auto">
-        <table className="w-full text-sm min-w-[560px]">
+        <table className="w-full text-sm">
           <thead>
             <tr className="text-xs text-[var(--muted)] border-b border-[var(--line)] text-left">
               <th className={th}>Company</th>
-              <th className={`${th} text-right`}>Bills</th>
-              <th className={`${th} text-right`}>Parties</th>
+              <th className={`${th} text-right hidden sm:table-cell`}>Bills</th>
+              <th className={`${th} text-right hidden sm:table-cell`}>Parties</th>
               <th className={`${th} text-right`}>Share billed</th>
               <th className={`${th} text-right`}>Balance</th>
             </tr>
@@ -192,8 +192,8 @@ export function CompanyBlocks({ companies, totals }: { companies: CompanyBlock[]
                     {c.company}
                   </a>
                 </td>
-                <td className={`${td} ${num}`}>{c.rows.length}</td>
-                <td className={`${td} ${num}`}>{c.parties}</td>
+                <td className={`${td} ${num} hidden sm:table-cell`}>{c.rows.length}</td>
+                <td className={`${td} ${num} hidden sm:table-cell`}>{c.parties}</td>
                 <td className={`${td} ${num}`}>{plain(c.totals.amount)}</td>
                 <td className={`${td} ${num} font-semibold text-[var(--ink)]`}>{plain(c.totals.balance)}</td>
               </tr>
@@ -202,7 +202,7 @@ export function CompanyBlocks({ companies, totals }: { companies: CompanyBlock[]
           <tfoot>
             <tr className="border-t-2 border-[var(--ink)] font-semibold text-[var(--ink)]">
               <td className={td}>{count(companies.filter((c) => c.companyId).length, "company", "companies")}</td>
-              <td className={td} colSpan={2} />
+              <td className={`${td} hidden sm:table-cell`} colSpan={2} />
               <td className={`${td} ${num}`}>{plain(totals.amount)}</td>
               <td className={`${td} ${num}`}>{plain(totals.balance)}</td>
             </tr>
