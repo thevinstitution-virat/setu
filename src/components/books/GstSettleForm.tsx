@@ -74,7 +74,7 @@ export default function GstSettleForm({
         <div className="space-y-2">
           <p className="text-sm text-[var(--ink-2)]">
             The first month settled here: enter the electronic credit ledger&apos;s balance on the GST portal at the start of {label}.
-            {inputAtStart !== null && <> The GST input account in the books then: {formatINR(inputAtStart)}.</>}
+            {inputAtStart !== null && <> The GST input account in the books then: {inputAtStart < 0 ? `−${formatINR(-inputAtStart)} (more taken back than claimed)` : formatINR(inputAtStart)}.</>}
           </p>
           <div className="grid grid-cols-3 gap-2">
             {HEADS.map((h) => (

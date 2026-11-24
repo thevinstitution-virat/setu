@@ -75,13 +75,13 @@ export default async function GstPage({ searchParams }: { searchParams: Promise<
           <button className="btn btn-mor btn-sm">Show</button>
         </form>
       ) : (
-        <div className="card p-3 flex items-center justify-between gap-2">
+        <div className="card p-3 flex flex-wrap items-center justify-between gap-2">
           <Link href={href(view, { period: shiftPeriod(period, -1) })} className="btn btn-quiet btn-sm" aria-label="Month before">
             ‹ {short(shiftPeriod(period, -1))}
           </Link>
-          <form method="get" className="flex items-center gap-2">
+          <form method="get" className="order-last flex w-full items-center gap-2 sm:order-none sm:w-auto">
             <input type="hidden" name="view" value={view} />
-            <input type="month" name="period" defaultValue={period} max={periodOf(today)} className="input !py-1.5 w-[9.5rem]" aria-label="Month" />
+            <input type="month" name="period" defaultValue={period} max={periodOf(today)} className="input !py-1.5 min-w-0 flex-1 sm:w-[9.5rem] sm:flex-none" aria-label="Month" />
             <button className="btn btn-mor btn-sm">Show</button>
           </form>
           {period < periodOf(today) ? (
