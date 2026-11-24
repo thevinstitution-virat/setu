@@ -207,10 +207,15 @@ function Pay({ o, year, banks, sections, canPost }: { o: Overview; year: Overvie
         <Kpi label="TDS payable in the books" value={formatINR(o.payable)} sub={`Kept back from us: ${formatINR(o.receivable)}`} />
       </div>
       <p className="text-sm text-[var(--ink-2)]">
-        Next return: {o.lastQuarter.label}, due {showDay(o.lastQuarter.due)}.{" "}
+        {o.lastQuarter.due < o.today ? `The return for ${o.lastQuarter.label} was due ${showDay(o.lastQuarter.due)}: file it if it isn't done. ` : `Next return: ${o.lastQuarter.label}, due ${showDay(o.lastQuarter.due)}. `}
         <Link href={`/admin/books/tds?view=26q&fy=${o.lastQuarter.fy}&q=${o.lastQuarter.q}`} className="underline">
           See the working
         </Link>
+        {o.lastQuarter.due < o.today && (
+          <span className="block">
+            Next: {o.thisQuarter.label}, due {showDay(o.thisQuarter.due)}.
+          </span>
+        )}
       </p>
       <Notes items={notes} />
       <div className="flex justify-end">

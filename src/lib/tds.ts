@@ -21,6 +21,8 @@ import {
   returnDue,
   STARTER_TDS_SECTIONS,
   type TdsSectionRow,
+  rateFor,
+  tdsOn,
 } from "@/lib/tds-math";
 
 /**
@@ -286,6 +288,14 @@ export async function tdsDeducted(ctx: Ctx, from: string, to: string): Promise<T
       return { id: c.id, date: istDay(c.date), source: "BILL" as const, number: c.number, href: pb ? `/admin/books/purchases/${pb}` : `/admin/books/suppliers/${c.supplierId}`, party: c.supplier.name, pan: panOf(c.supplier), section: c.tdsSection ?? "?", base: c.tdsBase ?? 0, tds: c.amount, rate: rate(c.amount, c.tdsBase ?? 0) };
     }),
   ];
+  // The rate is the section's rate for the party when the TDS agrees with it (to the rupee); else what was actually kept.
+  const sections = new Map((await ctx.tx.tdsSection.findMany()).map((x) => [x.code, x]));
+  for (const r of rows) {
+    const s = sections.get(r.section);
+    if (!s) continue;
+    const nominal = rateFor(s, r.pan);
+    if (Math.abs(tdsOn(r.base, nominal) - r.tds) <= 100) r.rate = nominal;
+  }
   return rows.sort((a, b) => a.date.localeCompare(b.date) || a.number.localeCompare(b.number));
 }
 
@@ -563,7 +573,7 @@ export async function tdsOverview(ctx: Ctx, day = todayIst()) {
   const of = (t: string) => bal.filter((b) => accs.find((a) => a.id === b.accountId)?.type === t).reduce((s, b) => s + (b._sum.amount ?? 0), 0);
   const q = quarterOf(day);
   const lastQ = q === 1 ? { fy: fy - 1, q: 4 } : { fy, q: q - 1 };
-  return { fy, label: fyLabel(fy), year: y, payable: -of("TDS_PAYABLE"), receivable: of("TDS_RECEIVABLE"), lastQuarter: { ...lastQ, label: quarterLabel(lastQ.fy, lastQ.q), due: returnDue(lastQ.fy, lastQ.q) } };
+  return { fy, label: fyLabel(fy), year: y, payable: -of("TDS_PAYABLE"), receivable: of("TDS_RECEIVABLE"), lastQuarter: { ...lastQ, label: quarterLabel(lastQ.fy, lastQ.q), due: returnDue(lastQ.fy, lastQ.q) }, thisQuarter: { fy, q, label: quarterLabel(fy, q), due: returnDue(fy, q) }, today: day };
 }
 
 export async function tdsBanks(ctx: Ctx) {

@@ -64,7 +64,7 @@ export function TdsHint({ p, current, onUse }: { p: Proposal | null; current: nu
   return (
     <div className={`text-xs rounded-lg px-3 py-2 ${same ? "bg-black/[0.03] text-[var(--ink-2)]" : "bg-[#fff4e0] text-[#7a4b00]"}`}>
       <span className="font-semibold">Works out to {formatINR(p.tds)}</span>
-      {p.known && p.rate ? ` (${rateLabel(p.rate)})` : ""}: {p.why}.
+      {p.known && p.tds > 0 && p.rate ? ` (${rateLabel(p.rate)}${p.pan ? "" : ", no PAN"})` : ""}: {p.why}.
       {p.known && (p.before > 0 || p.deducted > 0) && (
         <span className="block">
           This year before this: {formatINR(p.before)}, TDS kept {formatINR(p.deducted)}.
@@ -75,7 +75,7 @@ export function TdsHint({ p, current, onUse }: { p: Proposal | null; current: nu
           Use {formatINR(p.tds)}
         </button>
       )}
-      {!same && <span className="block mt-0.5">Keeping a different amount? Say why in the TDS note.</span>}
+      {!same && <span className="block mt-0.5">Keeping a different amount? Say why below.</span>}
     </div>
   );
 }
