@@ -43,11 +43,17 @@ async function newRetailer() {
 const quote = (retailerId: string, items: CartItemInput[], extra: { coupon?: string; deliveryDate?: string } = {}, settings: unknown = SETTINGS) =>
   withTenantTx(T, async (tx) => quoteCart(tx, settings, (await retailerPricingCtx(tx, retailerId))!, { items, ...extra }));
 
-/** placeOrder reads the tenant's real settings; give it ours for the call. */
+/**
+ * placeOrder reads the tenant's real settings; give it ours for the call.
+ * The amounts below are ex-GST rates, so pin that even when the demo tenant
+ * has been switched to rates that include GST.
+ */
 async function place(retailerId: string, items: CartItemInput[], coupon?: string) {
   return withMoney(T, adminId, async (ctx) => {
     const real = await ctx.tx.tenant.findUniqueOrThrow({ where: { id: T }, select: { settings: true } });
-    await ctx.tx.tenant.update({ where: { id: T }, data: { settings: { ...(real.settings as object), ...SETTINGS } } });
+    const settings = (real.settings ?? {}) as { invoice?: object };
+    const invoice = { ...(settings.invoice ?? {}), ratesIncludeGst: false };
+    await ctx.tx.tenant.update({ where: { id: T }, data: { settings: { ...settings, ...SETTINGS, invoice } } });
     try {
       return await placeOrder(ctx, { retailerId, placedById: adminId, items, coupon });
     } finally {
