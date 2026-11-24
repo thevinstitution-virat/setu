@@ -182,7 +182,7 @@ export default function CountSheet({ count, products, canPost }: { count: Count;
           aria-label="Search the sheet"
         />
         <div className="flex gap-1.5 overflow-x-auto" role="radiogroup" aria-label="Show">
-          {([["all", "All"], ["blank", "Not counted"], ...(mode === "TRACKED" ? [["diff", "Differences"]] : [])] as [Show, string][]).map(([k, label]) => (
+          {([["all", "All"], ...(count.status === "DRAFT" ? [["blank", "Not counted"]] : []), ...(mode === "TRACKED" ? [["diff", "Differences"]] : [])] as [Show, string][]).map(([k, label]) => (
             <button
               key={k}
               type="button"
@@ -341,9 +341,8 @@ export default function CountSheet({ count, products, canPost }: { count: Count;
             <div className="space-y-2 pt-1">
               <p className="text-sm text-[var(--ink-2)]">
                 {mode === "TRACKED"
-                  ? `The app's stock will be set to what you counted, as at the end of the day. ${net < 0 ? `The shortage of ${formatINR(-net)} goes to stock shortage.` : net > 0 ? `The excess of ${formatINR(net)} reduces purchases.` : "There is no difference in value."} `
-                  : ""}
-                The closing stock becomes {formatINR(totals.countedValue)}. This can&apos;t be undone{mode === "TRACKED" ? "; count again to correct it" : ""}.
+                  ? `The app's stock will be set to what you counted, as at the end of the day. ${net < 0 ? `The shortage of ${formatINR(-net)} goes to stock shortage.` : net > 0 ? `The excess of ${formatINR(net)} is credited to stock shortage (a stock gain).` : "There is no difference in value."} Counted stock: ${formatINR(totals.countedValue)} at cost. This can't be undone; count again to correct it.`
+                  : `The closing stock becomes ${formatINR(totals.countedValue)}. This can't be undone.`}
               </p>
               {totals.noRate > 0 && <p className="text-sm text-[#7a4b00]">{totals.noRate} lines have no rate; enter one for each first.</p>}
               <div className="flex gap-2">

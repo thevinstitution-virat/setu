@@ -204,11 +204,7 @@ export async function closingStock(ctx: Ctx, day: string) {
       value: v.total,
       source: "book" as const,
       lastCount: last ? { id: last.id, number: last.number, date: dayText(last.date), place: last.location?.name ?? null } : null,
-      note: last
-        ? dayText(last.date) === day
-          ? `Counted on ${showDay(day)} (${last.number}${last.location ? `, ${last.location.name}` : ""}).`
-          : `The app's stock at cost. Last counted on ${showDay(dayText(last.date))} (${last.number}${last.location ? `, ${last.location.name}` : ""}).`
-        : null,
+      note: last ? `The app's stock at cost, after counts. Last count accepted: ${showDay(dayText(last.date))} (${last.number}${last.location ? `, ${last.location.name}` : ""}).` : null,
       warning: last ? null : `Not counted: no physical count was accepted on or before ${showDay(day)}, so this is the app's stock at cost.`,
       noCost: v.noCost,
       byCompany: v.groups,

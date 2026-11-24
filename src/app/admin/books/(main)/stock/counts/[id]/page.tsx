@@ -42,7 +42,10 @@ export default async function CountPage({ params }: { params: Promise<{ id: stri
         {c.note && <p className="text-sm text-[var(--muted)]">{c.note}</p>}
         {c.status === "ACCEPTED" && (
           <p className="text-sm text-[var(--ink-2)]">
-            Accepted{c.acceptedBy ? ` by ${c.acceptedBy}` : ""}: closing stock {formatINR(c.totals.countedValue)} for {showDay(c.date)}.
+            Accepted{c.acceptedBy ? ` by ${c.acceptedBy}` : ""}:{" "}
+            {c.mode === "TRACKED"
+              ? `the app's stock here was set to the count (${formatINR(c.totals.countedValue)} at cost).`
+              : `closing stock ${formatINR(c.totals.countedValue)} for ${showDay(c.date)}.`}
             {c.entryId && (
               <>
                 {" "}
