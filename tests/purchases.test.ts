@@ -103,6 +103,8 @@ describe("suppliers", () => {
   it("reads the state and PAN from the GSTIN and checks bank details", () => {
     const d = parseSupplier({ name: "Acme Traders", gstin: "27AAPFU0939F1ZV", kind: "SERVICES", creditDays: 45 }, false);
     expect(d).toMatchObject({ stateCode: "27", pan: "AAPFU0939F", kind: "SERVICES", creditDays: 45 });
+    // The form sends blank state and PAN: both still come from the GSTIN.
+    expect(parseSupplier({ name: "Acme", gstin: "27AAPFU0939F1ZV", stateCode: "", pan: "" }, false)).toMatchObject({ stateCode: "27", pan: "AAPFU0939F" });
     expect(parseSupplier({ name: "Acme", bankIfsc: "SBIN123" }, false)).toMatch(/IFSC/);
     expect(parseSupplier({ name: "Acme", kind: "SHOP" }, false)).toMatch(/Pick/);
     expect(parseSupplier({ name: "Acme", gstin: "27AAPFU0939F1ZV", stateCode: "29" }, false)).toMatch(/match/);

@@ -42,14 +42,15 @@ export function parseSupplier(b: Record<string, unknown>, partial: boolean): Rec
     if (sc && !isStateCode(sc)) return "Pick the supplier's state";
     d.stateCode = sc || null;
   }
-  if (d.gstin && !d.stateCode && !("stateCode" in b)) d.stateCode = (d.gstin as string).slice(0, 2);
+  // Blank state and PAN are read from the GSTIN.
+  if (d.gstin && !d.stateCode) d.stateCode = (d.gstin as string).slice(0, 2);
   if (d.gstin && d.stateCode && (d.gstin as string).slice(0, 2) !== d.stateCode) return "The state doesn't match the GSTIN's first two digits";
   if ("pan" in b) {
     const pan = t(b.pan, 10).toUpperCase();
     if (pan && !/^[A-Z]{5}\d{4}[A-Z]$/.test(pan)) return "That PAN is not valid (10 characters, like ABCDE1234F)";
     d.pan = pan || null;
   }
-  if (d.gstin && !("pan" in b)) d.pan = (d.gstin as string).slice(2, 12);
+  if (d.gstin && !d.pan) d.pan = (d.gstin as string).slice(2, 12);
   if ("creditDays" in b) {
     const n = Number(b.creditDays);
     if (!Number.isInteger(n) || n < 0 || n > 365) return "Credit days must be 0 to 365";
