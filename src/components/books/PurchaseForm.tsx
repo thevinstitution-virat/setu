@@ -190,7 +190,7 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
   const productOptions = o.products.map((p) => ({ id: p.id, label: p.name, sub: `${p.sku} · GST ${p.gstRate}%${p.lastCost ? ` · last cost ${formatINR(p.lastCost)}` : ""}` }));
 
   return (
-    <div className="space-y-4 pb-28">
+    <div className="space-y-4">
       <Link href="/admin/books/purchases" className="inline-flex items-center gap-1 text-sm font-bold text-[var(--ink-2)]">
         <Icon name="arrow" className="h-4 w-4 rotate-180" /> Purchases
       </Link>
@@ -202,7 +202,7 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
             type="button"
             role="tab"
             aria-selected={type === t}
-            className={`rounded-full px-3.5 py-1.5 text-sm font-semibold ${type === t ? "bg-[var(--ink)] text-white" : "bg-black/5 text-foreground/70"}`}
+            className={`rounded-full px-3.5 py-1.5 text-sm font-semibold ${type === t ? "bg-ink text-white" : "bg-black/5 text-foreground/70"}`}
             onClick={() => {
               setType(t);
               setGrnId(null);
@@ -308,7 +308,7 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
                       key={t}
                       type="button"
                       disabled={!!l.purchaseLineId}
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${l.target === t ? "bg-[var(--ink)] text-white" : "bg-black/5 text-foreground/70"}`}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${l.target === t ? "bg-ink text-white" : "bg-black/5 text-foreground/70"}`}
                       onClick={() => setLine(l.key, { ...blankLine(t), key: l.key })}
                     >
                       {t === "GOODS" ? "Goods" : t === "HEAD" ? "Expense / asset" : "Scheme or claim"}
@@ -449,13 +449,14 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
         {err && <p className="text-sm text-[#a8281e]">{err}</p>}
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--line)] bg-white/95 px-4 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
-          <p className="text-sm min-w-0 truncate">
-            <span className="text-[var(--muted)]">{DOC_LABEL[type]}:</span> <span className="font-bold tabular-nums">{formatINR(figures.total)}</span>
-          </p>
-          <button type="button" className="btn btn-mor" disabled={busy || !supplierId} onClick={save}>
-            {busy ? "Saving…" : "Save"}
+      <div className="sticky bottom-[5.5rem] md:bottom-3 z-10">
+        <div className="card p-3 shadow-xl flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-heading font-bold text-lg leading-tight tabular-nums">{formatINR(figures.total)}</p>
+            <p className="text-xs text-[var(--muted)] truncate">{DOC_LABEL[type]}</p>
+          </div>
+          <button type="button" className="btn btn-mor shrink-0" disabled={busy || !supplierId} onClick={save}>
+            <Icon name="check" className="h-4 w-4" /> {busy ? "Saving…" : "Save"}
           </button>
         </div>
       </div>

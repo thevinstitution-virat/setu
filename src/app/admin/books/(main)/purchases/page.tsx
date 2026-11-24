@@ -47,7 +47,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
       )}
 
       <form method="get" className="card p-4 flex flex-wrap items-end gap-3">
-        <label className="text-xs text-[var(--muted)] min-w-0 flex-1 basis-56">
+        <label className="text-xs text-[var(--muted)] min-w-0 w-full sm:w-auto sm:flex-1 sm:basis-56">
           Supplier
           <select name="supplier" defaultValue={supplier ?? ""} className="input !py-1.5 mt-1 block w-full">
             <option value="">All suppliers</option>
