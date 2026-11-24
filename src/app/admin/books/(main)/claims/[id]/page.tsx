@@ -119,7 +119,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
                         </>
                       ) : null}
                       {s.kind === "RECEIPT" ? ` · ${s.cash ? "Office cash" : (s.bankAccount?.name ?? "Bank")}` : ""}
-                      {s.reference ? ` · ${s.reference}` : ""}
+                      {s.reference && !s.creditNote ? ` · ${s.reference}` : ""}
                       {s.note ? ` · ${s.note}` : ""}
                     </span>
                   </span>

@@ -167,7 +167,8 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
         target: l.target,
         productId: l.target === "GOODS" ? l.productId : null,
         headId: l.target === "HEAD" ? l.headId || null : null,
-        description: l.description,
+        // A claim line left blank says which claim it settles.
+        description: l.description || (l.target === "CLAIM" && l.claimId ? `Claim ${openClaims.find((c) => c.id === l.claimId)?.number ?? ""}`.trim() : ""),
         quantity: int(l.quantity),
         freeQty: l.target === "GOODS" ? int(l.freeQty) : 0,
         rate,
