@@ -7,7 +7,8 @@ import Icon from "@/components/Icon";
 import { errText, ErrorBox, Field, readRupees, SearchPick, send, useFetch } from "@/components/admin/AdminKit";
 import { CLAIM_TYPE_LABEL } from "@/lib/claim-labels";
 import type { ClaimType } from "@/generated/prisma/enums";
-import { DOC_LABEL, purchaseLineMoney, type PurchaseDocType } from "@/lib/purchase-math";
+import { DOC_LABEL, parseDiscounts, purchaseLineMoney, type PurchaseDocType } from "@/lib/purchase-math";
+import { ScanPicker } from "@/components/books/BillScans";
 import { STATES } from "@/lib/gst";
 import { formatINR } from "@/lib/money";
 import { showDay } from "@/components/books/fmt";
@@ -15,7 +16,7 @@ import { showDay } from "@/components/books/fmt";
 type Options = {
   stateCode: string | null;
   suppliers: { id: string; name: string; kind: string; gstin: string | null; stateCode: string | null; creditDays: number }[];
-  products: { id: string; name: string; sku: string; hsnCode: string | null; gstRate: number; lastCost: number | null; trackExpiry: boolean; supplierId: string | null; unit: string }[];
+  products: { id: string; name: string; sku: string; hsnCode: string | null; gstRate: number; lastCost: number | null; trackExpiry: boolean; supplierId: string | null; unit: string; caseSize: number | null; caseUnit: string | null; mrp: number }[];
   heads: { id: string; name: string; group: string }[];
   stockOn: boolean;
   grns: { id: string; number: string; supplierId: string; billNo: string | null; billDate: string | null; createdAt: string; lines: { id: string; productId: string; quantity: number; unitCost: number | null; batch: string; expiry: string | null }[] }[];
@@ -34,7 +35,15 @@ type LineForm = {
   quantity: string;
   freeQty: string;
   rate: string;
+  /** "10" or "10+5+2": discounts one after another. */
   discountPct: string;
+  /** Billed by the case: cases + loose units at a rate per case. */
+  byCase: boolean;
+  caseSize: number | null;
+  cases: string;
+  loose: string;
+  caseRate: string;
+  mrp: string;
   gstRate: string;
   itc: boolean;
   batch: string;
@@ -47,9 +56,49 @@ type LineForm = {
 const GROUP_LABEL: Record<string, string> = { DIRECT_EXPENSES: "Direct expenses", INDIRECT_EXPENSES: "Indirect expenses", FIXED_ASSETS: "Fixed assets", CURRENT_ASSETS: "Current assets" };
 const todayIst = () => new Date(Date.now() + 5.5 * 3_600_000).toISOString().slice(0, 10);
 let seq = 1;
-const blankLine = (target: LineForm["target"] = "GOODS"): LineForm => ({ key: seq++, target, productId: null, headId: "", description: "", quantity: "1", freeQty: "", rate: "", discountPct: "", gstRate: target === "CLAIM" ? "0" : "18", itc: true, batch: "", expiry: "", purchaseLineId: null, claimId: "" });
+const blankLine = (target: LineForm["target"] = "GOODS"): LineForm => ({
+  key: seq++,
+  target,
+  productId: null,
+  headId: "",
+  description: "",
+  quantity: "1",
+  freeQty: "",
+  rate: "",
+  discountPct: "",
+  byCase: false,
+  caseSize: null,
+  cases: "",
+  loose: "",
+  caseRate: "",
+  mrp: "",
+  gstRate: target === "CLAIM" ? "0" : "18",
+  itc: true,
+  batch: "",
+  expiry: "",
+  purchaseLineId: null,
+  claimId: "",
+});
 const int = (s: string) => (s.trim() === "" ? 0 : Number(s));
 const rupees = (p: number) => (p / 100).toFixed(2);
+
+/** A line's quantity, rate (per unit) and money, or why it can't be worked out yet. */
+function lineMoney(l: LineForm, inclusive: boolean, interState: boolean) {
+  const ds = parseDiscounts(l.discountPct);
+  const g = Number(l.gstRate);
+  if (!ds) return null;
+  if (l.byCase && l.caseSize) {
+    const cr = readRupees(l.caseRate);
+    const q = int(l.cases) * l.caseSize + int(l.loose);
+    if (cr === "bad" || cr === null || !Number.isInteger(q) || q < 1) return null;
+    const rate = Math.round(cr / l.caseSize);
+    return { quantity: q, rate, ds, caseRate: cr, m: purchaseLineMoney(rate, q, ds[0] ?? 0, g, inclusive, interState, { caseRate: cr, caseSize: l.caseSize, more: ds.slice(1) }) };
+  }
+  const rate = readRupees(l.rate);
+  const q = int(l.quantity);
+  if (rate === "bad" || rate === null || !Number.isInteger(q) || q < 1) return null;
+  return { quantity: q, rate, ds, caseRate: null, m: purchaseLineMoney(rate, q, ds[0] ?? 0, g, inclusive, interState, { more: ds.slice(1) }) };
+}
 
 /**
  * Enter a supplier's bill, a debit note to them or their credit note to us.
@@ -73,6 +122,12 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [billTotal, setBillTotal] = useState("");
+  const [scans, setScans] = useState<string[]>([]);
+  const [irn, setIrn] = useState("");
+  const [ewayBill, setEwayBill] = useState("");
+  const [transporter, setTransporter] = useState("");
+  const [vehicleNo, setVehicleNo] = useState("");
+  const [poNumber, setPoNumber] = useState("");
   const [lines, setLines] = useState<LineForm[]>(() => [{ ...blankLine(initial.type === "CREDIT_NOTE" ? "CLAIM" : "GOODS"), claimId: initial.type === "CREDIT_NOTE" ? (initial.claim ?? "") : "" }]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -112,14 +167,7 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
   const interState = !!placeOfSupply && !!tenantState && placeOfSupply !== tenantState;
 
   const figures = useMemo(() => {
-    const rows = lines.map((l) => {
-      const rate = readRupees(l.rate);
-      const q = int(l.quantity);
-      const d = l.discountPct.trim() === "" ? 0 : Number(l.discountPct);
-      const g = Number(l.gstRate);
-      if (rate === "bad" || rate === null || !Number.isInteger(q) || q < 1 || !(d >= 0 && d <= 100)) return null;
-      return purchaseLineMoney(rate, q, d, g, inclusive, interState);
-    });
+    const rows = lines.map((l) => lineMoney(l, inclusive, interState)?.m ?? null);
     const ok = rows.filter((r): r is NonNullable<typeof r> => !!r);
     const taxable = ok.reduce((a, r) => a + r.taxable, 0);
     const tax = ok.reduce((a, r) => a + r.tax, 0);
@@ -134,7 +182,20 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
 
   function pickProduct(key: number, id: string | null) {
     const p = o?.products.find((x) => x.id === id);
-    setLine(key, { productId: id, description: p?.name ?? "", gstRate: p ? String(p.gstRate) : "18", rate: p?.lastCost ? rupees(p.lastCost) : "" });
+    const size = p?.caseSize && p.caseSize > 1 ? p.caseSize : null;
+    setLine(key, {
+      productId: id,
+      description: p?.name ?? "",
+      gstRate: p ? String(p.gstRate) : "18",
+      rate: p?.lastCost ? rupees(p.lastCost) : "",
+      // A product sold in cases is usually billed by the case.
+      byCase: !!size,
+      caseSize: size,
+      caseRate: size && p?.lastCost ? rupees(p.lastCost * size) : "",
+      cases: "",
+      loose: "",
+      mrp: p?.mrp ? rupees(p.mrp) : "",
+    });
   }
 
   async function save() {
@@ -154,6 +215,12 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
       moveStock: type !== "CREDIT_NOTE" && !grnId ? moveStock : false,
       reason: reason || null,
       note: note || null,
+      scans,
+      irn: irn || null,
+      ewayBill: ewayBill || null,
+      transporter: transporter || null,
+      vehicleNo: vehicleNo || null,
+      poNumber: poNumber || null,
       billTotal: (() => {
         const p = readRupees(billTotal);
         return typeof p === "number" ? p : null;
@@ -161,18 +228,25 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
       lines: [] as Record<string, unknown>[],
     };
     for (const [i, l] of lines.entries()) {
-      const rate = readRupees(l.rate);
-      if (rate === "bad" || rate === null) return setErr(`Line ${i + 1}: enter the rate in rupees`);
+      const x = lineMoney(l, inclusive, interState);
+      if (!parseDiscounts(l.discountPct)) return setErr(`Line ${i + 1}: write the discount like 10 or 10+5 (up to three)`);
+      if (!x) return setErr(l.byCase ? `Line ${i + 1}: enter the cases (or loose units) and the rate per case` : `Line ${i + 1}: enter the quantity and the rate in rupees`);
+      const mrp = readRupees(l.mrp);
+      if (mrp === "bad") return setErr(`Line ${i + 1}: write the MRP in rupees`);
       body.lines.push({
         target: l.target,
         productId: l.target === "GOODS" ? l.productId : null,
         headId: l.target === "HEAD" ? l.headId || null : null,
         // A claim line left blank says which claim it settles.
         description: l.description || (l.target === "CLAIM" && l.claimId ? `Claim ${openClaims.find((c) => c.id === l.claimId)?.number ?? ""}`.trim() : ""),
-        quantity: int(l.quantity),
+        quantity: x.quantity,
         freeQty: l.target === "GOODS" ? int(l.freeQty) : 0,
-        rate,
-        discountPct: l.discountPct.trim() === "" ? 0 : Number(l.discountPct),
+        rate: x.rate,
+        ...(l.byCase && l.caseSize ? { cases: int(l.cases), loose: int(l.loose), caseSize: l.caseSize, caseRate: x.caseRate } : {}),
+        mrp: l.target === "GOODS" && typeof mrp === "number" ? mrp : null,
+        discountPct: x.ds[0] ?? 0,
+        discount2Pct: x.ds[1] ?? 0,
+        discount3Pct: x.ds[2] ?? 0,
         gstRate: Number(l.gstRate),
         itc: l.itc,
         batch: l.batch || null,
@@ -302,6 +376,31 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
             </label>
           )}
         </div>
+        <Field label="Photo or PDF of their document" hint="Optional. Kept with the entry, for checking and for the CA.">
+          <ScanPicker value={scans} onChange={setScans} />
+        </Field>
+        {type === "BILL" && (
+          <details className="rounded-xl border border-[var(--line)] px-3 py-2" open={!!(irn || ewayBill || transporter || vehicleNo || poNumber)}>
+            <summary className="cursor-pointer text-sm font-semibold text-[var(--ink-2)]">More from the bill: e-invoice, e-way bill, transporter, PO</summary>
+            <div className="grid gap-3 pt-3 sm:grid-cols-2 lg:grid-cols-3">
+              <Field label="e-invoice number (IRN)" className="sm:col-span-2 lg:col-span-3">
+                <input className="input font-mono text-xs" value={irn} maxLength={64} onChange={(e) => setIrn(e.target.value.trim())} />
+              </Field>
+              <Field label="e-way bill number">
+                <input className="input" inputMode="numeric" value={ewayBill} maxLength={14} onChange={(e) => setEwayBill(e.target.value.replace(/[^\d ]/g, ""))} />
+              </Field>
+              <Field label="Transporter">
+                <input className="input" value={transporter} maxLength={80} onChange={(e) => setTransporter(e.target.value)} />
+              </Field>
+              <Field label="Vehicle number">
+                <input className="input uppercase" value={vehicleNo} maxLength={20} onChange={(e) => setVehicleNo(e.target.value.toUpperCase())} />
+              </Field>
+              <Field label="Our PO number">
+                <input className="input" value={poNumber} maxLength={40} onChange={(e) => setPoNumber(e.target.value)} />
+              </Field>
+            </div>
+          </details>
+        )}
       </section>
 
       <section className="space-y-3">
@@ -325,6 +424,21 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
                   ))}
                 </div>
                 <div className="flex items-center gap-3">
+                  {l.target === "GOODS" && !l.purchaseLineId && product?.caseSize && product.caseSize > 1 && (
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-[var(--ink-2)]">
+                      <input
+                        type="checkbox"
+                        checked={l.byCase}
+                        onChange={(e) => {
+                          const on = e.target.checked;
+                          const size = product.caseSize!;
+                          const r = readRupees(on ? l.rate : l.caseRate);
+                          setLine(l.key, on ? { byCase: true, caseSize: size, caseRate: typeof r === "number" ? rupees(r * size) : "", cases: "", loose: "" } : { byCase: false, rate: typeof r === "number" ? rupees(Math.round(r / size)) : "", quantity: "1" });
+                        }}
+                      />
+                      By the {product.caseUnit || "case"} of {product.caseSize}
+                    </label>
+                  )}
                   <span className="text-sm font-bold tabular-nums">{m ? formatINR(m.total) : "–"}</span>
                   {lines.length > 1 && !l.purchaseLineId && (
                     <button type="button" className="btn btn-quiet btn-xs" aria-label={`Remove line ${i + 1}`} onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}>
@@ -394,20 +508,42 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
                 )}
               </div>
               <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
-                <Field label="Qty">
-                  <input className="input" inputMode="numeric" value={l.quantity} onChange={(e) => setLine(l.key, { quantity: e.target.value.replace(/\D/g, "") })} />
-                </Field>
+                {l.byCase && l.caseSize ? (
+                  <>
+                    <Field label={`${(product?.caseUnit || "case").replace(/^./, (c) => c.toUpperCase())}s`}>
+                      <input className="input" inputMode="numeric" value={l.cases} onChange={(e) => setLine(l.key, { cases: e.target.value.replace(/\D/g, "") })} />
+                    </Field>
+                    <Field label={`Loose ${product?.unit ?? "units"}`}>
+                      <input className="input" inputMode="numeric" value={l.loose} onChange={(e) => setLine(l.key, { loose: e.target.value.replace(/\D/g, "") })} />
+                    </Field>
+                  </>
+                ) : (
+                  <Field label="Qty">
+                    <input className="input" inputMode="numeric" value={l.quantity} onChange={(e) => setLine(l.key, { quantity: e.target.value.replace(/\D/g, "") })} />
+                  </Field>
+                )}
                 {l.target === "GOODS" && (
                   <Field label="Free">
                     <input className="input" inputMode="numeric" value={l.freeQty} disabled={!!l.purchaseLineId} onChange={(e) => setLine(l.key, { freeQty: e.target.value.replace(/\D/g, "") })} />
                   </Field>
                 )}
-                <Field label={`Rate (₹)${inclusive ? " with GST" : ""}`}>
-                  <input className="input" inputMode="decimal" value={l.rate} onChange={(e) => setLine(l.key, { rate: e.target.value })} />
+                {l.byCase && l.caseSize ? (
+                  <Field label={`Rate per ${product?.caseUnit || "case"} (₹)${inclusive ? " with GST" : ""}`}>
+                    <input className="input" inputMode="decimal" value={l.caseRate} onChange={(e) => setLine(l.key, { caseRate: e.target.value })} />
+                  </Field>
+                ) : (
+                  <Field label={`Rate (₹)${inclusive ? " with GST" : ""}`}>
+                    <input className="input" inputMode="decimal" value={l.rate} onChange={(e) => setLine(l.key, { rate: e.target.value })} />
+                  </Field>
+                )}
+                <Field label="Discount %" hint={l.discountPct.includes("+") ? undefined : "Several: 10+5"}>
+                  <input className="input" inputMode="text" value={l.discountPct} onChange={(e) => setLine(l.key, { discountPct: e.target.value.replace(/[^\d.+, ]/g, "") })} />
                 </Field>
-                <Field label="Discount %">
-                  <input className="input" inputMode="decimal" value={l.discountPct} onChange={(e) => setLine(l.key, { discountPct: e.target.value })} />
-                </Field>
+                {l.target === "GOODS" && (
+                  <Field label="MRP (₹)">
+                    <input className="input" inputMode="decimal" value={l.mrp} onChange={(e) => setLine(l.key, { mrp: e.target.value })} />
+                  </Field>
+                )}
                 <Field label="GST %">
                   <select className="input" value={l.gstRate} onChange={(e) => setLine(l.key, { gstRate: e.target.value })}>
                     {o.gstRates.map((g) => (
@@ -435,6 +571,7 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
               )}
               {m && (
                 <p className="text-xs text-[var(--muted)] tabular-nums">
+                  {l.byCase && l.caseSize ? `${int(l.cases) * l.caseSize + int(l.loose)} ${product?.unit ?? "units"} · ` : ""}
                   Taxable {formatINR(m.taxable)}
                   {m.discount ? ` after ${formatINR(m.discount)} discount` : ""} · {interState ? `IGST ${formatINR(m.igst)}` : `CGST ${formatINR(m.cgst)} + SGST ${formatINR(m.sgst)}`}
                   {!l.itc && m.tax ? " · tax added to the cost" : ""}

@@ -23,6 +23,8 @@ import {
   purchaseOptions,
   purchaseRegister,
   recordPurchase,
+  setBillDetails,
+  billDetails,
   supplierDetail,
   supplierSummary,
   type PurchaseInput,
@@ -32,6 +34,7 @@ import { parseSupplier } from "@/lib/supplier-api";
 import { can } from "@/lib/permissions";
 import { purchaseRegisterCsv, purchaseRegisterSheet } from "@/lib/books-export";
 import { renderSheetPdf } from "@/lib/dues-export";
+import { discountText, parseDiscounts } from "@/lib/purchase-math";
 
 let T = "";
 let adminId = "";
@@ -42,7 +45,7 @@ const today = todayIst();
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000 + 5.5 * 3_600_000).toISOString().slice(0, 10);
 const as = <R>(fn: (ctx: Ctx) => Promise<R>) => withMoney(T, adminId, fn);
 const code = async (p: Promise<unknown>) => p.then(() => 0, (e) => (e instanceof MoneyError ? e.status : -1));
-const ids = { local: "", far: "", transport: "", headFreight: "", headRepairs: "", cat: "", p1: "", p2: "" };
+const ids = { local: "", far: "", transport: "", headFreight: "", headRepairs: "", cat: "", p1: "", p2: "", pCase: "" };
 const owed = async (supplierId: string) => -(await as((ctx) => balanceOf(ctx, { type: "PAYABLE", supplierId })));
 const entryLines = async (entryId: string) => {
   const lines = await tenantDb(T).ledgerLine.findMany({ where: { entryId }, include: { account: true } });
@@ -76,6 +79,7 @@ beforeAll(async () => {
   const mk = (sku: string) => db.product.create({ data: { name: `Test purchase ${sku} ${run}`, sku: `PUR-${sku}-${run}`, categoryId: ids.cat, unit: "pc", price: 15000, mrp: 20000, gstRate: 18, hsnCode: "3401", supplierId: ids.local } });
   ids.p1 = (await mk("A")).id;
   ids.p2 = (await mk("B")).id;
+  ids.pCase = (await db.product.update({ where: { id: (await mk("C")).id }, data: { caseSize: 144, caseUnit: "case" } })).id;
 });
 
 afterAll(async () => {
@@ -83,6 +87,7 @@ afterAll(async () => {
   const db = tenantDb(T);
   await db.supplier.updateMany({ where: { id: { in: [ids.local, ids.far, ids.transport] } }, data: { active: false } });
   await db.product.updateMany({ where: { id: { in: [ids.p1, ids.p2] } }, data: { active: false } });
+  await db.product.updateMany({ where: { id: ids.pCase }, data: { active: false } });
 });
 
 const stockOnFor = async (on: boolean) => {
@@ -271,6 +276,60 @@ describe("opening bills", () => {
     expect(await code(as((ctx) => openingSupplierBills(ctx, s, [{ number: "OLD-3", date: "2026-03-01", amount: 100 }])))).toBe(409);
     expect(await code(as((ctx) => openingSupplierBills(ctx, ids.far, [{ number: "X", date: "2026-03-01", amount: 100, paid: 100 }])))).toBe(400);
     await as((ctx) => ctx.tx.supplier.update({ where: { id: s }, data: { active: false } }));
+  });
+});
+
+describe("by the case, several discounts, bill details", () => {
+  it("works a case rate to the paisa, as the bill prints it", () => {
+    // 10 cases of 144 at ₹2,391.55 a case = ₹23,915.50 (₹16.6080… a piece would round wrong)
+    expect(purchaseLineMoney(1661, 1440, 0, 0, false, false, { caseRate: 239155, caseSize: 144 }).gross).toBe(2391550);
+    expect(purchaseLineMoney(13110, 150, 0, 0, false, false, { caseRate: 393287, caseSize: 30 }).gross).toBe(1966435);
+    expect(purchaseLineMoney(0, 15 * 12, 0, 0, false, false, { caseRate: 193514, caseSize: 12 }).gross).toBe(2902710);
+    // 10% then 5% on what is left: 100000 → 90000 → 85500
+    const m = purchaseLineMoney(1000, 100, 10, 18, false, false, { more: [5] });
+    expect(m).toMatchObject({ gross: 100000, discount: 14500, taxable: 85500 });
+    expect(parseDiscounts("10+5")).toEqual([10, 5]);
+    expect(parseDiscounts(" 10 , 5% + 2.5 ")).toEqual([10, 5, 2.5]);
+    expect(parseDiscounts("")).toEqual([]);
+    expect(parseDiscounts("1+2+3+4")).toBeNull();
+    expect(parseDiscounts("120")).toBeNull();
+    expect(parseDiscounts("ten")).toBeNull();
+    expect(discountText([10, 5, 0])).toBe("10% + 5%");
+  });
+
+  it("enters cases + loose units at a rate per case, with MRP and two discounts", async () => {
+    const doc = await as((ctx) =>
+      recordPurchase(ctx, bill({ lines: [{ productId: ids.pCase, quantity: 0, rate: 0, cases: 10, loose: 6, caseRate: 239155, mrp: 2500, discountPct: 10, discount2Pct: 5, gstRate: 18 }] }))
+    );
+    const d = await as((ctx) => purchaseDetail(ctx, doc.id));
+    const l = d.lines[0];
+    // 1446 pieces; gross = 239155 × 1446 / 144 = 2401514.375 → 2401514
+    expect(l).toMatchObject({ quantity: 1446, cases: 10, caseSize: 144, caseRate: 239155, rate: 1661, mrp: 2500, discountPct: 10, discount2Pct: 5 });
+    const after1 = 2401514 - Math.round(2401514 * 0.1);
+    const taxable = after1 - Math.round(after1 * 0.05);
+    expect(l.taxable).toBe(taxable);
+    // The case size comes from the product; a product with no case size can't be billed by the case.
+    expect(await code(as((ctx) => recordPurchase(ctx, bill({ lines: [{ productId: ids.p1, quantity: 0, rate: 0, cases: 2, caseRate: 1000, gstRate: 18 }] }))))).toBe(400);
+    expect(await code(as((ctx) => recordPurchase(ctx, bill({ lines: [{ productId: ids.pCase, quantity: 0, rate: 0, cases: 0, loose: 0, caseRate: 1000, gstRate: 18 }] }))))).toBe(400);
+    expect(await code(as((ctx) => recordPurchase(ctx, bill({ lines: [{ productId: ids.p1, quantity: 1, rate: 100, discount2Pct: 120, gstRate: 18 }] }))))).toBe(400);
+  });
+
+  it("keeps the e-invoice, e-way bill, transport, PO and scans, and checks them", async () => {
+    const irn = "a".repeat(64);
+    const scan = `t/${T}/purchase-bill/2026/11/x.pdf`;
+    const doc = await as((ctx) => recordPurchase(ctx, bill({ irn: irn.toUpperCase(), ewayBill: "1234 5678 9012", transporter: " Shree Roadways ", vehicleNo: "mh12ab1234", poNumber: "PO-7", scans: [scan, scan] })));
+    expect(doc).toMatchObject({ irn, ewayBill: "123456789012", transporter: "Shree Roadways", vehicleNo: "MH12AB1234", poNumber: "PO-7", scans: [scan] });
+    expect(() => billDetails({ irn: "abc" }, T)).toThrow(MoneyError);
+    expect(() => billDetails({ ewayBill: "12345" }, T)).toThrow(MoneyError);
+    expect(() => billDetails({ scans: ["t/other/purchase-bill/2026/11/x.pdf"] }, T)).toThrow(MoneyError);
+    expect(() => billDetails({ scans: [`t/${T}/shop-photo/2026/11/x.jpg`] }, T)).toThrow(MoneyError);
+    expect(() => billDetails({ scans: [`t/${T}/purchase-bill/../x.jpg`] }, T)).toThrow(MoneyError);
+    expect(() => billDetails({ scans: Array.from({ length: 11 }, (_, i) => `t/${T}/purchase-bill/2026/11/${i}.jpg`) }, T)).toThrow(MoneyError);
+    // Changing the scans later keeps the other details.
+    const after = await as((ctx) => setBillDetails(ctx, doc.id, { scans: [] }));
+    expect(after).toMatchObject({ scans: [], irn, poNumber: "PO-7" });
+    const again = await as((ctx) => setBillDetails(ctx, doc.id, { poNumber: null, scans: [scan] }));
+    expect(again).toMatchObject({ scans: [scan], irn, poNumber: null });
   });
 });
 

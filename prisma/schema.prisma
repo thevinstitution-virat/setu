@@ -3340,6 +3340,14 @@ model PurchaseBill {
   roundOff        Int             @default(0)
   total           Int             @default(0)
   note            String?
+  /// Storage keys of the supplier's bill: photos or a PDF.
+  scans           String[]        @default([])
+  /// e-invoice number (64 characters), e-way bill (12 digits), transporter, vehicle and our PO number, as printed.
+  irn             String?
+  ewayBill        String?
+  transporter     String?
+  vehicleNo       String?
+  poNumber        String?
   entryId         String?         @unique
   cancelledAt     DateTime?
   cancelReason    String?
@@ -3371,6 +3379,16 @@ model PurchaseBillLine {
   /// Per unit, paise, as on the bill (with GST when the bill's rates include it).
   rate           Int
   discountPct    Float              @default(0)
+  /// More discounts taken one after another on what is left (a bill printing 10% + 5% + 2%).
+  discount2Pct   Float              @default(0)
+  discount3Pct   Float              @default(0)
+  /// Billed by the case: whole cases, units in a case, and the rate per case (paise). quantity = cases × caseSize + loose units;
+  /// the line amount is caseRate × quantity / caseSize, so it matches the bill to the paisa; rate is per unit, rounded.
+  cases          Int?
+  caseSize       Int?
+  caseRate       Int?
+  /// MRP per unit as printed on the bill, paise.
+  mrp            Int?
   gstRate        Float              @default(0)
   /// Input credit can be claimed on this line's tax.
   itc            Boolean            @default(true)

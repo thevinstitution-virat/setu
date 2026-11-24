@@ -10,6 +10,8 @@ import { showDay } from "@/components/books/fmt";
 import CancelPurchase from "@/components/books/CancelPurchase";
 import { BillTdsCard } from "@/components/books/TdsForms";
 import { billTds, tdsSections } from "@/lib/tds";
+import { discountText } from "@/lib/purchase-math";
+import { BillScans } from "@/components/books/BillScans";
 
 /** One purchase bill or note: its lines, tax, what it is against and how much is settled. */
 export default async function PurchaseDocPage({ params }: { params: Promise<{ id: string }> }) {
@@ -93,6 +95,30 @@ export default async function PurchaseDocPage({ params }: { params: Promise<{ id
             )}
           </Item>
         </dl>
+        {(d.irn || d.ewayBill || d.transporter || d.vehicleNo || d.poNumber) && (
+          <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+            {d.irn && (
+              <Item label="e-invoice (IRN)">
+                <p className="font-mono text-xs break-all">{d.irn}</p>
+              </Item>
+            )}
+            {d.ewayBill && (
+              <Item label="e-way bill">
+                <p className="font-semibold tabular-nums">{d.ewayBill.replace(/(\d{4})(?=\d)/g, "$1 ")}</p>
+              </Item>
+            )}
+            {(d.transporter || d.vehicleNo) && (
+              <Item label="Transport">
+                <p className="font-semibold">{[d.transporter, d.vehicleNo].filter(Boolean).join(" · ")}</p>
+              </Item>
+            )}
+            {d.poNumber && (
+              <Item label="Our PO">
+                <p className="font-semibold">{d.poNumber}</p>
+              </Item>
+            )}
+          </dl>
+        )}
         {(d.reason || d.note) && <p className="rounded-xl bg-black/[0.04] px-3 py-2 text-sm text-[var(--ink-2)]">{[d.reason, d.note].filter(Boolean).join(" · ")}</p>}
         {d.cancelledAt && <p className="rounded-xl bg-[#fdecea] px-3 py-2 text-sm text-[#a8281e]">Cancelled: {d.cancelReason}</p>}
         <div className="flex flex-wrap gap-2">
@@ -110,6 +136,14 @@ export default async function PurchaseDocPage({ params }: { params: Promise<{ id
         </div>
       </section>
 
+      {(d.scans.length > 0 || (live && r.me.canPurchase)) && (
+        <section className="card p-4 sm:p-5 space-y-2">
+          <h3 className="font-heading font-bold text-[var(--ink)]">Their document</h3>
+          <p className="text-sm text-[var(--ink-2)]">Photos or a PDF of the {d.type === "BILL" ? "bill" : "note"}, kept with the entry.</p>
+          <BillScans id={d.id} scans={d.scans} canEdit={live && r.me.canPurchase} />
+        </section>
+      )}
+
       {live && t && (t.tds || t.open > 0) && (
         <BillTdsCard
           billId={d.id}
@@ -126,12 +160,13 @@ export default async function PurchaseDocPage({ params }: { params: Promise<{ id
       )}
 
       <section className="card p-0 overflow-x-auto">
-        <table className="w-full text-sm" style={{ minWidth: 760 }}>
+        <table className="w-full text-sm" style={{ minWidth: 840 }}>
           <thead>
             <tr className="text-xs text-[var(--muted)] border-b border-[var(--line)]">
               <th className="px-4 py-2 text-left font-semibold">Item</th>
               <th className="px-4 py-2 text-right font-semibold">Qty</th>
               <th className="px-4 py-2 text-right font-semibold">Rate</th>
+              <th className="px-4 py-2 text-right font-semibold">MRP</th>
               <th className="px-4 py-2 text-right font-semibold">Disc</th>
               <th className="px-4 py-2 text-right font-semibold">Taxable</th>
               <th className="px-4 py-2 text-right font-semibold">GST</th>
@@ -155,9 +190,25 @@ export default async function PurchaseDocPage({ params }: { params: Promise<{ id
                 <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
                   {l.quantity}
                   {l.freeQty ? ` + ${l.freeQty} free` : ""}
+                  {l.caseSize && l.cases !== null && (
+                    <span className="block text-xs text-[var(--muted)]">
+                      {l.cases} × {l.caseSize}
+                      {l.quantity - l.cases * l.caseSize ? ` + ${l.quantity - l.cases * l.caseSize} loose` : ""}
+                    </span>
+                  )}
                 </td>
-                <td className="px-4 py-2 text-right tabular-nums">{formatINR(l.rate)}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{l.discountPct ? `${l.discountPct}%` : ""}</td>
+                <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
+                  {l.caseRate !== null && l.caseSize ? (
+                    <>
+                      {formatINR(l.caseRate)}
+                      <span className="block text-xs text-[var(--muted)]">per case of {l.caseSize}</span>
+                    </>
+                  ) : (
+                    formatINR(l.rate)
+                  )}
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">{l.mrp !== null ? formatINR(l.mrp) : ""}</td>
+                <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">{discountText([l.discountPct, l.discount2Pct, l.discount3Pct])}</td>
                 <td className="px-4 py-2 text-right tabular-nums">{formatINR(l.taxable)}</td>
                 <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
                   {formatINR(l.cgst + l.sgst + l.igst)} <span className="text-xs text-[var(--muted)]">{l.gstRate}%</span>

@@ -6,6 +6,7 @@ import { nextSequence } from "@/lib/orders";
 import { defaultWarehouse, receiveGoods, stockOn, stockOut } from "@/lib/stock";
 import { dayEnd, dayStart, isDay, todayIst } from "@/lib/books";
 import { checkClaimLines, settleByCreditNote, unsettleCreditNote } from "@/lib/claims";
+import { keyBelongsTo } from "@/lib/storage";
 
 /**
  * Purchases (A2): a supplier's bill, our debit note to them, their credit
@@ -37,6 +38,17 @@ export type PurchaseLineInput = {
   freeQty?: number;
   rate: number;
   discountPct?: number;
+  /** Further discounts, each on what is left after the one before. */
+  discount2Pct?: number;
+  discount3Pct?: number;
+  /** By the case: whole cases + loose units at a rate per case (paise). quantity and rate are then worked out. */
+  cases?: number | null;
+  loose?: number | null;
+  caseRate?: number | null;
+  /** Units in a case; blank = the product's case size. */
+  caseSize?: number | null;
+  /** MRP per unit printed on the bill, paise. */
+  mrp?: number | null;
   gstRate?: number;
   itc?: boolean;
   /** Line of the goods received note being billed. */
@@ -67,8 +79,27 @@ export type PurchaseInput = {
   note?: string | null;
   /** The total printed on the supplier's bill; the difference (up to ₹1) is rounding. Blank = round to the rupee. */
   billTotal?: number | null;
+  /** Storage keys of the bill's photos or PDF (uploaded first). */
+  scans?: string[];
+  irn?: string | null;
+  ewayBill?: string | null;
+  transporter?: string | null;
+  vehicleNo?: string | null;
+  poNumber?: string | null;
   lines: PurchaseLineInput[];
 };
+
+/** Bill details printed on it: e-invoice number, e-way bill, transporter, vehicle, our PO, and the scans. */
+export function billDetails(input: Pick<PurchaseInput, "scans" | "irn" | "ewayBill" | "transporter" | "vehicleNo" | "poNumber">, tenantId: string) {
+  const irn = text(input.irn, 64).toLowerCase() || null;
+  if (irn && !/^[0-9a-f]{64}$/.test(irn)) throw new MoneyError("The e-invoice number (IRN) is 64 letters and digits");
+  const ewayBill = text(input.ewayBill, 20).replace(/\s/g, "") || null;
+  if (ewayBill && !/^\d{12}$/.test(ewayBill)) throw new MoneyError("The e-way bill number is 12 digits");
+  const scans = Array.isArray(input.scans) ? [...new Set(input.scans.map(String))] : [];
+  if (scans.length > 10) throw new MoneyError("At most 10 scans on a bill");
+  if (scans.some((k) => !keyBelongsTo(k, tenantId) || !k.startsWith(`t/${tenantId}/purchase-bill/`))) throw new MoneyError("Upload the scan first");
+  return { scans, irn, ewayBill, transporter: text(input.transporter, 80) || null, vehicleNo: text(input.vehicleNo, 20).toUpperCase() || null, poNumber: text(input.poNumber, 40) || null };
+}
 
 /** "YYYY-MM-DD" + n days. */
 const plusDays = (day: string, n: number) => addDays(new Date(`${day}T00:00:00Z`), n).toISOString().slice(0, 10);
@@ -116,6 +147,7 @@ export async function recordPurchase(ctx: Ctx, input: PurchaseInput) {
   if (moveStock && type === "CREDIT_NOTE") throw new MoneyError("A credit note doesn't move goods");
 
   if (!Array.isArray(input.lines) || input.lines.length === 0 || input.lines.length > 300) throw new MoneyError("Add 1 to 300 lines");
+  const details = billDetails(input, ctx.tenantId);
   const lines = [];
   for (const [i, raw] of input.lines.entries()) {
     const n = `Line ${i + 1}`;
@@ -125,10 +157,12 @@ export async function recordPurchase(ctx: Ctx, input: PurchaseInput) {
     let productId: string | null = null;
     let headId: string | null = null;
     let claimId: string | null = null;
+    let productCase: number | null = null;
     if (target === "GOODS") {
-      const p = raw.productId ? await ctx.tx.product.findUnique({ where: { id: String(raw.productId) }, select: { id: true, name: true, hsnCode: true } }) : null;
+      const p = raw.productId ? await ctx.tx.product.findUnique({ where: { id: String(raw.productId) }, select: { id: true, name: true, hsnCode: true, caseSize: true } }) : null;
       if (!p) throw new MoneyError(`${n}: pick the product`);
       productId = p.id;
+      productCase = p.caseSize ?? null;
       description ||= p.name;
       hsnCode = p.hsnCode ?? null;
     } else if (target === "HEAD") {
@@ -142,18 +176,38 @@ export async function recordPurchase(ctx: Ctx, input: PurchaseInput) {
       description ||= "Scheme / claim";
       claimId = raw.claimId ? String(raw.claimId) : null;
     } else throw new MoneyError(`${n}: unknown line type`);
-    const quantity = Number(raw.quantity);
+    const byCase = raw.caseRate !== undefined && raw.caseRate !== null;
+    let quantity = Number(raw.quantity);
+    let rate = Number(raw.rate);
+    let cases: number | null = null;
+    let caseSize: number | null = null;
+    let caseRate: number | null = null;
+    if (byCase) {
+      if (target !== "GOODS") throw new MoneyError(`${n}: only goods are billed by the case`);
+      caseSize = Number(raw.caseSize ?? productCase);
+      cases = Number(raw.cases ?? 0);
+      const loose = Number(raw.loose ?? 0);
+      caseRate = Number(raw.caseRate);
+      if (!isInt(caseSize, 1, 100_000)) throw new MoneyError(`${n}: how many units in a case? (set the product's case size)`);
+      if (!isInt(cases, 0, 1_000_000) || !isInt(loose, 0, 10_000_000)) throw new MoneyError(`${n}: cases and loose units must be whole numbers`);
+      if (!isInt(caseRate, 0, 100_000_000_000)) throw new MoneyError(`${n}: rate per case must be in rupees and paise`);
+      quantity = cases * caseSize + loose;
+      rate = Math.round(caseRate / caseSize);
+    }
     const freeQty = Number(raw.freeQty ?? 0);
-    const rate = Number(raw.rate);
     const discountPct = Number(raw.discountPct ?? 0);
+    const discount2Pct = Number(raw.discount2Pct ?? 0);
+    const discount3Pct = Number(raw.discount3Pct ?? 0);
     const gstRate = Number(raw.gstRate ?? 0);
+    const mrp = raw.mrp === undefined || raw.mrp === null ? null : Number(raw.mrp);
+    if (mrp !== null && (!isInt(mrp, 0, 10_000_000_000) || target !== "GOODS")) throw new MoneyError(`${n}: MRP must be in rupees and paise`);
     if (!isInt(quantity, 1, 10_000_000)) throw new MoneyError(`${n}: quantity must be a whole number, 1 or more`);
     if (!isInt(freeQty, 0, 10_000_000)) throw new MoneyError(`${n}: free quantity must be a whole number`);
     if (freeQty && target !== "GOODS") throw new MoneyError(`${n}: only goods come free`);
     if (!isInt(rate, 0, 10_000_000_000)) throw new MoneyError(`${n}: rate must be in rupees and paise`);
-    if (!(discountPct >= 0 && discountPct <= 100)) throw new MoneyError(`${n}: discount must be 0 to 100%`);
+    if (![discountPct, discount2Pct, discount3Pct].every((d) => d >= 0 && d <= 100)) throw new MoneyError(`${n}: discount must be 0 to 100%`);
     if (!GST_RATES.includes(gstRate)) throw new MoneyError(`${n}: GST rate ${gstRate}% is not a GST rate`);
-    const m = purchaseLineMoney(rate, quantity, discountPct, gstRate, inclusive, interState);
+    const m = purchaseLineMoney(rate, quantity, discountPct, gstRate, inclusive, interState, { caseRate, caseSize, more: [discount2Pct, discount3Pct] });
     if (m.total <= 0) throw new MoneyError(`${n}: the amount is ₹0`);
     let purchaseLineId: string | null = null;
     if (raw.purchaseLineId) {
@@ -164,7 +218,7 @@ export async function recordPurchase(ctx: Ctx, input: PurchaseInput) {
     }
     const expiry = raw.expiry ? (isDay(raw.expiry) ? raw.expiry : null) : null;
     if (raw.expiry && !expiry) throw new MoneyError(`${n}: expiry must be a date`);
-    lines.push({ target, productId, headId, description, hsnCode, quantity, freeQty, rate, discountPct, gstRate, itc: raw.itc !== false, purchaseLineId, batch: text(raw.batch, 40) || null, expiry, claimId, m });
+    lines.push({ target, productId, headId, description, hsnCode, quantity, freeQty, rate, discountPct, discount2Pct, discount3Pct, cases, caseSize, caseRate, mrp, gstRate, itc: raw.itc !== false, purchaseLineId, batch: text(raw.batch, 40) || null, expiry, claimId, m });
   }
   // Claim lines against raised claims: each claim must have room for them.
   const claimWants = lines.filter((l) => l.claimId).map((l) => ({ claimId: l.claimId!, amount: l.m.taxable + (l.itc ? 0 : l.m.tax) }));
@@ -210,6 +264,7 @@ export async function recordPurchase(ctx: Ctx, input: PurchaseInput) {
         purchaseId: grn?.id ?? null,
         reason: text(input.reason, 200) || null,
         note: text(input.note, 300) || null,
+        ...details,
         taxable,
         cgst,
         sgst,
@@ -230,6 +285,12 @@ export async function recordPurchase(ctx: Ctx, input: PurchaseInput) {
             freeQty: l.freeQty,
             rate: l.rate,
             discountPct: l.discountPct,
+            discount2Pct: l.discount2Pct,
+            discount3Pct: l.discount3Pct,
+            cases: l.cases,
+            caseSize: l.caseSize,
+            caseRate: l.caseRate,
+            mrp: l.mrp,
             gstRate: l.gstRate,
             itc: l.itc,
             taxable: l.m.taxable,
@@ -600,6 +661,15 @@ export async function supplierDetail(ctx: Ctx, id: string) {
 }
 
 /** One bill or note with its lines, what it is against, and how much of it is paid. */
+/** Add or change a saved bill's scans and printed details (they don't touch the money). */
+export async function setBillDetails(ctx: Ctx, id: string, input: Pick<PurchaseInput, "scans" | "irn" | "ewayBill" | "transporter" | "vehicleNo" | "poNumber">) {
+  const doc = await ctx.tx.purchaseBill.findUnique({ where: { id }, select: { id: true, scans: true, irn: true, ewayBill: true, transporter: true, vehicleNo: true, poNumber: true } });
+  if (!doc) throw new MoneyError("Not found", 404);
+  const merged = { ...doc, ...Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined)) };
+  const d = billDetails(merged, ctx.tenantId);
+  return ctx.tx.purchaseBill.update({ where: { id }, data: d, select: { id: true, scans: true, irn: true, ewayBill: true, transporter: true, vehicleNo: true, poNumber: true } });
+}
+
 export async function purchaseDetail(ctx: Ctx, id: string) {
   const doc = await ctx.tx.purchaseBill.findUnique({
     where: { id },
@@ -622,7 +692,7 @@ export async function purchaseOptions(ctx: Ctx) {
   const [tenant, suppliers, products, heads, stock, grns] = await Promise.all([
     ctx.tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { stateCode: true } }),
     ctx.tx.supplier.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true, kind: true, gstin: true, stateCode: true, creditDays: true } }),
-    ctx.tx.product.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true, sku: true, hsnCode: true, gstRate: true, lastCost: true, trackExpiry: true, supplierId: true, unit: true } }),
+    ctx.tx.product.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true, sku: true, hsnCode: true, gstRate: true, lastCost: true, trackExpiry: true, supplierId: true, unit: true, caseSize: true, caseUnit: true, mrp: true } }),
     ctx.tx.ledgerHead.findMany({ where: { active: true, group: { in: PURCHASE_HEAD_GROUPS } }, orderBy: [{ group: "asc" }, { name: "asc" }], select: { id: true, name: true, group: true } }),
     stockOn(ctx),
     ctx.tx.purchase.findMany({
