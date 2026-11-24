@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { audit, requestIp } from "@/lib/audit";
 import { withTenantTx } from "@/lib/db";
-import { recordHandover, withMoney, writeOffShortage } from "@/lib/ledger";
+import { withMoney, writeOffShortage } from "@/lib/ledger";
+import { handoverWithExpenses, type ExpenseLine } from "@/lib/vouchers";
 import { moneyFail } from "@/lib/money-api";
 
 /** Cash held by each staff member, plus recent handovers. */
@@ -61,7 +62,8 @@ export async function GET() {
 }
 
 /**
- *   { action: "handover", staffUserId, counted (paise), note? }
+ *   { action: "handover", staffUserId, counted (paise), note?, expenses?: [{ headId, amount (paise), note? }], photos?: [key], reference? }
+ *     Expenses paid from the cash (fuel, toll, loading) go in first as one payment voucher.
  *   { action: "writeoff", staffUserId, amount (paise), note }
  */
 export async function POST(req: Request) {
@@ -77,8 +79,10 @@ export async function POST(req: Request) {
   let result: unknown;
   try {
     if (body?.action === "handover") {
+      const expenses: ExpenseLine[] = Array.isArray(body.expenses) ? body.expenses.slice(0, 20).map((e: Record<string, unknown>) => ({ headId: String(e?.headId ?? ""), amount: Number(e?.amount), note: typeof e?.note === "string" ? e.note : null })) : [];
+      const photos: string[] = Array.isArray(body.photos) ? body.photos.map(String) : [];
       result = await withMoney(tenant.id, session.userId, (ctx) =>
-        recordHandover(ctx, { staffUserId, counted: Number(body.counted), note: note || undefined })
+        handoverWithExpenses(ctx, { staffUserId, counted: Number(body.counted), note: note || undefined, expenses, photos, reference: typeof body.reference === "string" ? body.reference : null })
       );
     } else if (body?.action === "writeoff") {
       if (note.length < 3) return NextResponse.json({ error: "Write why this is written off" }, { status: 400 });
@@ -89,6 +93,6 @@ export async function POST(req: Request) {
   } catch (e) {
     return moneyFail(e);
   }
-  await audit(db, { actorId: session.userId, action: `cash.${body.action}`, entity: "User", entityId: staffUserId, after: { counted: body.counted, amount: body.amount, note }, ip: requestIp(req) });
+  await audit(db, { actorId: session.userId, action: `cash.${body.action}`, entity: "User", entityId: staffUserId, after: { counted: body.counted, amount: body.amount, note, expenses: (result as { voucher?: { number: string; amount: number } | null })?.voucher ?? null }, ip: requestIp(req) });
   return NextResponse.json({ ok: true, result });
 }

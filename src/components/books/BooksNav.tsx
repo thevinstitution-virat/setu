@@ -9,6 +9,8 @@ const TABS = [
   { href: "/admin/books/payments", label: "Payments" },
   { href: "/admin/books/payables", label: "Payables" },
   { href: "/admin/books/claims", label: "Claims" },
+  { href: "/admin/books/vouchers", label: "Vouchers" },
+  { href: "/admin/books/cashbook", label: "Cash & bank books" },
   { href: "/admin/books/suppliers", label: "Suppliers" },
   { href: "/admin/books/banks", label: "Bank accounts" },
   { href: "/admin/books/ledger", label: "Ledger" },

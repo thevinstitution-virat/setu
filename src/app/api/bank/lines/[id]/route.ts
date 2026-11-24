@@ -8,7 +8,7 @@ import { ignoreLine, matchLine, MATCH_LABEL, unmatchLine, type MatchKind } from 
 type P = { params: Promise<{ id: string }> };
 
 /**
- * Body: { action: "match", kind, ref?, retailerId?, supplierId?, purpose?, fees? (paise), note? }
+ * Body: { action: "match", kind, ref?, retailerId?, supplierId?, purpose?, fees? (paise), headId?, otherCode?, party?, note? }
  *     | { action: "unmatch" } | { action: "ignore", note? } | { action: "unignore" }
  */
 export async function POST(req: Request, { params }: P) {
@@ -25,12 +25,13 @@ export async function POST(req: Request, { params }: P) {
         const kind = b.kind as MatchKind;
         if (!(kind in MATCH_LABEL)) return NextResponse.json({ error: "Choose what this money is" }, { status: 400 });
         if (kind === "NEW_SUPPLIER_PAYMENT" && !can(session.role, "payables.pay")) return NextResponse.json({ error: "You can't pay suppliers" }, { status: 403 });
+        if ((kind === "NEW_EXPENSE" || kind === "NEW_RECEIPT" || kind === "NEW_CONTRA") && !can(session.role, "accounts.post")) return NextResponse.json({ error: "You can't enter vouchers" }, { status: 403 });
         const fees = b.fees === undefined || b.fees === null || b.fees === "" ? null : Number(b.fees);
         line = await matchLine(
           tenant.id,
           session.userId,
           id,
-          { kind, ref: str(b.ref), retailerId: str(b.retailerId), supplierId: str(b.supplierId), purpose: b.purpose === "WALLET" ? "WALLET" : "DUES", fees },
+          { kind, ref: str(b.ref), retailerId: str(b.retailerId), supplierId: str(b.supplierId), purpose: b.purpose === "WALLET" ? "WALLET" : "DUES", fees, headId: str(b.headId), otherCode: str(b.otherCode), party: str(b.party) },
           str(b.note)
         );
         break;

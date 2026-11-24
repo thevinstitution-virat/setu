@@ -8,9 +8,37 @@ import { api, errText, ErrorBox, Flash, readRupees, SearchPick, send, TabBar, ty
 // ───────────────────────────── types (API JSON) ─────────────────────────────
 
 type LineStatus = "UNMATCHED" | "SUGGESTED" | "MATCHED" | "IGNORED";
-type MatchKind = "VERIFY" | "UPI_CLEAR" | "BANK_LINK" | "CHEQUE_CLEAR" | "SETTLEMENT" | "CASH_DEPOSIT" | "NEW_PAYMENT" | "SUPPLIER_PAY" | "ISSUED_CHEQUE" | "NEW_SUPPLIER_PAYMENT";
+type MatchKind =
+  | "VERIFY"
+  | "UPI_CLEAR"
+  | "BANK_LINK"
+  | "CHEQUE_CLEAR"
+  | "SETTLEMENT"
+  | "CASH_DEPOSIT"
+  | "NEW_PAYMENT"
+  | "SUPPLIER_PAY"
+  | "ISSUED_CHEQUE"
+  | "NEW_SUPPLIER_PAYMENT"
+  | "VOUCHER_OUT"
+  | "VOUCHER_IN"
+  | "NEW_EXPENSE"
+  | "NEW_RECEIPT"
+  | "NEW_CONTRA";
+type VoucherKind = "NEW_EXPENSE" | "NEW_RECEIPT" | "NEW_CONTRA";
+const VOUCHER_MADE = new Set<MatchKind>(["CASH_DEPOSIT", "VOUCHER_OUT", "VOUCHER_IN", "NEW_EXPENSE", "NEW_RECEIPT", "NEW_CONTRA"]);
 
-type Suggestion = { kind: MatchKind; ref: string | null; retailerId?: string | null; supplierId?: string | null; label: string; amount: number; date?: string | null; exact: boolean };
+type Suggestion = {
+  kind: MatchKind;
+  ref: string | null;
+  retailerId?: string | null;
+  supplierId?: string | null;
+  headId?: string | null;
+  otherCode?: string | null;
+  label: string;
+  amount: number;
+  date?: string | null;
+  exact: boolean;
+};
 
 type Line = {
   id: string;
@@ -452,7 +480,7 @@ function UploadSummary({ r }: { r: UploadResult }) {
 
 // ───────────────────────────── lines ─────────────────────────────
 
-type Open = { id: string; mode: "fee" | "shop" | "supplier" | "ignore"; retailerId?: string | null; supplierId?: string | null };
+type Open = { id: string; mode: "fee" | "shop" | "supplier" | "ignore" | "voucher"; retailerId?: string | null; supplierId?: string | null; kind?: VoucherKind; headId?: string | null; otherCode?: string | null };
 
 function LineList({
   tab,
@@ -498,11 +526,12 @@ function LineList({
     if (s.kind === "NEW_PAYMENT") return setOpen({ id: line.id, mode: "shop", retailerId: s.retailerId });
     if (s.kind === "NEW_SUPPLIER_PAYMENT") return setOpen({ id: line.id, mode: "supplier", supplierId: s.supplierId });
     if (s.kind === "CASH_DEPOSIT") return cashDeposit(line);
+    if (s.kind === "NEW_EXPENSE" || s.kind === "NEW_RECEIPT" || s.kind === "NEW_CONTRA") return setOpen({ id: line.id, mode: "voucher", kind: s.kind, headId: s.headId, otherCode: s.otherCode });
     act(line, { action: "match", kind: s.kind, ref: s.ref }, `${formatINR(line.credit || line.debit)} matched: ${data.labels[s.kind] ?? s.kind}`);
   }
 
   function cashDeposit(line: Line) {
-    if (!window.confirm(`Book ${formatINR(line.credit)} as office cash paid into the bank? This can't be undone here.`)) return;
+    if (!window.confirm(`Enter ${formatINR(line.credit)} as office cash paid into the bank (a contra voucher)? To undo it, cancel the voucher.`)) return;
     act(line, { action: "match", kind: "CASH_DEPOSIT" }, `${formatINR(line.credit)} booked as cash deposited`);
   }
 
@@ -581,6 +610,18 @@ function LineList({
                   }
                 />
               )}
+              {open?.id === l.id && open.mode === "voucher" && open.kind && (
+                <VoucherLineForm
+                  kind={open.kind}
+                  out={l.debit > 0}
+                  amount={l.debit || l.credit}
+                  initialHead={open.headId ?? null}
+                  initialOther={open.otherCode ?? null}
+                  busy={busyId === l.id}
+                  onCancel={() => setOpen(null)}
+                  onSubmit={(body, message) => act(l, { action: "match", kind: open.kind, ...body }, message)}
+                />
+              )}
               {open?.id === l.id && open.mode === "ignore" && (
                 <IgnoreForm
                   busy={busyId === l.id}
@@ -594,6 +635,12 @@ function LineList({
                   <button className="btn btn-outline btn-xs" disabled={busyId === l.id} onClick={() => setOpen({ id: l.id, mode: "supplier" })}>
                     <Icon name="truck" className="h-4 w-4" /> Payment to a supplier
                   </button>
+                  <button className="btn btn-outline btn-xs" disabled={busyId === l.id} onClick={() => setOpen({ id: l.id, mode: "voucher", kind: "NEW_EXPENSE" })}>
+                    <Icon name="receipt" className="h-4 w-4" /> Expense
+                  </button>
+                  <button className="btn btn-outline btn-xs" disabled={busyId === l.id} onClick={() => setOpen({ id: l.id, mode: "voucher", kind: "NEW_CONTRA" })}>
+                    <Icon name="cash" className="h-4 w-4" /> To cash / another bank
+                  </button>
                   <button className="btn btn-quiet btn-xs" disabled={busyId === l.id} onClick={() => setOpen({ id: l.id, mode: "ignore" })}>
                     Set aside
                   </button>
@@ -606,6 +653,12 @@ function LineList({
                   </button>
                   <button className="btn btn-outline btn-xs" disabled={busyId === l.id} onClick={() => setOpen({ id: l.id, mode: "shop" })}>
                     <Icon name="user" className="h-4 w-4" /> New payment from a shop
+                  </button>
+                  <button className="btn btn-outline btn-xs" disabled={busyId === l.id} onClick={() => setOpen({ id: l.id, mode: "voucher", kind: "NEW_RECEIPT" })}>
+                    <Icon name="receipt" className="h-4 w-4" /> Other money in
+                  </button>
+                  <button className="btn btn-outline btn-xs" disabled={busyId === l.id} onClick={() => setOpen({ id: l.id, mode: "voucher", kind: "NEW_CONTRA" })}>
+                    <Icon name="cash" className="h-4 w-4" /> From another of our banks
                   </button>
                   <button className="btn btn-quiet btn-xs" disabled={busyId === l.id} onClick={() => setOpen({ id: l.id, mode: "ignore" })}>
                     Set aside
@@ -628,6 +681,11 @@ function LineList({
                     {l.note && l.matchedAt && " · "}
                     {l.matchedAt && when(l.matchedAt)}
                   </p>
+                )}
+                {l.matchKind && VOUCHER_MADE.has(l.matchKind) && l.matchRef && !l.matchRef.startsWith("cash_") && (
+                  <a href={`/admin/books/vouchers/${l.matchRef}`} className="text-xs font-semibold text-[var(--kesar-text)] underline">
+                    Open the voucher
+                  </a>
                 )}
               </div>
               <button
@@ -710,7 +768,7 @@ function Suggestions({ line, busy, onPick }: { line: Line; busy: boolean; onPick
             </p>
           </div>
           <button className={`btn btn-xs shrink-0 ${s.exact ? "btn-mor" : "btn-soft"}`} disabled={busy} onClick={() => onPick(s)}>
-            {busy ? "Saving…" : s.kind === "SETTLEMENT" && !s.ref ? "Enter fee" : s.kind === "NEW_PAYMENT" || s.kind === "NEW_SUPPLIER_PAYMENT" ? "Choose" : "Match"}
+            {busy ? "Saving…" : s.kind === "SETTLEMENT" && !s.ref ? "Enter fee" : s.kind === "NEW_PAYMENT" || s.kind === "NEW_SUPPLIER_PAYMENT" || s.kind === "NEW_EXPENSE" || s.kind === "NEW_RECEIPT" || s.kind === "NEW_CONTRA" ? "Choose" : "Match"}
           </button>
         </div>
       ))}
@@ -913,13 +971,123 @@ function SupplierForm({
   );
 }
 
+type VoucherOpts = { heads: { code: string; name: string; groupLabel: string }[]; cash: { code: string; name: string }[]; banks: { code: string; name: string }[] };
+
+/** An expense, other money in, or a move to / from our cash or another bank, entered from the line as a voucher. */
+function VoucherLineForm({
+  kind,
+  out,
+  amount,
+  initialHead,
+  initialOther,
+  busy,
+  onCancel,
+  onSubmit,
+}: {
+  kind: VoucherKind;
+  out: boolean;
+  amount: number;
+  initialHead: string | null;
+  initialOther: string | null;
+  busy: boolean;
+  onCancel: () => void;
+  onSubmit: (body: Record<string, unknown>, message: string) => void;
+}) {
+  const [opts, setOpts] = useState<VoucherOpts | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [head, setHead] = useState(initialHead ? `HEAD:${initialHead}` : "");
+  const [other, setOther] = useState(initialOther ?? "");
+  const [party, setParty] = useState("");
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api<VoucherOpts>("/api/admin/books/vouchers?options=1")
+      .then(setOpts)
+      .catch((e) => setLoadError(errText(e)));
+  }, []);
+
+  const contra = kind === "NEW_CONTRA";
+  const groups = opts ? [...new Set(opts.heads.map((h) => h.groupLabel))] : [];
+  function submit() {
+    if (contra) {
+      if (!other) return setError(out ? "Choose where the money went" : "Choose where it came from");
+      const name = [...(opts?.cash ?? []), ...(opts?.banks ?? [])].find((x) => x.code === other)?.name ?? "";
+      return onSubmit({ otherCode: other, note: note.trim() || undefined }, `${formatINR(amount)} entered as a contra ${out ? "to" : "from"} ${name}`);
+    }
+    if (!head) return setError("Choose the head");
+    const name = opts?.heads.find((h) => h.code === head)?.name ?? "";
+    onSubmit({ headId: head.replace(/^HEAD:/, ""), party: party.trim() || undefined, note: note.trim() || undefined }, `${formatINR(amount)} entered as a ${kind === "NEW_EXPENSE" ? "payment" : "receipt"} voucher: ${name}`);
+  }
+
+  return (
+    <FormBox onSubmit={submit}>
+      <p className="text-xs text-[var(--ink-2)]">
+        {contra
+          ? `Enters a contra voucher of ${formatINR(amount)} ${out ? "from this statement's bank to" : "into this statement's bank from"} the account you choose, on the line's date.`
+          : `Enters a ${kind === "NEW_EXPENSE" ? "payment" : "receipt"} voucher of ${formatINR(amount)} ${kind === "NEW_EXPENSE" ? "from" : "into"} this statement's bank, on the line's date.`}
+      </p>
+      {loadError && <p className="text-xs text-[#a8281e]">{loadError}</p>}
+      {!opts && !loadError && <p className="text-xs text-[var(--muted)]">Loading…</p>}
+      {opts && contra && (
+        <select className="input" value={other} onChange={(e) => setOther(e.target.value)} aria-label={out ? "Moved to" : "Came from"}>
+          <option value="">{out ? "Moved to" : "Came from"}</option>
+          <optgroup label="Cash">
+            {opts.cash.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.name}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="Our other banks">
+            {opts.banks.map((b) => (
+              <option key={b.code} value={b.code}>
+                {b.name}
+              </option>
+            ))}
+          </optgroup>
+        </select>
+      )}
+      {opts && !contra && (
+        <>
+          <select className="input" value={head} onChange={(e) => setHead(e.target.value)} aria-label="Head">
+            <option value="">{kind === "NEW_EXPENSE" ? "What was it for?" : "What is this money?"}</option>
+            {groups.map((g) => (
+              <optgroup key={g} label={g}>
+                {opts.heads
+                  .filter((h) => h.groupLabel === g)
+                  .map((h) => (
+                    <option key={h.code} value={h.code}>
+                      {h.name}
+                    </option>
+                  ))}
+              </optgroup>
+            ))}
+          </select>
+          <input className="input" value={party} maxLength={100} onChange={(e) => setParty(e.target.value)} placeholder={kind === "NEW_EXPENSE" ? "Paid to (optional)" : "Received from (optional)"} />
+        </>
+      )}
+      <NoteInput value={note} onChange={setNote} />
+      {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+      <div className="flex gap-2">
+        <button type="submit" className="btn btn-mor btn-sm" disabled={busy || !opts}>
+          {busy ? "Saving…" : "Enter voucher"}
+        </button>
+        <button type="button" className="btn btn-quiet btn-sm" disabled={busy} onClick={onCancel}>
+          Back
+        </button>
+      </div>
+    </FormBox>
+  );
+}
+
 function IgnoreForm({ busy, onCancel, onSubmit }: { busy: boolean; onCancel: () => void; onSubmit: (note: string | undefined) => void }) {
   const [note, setNote] = useState("");
   return (
     <FormBox onSubmit={() => onSubmit(note.trim() || undefined)}>
-      <p className="text-xs text-[var(--ink-2)]">Set aside a line that is nothing to match (interest, charges, a transfer between our accounts), so it stops showing here.</p>
+      <p className="text-xs text-[var(--ink-2)]">Set aside a line that is nothing to match, so it stops showing here. Interest, charges and transfers between our accounts are better entered as vouchers above, so the bank book stays whole.</p>
       <div className="flex flex-wrap gap-1.5">
-        {["Not from a shop", "Interest", "Refund", "Transfer between our accounts"].map((t) => (
+        {["Not from a shop", "Refund", "Duplicate line"].map((t) => (
           <button key={t} type="button" className="chip" onClick={() => setNote(t)}>
             {t}
           </button>

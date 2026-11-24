@@ -196,6 +196,8 @@ model Tenant {
   claimLines         ClaimLine[]
   claimSettlements   ClaimSettlement[]
   supplierAllocs     SupplierAllocation[]
+  vouchers           Voucher[]
+  voucherLines       VoucherLine[]
 }
 
 /// Custom domains a tenant has verified (e.g. order.agencyname.in).
@@ -1097,6 +1099,10 @@ enum EntryKind {
   CLAIM_RAISE // a claim raised on a company
   CLAIM_RECEIPT // money from a company against a claim
   CLAIM_WRITE_OFF // the part of a claim we won't get
+  VOUCHER_PAYMENT // a payment voucher: an expense or anything paid that is not a supplier's bill
+  VOUCHER_RECEIPT // a receipt voucher: money in that is not from a shop
+  CONTRA // money moved between our own cash and banks
+  JOURNAL // a journal voucher: any balanced lines, with a reason
 }
 
 enum PayMethod {
@@ -1208,6 +1214,7 @@ model BankAccount {
   supplierPayments SupplierPayment[]
   issuedCheques    IssuedCheque[]
   claimSettlements ClaimSettlement[]
+  vouchers         Voucher[]
 
   @@unique([tenantId, name])
   @@unique([tenantId, ledgerCode])
@@ -1400,6 +1407,8 @@ model CashHandover {
   counted      Int
   /// expected − counted; positive = short.
   variance     Int
+  /// Expenses paid from this cash (fuel, toll, loading), entered at the handover as a payment voucher.
+  expenses     Int      @default(0)
   note         String?
   entryId      String?
   createdAt    DateTime @default(now())
@@ -2529,7 +2538,8 @@ model BankLine {
   /// The same line in two uploads is imported once.
   fingerprint String
   status      BankLineStatus @default(UNMATCHED)
-  /// VERIFY | UPI_CLEAR | CHEQUE_CLEAR | SETTLEMENT | CASH_DEPOSIT | NEW_PAYMENT
+  /// VERIFY | UPI_CLEAR | CHEQUE_CLEAR | SETTLEMENT | CASH_DEPOSIT | NEW_PAYMENT | SUPPLIER_PAY | ISSUED_CHEQUE
+  /// | NEW_SUPPLIER_PAYMENT | VOUCHER_OUT | VOUCHER_IN | NEW_EXPENSE | NEW_RECEIPT | NEW_CONTRA
   matchKind   String?
   /// Id of the payment / cheque / settlement it matched (one line per thing).
   matchRef    String?
@@ -3397,6 +3407,7 @@ model IssuedCheque {
   createdAt     DateTime           @default(now())
 
   payment SupplierPayment?
+  voucher Voucher?
 
   @@unique([tenantId, bankAccountId, number])
   @@index([tenantId, status])
@@ -3518,4 +3529,99 @@ model ClaimSettlement {
   @@index([tenantId, claimId])
   @@index([tenantId, date])
   @@index([tenantId, purchaseBillId])
+}
+
+// ───────────────────────────── Vouchers (A5) ─────────────────────────────
+
+enum VoucherType {
+  /// Money paid for an expense, an asset, drawings, a loan repaid … (not a supplier's bill).
+  PAYMENT
+  /// Money in that is not from a shop: capital, a loan, interest, scrap sold.
+  RECEIPT
+  /// Money moved between our own cash and banks.
+  CONTRA
+  /// Any balanced lines, with a reason: depreciation, provisions, corrections.
+  JOURNAL
+}
+
+enum VoucherMethod {
+  CASH // office cash, or a cash head such as petty cash
+  BANK // transfer / UPI / card from one of our bank accounts
+  CHEQUE // a cheque we wrote (payment only)
+  STAFF // paid by a staff member from cash they collected (payment only)
+}
+
+enum VoucherLineRole {
+  ACCOUNT // the head (or, in a journal, any account) the voucher is for
+  MONEY // the cash, bank, cheque or staff cash the money moved through
+  GST // GST input credit on a payment
+  TDS // TDS kept back (payment) or deducted by the payer (receipt)
+}
+
+/// A numbered voucher (PV / RV / CV / JV + FY). Posted once from its own lines; cancelled by reversal.
+model Voucher {
+  id            String         @id @default(cuid())
+  tenantId      String         @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  /// PV2627-00001, RV…, CV…, JV….
+  number        String
+  type          VoucherType
+  date          DateTime       @db.Date
+  /// Payment / receipt: how the money moved.
+  method        VoucherMethod?
+  bankAccountId String?
+  bankAccount   BankAccount?   @relation(fields: [bankAccountId], references: [id])
+  /// Payment by a staff member from collected cash.
+  staffUserId   String?
+  /// The handover it was entered with, if any.
+  handoverId    String?
+  /// Paise. Payment / receipt: the money that moved; contra: the amount moved; journal: total debits.
+  amount        Int
+  /// Paid to / received from.
+  party         String?
+  partyGstin    String?
+  /// GST input credit on a payment (paise).
+  gst           Int            @default(0)
+  /// TDS kept back (payment) or deducted by the payer (receipt), paise.
+  tds           Int            @default(0)
+  tdsSection    String?
+  /// UTR / bill number / slip number.
+  reference     String?
+  narration     String?
+  /// Storage keys of slip photos.
+  photos        String[]       @default([])
+  entryId       String?        @unique
+  chequeId      String?        @unique
+  cheque        IssuedCheque?  @relation(fields: [chequeId], references: [id])
+  cancelledAt   DateTime?
+  cancelReason  String?
+  createdById   String?
+  createdAt     DateTime       @default(now())
+
+  lines VoucherLine[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, type, date])
+  @@index([tenantId, date])
+  @@index([tenantId, staffUserId])
+}
+
+/// One line of a voucher, exactly as posted (debit positive).
+model VoucherLine {
+  id        String          @id @default(cuid())
+  tenantId  String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant          @relation(fields: [tenantId], references: [id])
+  voucherId String
+  voucher   Voucher         @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  sl        Int
+  role      VoucherLineRole
+  /// Ledger account code (HEAD:<id>, BANK:<id>, OFFICE_CASH, STAFF_CASH:<user> …).
+  code      String
+  /// The account's name when posted.
+  name      String
+  amount    Int
+  note      String?
+
+  @@index([tenantId, voucherId])
+  @@index([tenantId, code])
 }

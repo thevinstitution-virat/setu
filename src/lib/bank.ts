@@ -7,6 +7,7 @@ import { parseCsv } from "@/lib/importers";
 import { sha256 } from "@/lib/secrets";
 import { recordSettlement } from "@/lib/gateway";
 import { clearIssuedCheque, paySupplier } from "@/lib/supplier-payments";
+import { createVoucher } from "@/lib/vouchers";
 
 /**
  * Bank statement import (CSV or XLSX as the bank gives it) and matching.
@@ -17,7 +18,9 @@ import { clearIssuedCheque, paySupplier } from "@/lib/supplier-payments";
  *  BANK_LINK     a confirmed bank transfer: link only (it was booked to Bank already)
  *  CHEQUE_CLEAR  a cheque: deposit (if not yet) and clear it
  *  SETTLEMENT    a gateway payout: link it, or book it here with its fee
- *  CASH_DEPOSIT  office cash paid in: Dr Bank / Cr Office cash
+ *  CASH_DEPOSIT  office cash paid in: a contra voucher, office cash to this bank
+ *  VOUCHER_IN    a receipt voucher or contra already entered: link only
+ *  NEW_RECEIPT   other money in (interest, capital, a loan): a receipt voucher entered here
  *  NEW_PAYMENT   money from a shop nobody recorded: a bank payment for that shop
  * A line with exactly one sure match (same amount and its reference in the
  * narration) is matched on import; the rest wait with suggestions. One
@@ -27,6 +30,11 @@ import { clearIssuedCheque, paySupplier } from "@/lib/supplier-payments";
  *  SUPPLIER_PAY          a bank payment to a supplier already entered: link only
  *  ISSUED_CHEQUE         a cheque we wrote, paid by our bank: Dr Cheques issued / Cr Bank
  *  NEW_SUPPLIER_PAYMENT  a payment to a supplier nobody entered: entered here
+ *  VOUCHER_OUT           a payment voucher or contra already entered: link only
+ *  NEW_EXPENSE           an expense nobody entered (bank charges, rent …): a payment voucher entered here
+ *
+ * Either way, NEW_CONTRA enters money moved between this bank and our cash
+ * or another of our banks as a contra voucher.
  *
  * A statement belongs to one of our bank accounts; what it books lands there.
  */
@@ -36,7 +44,22 @@ export const MAX_LINES = 5000;
 const IST = 330 * 60_000;
 const DAY = 24 * 3600_000;
 
-export type MatchKind = "VERIFY" | "UPI_CLEAR" | "BANK_LINK" | "CHEQUE_CLEAR" | "SETTLEMENT" | "CASH_DEPOSIT" | "NEW_PAYMENT" | "SUPPLIER_PAY" | "ISSUED_CHEQUE" | "NEW_SUPPLIER_PAYMENT";
+export type MatchKind =
+  | "VERIFY"
+  | "UPI_CLEAR"
+  | "BANK_LINK"
+  | "CHEQUE_CLEAR"
+  | "SETTLEMENT"
+  | "CASH_DEPOSIT"
+  | "NEW_PAYMENT"
+  | "SUPPLIER_PAY"
+  | "ISSUED_CHEQUE"
+  | "NEW_SUPPLIER_PAYMENT"
+  | "VOUCHER_OUT"
+  | "VOUCHER_IN"
+  | "NEW_EXPENSE"
+  | "NEW_RECEIPT"
+  | "NEW_CONTRA";
 export const MATCH_LABEL: Record<MatchKind, string> = {
   VERIFY: "Confirm reported payment",
   UPI_CLEAR: "UPI payment reached the bank",
@@ -48,15 +71,36 @@ export const MATCH_LABEL: Record<MatchKind, string> = {
   SUPPLIER_PAY: "Payment to a supplier already entered",
   ISSUED_CHEQUE: "Our cheque was paid",
   NEW_SUPPLIER_PAYMENT: "New payment to a supplier",
+  VOUCHER_OUT: "Voucher already entered",
+  VOUCHER_IN: "Voucher already entered",
+  NEW_EXPENSE: "New expense (payment voucher)",
+  NEW_RECEIPT: "Other money in (receipt voucher)",
+  NEW_CONTRA: "Moved between our cash and banks",
 };
-/** The kinds that match money going out. */
-export const OUT_KINDS = new Set<MatchKind>(["SUPPLIER_PAY", "ISSUED_CHEQUE", "NEW_SUPPLIER_PAYMENT"]);
+/** The kinds that match money going out (NEW_CONTRA goes either way). */
+export const OUT_KINDS = new Set<MatchKind>(["SUPPLIER_PAY", "ISSUED_CHEQUE", "NEW_SUPPLIER_PAYMENT", "VOUCHER_OUT", "NEW_EXPENSE"]);
+/** Kinds whose match points at a voucher (one line per direction of it). */
+const VOUCHER_KINDS = new Set(["CASH_DEPOSIT", "VOUCHER_OUT", "VOUCHER_IN", "NEW_EXPENSE", "NEW_RECEIPT", "NEW_CONTRA"]);
 
-export type Suggestion = { kind: MatchKind; ref: string | null; retailerId?: string | null; supplierId?: string | null; label: string; amount: number; date?: string | null; exact: boolean };
+export type Suggestion = {
+  kind: MatchKind;
+  ref: string | null;
+  retailerId?: string | null;
+  supplierId?: string | null;
+  /** NEW_EXPENSE / NEW_RECEIPT: the head it most likely is. */
+  headId?: string | null;
+  /** NEW_CONTRA: the cash or bank on the other side. */
+  otherCode?: string | null;
+  label: string;
+  amount: number;
+  date?: string | null;
+  exact: boolean;
+};
 
 // ───────────────────────────── parsing ─────────────────────────────
 
-export type ParsedLine = { date: Date; narration: string; reference: string | null; debit: number; credit: number; balance: number | null };
+/** blankBalance: the statement has a balance column but this line's cell is empty (balance is then null). */
+export type ParsedLine = { date: Date; narration: string; reference: string | null; debit: number; credit: number; balance: number | null; blankBalance?: true };
 export type Parsed = { lines: ParsedLine[]; skipped: number; columns: Record<string, string> };
 
 type Col = "date" | "narration" | "ref" | "debit" | "credit" | "amount" | "drcr" | "balance";
@@ -207,9 +251,12 @@ export async function parseStatement(bytes: Buffer, fileName: string): Promise<P
       continue;
     }
     const narration = cell(row, "narration").replace(/\s+/g, " ").slice(0, 500);
-    const bal = cols.balance !== undefined ? parseBankAmount(cell(row, "balance")) : null;
+    // An empty balance cell is no balance, not ₹0.
+    const balRaw = cols.balance !== undefined ? cell(row, "balance").trim() : "";
+    const blankBalance = cols.balance !== undefined && (!balRaw || balRaw === "-" || balRaw === "--");
+    const bal = cols.balance !== undefined && !blankBalance ? parseBankAmount(balRaw) : null;
     const ref = cell(row, "ref").replace(/\s+/g, "");
-    lines.push({ date, narration, reference: (ref && !/^0+$/.test(ref) ? ref : refsIn(narration)[0] ?? null)?.slice(0, 60) ?? null, debit, credit, balance: bal });
+    lines.push({ date, narration, reference: (ref && !/^0+$/.test(ref) ? ref : refsIn(narration)[0] ?? null)?.slice(0, 60) ?? null, debit, credit, balance: bal, ...(blankBalance ? { blankBalance: true as const } : {}) });
     if (lines.length > MAX_LINES) throw new MoneyError(`A statement can have at most ${MAX_LINES} lines; upload a shorter period`);
   }
   if (!lines.length) throw new MoneyError("No lines with a date and an amount were found");
@@ -243,8 +290,9 @@ export function lineHasRef(line: Pick<BankLine, "narration" | "reference">, ref:
   return r.length >= 10 && alnum(`${line.narration} ${line.reference ?? ""}`).includes(r);
 }
 
+// A blank balance cell used to be read as 0: it still fingerprints as 0, so a statement uploaded before is not imported twice.
 const fingerprintOf = (account: string, l: ParsedLine, n: number) =>
-  sha256([account.toLowerCase(), l.date.toISOString(), l.narration, l.reference ?? "", l.debit, l.credit, l.balance ?? "", n].join("|"));
+  sha256([account.toLowerCase(), l.date.toISOString(), l.narration, l.reference ?? "", l.debit, l.credit, l.balance ?? (l.blankBalance ? 0 : ""), n].join("|"));
 
 // ───────────────────────────── import ─────────────────────────────
 
@@ -316,8 +364,10 @@ type Pool = Awaited<ReturnType<typeof loadPool>>;
 
 /** Everything a money-in line could be, loaded once per run. */
 async function loadPool(tx: Ctx["tx"], from: Date) {
-  const claimed = await tx.bankLine.findMany({ where: { status: "MATCHED", matchRef: { not: null } }, select: { matchKind: true, matchRef: true } });
+  const claimed = await tx.bankLine.findMany({ where: { status: "MATCHED", matchRef: { not: null } }, select: { matchKind: true, matchRef: true, debit: true } });
   const used = new Set(claimed.map((c) => c.matchRef!));
+  // A contra between two of our banks is seen twice: going out of one, coming into the other.
+  for (const c of claimed) if (VOUCHER_KINDS.has(c.matchKind ?? "")) used.add(`${c.matchRef}:${c.debit > 0 ? "out" : "in"}`);
   const payments = await tx.payment.findMany({
     where: {
       method: { in: ["UPI", "BANK"] },
@@ -338,7 +388,22 @@ async function loadPool(tx: Ctx["tx"], from: Date) {
   });
   const ourCheques = await tx.issuedCheque.findMany({ where: { status: "ISSUED" }, select: { id: true, number: true, amount: true, date: true, bankAccountId: true, payee: true } });
   const suppliers = await tx.supplier.findMany({ where: { active: true }, select: { id: true, name: true, gstin: true, phone: true } });
+  // Vouchers with a bank side: which bank, which way, how much.
+  const banks = await tx.bankAccount.findMany({ select: { id: true, ledgerCode: true } });
+  const bankOf = new Map(banks.map((b) => [b.ledgerCode, b.id]));
+  const vlines = banks.length
+    ? await tx.voucherLine.findMany({
+        where: { code: { in: [...bankOf.keys()] }, voucher: { cancelledAt: null, type: { in: ["PAYMENT", "RECEIPT", "CONTRA"] }, date: { gte: from } } },
+        select: { code: true, amount: true, voucher: { select: { id: true, number: true, type: true, date: true, party: true, reference: true, narration: true } } },
+      })
+    : [];
+  const legs = vlines
+    .map((l) => ({ ...l.voucher, bankAccountId: bankOf.get(l.code)!, dir: l.amount < 0 ? ("out" as const) : ("in" as const), amount: Math.abs(l.amount) }))
+    .filter((l) => !used.has(`${l.id}:${l.dir}`));
+  const heads = await tx.ledgerHead.findMany({ where: { active: true, key: { in: ["bank_charges", "interest_received", "interest_paid"] } }, select: { id: true, key: true } });
   return {
+    legs,
+    heads: new Map(heads.map((h) => [h.key!, h.id])),
     used,
     payments: payments.filter((p) => !used.has(p.id)),
     cheques: cheques.filter((c) => !used.has(c.id)),
@@ -397,10 +462,34 @@ function suggestOut(pool: Pool, line: Pick<BankLine, "date" | "narration" | "ref
     if (!exact && !near(line.date, c.date, 30, 1)) continue;
     out.push({ kind: "ISSUED_CHEQUE", ref: c.id, label: `Our cheque ${c.number} to ${c.payee}`, amount: c.amount, date: c.date.toISOString().slice(0, 10), exact });
   }
+  out.push(...legSuggestions(pool, line, amount, "out", bankId));
   for (const s of guessNamed(pool.suppliers, line.narration)) {
     out.push({ kind: "NEW_SUPPLIER_PAYMENT", ref: null, supplierId: s.id, label: `New payment to ${s.name} (matched by ${s.why})`, amount, exact: false });
   }
+  const n = line.narration.toUpperCase();
+  if (/\bATM\b|CASH WDL|CASH WITHDRAW|\bCWDR\b|\bSELF\b|BY SELF/.test(n)) {
+    out.push({ kind: "NEW_CONTRA", ref: null, otherCode: "OFFICE_CASH", label: "Cash drawn out to office cash", amount, exact: false });
+  }
+  if (/CHG|CHRG|CHARGES|COMMISSION|\bCOMM\b|SMS ALERT|MIN BAL|\bAMC\b|GST ON|\bFEE\b|FEES|CHQ BOOK|STAMP/.test(n) && pool.heads.get("bank_charges")) {
+    out.push({ kind: "NEW_EXPENSE", ref: null, headId: pool.heads.get("bank_charges"), label: "Bank charges (new payment voucher)", amount, exact: false });
+  }
+  if (/\bINT\b.*\b(DR|DEBIT|COLL|CHARGED)\b|INTEREST (DEBIT|CHARGED|APPLIED)|OD INT|CC INT/.test(n) && pool.heads.get("interest_paid")) {
+    out.push({ kind: "NEW_EXPENSE", ref: null, headId: pool.heads.get("interest_paid"), label: "Interest paid (new payment voucher)", amount, exact: false });
+  }
   return out.sort((a, b) => Number(b.exact) - Number(a.exact)).slice(0, 6);
+}
+
+/** Vouchers already entered with this bank, this way and this amount. */
+function legSuggestions(pool: Pool, line: Pick<BankLine, "date" | "narration" | "reference">, amount: number, dir: "out" | "in", bankId: string | null): Suggestion[] {
+  const out: Suggestion[] = [];
+  for (const v of pool.legs) {
+    if (v.dir !== dir || v.amount !== amount || (bankId && v.bankAccountId !== bankId) || pool.used.has(`${v.id}:${dir}`)) continue;
+    const exact = (!!v.reference && lineHasRef(line, v.reference) && near(line.date, v.date, 30, 5)) || lineHasRef(line, v.number);
+    if (!exact && !near(line.date, v.date, 10, 5)) continue;
+    const what = v.party ?? v.narration ?? (v.type === "CONTRA" ? "Contra" : "");
+    out.push({ kind: dir === "out" ? "VOUCHER_OUT" : "VOUCHER_IN", ref: v.id, label: `${v.number}${what ? ` · ${what.slice(0, 60)}` : ""}${v.reference ? ` · ${v.reference}` : ""}`, amount, date: v.date.toISOString().slice(0, 10), exact });
+  }
+  return out;
 }
 
 export function suggestFor(pool: Pool, line: Pick<BankLine, "date" | "narration" | "reference" | "credit" | "debit">, bankId: string | null = null): Suggestion[] {
@@ -426,8 +515,12 @@ export function suggestFor(pool: Pool, line: Pick<BankLine, "date" | "narration"
     if (!exact && !near(line.date, s.settledAt, 2, 4)) continue;
     out.push({ kind: "SETTLEMENT", ref: s.id, label: `Gateway payout ${s.providerRef}${s.utr ? ` · UTR ${s.utr}` : ""}`, amount: s.amount, date: ymd(s.settledAt), exact });
   }
+  out.push(...legSuggestions(pool, line, line.credit, "in", bankId));
   const n = line.narration.toUpperCase();
   if (/\bCASH\b|\bCDM\b|BY CASH|CASH DEP/.test(n)) out.push({ kind: "CASH_DEPOSIT", ref: null, label: "Office cash paid into the bank", amount: line.credit, exact: false });
+  if (/\bINT\b.*\b(CR|CREDIT|PAID|PD)\b|INTEREST (CREDIT|PAID)|\bINT\.? ?PD\b|SB INT/.test(n) && pool.heads.get("interest_received")) {
+    out.push({ kind: "NEW_RECEIPT", ref: null, headId: pool.heads.get("interest_received"), label: "Interest received (new receipt voucher)", amount: line.credit, exact: false });
+  }
   if (/RAZORPAY|SETTLEMENT|SETL/.test(n) && !out.some((s) => s.kind === "SETTLEMENT")) {
     out.push({ kind: "SETTLEMENT", ref: null, label: "Gateway payout not yet recorded (enter its fee)", amount: line.credit, exact: false });
   }
@@ -461,7 +554,7 @@ export async function matchOpen(tenantId: string, actorId: string | null, opts: 
     const exact = s.filter((x) => x.exact && x.ref);
     if (exact.length === 1) {
       sure.push({ line, s: exact[0] });
-      pool.used.add(exact[0].ref!);
+      pool.used.add(VOUCHER_KINDS.has(exact[0].kind) ? `${exact[0].ref}:${line.debit > 0 ? "out" : "in"}` : exact[0].ref!);
     }
     updates.push({ id: line.id, status: s.length ? "SUGGESTED" : "UNMATCHED", suggestions: s });
   }
@@ -482,12 +575,25 @@ export async function matchOpen(tenantId: string, actorId: string | null, opts: 
 
 // ───────────────────────────── matching ─────────────────────────────
 
-export type MatchChoice = { kind: MatchKind; ref?: string | null; retailerId?: string | null; supplierId?: string | null; purpose?: "DUES" | "WALLET"; fees?: number | null };
+export type MatchChoice = {
+  kind: MatchKind;
+  ref?: string | null;
+  retailerId?: string | null;
+  supplierId?: string | null;
+  purpose?: "DUES" | "WALLET";
+  fees?: number | null;
+  /** NEW_EXPENSE / NEW_RECEIPT: the head. */
+  headId?: string | null;
+  /** NEW_CONTRA (and CASH_DEPOSIT from a cash head): the cash or bank on the other side. */
+  otherCode?: string | null;
+  /** NEW_EXPENSE / NEW_RECEIPT: paid to / received from. */
+  party?: string | null;
+};
 
 const isBanked = async (ctx: Ctx, id: string) => !!(await ctx.tx.bankLine.findFirst({ where: { matchRef: id, status: "MATCHED" }, select: { id: true } }));
 
 async function applyMatch(ctx: Ctx, line: BankLine & { statement: { bankAccountId: string | null } }, c: MatchChoice): Promise<{ ref: string | null; entryId: string | null }> {
-  const out = OUT_KINDS.has(c.kind);
+  const out = c.kind === "NEW_CONTRA" ? line.debit > 0 : OUT_KINDS.has(c.kind);
   if (out ? line.debit <= 0 : line.credit <= 0) throw new MoneyError(out ? "That is for money going out" : "That is for money coming in");
   const amount = out ? line.debit : line.credit;
   // The statement's bank; the default bank when it names none.
@@ -520,6 +626,12 @@ async function applyMatch(ctx: Ctx, line: BankLine & { statement: { bankAccountI
           })
         ).id
       : null;
+  /** This statement's bank as a ledger code (the default bank when it names none). */
+  const bankCode = async () => {
+    if (stBank) return (await ctx.tx.bankAccount.findUniqueOrThrow({ where: { id: stBank.id }, select: { ledgerCode: true } })).ledgerCode;
+    return (await ctx.tx.bankAccount.findFirst({ where: { isDefault: true }, select: { ledgerCode: true } }))?.ledgerCode ?? "BANK";
+  };
+  const lineRef = () => (line.reference ?? refsIn(line.narration)[0] ?? "").slice(0, 60) || null;
 
   switch (c.kind) {
     case "VERIFY":
@@ -568,7 +680,49 @@ async function applyMatch(ctx: Ctx, line: BankLine & { statement: { bankAccountI
       return { ref: s.id, entryId: s.entryId };
     }
     case "CASH_DEPOSIT":
-      return { ref: `cash_${line.id}`, entryId: await bankIn(`Cash deposited: ${line.narration.slice(0, 80)}`, "OFFICE_CASH") };
+    case "NEW_CONTRA": {
+      const other = c.kind === "CASH_DEPOSIT" ? c.otherCode || "OFFICE_CASH" : c.otherCode;
+      if (!other) throw new MoneyError("Choose where the money went or came from", 400);
+      const v = await createVoucher(ctx, {
+        type: "CONTRA",
+        date: ymd(line.date),
+        fromCode: out ? await bankCode() : other,
+        toCode: out ? other : await bankCode(),
+        amount,
+        reference: lineRef(),
+        narration: `From the bank statement: ${line.narration.slice(0, 200)}`,
+      });
+      return { ref: v.id, entryId: v.entryId };
+    }
+    case "VOUCHER_OUT":
+    case "VOUCHER_IN": {
+      const v = c.ref ? await ctx.tx.voucher.findUnique({ where: { id: c.ref }, include: { lines: true } }) : null;
+      if (!v) throw new MoneyError("Voucher not found", 404);
+      if (v.cancelledAt) throw new MoneyError(`${v.number} was cancelled`, 409);
+      const code = await bankCode();
+      const leg = v.lines.find((l) => l.code === code && (out ? l.amount < 0 : l.amount > 0));
+      if (!leg) throw new MoneyError(`${v.number} doesn't move money ${out ? "out of" : "into"} ${stBank?.name ?? "this bank"}`);
+      if (Math.abs(leg.amount) !== amount) throw new MoneyError(`${v.number} is ${formatINR(Math.abs(leg.amount))}, the bank line ${formatINR(amount)}`);
+      const taken = await ctx.tx.bankLine.findFirst({ where: { matchRef: v.id, status: "MATCHED", ...(out ? { debit: { gt: 0 } } : { credit: { gt: 0 } }) }, select: { id: true } });
+      if (taken) throw new MoneyError("That voucher is already matched to another bank line", 409);
+      return { ref: v.id, entryId: null };
+    }
+    case "NEW_EXPENSE":
+    case "NEW_RECEIPT": {
+      if (!c.headId) throw new MoneyError("Choose the head", 400);
+      const bankId = stBank?.id ?? (await ctx.tx.bankAccount.findFirst({ where: { isDefault: true }, select: { id: true } }))?.id ?? null;
+      const v = await createVoucher(ctx, {
+        type: c.kind === "NEW_EXPENSE" ? "PAYMENT" : "RECEIPT",
+        date: ymd(line.date),
+        method: "BANK",
+        bankAccountId: bankId,
+        lines: [{ code: `HEAD:${c.headId}`, amount }],
+        party: c.party ?? null,
+        reference: lineRef(),
+        narration: `From the bank statement: ${line.narration.slice(0, 200)}`,
+      });
+      return { ref: v.id, entryId: v.entryId };
+    }
     case "NEW_PAYMENT": {
       const shop = c.retailerId ? await ctx.tx.retailerProfile.findUnique({ where: { id: c.retailerId }, select: { id: true } }) : null;
       if (!shop) throw new MoneyError("Choose the shop", 400);
@@ -651,8 +805,10 @@ export async function unmatchLine(tenantId: string, actorId: string | null, line
     const linkOnly =
       line.matchKind === "BANK_LINK" ||
       line.matchKind === "SUPPLIER_PAY" ||
+      line.matchKind === "VOUCHER_OUT" ||
+      line.matchKind === "VOUCHER_IN" ||
       (line.matchKind === "SETTLEMENT" && !(await ctx.tx.gatewaySettlement.findFirst({ where: { id: line.matchRef ?? "", providerRef: `bank_${line.id}` } })));
-    if (!linkOnly) throw new MoneyError("This match booked an entry; reverse the payment or entry instead", 409);
+    if (!linkOnly) throw new MoneyError(VOUCHER_KINDS.has(line.matchKind ?? "") ? "This match entered a voucher; cancel the voucher instead" : "This match booked an entry; reverse the payment or entry instead", 409);
     if (line.entryId) await reverseEntry(ctx, line.entryId, "Bank line unmatched");
     return ctx.tx.bankLine.update({ where: { id: line.id }, data: { status: "UNMATCHED", matchKind: null, matchRef: null, entryId: null, matchedById: null, matchedAt: null, note: null } });
   });

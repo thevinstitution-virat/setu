@@ -98,6 +98,10 @@ export const KIND_LABEL: Record<EntryKind, string> = {
   CLAIM_RAISE: "Claim on a company",
   CLAIM_RECEIPT: "Claim money received",
   CLAIM_WRITE_OFF: "Claim written off",
+  VOUCHER_PAYMENT: "Payment voucher",
+  VOUCHER_RECEIPT: "Receipt voucher",
+  CONTRA: "Contra",
+  JOURNAL: "Journal voucher",
 };
 
 export const BANK_KINDS: Record<BankKind, string> = { CURRENT: "Current account", SAVINGS: "Savings account", OD: "Overdraft (OD)", CC: "Cash credit (CC)" };
@@ -434,6 +438,20 @@ export async function ledgerChoices(ctx: Ctx) {
   return out.sort((x, y) => x.group.localeCompare(y.group) || x.label.localeCompare(y.label));
 }
 
+/** Where an entry made by a voucher (or its reversal) opens. */
+async function voucherLinks(ctx: Ctx, entries: { id: string; reversesId: string | null }[]) {
+  const ids = [...new Set(entries.flatMap((e) => [e.id, e.reversesId]).filter((x): x is string => !!x))];
+  if (!ids.length) return new Map<string, string>();
+  const vs = await ctx.tx.voucher.findMany({ where: { entryId: { in: ids } }, select: { id: true, entryId: true } });
+  const by = new Map(vs.map((v) => [v.entryId!, `/admin/books/vouchers/${v.id}`]));
+  const out = new Map<string, string>();
+  for (const e of entries) {
+    const h = by.get(e.id) ?? (e.reversesId ? by.get(e.reversesId) : undefined);
+    if (h) out.set(e.id, h);
+  }
+  return out;
+}
+
 // ───────────────────────────── ledger ─────────────────────────────
 
 const LINE_CAP = 3000;
@@ -478,6 +496,7 @@ export async function accountLedger(ctx: Ctx, code: string, from: string, to: st
           occurredAt: true,
           retailerId: true,
           supplierId: true,
+          reversesId: true,
           lines: { select: { accountId: true, amount: true, account: { select: accSelect } } },
         },
       },
@@ -488,6 +507,7 @@ export async function accountLedger(ctx: Ctx, code: string, from: string, to: st
   const capped = lines.length > LINE_CAP;
   const used = lines.slice(0, LINE_CAP);
   const users = await userNames(ctx, used.flatMap((l) => l.entry.lines.map((x) => x.account)));
+  const vlink = await voucherLinks(ctx, used.map((l) => l.entry));
   let running = Number(before._sum.amount ?? 0);
   const opening = running;
   let debit = 0;
@@ -508,7 +528,7 @@ export async function accountLedger(ctx: Ctx, code: string, from: string, to: st
       debit: l.amount > 0 ? l.amount : 0,
       credit: l.amount < 0 ? -l.amount : 0,
       balance: running,
-      href: l.entry.retailerId ? `/admin/khata/${l.entry.retailerId}` : l.entry.supplierId ? `/admin/books/suppliers/${l.entry.supplierId}` : null,
+      href: vlink.get(l.entry.id) ?? (l.entry.retailerId ? `/admin/khata/${l.entry.retailerId}` : l.entry.supplierId ? `/admin/books/suppliers/${l.entry.supplierId}` : null),
     };
   });
   return { ...empty, opening, closing: running, debit, credit, rows, capped };
@@ -542,6 +562,7 @@ export async function dayBook(ctx: Ctx, from: string, to: string, kind?: EntryKi
       occurredAt: true,
       retailerId: true,
       supplierId: true,
+      reversesId: true,
       reversedBy: { select: { id: true } },
       lines: { select: { amount: true, account: { select: accSelect } }, orderBy: { amount: "desc" } },
     },
@@ -551,6 +572,7 @@ export async function dayBook(ctx: Ctx, from: string, to: string, kind?: EntryKi
   const capped = entries.length > ENTRY_CAP;
   const used = entries.slice(0, ENTRY_CAP);
   const users = await userNames(ctx, used.flatMap((e) => e.lines.map((l) => l.account)));
+  const vlink = await voucherLinks(ctx, used);
   const byKind = new Map<EntryKind, { count: number; amount: number }>();
   let debit = 0;
   let credit = 0;
@@ -569,7 +591,7 @@ export async function dayBook(ctx: Ctx, from: string, to: string, kind?: EntryKi
       kindLabel: KIND_LABEL[e.kind],
       memo: e.memo,
       reversed: !!e.reversedBy,
-      href: e.retailerId ? `/admin/khata/${e.retailerId}` : e.supplierId ? `/admin/books/suppliers/${e.supplierId}` : null,
+      href: vlink.get(e.id) ?? (e.retailerId ? `/admin/khata/${e.retailerId}` : e.supplierId ? `/admin/books/suppliers/${e.supplierId}` : null),
       lines,
       total,
     };
@@ -637,6 +659,13 @@ export async function checkBooks(ctx: Ctx): Promise<{ ok: boolean; results: Chec
     st AS (SELECT c.id, c.settled, c."writtenOff", coalesce(sum(x.amount) FILTER (WHERE x.kind <> 'WRITE_OFF'), 0) got, coalesce(sum(x.amount) FILTER (WHERE x.kind = 'WRITE_OFF'), 0) lost
       FROM "Claim" c LEFT JOIN "ClaimSettlement" x ON x."claimId" = c.id AND x."reversedAt" IS NULL WHERE c."tenantId" = ${t} GROUP BY c.id)
     SELECT (SELECT count(*) FROM acc FULL JOIN cl ON acc.s = cl.s WHERE coalesce(acc.bal, 0) <> coalesce(cl.amt, 0)) + (SELECT count(*) FROM st WHERE settled <> got OR "writtenOff" <> lost) c`;
+  const vouchers = await q`WITH vl AS (SELECT "voucherId" v, code, sum(amount) amt FROM "VoucherLine" WHERE "tenantId" = ${t} GROUP BY 1, 2),
+    el AS (SELECT v.id v, a.code, sum(l.amount) amt FROM "Voucher" v JOIN "LedgerLine" l ON l."entryId" = v."entryId" JOIN "LedgerAccount" a ON a.id = l."accountId" WHERE v."tenantId" = ${t} GROUP BY 1, 2),
+    diff AS (SELECT DISTINCT coalesce(vl.v, el.v) v FROM vl FULL JOIN el ON el.v = vl.v AND el.code = vl.code WHERE coalesce(vl.amt, 0) <> coalesce(el.amt, 0)),
+    bad AS (SELECT v.id FROM "Voucher" v LEFT JOIN "JournalEntry" r ON r."reversesId" = v."entryId" WHERE v."tenantId" = ${t} AND (v."entryId" IS NULL OR (v."cancelledAt" IS NULL) <> (r.id IS NULL)))
+    SELECT (SELECT count(*) FROM diff) + (SELECT count(*) FROM bad WHERE id NOT IN (SELECT v FROM diff)) c`;
+  const cashBelow = await q`SELECT count(*) c FROM (SELECT a.id FROM "LedgerAccount" a JOIN "LedgerLine" l ON l."accountId" = a.id
+    WHERE a."tenantId" = ${t} AND (a.type IN ('OFFICE_CASH', 'STAFF_CASH') OR (a.type = 'HEAD' AND a."group" = 'CASH')) GROUP BY a.id HAVING sum(l.amount) < 0) x`;
   const lock = await booksLock(ctx);
   const afterLock = lock
     ? await q`SELECT count(*) c FROM "JournalEntry" WHERE "tenantId" = ${t} AND "occurredAt" < ${dayEnd(lock)} AND "createdAt" > (SELECT coalesce(max("createdAt"), now()) FROM "AuditLog" WHERE "tenantId" = ${t} AND action = 'books.lock')`
@@ -658,6 +687,8 @@ export async function checkBooks(ctx: Ctx): Promise<{ ok: boolean; results: Chec
     { key: "suppliers", title: "Each supplier's account matches their bills", ok: !suppliers, found: suppliers, detail: suppliers ? `${suppliers} suppliers' accounts differ from their open bills less unused notes and payments` : "Every supplier's account equals their open bills less unused notes and payments", fix: "Open Books, Suppliers to find the supplier, then tell support." },
     { key: "issued-cheques", title: "Our uncleared cheques add up", ok: !cheques, found: cheques, detail: cheques ? "Cheques issued in the books differ from the cheques not yet cleared" : "Cheques issued in the books equal the cheques not yet cleared", fix: "Open Books, Payments, Cheques we wrote, then tell support." },
     { key: "claims", title: "Claims on companies add up", ok: !claims, found: claims, detail: claims ? "Claims receivable in the books differ from the claims still open" : "Each company's claims receivable equals its open claims", fix: "Open Books, Claims, then tell support." },
+    { key: "vouchers", title: "Vouchers agree with the ledger", ok: !vouchers, found: vouchers, detail: vouchers ? `${vouchers} vouchers differ from their entries` : "Every voucher's lines are in the ledger as entered, and every cancelled one is reversed", fix: "Open Books, Vouchers, then tell support." },
+    { key: "cash", title: "No cash below zero", ok: !cashBelow, found: cashBelow, detail: cashBelow ? `${cashBelow} cash accounts show less than nothing` : "Office cash, petty cash and staff cash are all ₹0 or more", fix: "Open the cash book: a payment from cash was entered before the cash came in, or a receipt or handover is missing." },
     { key: "lock", title: "Nothing new in closed days", ok: !afterLock, found: afterLock, detail: lock ? (afterLock ? `${afterLock} entries were added on or before ${showDay(lock)} after the books were closed` : `Closed up to ${showDay(lock)}; nothing was added there since`) : "The books are not closed for any days yet", fix: "Ask the owner to look at the day book for those days." },
   ];
   return { ok: results.every((r) => r.ok), results, counts: { entries, lines } };
