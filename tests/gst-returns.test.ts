@@ -338,6 +338,11 @@ describe("the GSTR-3B working", () => {
     expect(reg.bySupplier[0].igst + reg.bySupplier[0].cgst + reg.bySupplier[0].sgst).toBeGreaterThan(0);
     expect(reg.byRate.find((r) => r.rate === 12)?.igst).toBe(1_200_00);
     expect(reg.byRate.find((r) => r.rate === null)?.igst).toBe(1_800_00);
+    // The exempt bill (no tax at all) is not in the register, so every table adds up to the same taxable value.
+    const sum = (xs: { taxable: number }[]) => xs.reduce((s, x) => s + x.taxable, 0);
+    expect(sum(reg.byRate)).toBe(reg.totals.taxable);
+    expect(sum(reg.byMonth)).toBe(reg.totals.taxable);
+    expect(sum(reg.bySupplier)).toBe(reg.totals.taxable);
   });
 });
 

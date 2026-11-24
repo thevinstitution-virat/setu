@@ -474,18 +474,21 @@ export async function itcRegister(ctx: Ctx, from: string, to: string) {
     let a = noAmt();
     let inel = 0;
     const rs = new Set<string>();
+    const byRate: { rate: number | null; x: Amt }[] = [];
     for (const l of d.lines) {
       const x = lineAmt(l, d.sign);
       if (l.rate !== null) rs.add(`${l.rate}%`);
-      if (!l.itc) {
-        inel += headsTotal(x);
-        a = addAmt(a, { taxable: x.taxable, igst: 0, cgst: 0, sgst: 0 });
-      } else a = addAmt(a, x);
-      const rk = l.rate === null ? "-" : String(l.rate);
-      const r = rates.get(rk) ?? { rate: l.rate, ...noAmt() };
-      rates.set(rk, { ...addAmt(r, l.itc ? x : { ...x, igst: 0, cgst: 0, sgst: 0 }), rate: l.rate });
+      const claimed = l.itc ? x : { taxable: x.taxable, igst: 0, cgst: 0, sgst: 0 };
+      if (!l.itc) inel += headsTotal(x);
+      a = addAmt(a, claimed);
+      byRate.push({ rate: l.rate, x: claimed });
     }
+    // A bill with no tax on it at all is not in the register (it is in 3B table 5).
     if (!headsTotal(a) && !inel) continue;
+    for (const { rate, x } of byRate) {
+      const rk = rate === null ? "-" : String(rate);
+      rates.set(rk, { ...addAmt(rates.get(rk) ?? { rate, ...noAmt() }, x), rate });
+    }
     const { lines: _l, sign: _s, ...rest } = d;
     void _l;
     void _s;

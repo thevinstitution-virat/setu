@@ -21,6 +21,7 @@ const VIEWS = [
 ] as const;
 type View = (typeof VIEWS)[number]["key"];
 const amt = (p: number) => (p ? (p < 0 ? `(${formatINR(-p)})` : formatINR(p)) : "–");
+const docs = (n: number) => `${n} document${n === 1 ? "" : "s"}`;
 const short = (p: string) => new Date(`${p}-01T00:00:00Z`).toLocaleDateString("en-IN", { month: "short", year: "numeric", timeZone: "UTC" });
 
 /** GST: the month's GSTR-3B working with its set-off and payment, the input credit register, and the GSTR-2B match. */
@@ -281,7 +282,7 @@ function Itc({ reg }: { reg: Reg }) {
   return (
     <>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi label="Input credit" value={formatINR(t.igst + t.cgst + t.sgst)} sub={`${reg.docs.length} documents`} />
+        <Kpi label="Input credit" value={formatINR(t.igst + t.cgst + t.sgst)} sub={docs(reg.docs.length)} />
         <Kpi label="IGST" value={formatINR(t.igst)} />
         <Kpi label="CGST + SGST" value={formatINR(t.cgst + t.sgst)} />
         <Kpi label="Not claimable" value={formatINR(t.ineligible)} sub="Tax on lines marked no credit" />
@@ -316,7 +317,7 @@ function Itc({ reg }: { reg: Reg }) {
           <span key="s">
             {x.party || "–"}
             <span className="block text-xs text-[var(--muted)]">
-              {x.gstin ?? "No GSTIN"} · {x.docs} docs
+              {x.gstin ?? "No GSTIN"} · {docs(x.docs)}
             </span>
           </span>,
           amt(x.taxable),
@@ -416,7 +417,7 @@ function Match({ m, canPost }: { m: M2b; canPost: boolean }) {
           <h2 className="font-heading text-lg font-bold text-[var(--ink)]">GSTR-2B for {m.label}</h2>
           <p className="text-sm text-[var(--ink-2)]">
             {m.upload
-              ? `${m.upload.fileName}: ${m.upload.rows} documents, uploaded ${new Date(m.upload.at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}.`
+              ? `${m.upload.fileName}: ${docs(m.upload.rows)}, uploaded ${new Date(m.upload.at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" })}.`
               : "Not uploaded yet. Download it from the GST portal (Returns → GSTR-2B → Download JSON or Excel) and upload it here."}
           </p>
         </div>
@@ -424,10 +425,10 @@ function Match({ m, canPost }: { m: M2b; canPost: boolean }) {
         {m.uploads.length > 0 && <p className="text-xs text-[var(--muted)]">Uploaded months: {m.uploads.map((u) => short(u.period)).join(", ")}. A bill shown in any of them counts as found.</p>}
       </section>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi label="Matched credit" value={formatINR(m.totals.matchedItc)} sub={`${m.matched.length} documents`} />
-        <Kpi label="Amounts differ" value={formatINR(m.totals.differentItc)} sub={`${m.different.length} documents`} />
-        <Kpi label="Credit at risk" value={formatINR(m.totals.atRisk)} sub={`${m.missing.length} of our bills not in 2B`} />
-        <Kpi label="In 2B, not in our books" value={formatINR(m.totals.notInBooksTax)} sub={`${m.notInBooks.length} documents`} />
+        <Kpi label="Matched credit" value={formatINR(m.totals.matchedItc)} sub={docs(m.matched.length)} />
+        <Kpi label="Amounts differ" value={formatINR(m.totals.differentItc)} sub={docs(m.different.length)} />
+        <Kpi label="Credit at risk" value={formatINR(m.totals.atRisk)} sub={`${m.missing.length} of our bill${m.missing.length === 1 ? "" : "s"} not in 2B`} />
+        <Kpi label="In 2B, not in our books" value={formatINR(m.totals.notInBooksTax)} sub={docs(m.notInBooks.length)} />
       </div>
       {m.upload && (
         <div className="flex justify-end">
@@ -436,7 +437,7 @@ function Match({ m, canPost }: { m: M2b; canPost: boolean }) {
           </a>
         </div>
       )}
-      {m.noCredit.length > 0 && <Notes items={[`The portal marks ${m.noCredit.length} matched documents as credit not available: check them before claiming.`]} />}
+      {m.noCredit.length > 0 && <Notes items={[`The portal marks ${docs(m.noCredit.length)} we matched as credit not available: check them before claiming.`]} />}
       <Table
         title="Amounts differ"
         head={["Supplier · their number", "Tax (ours)", "Tax (2B)", "Credit"]}
