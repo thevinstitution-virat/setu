@@ -522,7 +522,7 @@ export async function filterOptions(tenantId: string) {
       tx.area.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
       tx.user.findMany({ where: { active: true, role: { in: ["SALES_AGENT", "SUPERVISOR"] } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
       tx.beat.findMany({ where: { active: true }, select: { id: true, name: true, weekdays: true }, orderBy: { name: "asc" } }),
-      tx.supplier.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+      tx.supplier.findMany({ where: { active: true, kind: "GOODS" }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     ]);
     return { areas, salesmen, beats, companies };
   });

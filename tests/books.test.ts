@@ -203,8 +203,8 @@ describe("ledger, day book, trial balance, check", () => {
     expect(csv.at(-1)).toEqual([today, "", "Closing balance", "", "", "", "30.00 Dr"]);
     const pdf = await renderSheetPdf(ledgerSheet(l), { name: "Test" });
     expect(pdf.byteLength).toBeGreaterThan(1000);
-    const empty = await books((ctx) => accountLedger(ctx, "PURCHASES", today, today));
-    expect(empty).toMatchObject({ name: "Purchases", opening: 0, rows: [] });
+    const empty = await books((ctx) => accountLedger(ctx, "TDS_PAYABLE", today, today));
+    expect(empty).toMatchObject({ name: "TDS payable", opening: 0, rows: [] });
     expect(await code(books((ctx) => accountLedger(ctx, "HEAD:nope", today, today)))).toBe(404);
   });
 

@@ -4,12 +4,14 @@ import { toCsv } from "@/lib/field";
 import { renderSheetPdf, type Sheet, type SheetRow } from "@/lib/dues-export";
 import type { TenantDb } from "@/lib/db";
 import { showDay, type accountLedger, type chartOfAccounts, type dayBook } from "@/lib/books";
+import { DOC_LABEL, type purchaseRegister } from "@/lib/purchases";
 
 /** PDF and CSV of the books' reports, in the outstanding reports' style. */
 
 type Ledger = Awaited<ReturnType<typeof accountLedger>>;
 type DayBook = Awaited<ReturnType<typeof dayBook>>;
 type Chart = Awaited<ReturnType<typeof chartOfAccounts>>;
+type Register = Awaited<ReturnType<typeof purchaseRegister>>;
 
 const amt = (p: number) => (p ? formatINR(p) : "");
 const rupees = (p: number) => (p / 100).toFixed(2);
@@ -111,6 +113,57 @@ export function trialCsv(c: Chart) {
     ["Group", "Account", "Accounts", "Debit", "Credit"],
     ...c.groups.flatMap((g) => g.rows.filter((r) => r.balance).map((r) => [g.label, r.name, r.count ?? 1, r.balance > 0 ? rupees(r.balance) : "", r.balance < 0 ? rupees(-r.balance) : ""])),
     ["", "Total", "", rupees(c.debit), rupees(c.credit)],
+  ];
+}
+
+const SHORT = { BILL: "Bill", DEBIT_NOTE: "Debit note", CREDIT_NOTE: "Credit note" } as const;
+
+/** Purchase register: one row per bill or note (notes shown minus), totals and a GST-rate summary. */
+export function purchaseRegisterSheet(r: Register): Sheet {
+  const neg = (t: keyof typeof SHORT, p: number) => (t === "BILL" ? p : -p);
+  const rows: SheetRow[] = r.docs.map((d): SheetRow => ({
+    kind: "row",
+    cells: [
+      showDay(d.date),
+      `${d.number}${d.cancelled ? " (cancelled)" : ""}`,
+      `${SHORT[d.type]} ${d.supplierRef}${d.reverseCharge ? " · RCM" : ""}`,
+      `${d.supplier}${d.gstin ? ` · ${d.gstin}` : ""}`,
+      d.cancelled ? "" : amt(neg(d.type, d.taxable)),
+      d.cancelled ? "" : amt(neg(d.type, d.cgst + d.sgst)),
+      d.cancelled ? "" : amt(neg(d.type, d.igst)),
+      d.cancelled ? "" : amt(neg(d.type, d.total)),
+    ],
+  }));
+  rows.push({ kind: "total", cells: ["", `${r.docs.filter((d) => !d.cancelled).length} documents`, "", "", amt(r.totals.taxable), amt(r.totals.cgst + r.totals.sgst), amt(r.totals.igst), amt(r.totals.total)] });
+  if (r.rates.length) {
+    rows.push({ kind: "group", text: "By GST rate" });
+    for (const x of r.rates) rows.push({ kind: "row", cells: ["", `GST ${x.rate}%`, "", "", amt(x.taxable), "", "", amt(x.tax)] });
+  }
+  rows.push({ kind: "note", text: `Input tax we can claim: ${formatINR(r.totals.itcTax)}.` });
+  if (r.capped) rows.push({ kind: "note", text: "Only the first 3,000 documents are shown. Pick a shorter period for the rest." });
+  return {
+    title: "Purchase register",
+    subtitle: period(r.from, r.to),
+    landscape: true,
+    cols: [
+      { label: "Date", width: 50 },
+      { label: "Our no.", width: 80 },
+      { label: "Their bill", width: 110, wrap: true },
+      { label: "Supplier", width: 170, wrap: true },
+      { label: "Taxable", width: 70, align: "r" },
+      { label: "CGST+SGST", width: 65, align: "r" },
+      { label: "IGST", width: 60, align: "r" },
+      { label: "Total", width: 75, align: "r" },
+    ],
+    rows,
+  };
+}
+
+export function purchaseRegisterCsv(r: Register) {
+  const neg = (t: keyof typeof SHORT, p: number) => rupees(t === "BILL" ? p : -p);
+  return [
+    ["Date", "Our number", "Type", "Supplier bill no", "Supplier", "GSTIN", "Taxable", "CGST", "SGST", "IGST", "Input tax claimable", "Total", "Reverse charge", "Cancelled"],
+    ...r.docs.map((d) => [d.date, d.number, DOC_LABEL[d.type], d.supplierRef, d.supplier, d.gstin ?? "", neg(d.type, d.taxable), neg(d.type, d.cgst), neg(d.type, d.sgst), neg(d.type, d.igst), neg(d.type, d.itcTax), neg(d.type, d.total), d.reverseCharge ? "yes" : "", d.cancelled ? "yes" : ""]),
   ];
 }
 

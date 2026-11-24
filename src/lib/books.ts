@@ -90,6 +90,9 @@ export const KIND_LABEL: Record<EntryKind, string> = {
   REWARD: "Reward",
   BANK_MATCH: "Seen in the bank",
   GATEWAY_SETTLEMENT: "Gateway settlement",
+  PURCHASE: "Purchase bill",
+  PURCHASE_DEBIT_NOTE: "Debit note to supplier",
+  PURCHASE_CREDIT_NOTE: "Credit note from supplier",
 };
 
 export const BANK_KINDS: Record<BankKind, string> = { CURRENT: "Current account", SAVINGS: "Savings account", OD: "Overdraft (OD)", CC: "Cash credit (CC)" };
@@ -301,7 +304,7 @@ export async function booksLock(ctx: Ctx) {
 
 // ───────────────────────────── names of accounts ─────────────────────────────
 
-type AccLite = { id: string; code: string; type: AccountType; name: string; userId: string | null; retailerId: string | null; retailer?: { outletName: string } | null };
+type AccLite = { id: string; code: string; type: AccountType; name: string; userId: string | null; retailerId: string | null; retailer?: { outletName: string } | null; supplier?: { name: string } | null };
 
 async function userNames(ctx: Ctx, accounts: AccLite[]) {
   const ids = [...new Set(accounts.map((a) => a.userId).filter((v): v is string => !!v))];
@@ -322,12 +325,16 @@ export function accountLabel(a: AccLite, users: Map<string, string>) {
       return `${shop} (wallet reserved)`;
     case "STAFF_CASH":
       return `Cash with ${users.get(a.userId ?? "") ?? "staff"}`;
+    case "PAYABLE":
+      return `${a.supplier?.name ?? "Supplier"} (payable)`;
+    case "CLAIMS_RECEIVABLE":
+      return `${a.supplier?.name ?? "Supplier"} (claims)`;
     default:
       return a.name;
   }
 }
 
-const accSelect = { id: true, code: true, type: true, name: true, userId: true, retailerId: true, retailer: { select: { outletName: true } } } as const;
+const accSelect = { id: true, code: true, type: true, name: true, userId: true, retailerId: true, retailer: { select: { outletName: true } }, supplier: { select: { name: true } } } as const;
 
 // ───────────────────────────── chart of accounts ─────────────────────────────
 
@@ -368,6 +375,8 @@ export async function chartOfAccounts(ctx: Ctx, asOn?: string) {
     WALLET: { name: "Shops' wallets", href: "/admin/khata" },
     WALLET_HOLD: { name: "Wallet money reserved for orders", href: "/admin/khata" },
     STAFF_CASH: { name: "Cash with staff", href: "/admin/cash" },
+    PAYABLE: { name: "Suppliers' bills", href: "/admin/books/suppliers" },
+    CLAIMS_RECEIVABLE: { name: "Claims on companies", href: "/admin/books/suppliers" },
   };
   const byHead = new Map<string, number>();
   const byBank = new Map<string, number>();
@@ -405,7 +414,7 @@ export const ledgerHref = (code: string) => `/admin/books/ledger?account=${encod
 /** Accounts a ledger can be opened for from the picker (shops' accounts open from their khata). */
 export async function ledgerChoices(ctx: Ctx) {
   const [accounts, heads, banks] = await Promise.all([
-    ctx.tx.ledgerAccount.findMany({ where: { type: { notIn: ["RECEIVABLE", "WALLET", "WALLET_HOLD", "HEAD"] }, bankAccountId: null }, select: accSelect }),
+    ctx.tx.ledgerAccount.findMany({ where: { type: { notIn: ["RECEIVABLE", "WALLET", "WALLET_HOLD", "HEAD", "PAYABLE", "CLAIMS_RECEIVABLE"] }, bankAccountId: null }, select: accSelect }),
     ctx.tx.ledgerHead.findMany({ orderBy: { name: "asc" } }),
     ctx.tx.bankAccount.findMany({ orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
   ]);
@@ -441,7 +450,12 @@ export async function accountLedger(ctx: Ctx, code: string, from: string, to: st
   } else {
     const b = await ctx.tx.bankAccount.findFirst({ where: { ledgerCode: code } });
     if (b) [name, group] = [b.name, "BANK"];
-    else if (code in NAMES && code !== "HEAD") [name, group] = [NAMES[code as AccountType], GROUP_OF[code as Exclude<AccountType, "HEAD">]];
+    else if (code.startsWith("PAYABLE:") || code.startsWith("CLAIMS_RECEIVABLE:")) {
+      const sup = await ctx.tx.supplier.findUnique({ where: { id: code.split(":")[1] }, select: { name: true } });
+      if (!sup) throw new MoneyError("Account not found", 404);
+      const t = code.split(":")[0] as "PAYABLE" | "CLAIMS_RECEIVABLE";
+      [name, group] = [`${sup.name} (${t === "PAYABLE" ? "payable" : "claims"})`, GROUP_OF[t]];
+    } else if (code in NAMES && code !== "HEAD") [name, group] = [NAMES[code as AccountType], GROUP_OF[code as Exclude<AccountType, "HEAD">]];
     else throw new MoneyError("Account not found", 404);
   }
   const empty = { code, name, group, groupLabel: GROUPS[group].label, from, to, opening: 0, closing: 0, debit: 0, credit: 0, rows: [] as LedgerRow[], capped: false };
@@ -458,6 +472,7 @@ export async function accountLedger(ctx: Ctx, code: string, from: string, to: st
           memo: true,
           occurredAt: true,
           retailerId: true,
+          supplierId: true,
           lines: { select: { accountId: true, amount: true, account: { select: accSelect } } },
         },
       },
@@ -488,7 +503,7 @@ export async function accountLedger(ctx: Ctx, code: string, from: string, to: st
       debit: l.amount > 0 ? l.amount : 0,
       credit: l.amount < 0 ? -l.amount : 0,
       balance: running,
-      href: l.entry.retailerId ? `/admin/khata/${l.entry.retailerId}` : null,
+      href: l.entry.retailerId ? `/admin/khata/${l.entry.retailerId}` : l.entry.supplierId ? `/admin/books/suppliers/${l.entry.supplierId}` : null,
     };
   });
   return { ...empty, opening, closing: running, debit, credit, rows, capped };
@@ -521,6 +536,7 @@ export async function dayBook(ctx: Ctx, from: string, to: string, kind?: EntryKi
       memo: true,
       occurredAt: true,
       retailerId: true,
+      supplierId: true,
       reversedBy: { select: { id: true } },
       lines: { select: { amount: true, account: { select: accSelect } }, orderBy: { amount: "desc" } },
     },
@@ -548,7 +564,7 @@ export async function dayBook(ctx: Ctx, from: string, to: string, kind?: EntryKi
       kindLabel: KIND_LABEL[e.kind],
       memo: e.memo,
       reversed: !!e.reversedBy,
-      href: e.retailerId ? `/admin/khata/${e.retailerId}` : null,
+      href: e.retailerId ? `/admin/khata/${e.retailerId}` : e.supplierId ? `/admin/books/suppliers/${e.supplierId}` : null,
       lines,
       total,
     };
@@ -595,6 +611,19 @@ export async function checkBooks(ctx: Ctx): Promise<{ ok: boolean; results: Chec
   const strayHead = await q`SELECT count(*) c FROM "LedgerAccount" a LEFT JOIN "LedgerHead" h ON h.id = a."headId" WHERE a."tenantId" = ${t} AND a.type = 'HEAD' AND (h.id IS NULL OR h."group" <> a."group")`;
   const defaults = await q`SELECT count(*) c FROM "BankAccount" WHERE "tenantId" = ${t} AND "isDefault"`;
   const banks = await q`SELECT count(*) c FROM "BankAccount" WHERE "tenantId" = ${t}`;
+  const supBills = await q`WITH al AS (SELECT "billId", sum(amount) s FROM "SupplierAllocation" WHERE "tenantId" = ${t} GROUP BY "billId")
+    SELECT count(*) c FROM "SupplierBill" b LEFT JOIN al ON al."billId" = b.id WHERE b."tenantId" = ${t}
+    AND (b.paid < 0 OR b.paid > b.amount OR b.paid < coalesce(al.s, 0) OR (b.kind <> 'OPENING' AND b.paid <> coalesce(al.s, 0)) OR b.settled <> (b.paid >= b.amount))`;
+  const supCredits = await q`WITH al AS (SELECT "creditId", sum(amount) s FROM "SupplierAllocation" WHERE "tenantId" = ${t} GROUP BY "creditId")
+    SELECT count(*) c FROM "SupplierCredit" p LEFT JOIN al ON al."creditId" = p.id WHERE p."tenantId" = ${t} AND (p.allocated <> coalesce(al.s, 0) OR p.allocated > p.amount OR p.allocated < 0)`;
+  const suppliers = await q`WITH pay AS (
+      SELECT a."supplierId" s, sum(l.amount) bal FROM "LedgerAccount" a JOIN "LedgerLine" l ON l."accountId" = a.id
+      WHERE a."tenantId" = ${t} AND a.type = 'PAYABLE' AND a."supplierId" IS NOT NULL GROUP BY a."supplierId"),
+    bills AS (SELECT "supplierId" s, sum(amount - paid) open FROM "SupplierBill" WHERE "tenantId" = ${t} GROUP BY "supplierId"),
+    unused AS (SELECT "supplierId" s, sum(amount - allocated) adv FROM "SupplierCredit" WHERE "tenantId" = ${t} GROUP BY "supplierId"),
+    cmp AS (SELECT coalesce(pay.s, bills.s, unused.s) s, coalesce(bal, 0) ledger, coalesce(adv, 0) - coalesce(open, 0) books
+      FROM pay FULL JOIN bills ON bills.s = pay.s FULL JOIN unused ON unused.s = coalesce(pay.s, bills.s))
+    SELECT count(*) c FROM cmp WHERE ledger <> books`;
   const lock = await booksLock(ctx);
   const afterLock = lock
     ? await q`SELECT count(*) c FROM "JournalEntry" WHERE "tenantId" = ${t} AND "occurredAt" < ${dayEnd(lock)} AND "createdAt" > (SELECT coalesce(max("createdAt"), now()) FROM "AuditLog" WHERE "tenantId" = ${t} AND action = 'books.lock')`
@@ -611,6 +640,9 @@ export async function checkBooks(ctx: Ctx): Promise<{ ok: boolean; results: Chec
     { key: "shops", title: "Each shop's dues match its bills", ok: !shops, found: shops, detail: shops ? `${shops} shops' khata balance differs from their open bills less unused payments` : "Every shop's khata equals its open bills less unused payments", fix: "Open the outstanding report to find the shop, then tell support." },
     { key: "banks", title: "Bank accounts are set up", ok: banks === 0 || (defaults === 1 && !strayBank), found: banks === 0 ? 0 : (defaults === 1 ? 0 : 1) + strayBank, detail: banks === 0 ? "Not set up yet (the books' first opening does it)" : defaults !== 1 ? "There must be exactly one default bank" : strayBank ? "Some bank money is not in any bank account" : "One default bank; all bank money sits in a bank account", fix: "Open Bank accounts and pick a default." },
     { key: "heads", title: "Heads sit in their groups", ok: !strayHead, found: strayHead, detail: strayHead ? `${strayHead} head accounts are out of step with their head` : "Every head's account is in the head's group", fix: "Rename the head (any change brings it back in step)." },
+    { key: "supplier-bills", title: "Suppliers' bills' paid amounts add up", ok: !supBills, found: supBills, detail: supBills ? `${supBills} suppliers' bills show more or less paid than the notes and payments set against them` : "Every supplier's bill matches what is set against it", fix: "Tell VBiz Pro support." },
+    { key: "supplier-credits", title: "Notes and payments to suppliers are set correctly", ok: !supCredits, found: supCredits, detail: supCredits ? `${supCredits} notes or payments to suppliers are set against more or less than they should be` : "Every note and payment to a supplier matches its bills", fix: "Tell VBiz Pro support." },
+    { key: "suppliers", title: "Each supplier's account matches their bills", ok: !suppliers, found: suppliers, detail: suppliers ? `${suppliers} suppliers' accounts differ from their open bills less unused notes and payments` : "Every supplier's account equals their open bills less unused notes and payments", fix: "Open Books, Suppliers to find the supplier, then tell support." },
     { key: "lock", title: "Nothing new in closed days", ok: !afterLock, found: afterLock, detail: lock ? (afterLock ? `${afterLock} entries were added on or before ${showDay(lock)} after the books were closed` : `Closed up to ${showDay(lock)}; nothing was added there since`) : "The books are not closed for any days yet", fix: "Ask the owner to look at the day book for those days." },
   ];
   return { ok: results.every((r) => r.ok), results, counts: { entries, lines } };

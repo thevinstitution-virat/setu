@@ -55,15 +55,21 @@ export { MoneyError };
  * Which account. BANK with no bankAccountId is the business's default bank;
  * HEAD is one of the business's own heads (rent, salaries, capital …).
  */
-export type AccountRef = { type: AccountType; retailerId?: string; userId?: string; headId?: string; bankAccountId?: string };
+export type AccountRef = { type: AccountType; retailerId?: string; userId?: string; headId?: string; bankAccountId?: string; supplierId?: string };
 
 const PER_RETAILER: AccountType[] = ["RECEIVABLE", "WALLET", "WALLET_HOLD"];
+/** One account per supplier: what we owe them, and what they owe us on claims. */
+export const PER_SUPPLIER: AccountType[] = ["PAYABLE", "CLAIMS_RECEIVABLE"];
 
 /** The account code, for every account whose code needs no lookup (not a chosen bank). */
 export function accountCode(ref: AccountRef): string {
   if (PER_RETAILER.includes(ref.type)) {
     if (!ref.retailerId) throw new Error(`${ref.type} needs a retailerId`);
     return `${ref.type}:${ref.retailerId}`;
+  }
+  if (PER_SUPPLIER.includes(ref.type)) {
+    if (!ref.supplierId) throw new Error(`${ref.type} needs a supplierId`);
+    return `${ref.type}:${ref.supplierId}`;
   }
   if (ref.type === "STAFF_CASH") {
     if (!ref.userId) throw new Error("STAFF_CASH needs a userId");
@@ -193,6 +199,7 @@ export async function accountId(ctx: Ctx, ref: AccountRef): Promise<string> {
       group: r.group,
       retailerId: ref.retailerId ?? null,
       userId: ref.userId ?? null,
+      supplierId: ref.supplierId ?? null,
       headId: r.headId,
       bankAccountId: r.bankAccountId,
     },
@@ -233,6 +240,7 @@ export async function post(
     retailerId?: string | null;
     orderId?: string | null;
     paymentId?: string | null;
+    supplierId?: string | null;
     occurredAt?: Date;
     lines: Line[];
   }
@@ -256,6 +264,7 @@ export async function post(
       retailerId: e.retailerId ?? null,
       orderId: e.orderId ?? null,
       paymentId: e.paymentId ?? null,
+      supplierId: e.supplierId ?? null,
       occurredAt: e.occurredAt ?? new Date(),
       createdById: ctx.actorId,
       lines: { create: resolved },
@@ -280,6 +289,7 @@ export async function reverseEntry(ctx: Ctx, entryId: string, memo: string) {
       retailerId: orig.retailerId,
       orderId: orig.orderId,
       paymentId: orig.paymentId,
+      supplierId: orig.supplierId,
       reversesId: orig.id,
       createdById: ctx.actorId,
       lines: { create: orig.lines.map((l) => ({ accountId: l.accountId, amount: -l.amount })) },
