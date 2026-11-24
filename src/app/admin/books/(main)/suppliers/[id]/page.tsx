@@ -9,15 +9,24 @@ import { Empty, ErrorCard, Kpi } from "@/components/reports/Kit";
 import { showDay } from "@/components/books/fmt";
 import SupplierEditor from "@/components/books/SupplierEditor";
 import OpeningSupplierBills from "@/components/books/OpeningSupplierBills";
+import { PAY_METHOD_LABEL } from "@/lib/pay-labels";
 
 const CREDIT_LABEL: Record<string, string> = { DEBIT_NOTE: "Our debit note", CREDIT_NOTE: "Their credit note", OPENING_ADVANCE: "Advance (old books)", PAYMENT: "Payment" };
 
 /** One supplier: what we owe, open bills, unused notes and advances, documents and the statement. */
 export default async function SupplierPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const r = await booksPage((ctx) => supplierDetail(ctx, id));
+  const r = await booksPage(async (ctx) => ({
+    ...(await supplierDetail(ctx, id)),
+    payments: await ctx.tx.supplierPayment.findMany({
+      where: { supplierId: id },
+      orderBy: [{ date: "desc" }, { number: "desc" }],
+      take: 20,
+      select: { id: true, number: true, date: true, method: true, amount: true, tds: true, cancelledAt: true, cheque: { select: { number: true, status: true } } },
+    }),
+  }));
   if (!r.ok) return <ErrorCard message={r.error} />;
-  const { supplier: s, summary, bills, credits, docs, hasOpening, account } = r.data;
+  const { supplier: s, summary, bills, credits, docs, hasOpening, account, payments } = r.data;
   const statement = ledgerHref(account);
 
   return (
@@ -66,9 +75,14 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          {r.me.canPay && s.active && (
+            <Link className="btn btn-mor btn-xs" href={`/admin/books/payments/new?supplier=${s.id}`}>
+              <Icon name="rupee" className="h-3.5 w-3.5" /> Pay
+            </Link>
+          )}
           {r.me.canPurchase && s.active && (
             <>
-              <Link className="btn btn-mor btn-xs" href={`/admin/books/purchases/new?supplier=${s.id}`}>
+              <Link className="btn btn-outline btn-xs" href={`/admin/books/purchases/new?supplier=${s.id}`}>
                 <Icon name="plus" className="h-3.5 w-3.5" /> Purchase bill
               </Link>
               <Link className="btn btn-outline btn-xs" href={`/admin/books/purchases/new?type=DEBIT_NOTE&supplier=${s.id}`}>
@@ -184,6 +198,32 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
           </ul>
         ) : (
           <Empty>No purchase bills or notes yet.</Empty>
+        )}
+      </section>
+
+      <section className="card p-4">
+        <h3 className="font-heading font-bold text-[var(--ink)] mb-2">Payments to them</h3>
+        {payments.length ? (
+          <ul className="divide-y divide-[var(--line)] text-sm">
+            {payments.map((p) => (
+              <li key={p.id} className={`flex justify-between gap-3 py-2 ${p.cancelledAt ? "opacity-50" : ""}`}>
+                <span className="min-w-0">
+                  <Link href={`/admin/books/payments/${p.id}`} className="font-semibold text-[var(--kesar-text)]">
+                    {p.number}
+                  </Link>{" "}
+                  <span className="text-[var(--muted)]">
+                    {PAY_METHOD_LABEL[p.method]}
+                    {p.cheque ? ` ${p.cheque.number}${p.cheque.status === "ISSUED" ? " (not yet cleared)" : ""}` : ""} · {showDay(p.date.toISOString().slice(0, 10))}
+                    {p.cancelledAt ? (p.cheque?.status === "BOUNCED" ? " · bounced" : " · cancelled") : ""}
+                    {p.tds ? ` · TDS ${formatINR(p.tds)}` : ""}
+                  </span>
+                </span>
+                <span className="tabular-nums">{formatINR(p.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Empty>No payments to them yet.</Empty>
         )}
       </section>
 

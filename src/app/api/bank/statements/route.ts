@@ -17,12 +17,18 @@ export async function GET() {
   const open = await db.bankLine.groupBy({ by: ["statementId", "status"], where: { statementId: { in: statements.map((s) => s.id) } }, _count: { _all: true } });
   const counts = new Map<string, Record<string, number>>();
   for (const o of open) counts.set(o.statementId, { ...(counts.get(o.statementId) ?? {}), [o.status]: o._count._all });
+  const [banks, suppliers] = await Promise.all([
+    db.bankAccount.findMany({ where: { active: true }, orderBy: [{ isDefault: "desc" }, { name: "asc" }], select: { id: true, name: true, isDefault: true } }),
+    db.supplier.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+  ]);
   return NextResponse.json({
     statements: statements.map((s) => ({ ...s, uploadedBy: s.uploadedBy.name, counts: counts.get(s.id) ?? {} })),
+    banks,
+    suppliers,
   });
 }
 
-/** Multipart: file (CSV / XLSX), account (label, e.g. "HDFC current"). */
+/** Multipart: file (CSV / XLSX), bankAccountId (blank = the default bank); account (a label) only before any bank account is set up. */
 export async function POST(req: Request) {
   const auth = await guard("bank.reconcile");
   if (!auth.ok) return auth.res;
@@ -34,6 +40,7 @@ export async function POST(req: Request) {
   try {
     const r = await importStatement(tenant.id, session.userId, {
       fileName: file.name || "statement.csv",
+      bankAccountId: String(form?.get("bankAccountId") ?? "") || null,
       account: String(form?.get("account") ?? ""),
       bytes: Buffer.from(await file.arrayBuffer()),
     });

@@ -8,9 +8,9 @@ import { api, errText, ErrorBox, Flash, readRupees, SearchPick, send, TabBar, ty
 // ───────────────────────────── types (API JSON) ─────────────────────────────
 
 type LineStatus = "UNMATCHED" | "SUGGESTED" | "MATCHED" | "IGNORED";
-type MatchKind = "VERIFY" | "UPI_CLEAR" | "BANK_LINK" | "CHEQUE_CLEAR" | "SETTLEMENT" | "CASH_DEPOSIT" | "NEW_PAYMENT";
+type MatchKind = "VERIFY" | "UPI_CLEAR" | "BANK_LINK" | "CHEQUE_CLEAR" | "SETTLEMENT" | "CASH_DEPOSIT" | "NEW_PAYMENT" | "SUPPLIER_PAY" | "ISSUED_CHEQUE" | "NEW_SUPPLIER_PAYMENT";
 
-type Suggestion = { kind: MatchKind; ref: string | null; retailerId?: string | null; label: string; amount: number; date?: string | null; exact: boolean };
+type Suggestion = { kind: MatchKind; ref: string | null; retailerId?: string | null; supplierId?: string | null; label: string; amount: number; date?: string | null; exact: boolean };
 
 type Line = {
   id: string;
@@ -61,6 +61,7 @@ type UploadResult = {
   unmatched: number;
 };
 
+type Bank = { id: string; name: string; isDefault: boolean };
 type ShopRow = { retailerId: string; outletName: string; ownerName: string; phone: string | null; areaName: string };
 
 const TABS = [
@@ -114,11 +115,15 @@ export default function BankPage() {
   const [rematching, setRematching] = useState(false);
   const [shops, setShops] = useState<Option[] | null>(null);
   const [shopsError, setShopsError] = useState<string | null>(null);
+  const [banks, setBanks] = useState<Bank[]>([]);
+  const [suppliers, setSuppliers] = useState<Option[]>([]);
 
   const loadStatements = useCallback(async () => {
     try {
-      const d = await api<{ statements: Statement[] }>("/api/bank/statements");
+      const d = await api<{ statements: Statement[]; banks?: Bank[]; suppliers?: { id: string; name: string }[] }>("/api/bank/statements");
       setStatements(d.statements);
+      setBanks(d.banks ?? []);
+      setSuppliers((d.suppliers ?? []).map((x) => ({ id: x.id, label: x.name })));
       setStError(null);
     } catch (e) {
       setStError(errText(e));
@@ -216,11 +221,12 @@ export default function BankPage() {
       <div>
         <p className="page-kick">Money</p>
         <h1 className="page-title">Bank</h1>
-        <p className="page-sub">Upload your bank statement and match each deposit to a payment, cheque, payout or cash deposit.</p>
+        <p className="page-sub">Upload your bank statement. Match money in to shop payments, cheques, payouts or cash deposits, and money out to supplier payments and our cheques.</p>
       </div>
 
       <UploadCard
         accounts={accounts}
+        banks={banks}
         onDone={async (r) => {
           setTab("open");
           setQuery("");
@@ -273,6 +279,7 @@ export default function BankPage() {
             shops={shops}
             shopsError={shopsError}
             loadShops={loadShops}
+            suppliers={suppliers}
             onDone={refresh}
           />
         )}
@@ -295,9 +302,10 @@ export default function BankPage() {
 
 // ───────────────────────────── upload ─────────────────────────────
 
-function UploadCard({ accounts, onDone }: { accounts: string[]; onDone: (r: UploadResult) => Promise<void> }) {
+function UploadCard({ accounts, banks, onDone }: { accounts: string[]; banks: Bank[]; onDone: (r: UploadResult) => Promise<void> }) {
   const [file, setFile] = useState<File | null>(null);
   const [account, setAccount] = useState("");
+  const [bankId, setBankId] = useState("");
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -316,7 +324,8 @@ function UploadCard({ accounts, onDone }: { accounts: string[]; onDone: (r: Uplo
     try {
       const form = new FormData();
       form.append("file", file);
-      form.append("account", shownAccount.trim());
+      if (banks.length) form.append("bankAccountId", bankId || banks[0].id);
+      else form.append("account", shownAccount.trim());
       const r = await api<UploadResult>("/api/bank/statements", { method: "POST", body: form });
       setResult(r);
       setFile(null);
@@ -338,7 +347,7 @@ function UploadCard({ accounts, onDone }: { accounts: string[]; onDone: (r: Uplo
         <div className="min-w-0">
           <p className="font-heading font-bold">Upload a statement</p>
           <p className="text-sm text-[var(--muted)]">
-            Export the statement from net banking as CSV or Excel. Money-out lines are set aside automatically. Lines already uploaded are skipped.
+            Export the statement from net banking as CSV or Excel, one bank account at a time. Lines already uploaded are skipped.
           </p>
         </div>
       </div>
@@ -346,6 +355,16 @@ function UploadCard({ accounts, onDone }: { accounts: string[]; onDone: (r: Uplo
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block min-w-0">
           <span className="block text-sm font-medium text-[var(--ink-2)] mb-1">Bank account</span>
+          {banks.length ? (
+            <select className="input" value={bankId || banks[0].id} onChange={(e) => setBankId(e.target.value)}>
+              {banks.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                  {b.isDefault ? " (default)" : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
           <input
             className="input"
             list="bank-accounts"
@@ -357,11 +376,14 @@ function UploadCard({ accounts, onDone }: { accounts: string[]; onDone: (r: Uplo
               setAccount(e.target.value);
             }}
           />
-          <datalist id="bank-accounts">
-            {accounts.map((a) => (
-              <option key={a} value={a} />
-            ))}
-          </datalist>
+          )}
+          {!banks.length && (
+            <datalist id="bank-accounts">
+              {accounts.map((a) => (
+                <option key={a} value={a} />
+              ))}
+            </datalist>
+          )}
         </label>
         <label className="block min-w-0">
           <span className="block text-sm font-medium text-[var(--ink-2)] mb-1">File (.csv or .xlsx, up to 5 MB)</span>
@@ -392,11 +414,10 @@ function UploadCard({ accounts, onDone }: { accounts: string[]; onDone: (r: Uplo
 function UploadSummary({ r }: { r: UploadResult }) {
   const total = r.statement.lineCount + r.duplicates;
   const look = r.suggested + r.unmatched;
-  const moneyOut = r.moneyOut ?? Math.max(0, r.statement.lineCount - r.matched - look);
   const parts = [
     `${plural(r.matched, "line")} matched automatically`,
     look ? `${look} need${look === 1 ? "s" : ""} a look` : null,
-    moneyOut ? `${moneyOut} money out set aside` : null,
+    r.moneyOut ? `${r.moneyOut} of them money out` : null,
     r.duplicates ? `${r.duplicates} already imported` : null,
   ].filter(Boolean);
   const cols = Object.entries(r.columns).filter(([, v]) => v);
@@ -431,7 +452,7 @@ function UploadSummary({ r }: { r: UploadResult }) {
 
 // ───────────────────────────── lines ─────────────────────────────
 
-type Open = { id: string; mode: "fee" | "shop" | "ignore"; retailerId?: string | null };
+type Open = { id: string; mode: "fee" | "shop" | "supplier" | "ignore"; retailerId?: string | null; supplierId?: string | null };
 
 function LineList({
   tab,
@@ -441,6 +462,7 @@ function LineList({
   shops,
   shopsError,
   loadShops,
+  suppliers,
   onDone,
 }: {
   tab: Tab;
@@ -450,6 +472,7 @@ function LineList({
   shops: Option[] | null;
   shopsError: string | null;
   loadShops: () => Promise<void>;
+  suppliers: Option[];
   onDone: (msg?: string) => Promise<void>;
 }) {
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -473,8 +496,9 @@ function LineList({
   function pick(line: Line, s: Suggestion) {
     if (s.kind === "SETTLEMENT" && !s.ref) return setOpen({ id: line.id, mode: "fee" });
     if (s.kind === "NEW_PAYMENT") return setOpen({ id: line.id, mode: "shop", retailerId: s.retailerId });
+    if (s.kind === "NEW_SUPPLIER_PAYMENT") return setOpen({ id: line.id, mode: "supplier", supplierId: s.supplierId });
     if (s.kind === "CASH_DEPOSIT") return cashDeposit(line);
-    act(line, { action: "match", kind: s.kind, ref: s.ref }, `${formatINR(line.credit)} matched: ${data.labels[s.kind] ?? s.kind}`);
+    act(line, { action: "match", kind: s.kind, ref: s.ref }, `${formatINR(line.credit || line.debit)} matched: ${data.labels[s.kind] ?? s.kind}`);
   }
 
   function cashDeposit(line: Line) {
@@ -484,6 +508,7 @@ function LineList({
 
   const lines = data.lines;
   const total = lines.reduce((t, l) => t + l.credit, 0);
+  const totalOut = lines.reduce((t, l) => t + l.debit, 0);
 
   if (lines.length === 0) {
     return (
@@ -491,7 +516,7 @@ function LineList({
         {searching
           ? "No lines match this search."
           : tab === "open"
-            ? "All caught up. Every deposit is matched or set aside."
+            ? "All caught up. Every line is matched or set aside."
             : tab === "MATCHED"
               ? "Nothing matched yet."
               : "Nothing set aside."}
@@ -504,6 +529,7 @@ function LineList({
       <p className="text-sm text-[var(--ink-2)]">
         <span className="font-bold">{plural(lines.length, "line")}</span>
         {total > 0 && ` · ${formatINR(total)} in`}
+        {totalOut > 0 && ` · ${formatINR(totalOut)} out`}
         {lines.length >= 200 && " · showing the latest 200, search or pick a statement to see others"}
       </p>
 
@@ -543,6 +569,18 @@ function LineList({
                   }
                 />
               )}
+              {open?.id === l.id && open.mode === "supplier" && (
+                <SupplierForm
+                  amount={l.debit}
+                  initial={open.supplierId ?? null}
+                  suppliers={suppliers}
+                  busy={busyId === l.id}
+                  onCancel={() => setOpen(null)}
+                  onSubmit={(supplierId, note, name) =>
+                    act(l, { action: "match", kind: "NEW_SUPPLIER_PAYMENT", supplierId, note }, `${formatINR(l.debit)} entered as a payment to ${name}`)
+                  }
+                />
+              )}
               {open?.id === l.id && open.mode === "ignore" && (
                 <IgnoreForm
                   busy={busyId === l.id}
@@ -551,7 +589,17 @@ function LineList({
                 />
               )}
 
-              {open?.id !== l.id && (
+              {open?.id !== l.id && l.debit > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  <button className="btn btn-outline btn-xs" disabled={busyId === l.id} onClick={() => setOpen({ id: l.id, mode: "supplier" })}>
+                    <Icon name="truck" className="h-4 w-4" /> Payment to a supplier
+                  </button>
+                  <button className="btn btn-quiet btn-xs" disabled={busyId === l.id} onClick={() => setOpen({ id: l.id, mode: "ignore" })}>
+                    Set aside
+                  </button>
+                </div>
+              )}
+              {open?.id !== l.id && l.debit === 0 && (
                 <div className="flex flex-wrap gap-2">
                   <button className="btn btn-outline btn-xs" disabled={busyId === l.id} onClick={() => cashDeposit(l)}>
                     <Icon name="cash" className="h-4 w-4" /> Cash deposited
@@ -598,7 +646,7 @@ function LineList({
                 <span className="chip">{l.debit > 0 ? "Money out" : "Set aside"}</span>
                 {l.note && l.note !== "Money out" && <span className="ml-1.5">{l.note}</span>}
               </p>
-              {l.credit > 0 && (
+              {(
                 <button
                   className="btn btn-quiet btn-xs shrink-0"
                   disabled={busyId === l.id}
@@ -662,7 +710,7 @@ function Suggestions({ line, busy, onPick }: { line: Line; busy: boolean; onPick
             </p>
           </div>
           <button className={`btn btn-xs shrink-0 ${s.exact ? "btn-mor" : "btn-soft"}`} disabled={busy} onClick={() => onPick(s)}>
-            {busy ? "Saving…" : s.kind === "SETTLEMENT" && !s.ref ? "Enter fee" : s.kind === "NEW_PAYMENT" ? "Choose" : "Match"}
+            {busy ? "Saving…" : s.kind === "SETTLEMENT" && !s.ref ? "Enter fee" : s.kind === "NEW_PAYMENT" || s.kind === "NEW_SUPPLIER_PAYMENT" ? "Choose" : "Match"}
           </button>
         </div>
       ))}
@@ -815,11 +863,61 @@ function ShopForm({
   );
 }
 
+function SupplierForm({
+  amount,
+  initial,
+  suppliers,
+  busy,
+  onCancel,
+  onSubmit,
+}: {
+  amount: number;
+  initial: string | null;
+  suppliers: Option[];
+  busy: boolean;
+  onCancel: () => void;
+  onSubmit: (supplierId: string, note: string | undefined, name: string) => void;
+}) {
+  const [supplierId, setSupplierId] = useState<string | null>(initial);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  function submit() {
+    const sup = suppliers.find((x) => x.id === supplierId);
+    if (!supplierId || !sup) return setError("Choose the supplier");
+    setError(null);
+    onSubmit(supplierId, note.trim() || undefined, sup.label);
+  }
+
+  return (
+    <FormBox onSubmit={submit}>
+      <p className="text-xs text-[var(--ink-2)]">
+        Enters a bank payment of {formatINR(amount)} to the supplier you choose, from this statement&apos;s bank, on the line&apos;s date. It pays their oldest bills; any extra is an advance.
+      </p>
+      {suppliers.length ? (
+        <SearchPick options={suppliers} value={supplierId} onChange={setSupplierId} placeholder="Search suppliers" />
+      ) : (
+        <p className="text-xs text-[var(--muted)]">No suppliers yet. Add them in Books, Suppliers.</p>
+      )}
+      <NoteInput value={note} onChange={setNote} />
+      {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+      <div className="flex gap-2">
+        <button type="submit" className="btn btn-mor btn-sm" disabled={busy || !suppliers.length}>
+          {busy ? "Saving…" : "Enter payment"}
+        </button>
+        <button type="button" className="btn btn-quiet btn-sm" disabled={busy} onClick={onCancel}>
+          Back
+        </button>
+      </div>
+    </FormBox>
+  );
+}
+
 function IgnoreForm({ busy, onCancel, onSubmit }: { busy: boolean; onCancel: () => void; onSubmit: (note: string | undefined) => void }) {
   const [note, setNote] = useState("");
   return (
     <FormBox onSubmit={() => onSubmit(note.trim() || undefined)}>
-      <p className="text-xs text-[var(--ink-2)]">Set aside money that is not from a shop, so it stops showing here.</p>
+      <p className="text-xs text-[var(--ink-2)]">Set aside a line that is nothing to match (interest, charges, a transfer between our accounts), so it stops showing here.</p>
       <div className="flex flex-wrap gap-1.5">
         {["Not from a shop", "Interest", "Refund", "Transfer between our accounts"].map((t) => (
           <button key={t} type="button" className="chip" onClick={() => setNote(t)}>

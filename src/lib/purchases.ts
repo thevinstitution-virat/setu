@@ -387,7 +387,7 @@ export async function allocateSupplier(ctx: Ctx, supplierId: string) {
   }
 }
 
-async function deallocateCredit(ctx: Ctx, creditId: string) {
+export async function deallocateCredit(ctx: Ctx, creditId: string) {
   const allocs = await ctx.tx.supplierAllocation.findMany({ where: { creditId } });
   for (const a of allocs) {
     await ctx.tx.supplierBill.update({ where: { id: a.billId }, data: { paid: { decrement: a.amount }, settled: false } });

@@ -190,6 +190,8 @@ model Tenant {
   purchaseBillLines  PurchaseBillLine[]
   supplierBills      SupplierBill[]
   supplierCredits    SupplierCredit[]
+  supplierPayments   SupplierPayment[]
+  issuedCheques      IssuedCheque[]
   supplierAllocs     SupplierAllocation[]
 }
 
@@ -1087,6 +1089,8 @@ enum EntryKind {
   PURCHASE // a supplier's bill
   PURCHASE_DEBIT_NOTE // our debit note to a supplier
   PURCHASE_CREDIT_NOTE // a supplier's credit note to us
+  SUPPLIER_PAYMENT // we paid a supplier (bank, cash or our cheque)
+  ISSUED_CHEQUE_CLEAR // a cheque we wrote was paid by our bank
 }
 
 enum PayMethod {
@@ -1193,8 +1197,10 @@ model BankAccount {
   active     Boolean  @default(true)
   createdAt  DateTime @default(now())
 
-  accounts   LedgerAccount[]
-  statements BankStatement[]
+  accounts         LedgerAccount[]
+  statements       BankStatement[]
+  supplierPayments SupplierPayment[]
+  issuedCheques    IssuedCheque[]
 
   @@unique([tenantId, name])
   @@unique([tenantId, ledgerCode])
@@ -2024,6 +2030,8 @@ model Supplier {
   purchaseBills   PurchaseBill[]
   supplierBills   SupplierBill[]
   supplierCredits SupplierCredit[]
+  payments        SupplierPayment[]
+  issuedCheques   IssuedCheque[]
 
   @@unique([tenantId, name])
 }
@@ -3307,4 +3315,79 @@ model SupplierAllocation {
 
   @@index([tenantId, creditId])
   @@index([tenantId, billId])
+}
+
+enum SupplierPayMethod {
+  BANK // NEFT / RTGS / IMPS / UPI from one of our bank accounts
+  CASH // from office cash
+  CHEQUE // a cheque we wrote (IssuedCheque)
+}
+
+enum IssuedChequeStatus {
+  ISSUED // handed over, not yet paid by our bank
+  CLEARED
+  BOUNCED // our bank did not pay it: the payment is reversed
+  CANCELLED // torn up / stopped before clearing: the payment is reversed
+}
+
+/// Money we paid a supplier. Posted once (Dr supplier, Cr bank / cash / issued cheques, Cr TDS); cancelled by reversal.
+model SupplierPayment {
+  id            String            @id @default(cuid())
+  tenantId      String            @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant            @relation(fields: [tenantId], references: [id])
+  /// Ours: SP2627-00001.
+  number        String
+  supplierId    String
+  supplier      Supplier          @relation(fields: [supplierId], references: [id])
+  date          DateTime          @db.Date
+  method        SupplierPayMethod
+  bankAccountId String?
+  bankAccount   BankAccount?      @relation(fields: [bankAccountId], references: [id])
+  /// Money that left us, paise.
+  amount        Int
+  /// TDS kept back and owed to the government; the supplier's bills are settled by amount + tds.
+  tds           Int               @default(0)
+  tdsSection    String?
+  /// UTR / transaction reference.
+  reference     String?
+  note          String?
+  /// The SupplierCredit (kind PAYMENT) that settles bills.
+  creditId      String?           @unique
+  entryId       String?           @unique
+  chequeId      String?           @unique
+  cheque        IssuedCheque?     @relation(fields: [chequeId], references: [id])
+  cancelledAt   DateTime?
+  cancelReason  String?
+  createdById   String?
+  createdAt     DateTime          @default(now())
+
+  @@unique([tenantId, number])
+  @@index([tenantId, supplierId])
+  @@index([tenantId, date])
+}
+
+/// A cheque we wrote. Clearing moves it from "issued cheques" to the bank.
+model IssuedCheque {
+  id            String             @id @default(cuid())
+  tenantId      String             @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant             @relation(fields: [tenantId], references: [id])
+  number        String
+  bankAccountId String
+  bankAccount   BankAccount        @relation(fields: [bankAccountId], references: [id])
+  /// The date written on the cheque.
+  date          DateTime           @db.Date
+  amount        Int
+  payee         String
+  supplierId    String?
+  supplier      Supplier?          @relation(fields: [supplierId], references: [id])
+  status        IssuedChequeStatus @default(ISSUED)
+  clearedAt     DateTime?
+  clearEntryId  String?
+  reason        String?
+  createdAt     DateTime           @default(now())
+
+  payment SupplierPayment?
+
+  @@unique([tenantId, bankAccountId, number])
+  @@index([tenantId, status])
 }
