@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 
 const TABS = [
   { href: "/admin/books", label: "Accounts" },
@@ -21,8 +22,14 @@ const TABS = [
 export default function BooksNav() {
   const path = usePathname();
   const tab = [...TABS].reverse().find((t) => (t.href === "/admin/books" ? path === t.href : path.startsWith(t.href)));
+  const nav = useRef<HTMLElement>(null);
+  // On a phone most tabs are off-screen: bring the open one into view.
+  useEffect(() => {
+    const el = nav.current?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (nav.current && el) nav.current.scrollLeft = el.offsetLeft - nav.current.offsetLeft - (nav.current.clientWidth - el.clientWidth) / 2;
+  }, [path]);
   return (
-    <nav className="flex gap-1.5 overflow-x-auto pb-1" aria-label="Books">
+    <nav ref={nav} className="flex gap-1.5 overflow-x-auto pb-1" aria-label="Books">
       {TABS.map((t) => (
         <Link
           key={t.href}

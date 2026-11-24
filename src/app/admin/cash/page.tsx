@@ -350,7 +350,7 @@ function HandoverForm({ row, onCancel, onDone }: { row: Row; onCancel: () => voi
       <div className="space-y-2">
         {expenses.length > 0 && <p className="text-xs font-bold text-[var(--ink-2)]">Paid from this cash</p>}
         {expenses.map((x, i) => (
-          <div key={i} className="grid grid-cols-[1fr_6.5rem_auto] gap-2 items-center">
+          <div key={i} className="grid grid-cols-[1fr_5rem_auto] gap-2 items-center">
             <select className="input" value={x.code} onChange={(e) => setExp(i, { code: e.target.value })} aria-label="Expense head">
               <option value="">What for</option>
               {(heads ?? []).map((h) => (
