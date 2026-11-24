@@ -120,7 +120,10 @@ type Section = { lines: PlLine[]; total: number };
 async function plCore(ctx: Ctx, from: string, to: string, s: Start) {
   const rolled = (await rollAccounts(ctx, await sums(ctx, from, to), 3)).filter((r) => isPl(r.group) && (r.v[1] || r.v[2]));
   const sec = (g: AccountGroup, credit: boolean): Section => {
-    const lines = rolled.filter((r) => r.group === g).map((r) => ({ key: r.key, name: r.name, amount: credit ? r.v[2] - r.v[1] : r.v[1] - r.v[2], href: withPeriod(r, from, to) }));
+    const lines = rolled
+      .filter((r) => r.group === g)
+      .map((r) => ({ key: r.key, name: r.name, amount: credit ? r.v[2] - r.v[1] : r.v[1] - r.v[2], href: withPeriod(r, from, to) }))
+      .filter((l) => l.amount !== 0);
     return { lines, total: lines.reduce((a, l) => a + l.amount, 0) };
   };
   const salesRows = rolled.filter((r) => r.group === "SALES");
@@ -135,7 +138,13 @@ async function plCore(ctx: Ctx, from: string, to: string, s: Start) {
   const costOfGoods = open.value + purchases.total - close.value;
   const grossProfit = salesNet - costOfGoods - direct.total;
   const netProfit = grossProfit - indirect.total + otherIncome.total;
-  const warnings = [open.warning ? `Opening stock: ${open.warning}` : null, close.warning ? `Closing stock: ${close.warning}` : null].filter((w): w is string => !!w);
+  const warnings = [
+    open.warning ? `Opening stock: ${open.warning}` : null,
+    close.warning ? `Closing stock: ${close.warning}` : null,
+    costOfGoods < 0
+      ? `Cost of goods is below zero: the stock at the end is more than the stock at the start plus purchases. Some stock came in without a purchase bill, or the opening stock is missing (Opening balances).`
+      : null,
+  ].filter((w): w is string => !!w);
   return {
     from,
     to,
