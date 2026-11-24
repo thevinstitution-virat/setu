@@ -5,11 +5,13 @@ import { voucherDetail } from "@/lib/vouchers";
 import { ErrorCard } from "@/components/reports/Kit";
 import { showDay } from "@/components/books/fmt";
 import { formatINR } from "@/lib/money";
-import { fileUrl, Thumb } from "@/components/admin/AdminKit";
+import { Thumb } from "@/components/admin/AdminKit";
 import SharePdf from "@/components/reports/SharePdf";
 import CancelVoucher from "@/components/books/CancelVoucher";
 import { ledgerHref } from "@/lib/books";
 
+/** Same as AdminKit's fileUrl, which is client-only and can't be called while rendering on the server. */
+const fileUrl = (key: string) => `/api/files/${key.split("/").map(encodeURIComponent).join("/")}`;
 const ROLE = { ACCOUNT: "", MONEY: "", GST: "GST input credit", TDS: "TDS" } as const;
 
 /** One voucher: its lines as posted, how the money moved, slips, the bank line it was seen on, and cancel. */
