@@ -30,3 +30,36 @@ export function formatINR(p: Paise, opts?: { whole?: boolean; symbol?: boolean }
 export function gstOn(amount: Paise, rate: number): Paise {
   return Math.round((amount * rate) / 100);
 }
+
+/**
+ * GST already inside an amount that includes it. Worked out the way dealer
+ * billing software prints it: each half (CGST, SGST) is taken out of the line
+ * and rounded to the paisa, so the tax is always even and splits exactly.
+ * ₹3,088 at 5% → 2 × ₹73.52 = ₹147.04.
+ */
+export function gstInside(amount: Paise, rate: number): Paise {
+  if (rate <= 0) return 0;
+  return 2 * Math.round((amount * rate) / (2 * (100 + rate)));
+}
+
+export type LineMoney = { gross: Paise; discount: Paise; taxable: Paise; tax: Paise; total: Paise };
+
+/**
+ * One line's money. price and discount are as stored on the order: before
+ * GST, or including GST when `inclusive`. Either way gross and discount come
+ * back before GST, so gross − discount = taxable and taxable + tax = total
+ * always hold; with inclusive rates the total is exactly price × qty − discount.
+ */
+export function lineMoney(price: Paise, quantity: number, discount: Paise, gstRate: number, inclusive = false): LineMoney {
+  if (!inclusive || gstRate <= 0) {
+    const gross = price * quantity;
+    const taxable = gross - discount;
+    const tax = gstOn(taxable, gstRate);
+    return { gross, discount, taxable, tax, total: taxable + tax };
+  }
+  const total = price * quantity - discount;
+  const tax = gstInside(total, gstRate);
+  const taxable = total - tax;
+  const discountEx = discount ? Math.round((discount * 100) / (100 + gstRate)) : 0;
+  return { gross: taxable + discountEx, discount: discountEx, taxable, tax, total };
+}

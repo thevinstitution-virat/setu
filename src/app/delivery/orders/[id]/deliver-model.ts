@@ -1,4 +1,5 @@
 import { repriceOrder, shortCredit } from "@/lib/delivery-math";
+import { lineMoney } from "@/lib/money";
 import { SHORT_REASONS } from "@/lib/delivery-settings";
 import type { DeliveryInvoice } from "./DeliveryInvoiceCard";
 
@@ -48,7 +49,7 @@ export const shortReasonLabel = (r: string | null | undefined) =>
  * `full` is the value if everything is handed over.
  */
 export function orderAmount(
-  order: { totalAmount: number; deliveryCharge: number; deliveryGstRate: number },
+  order: { totalAmount: number; deliveryCharge: number; deliveryGstRate: number; taxInclusive?: boolean },
   items: DeliverItem[],
   lines: LineState,
   invoices: DeliveryInvoice[]
@@ -60,7 +61,8 @@ export function orderAmount(
     const credit = shortCredit(
       items.map((i) => {
         const ordered = orderedOf(i);
-        return { taxable: i.price * ordered - i.discount, gstRate: i.gstRate, quantity: ordered, short: ordered - deliveredOf(lines, i) };
+        const taxable = lineMoney(i.price, ordered, i.discount, i.gstRate, !!order.taxInclusive).taxable;
+        return { taxable, gstRate: i.gstRate, quantity: ordered, short: ordered - deliveredOf(lines, i) };
       })
     );
     return { invoiced, booked, full: booked, amount: booked - credit, anyShort };

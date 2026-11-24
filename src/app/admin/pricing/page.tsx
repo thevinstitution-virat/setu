@@ -478,7 +478,7 @@ function RetailerPanel({ id }: { id: string }) {
   const pricing = useFetch<{ retailer: RetailerPricing }>(`/api/admin/retailers/${id}/pricing`);
   const lists = useFetch<{ lists: PriceList[] }>("/api/admin/price-lists");
   const groups = useFetch<{ groups: GroupRow[] }>("/api/admin/groups");
-  const products = useFetch<{ products: ProductLite[] }>("/api/products");
+  const products = useFetch<{ products: ProductLite[]; ratesIncludeGst?: boolean }>("/api/products");
   const [version, setVersion] = useState(0);
   const [flash, setFlash] = useState<string | null>(null);
 
@@ -497,7 +497,7 @@ function RetailerPanel({ id }: { id: string }) {
     <div className="space-y-4">
       <Flash text={flash} />
       <ListAndGroups key={`lg-${r.priceListId}-${r.groups.map((g) => g.id).join()}`} r={r} lists={lists.data?.lists ?? []} groups={groups.data?.groups ?? []} onSaved={saved} />
-      <SpecialRates key={`sr-${r.prices.map((p) => `${p.productId}:${p.price}:${p.note}`).join()}`} r={r} products={products.data?.products ?? []} onSaved={saved} />
+      <SpecialRates key={`sr-${r.prices.map((p) => `${p.productId}:${p.price}:${p.note}`).join()}`} r={r} products={products.data?.products ?? []} inclusive={!!products.data?.ratesIncludeGst} onSaved={saved} />
       <ViewAsPanel retailerId={id} version={version} />
     </div>
   );
@@ -560,7 +560,7 @@ function ListAndGroups({ r, lists, groups, onSaved }: { r: RetailerPricing; list
   );
 }
 
-function SpecialRates({ r, products, onSaved }: { r: RetailerPricing; products: ProductLite[]; onSaved: (text: string) => void }) {
+function SpecialRates({ r, products, inclusive = false, onSaved }: { r: RetailerPricing; products: ProductLite[]; inclusive?: boolean; onSaved: (text: string) => void }) {
   const [rows, setRows] = useState<RateRow[]>(() =>
     r.prices.map((p) => ({
       productId: p.productId,
@@ -632,7 +632,7 @@ function SpecialRates({ r, products, onSaved }: { r: RetailerPricing; products: 
         <div className="divide-y divide-[var(--line)] rounded-xl border border-[var(--line)] bg-white/60">
           {rows.map((x) => {
             const p = readRupees(x.price);
-            const m = typeof p === "number" ? margin(p, x.gstRate, x.mrp) : null;
+            const m = typeof p === "number" ? margin(p, x.gstRate, x.mrp, inclusive) : null;
             const diff = typeof p === "number" && x.base > 0 ? Math.round(((p - x.base) / x.base) * 1000) / 10 : null;
             const changed = !x.orig || x.orig.price !== p || x.orig.note !== x.note.trim();
             return (

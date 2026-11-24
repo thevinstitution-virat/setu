@@ -1,10 +1,10 @@
 import type { Invoice, InvoiceLine, InvoiceType, Prisma } from "@/generated/prisma/client";
 import type { Tx } from "@/lib/db";
 import { MoneyError } from "@/lib/money-error";
-import { formatINR, gstOn } from "@/lib/money";
+import { formatINR, gstOn, lineMoney } from "@/lib/money";
 import { nextSequence } from "@/lib/orders";
 import { invoiceSettings, type InvoiceSettings } from "@/lib/invoice-settings";
-import { amountInWords, creditNoteDeadline, docNumber, fyCode, splitTax, uqc } from "@/lib/gst";
+import { amountInWords, creditNoteDeadline, docNumber, fyCode, runningNumber, splitTax, uqc } from "@/lib/gst";
 import { invoiceWebhook } from "@/lib/webhooks";
 
 /**
@@ -33,14 +33,46 @@ export const DOC_TITLE: Record<InvoiceType, string> = {
   DEBIT_NOTE: "Debit Note",
 };
 
-const prefixFor = (s: InvoiceSettings, type: InvoiceType) =>
+export const prefixFor = (s: InvoiceSettings, type: InvoiceType) =>
   ({ TAX_INVOICE: s.prefixes.tax, BILL_OF_SUPPLY: s.prefixes.bos, CREDIT_NOTE: s.prefixes.credit, DEBIT_NOTE: s.prefixes.debit })[type];
 
-/** Next gap-free number for a document type in the date's financial year. */
+/** Counter behind a running (not yearly) series. */
+export const runningKey = (type: InvoiceType) => `doc:${type}:run`;
+
+/**
+ * Next gap-free number for a document type: in the date's financial year
+ * (INV2627-00042), or from the running series (A004262).
+ */
 async function nextDocNumber(ctx: Ctx, s: InvoiceSettings, type: InvoiceType, date: Date) {
   const fy = fyCode(date);
+  if (s.numbering.style === "running") {
+    const seq = await nextSequence(ctx.tx, ctx.tenantId, runningKey(type));
+    return { fy, number: runningNumber(prefixFor(s, type), seq, s.numbering.digits) };
+  }
   const seq = await nextSequence(ctx.tx, ctx.tenantId, `doc:${type}:${fy}`);
   return { fy, number: docNumber(prefixFor(s, type), fy, seq) };
+}
+
+/** The number the next document of this type will get in the running series (null = nothing issued yet: starts at 1). */
+export async function nextRunningNumber(tx: Tx, tenantId: string, type: InvoiceType) {
+  const row = await tx.counter.findUnique({ where: { tenantId_key: { tenantId, key: runningKey(type) } } });
+  return (row?.value ?? 0) + 1;
+}
+
+/**
+ * Carry on an old book's series: the next document gets `next`. Only moves
+ * forward, so a number can never be issued twice.
+ */
+export async function setNextRunningNumber(tx: Tx, tenantId: string, type: InvoiceType, next: number) {
+  if (!Number.isInteger(next) || next < 1 || next > 99_999_999) throw new MoneyError("The next number must be a whole number from 1 to 99,999,999");
+  const current = await nextRunningNumber(tx, tenantId, type);
+  if (next < current) throw new MoneyError(`Numbers up to ${current - 1} are already used; the next number can't go back`, 409);
+  await tx.counter.upsert({
+    where: { tenantId_key: { tenantId, key: runningKey(type) } },
+    create: { tenantId, key: runningKey(type), value: next - 1 },
+    update: { value: next - 1 },
+  });
+  return next;
 }
 
 async function sellerOf(ctx: Ctx) {
@@ -100,9 +132,13 @@ type Draft = {
   discount: number;
   gstRate: number;
   tax: number;
+  /** Print details (no effect on money). */
+  inclRate?: number | null;
+  mrp?: number | null;
+  caseSize?: number | null;
 };
 
-function finalise(drafts: Draft[], interState: boolean) {
+export function finalise(drafts: Draft[], interState: boolean) {
   const lines = drafts.map((d, i) => {
     const taxable = d.gross - d.discount;
     const { cgst, sgst, igst } = splitTax(d.tax, interState);
@@ -126,6 +162,8 @@ export function orderDrafts(
     gstAmount: number;
     deliveryCharge: number;
     deliveryGstRate: number;
+    /** Item rates and discounts include GST. */
+    taxInclusive?: boolean;
     items: {
       id: string;
       productId: string;
@@ -134,16 +172,17 @@ export function orderDrafts(
       gstRate: number;
       discount: number;
       freeSchemeId: string | null;
-      product: { name: string; hsnCode: string | null; unit: string };
+      mrp?: number | null;
+      product: { name: string; hsnCode: string | null; unit: string; caseSize?: number | null };
     }[];
   },
   s: InvoiceSettings
 ): Draft[] {
+  const inclusive = !!order.taxInclusive;
   // Lines cut to nothing at delivery (invoice at delivery) don't appear.
   const drafts: Draft[] = order.items.filter((it) => it.quantity > 0).map((it) => {
     const free = !!it.freeSchemeId || it.price === 0;
-    const gross = free ? 0 : it.price * it.quantity;
-    const discount = free ? 0 : it.discount;
+    const m = free ? { gross: 0, discount: 0, tax: 0 } : lineMoney(it.price, it.quantity, it.discount, it.gstRate, inclusive);
     return {
       productId: it.productId,
       orderItemId: it.id,
@@ -154,11 +193,15 @@ export function orderDrafts(
       unit: uqc(it.product.unit),
       quantity: it.quantity,
       freeQty: free ? it.quantity : 0,
-      rate: free ? 0 : it.price,
-      gross,
-      discount,
+      // The invoice's rate is always before GST; with inclusive rates it is the line's taxable gross per unit.
+      rate: free ? 0 : inclusive && it.gstRate > 0 ? Math.round(m.gross / it.quantity) : it.price,
+      gross: m.gross,
+      discount: m.discount,
       gstRate: it.gstRate,
-      tax: gstOn(gross - discount, it.gstRate),
+      tax: m.tax,
+      inclRate: free ? 0 : inclusive ? it.price : null,
+      mrp: it.mrp ?? null,
+      caseSize: it.product.caseSize ?? null,
     };
   });
   if (order.deliveryCharge > 0) {
@@ -203,9 +246,12 @@ export async function issueSaleInvoice(ctx: Ctx, orderId: string, now = new Date
 
   const order = await ctx.tx.order.findUniqueOrThrow({
     where: { id: orderId },
-    include: { items: { include: { product: { select: { name: true, hsnCode: true, unit: true } } }, orderBy: [{ freeSchemeId: { sort: "asc", nulls: "first" } }, { id: "asc" }] } },
+    include: { items: { include: { product: { select: { name: true, hsnCode: true, unit: true, caseSize: true } } }, orderBy: [{ freeSchemeId: { sort: "asc", nulls: "first" } }, { id: "asc" }] } },
   });
   if (order.status === "CANCELLED") throw new MoneyError("A cancelled order can't be invoiced", 409);
+  const salesman = order.salesmanId
+    ? ((await ctx.tx.user.findUnique({ where: { id: order.salesmanId }, select: { name: true } }))?.name ?? null)
+    : null;
   const { seller, settings } = await sellerOf(ctx);
   const buyer = await buyerOf(ctx, order.retailerId, seller.stateCode);
   const drafts = orderDrafts(order, settings);
@@ -236,6 +282,7 @@ export async function issueSaleInvoice(ctx: Ctx, orderId: string, now = new Date
       sgst: f.sgst,
       igst: f.igst,
       total: f.total,
+      salesman,
       createdById: ctx.actorId,
       einvStatus: einvoiceRequired(settings, type, b2b, seller.gstin) ? "PENDING" : "NOT_REQUIRED",
       lines: { create: f.lines },
@@ -350,6 +397,8 @@ export async function issueNoteDoc(ctx: Ctx, input: NoteInput, now = new Date())
       discount: 0,
       gstRate: l.gstRate,
       tax,
+      mrp: l.mrp,
+      caseSize: l.caseSize,
     });
   }
   const f = finalise(drafts, original.interState);
@@ -416,7 +465,9 @@ export type InvoiceDoc = Invoice & {
   original: { id: string; number: string; date: Date } | null;
   notes: { id: string; type: InvoiceType; number: string; date: Date; total: number }[];
   order: { id: string; orderNumber: string; deliveryDate: Date | null; status: string } | null;
-  settings: Pick<InvoiceSettings, "terms" | "bankName" | "bankAccount" | "bankIfsc" | "upiQr" | "ewayThreshold">;
+  settings: Pick<InvoiceSettings, "terms" | "bankName" | "bankAccount" | "bankIfsc" | "upiQr" | "ewayThreshold" | "layout">;
+  /** Due date of this invoice's bill (sale invoices and debit notes). */
+  dueDate: Date | null;
   /** Still unpaid on this invoice's bill (sale invoices and debit notes), paise. */
   due: number | null;
   ewayNeeded: boolean;
@@ -436,7 +487,7 @@ export async function loadInvoiceDoc(tx: Tx, id: string): Promise<InvoiceDoc | n
   });
   if (!inv) return null;
   const s = invoiceSettings(inv.tenant.settings);
-  const bill = await tx.bill.findFirst({ where: { number: inv.number }, select: { amount: true, paid: true } });
+  const bill = await tx.bill.findFirst({ where: { number: inv.number }, select: { amount: true, paid: true, dueDate: true } });
   const { tenant: _t, ...rest } = inv;
   void _t;
   return {
@@ -446,7 +497,8 @@ export async function loadInvoiceDoc(tx: Tx, id: string): Promise<InvoiceDoc | n
     buyer: inv.buyer as unknown as Party,
     rates: rateSummary(inv.lines),
     words: amountInWords(inv.total),
-    settings: { terms: s.terms, bankName: s.bankName, bankAccount: s.bankAccount, bankIfsc: s.bankIfsc, upiQr: s.upiQr, ewayThreshold: s.ewayThreshold },
+    settings: { terms: s.terms, bankName: s.bankName, bankAccount: s.bankAccount, bankIfsc: s.bankIfsc, upiQr: s.upiQr, ewayThreshold: s.ewayThreshold, layout: s.layout },
+    dueDate: bill?.dueDate ?? null,
     due: bill ? bill.amount - bill.paid : null,
     ewayNeeded: (inv.type === "TAX_INVOICE" || inv.type === "BILL_OF_SUPPLY") && inv.total >= s.ewayThreshold && !inv.ewbNo,
   };

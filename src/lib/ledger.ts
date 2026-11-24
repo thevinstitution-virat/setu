@@ -249,6 +249,10 @@ async function createBill(
     creditDays: number;
     entryId: string;
     note?: string;
+    salesmanId?: string | null;
+    /** Imported bills: the old book's due date and what was already received on it. */
+    dueDate?: Date;
+    paid?: number;
   }
 ) {
   const date = b.date ?? new Date();
@@ -260,10 +264,12 @@ async function createBill(
       number: b.number ?? (await nextNumber(ctx, prefix)),
       orderId: b.orderId ?? null,
       date,
-      dueDate: addDays(date, b.creditDays),
+      dueDate: b.dueDate ?? addDays(date, b.creditDays),
       amount: b.amount,
+      paid: b.paid ?? 0,
       entryId: b.entryId,
       note: b.note,
+      salesmanId: b.salesmanId ?? null,
     },
   });
 }
@@ -633,6 +639,103 @@ export async function openingBalance(ctx: Ctx, retailerId: string, amount: numbe
   await allocateRetailer(ctx, retailerId);
 }
 
+export type OpeningBill = {
+  /** The old book's invoice number, kept as the bill number (A004081). */
+  number: string;
+  date: Date;
+  /** null = date + the shop's credit days. */
+  dueDate: Date | null;
+  /** Bill value and what was already received on it in the old book, paise. */
+  amount: number;
+  paid: number;
+  salesmanId: string | null;
+};
+
+/**
+ * Opening balance bill by bill, when moving a shop from another book: each
+ * open bill keeps its number, date, due date, value and part payment, so
+ * ageing, days overdue and the outstanding reports are right from day one.
+ * `advance` (paise) = money the shop paid that no bill has used yet.
+ * Same rule as openingBalance: once per shop, refused rows write nothing.
+ */
+export async function openingBills(ctx: Ctx, retailerId: string, bills: OpeningBill[], advance = 0, asOf = new Date()) {
+  if (!bills.length && advance <= 0) throw new MoneyError("Nothing to import for this shop");
+  if (!Number.isInteger(advance) || advance < 0) throw new MoneyError("Advance must be whole paise, 0 or more");
+  const numbers = new Set<string>();
+  for (const b of bills) {
+    if (!b.number.trim()) throw new MoneyError("Every bill needs its number");
+    if (numbers.has(b.number)) throw new MoneyError(`Bill ${b.number} is repeated`);
+    numbers.add(b.number);
+    if (!Number.isInteger(b.amount) || b.amount <= 0) throw new MoneyError(`Bill ${b.number}: value must be more than ₹0`);
+    if (!Number.isInteger(b.paid) || b.paid < 0 || b.paid >= b.amount) throw new MoneyError(`Bill ${b.number}: received must be less than the bill value`);
+    if (b.dueDate && b.dueDate < b.date) throw new MoneyError(`Bill ${b.number}: due date is before the bill date`);
+  }
+  await lockRetailer(ctx, retailerId);
+  const existing = await ctx.tx.journalEntry.count({ where: { retailerId, kind: "OPENING", reversedBy: null } });
+  if (existing) throw new MoneyError("This shop already has an opening balance", 409);
+  if (numbers.size) {
+    const taken = await ctx.tx.bill.findFirst({ where: { number: { in: [...numbers] } }, select: { number: true } });
+    if (taken) throw new MoneyError(`Bill number ${taken.number} is already in VBiz Pro`, 409);
+  }
+  const { terms } = await loadTerms(ctx, retailerId);
+
+  const dues = bills.reduce((a, b) => a + b.amount - b.paid, 0);
+  if (dues > 0) {
+    const entry = await post(ctx, {
+      kind: "OPENING",
+      memo: `Opening balance: ${bills.length} bill${bills.length === 1 ? "" : "s"} from the old book`,
+      retailerId,
+      occurredAt: asOf,
+      lines: [
+        { account: { type: "RECEIVABLE", retailerId }, amount: dues },
+        { account: { type: "OPENING_EQUITY" }, amount: -dues },
+      ],
+    });
+    for (const b of [...bills].sort((x, y) => x.date.getTime() - y.date.getTime())) {
+      await createBill(ctx, {
+        retailerId,
+        kind: "OPENING",
+        number: b.number,
+        date: b.date,
+        dueDate: b.dueDate ?? undefined,
+        creditDays: terms.creditDays,
+        amount: b.amount,
+        paid: b.paid,
+        entryId: entry.id,
+        note: b.paid ? `Opening bill (₹${(b.paid / 100).toFixed(2)} received in the old book)` : "Opening bill",
+        salesmanId: b.salesmanId,
+      });
+    }
+  }
+  if (advance > 0) {
+    const entry = await post(ctx, {
+      kind: "OPENING",
+      memo: "Opening advance from the old book",
+      retailerId,
+      occurredAt: asOf,
+      lines: [
+        { account: { type: "RECEIVABLE", retailerId }, amount: -advance },
+        { account: { type: "OPENING_EQUITY" }, amount: advance },
+      ],
+    });
+    await ctx.tx.payment.create({
+      data: {
+        number: await nextNumber(ctx, "CN"),
+        retailerId,
+        method: "CREDIT_NOTE",
+        state: "CONFIRMED",
+        amount: advance,
+        note: "Opening advance (old book)",
+        collectedById: ctx.actorId,
+        collectedAt: asOf,
+        entryId: entry.id,
+      },
+    });
+  }
+  await allocateRetailer(ctx, retailerId);
+  return { bills: bills.length, dues, advance };
+}
+
 // ───────────────────────────── orders ─────────────────────────────
 
 /**
@@ -781,7 +884,7 @@ export async function onOrderDelivered(
  * Idempotent: an order that is already billed is left alone.
  */
 export async function bookSale(ctx: Ctx, orderId: string, now = new Date()) {
-  const order = await ctx.tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { id: true, retailerId: true, orderNumber: true } });
+  const order = await ctx.tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { id: true, retailerId: true, orderNumber: true, salesmanId: true } });
   await lockRetailer(ctx, order.retailerId);
   const billed = await ctx.tx.bill.findUnique({ where: { orderId } });
   if (billed) {
@@ -811,6 +914,7 @@ export async function bookSale(ctx: Ctx, orderId: string, now = new Date()) {
     amount: invoice.total,
     creditDays: terms.mode === "PREPAID" ? 0 : terms.creditDays,
     entryId: sale.id,
+    salesmanId: order.salesmanId,
   });
   const linked = await ctx.tx.invoice.update({ where: { id: invoice.id }, data: { entryId: sale.id } });
   return { invoice: linked, booked: true };

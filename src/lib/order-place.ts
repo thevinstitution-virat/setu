@@ -2,6 +2,7 @@ import { MoneyError, lockRetailer, onOrderPlaced, type Ctx } from "@/lib/ledger"
 import { nextOrderNumber } from "@/lib/orders";
 import { quoteCart, retailerPricingCtx, type CartItemInput, type Quote } from "@/lib/pricing";
 import type { Tx } from "@/lib/db";
+import { invoiceSettings } from "@/lib/invoice-settings";
 
 /**
  * Place an order from a cart (inside withMoney). Prices, schemes, delivery
@@ -32,12 +33,15 @@ export async function placeOrder(
   const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { settings: true } });
   const quote = await quoteCart(tx, tenant.settings, r, { items: p.items, coupon: p.coupon, deliveryDate: p.deliveryDate, skipStockCheck: p.skipStockCheck }, p.now);
   if (quote.problems.length) throw new MoneyError(quote.problems[0], 400);
+  const salesmanId = await defaultSalesman(tx, p.retailerId, p.placedById);
 
   const created = await tx.order.create({
     data: {
       orderNumber: await nextOrderNumber(tx, ctx.tenantId),
       retailerId: p.retailerId,
       placedById: p.placedById,
+      salesmanId,
+      taxInclusive: invoiceSettings(tenant.settings).ratesIncludeGst,
       grossAmount: quote.grossAmount,
       discountAmount: quote.discountAmount,
       deliveryCharge: quote.deliveryCharge,
@@ -56,7 +60,8 @@ export async function placeOrder(
             quantity: l.quantity,
             price: l.price,
             gstRate: l.gstRate,
-            discount: l.discount,
+            // As charged against the rate (includes GST when the rates do); the invoice works GST out from it.
+            discount: l.itemDiscount,
             mrp: l.mrp,
             cases: l.cases,
             caseSize: l.cases ? l.caseSize : null,
@@ -95,6 +100,19 @@ export async function placeOrder(
   }
   const credit = await onOrderPlaced(ctx, created);
   return { order: { ...created, creditHold: credit.hold, creditHoldReason: credit.reason }, quote };
+}
+
+/**
+ * Who gets the order on their book: the sales agent who placed it, otherwise
+ * the shop's own sales agent (shop, office or driver orders). null = none.
+ */
+export async function defaultSalesman(tx: Tx, retailerId: string, placedById: string | null) {
+  if (placedById) {
+    const placer = await tx.user.findUnique({ where: { id: placedById }, select: { role: true } });
+    if (placer?.role === "SALES_AGENT") return placedById;
+  }
+  const shop = await tx.retailerProfile.findUnique({ where: { id: retailerId }, select: { salesAgent: { select: { userId: true } } } });
+  return shop?.salesAgent?.userId ?? null;
 }
 
 /** Order cancelled: give the scheme budget back and free the retailer's use. */

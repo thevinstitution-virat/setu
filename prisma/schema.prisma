@@ -359,6 +359,10 @@ model RetailerProfile {
   fssai        String?
   /// Shop front photo (storage key), e.g. from the field store form.
   photoKey     String?
+  /// Person to ask for at the shop when it isn't the owner (printed on outstanding reports).
+  contactName  String?
+  /// Second number (landline or another mobile). Not a sign-in number.
+  altPhone     String?
 
   orders          Order[]
   invoices        Invoice[]
@@ -575,6 +579,10 @@ model Order {
   spot             Boolean         @default(false)
   /// Total as ordered, kept when delivery cut the order short before invoicing (invoice at delivery).
   orderedTotal     Int?
+  /// Item rates and discounts on this order include GST (settings.invoice.ratesIncludeGst at order time).
+  taxInclusive     Boolean         @default(false)
+  /// Salesman (User id) credited with this order; printed on the bill and used by agent-wise reports.
+  salesmanId       String?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
@@ -1138,12 +1146,15 @@ model Bill {
   settled    Boolean         @default(false)
   note       String?
   entryId    String?
+  /// Salesman (User id) on this bill: from the order, or given when bills were imported.
+  salesmanId String?
   createdAt  DateTime        @default(now())
 
   allocations PaymentAllocation[]
 
   @@unique([tenantId, number])
   @@index([tenantId, retailerId, settled, date])
+  @@index([tenantId, salesmanId, settled])
 }
 
 model Payment {
@@ -1513,6 +1524,8 @@ model Invoice {
   total         Int
   /// The ledger entry this document posted.
   entryId       String?
+  /// Salesman's name at issue time (printed on the bill).
+  salesman      String?
   createdById   String?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
@@ -1572,6 +1585,12 @@ model InvoiceLine {
   sgst           Int
   igst           Int
   total          Int
+  /// Rate per unit including GST, when the order's rates included GST (printed as the bill rate).
+  inclRate       Int?
+  /// MRP per unit at sale time, paise.
+  mrp            Int?
+  /// Units per case at sale time (prints cases + loose pieces).
+  caseSize       Int?
 
   @@index([tenantId, invoiceId])
   @@index([tenantId, originalLineId])

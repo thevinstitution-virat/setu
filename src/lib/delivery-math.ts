@@ -1,4 +1,4 @@
-import { gstOn } from "@/lib/money";
+import { gstOn, lineMoney } from "@/lib/money";
 
 /**
  * Pure delivery maths, safe to import in the browser (the driver's screen
@@ -24,7 +24,7 @@ export type DeliveryItem = {
  * Same rounding as the cart quote, so the invoice check still passes.
  */
 export function repriceOrder(
-  order: { deliveryCharge: number; deliveryGstRate: number },
+  order: { deliveryCharge: number; deliveryGstRate: number; taxInclusive?: boolean },
   lines: { item: DeliveryItem; delivered: number }[]
 ) {
   const items = lines.map(({ item, delivered }) => {
@@ -34,9 +34,10 @@ export function repriceOrder(
     return { id: item.id, quantity: delivered, discount, cases, price: item.price, gstRate: item.gstRate, free: !!item.freeSchemeId || item.price === 0 };
   });
   const paid = items.filter((i) => !i.free);
-  const grossAmount = paid.reduce((a, i) => a + i.price * i.quantity, 0);
-  const discountAmount = paid.reduce((a, i) => a + i.discount, 0);
-  const goodsTax = paid.reduce((a, i) => a + gstOn(i.price * i.quantity - i.discount, i.gstRate), 0);
+  const money = paid.map((i) => lineMoney(i.price, i.quantity, i.discount, i.gstRate, !!order.taxInclusive));
+  const grossAmount = money.reduce((a, m) => a + m.gross, 0);
+  const discountAmount = money.reduce((a, m) => a + m.discount, 0);
+  const goodsTax = money.reduce((a, m) => a + m.tax, 0);
   const subtotal = grossAmount - discountAmount + order.deliveryCharge;
   const gstAmount = goodsTax + gstOn(order.deliveryCharge, order.deliveryGstRate);
   return { items, grossAmount, discountAmount, subtotal, gstAmount, totalAmount: subtotal + gstAmount };

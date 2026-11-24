@@ -1,4 +1,4 @@
-import { formatINR, gstOn } from "@/lib/money";
+import { formatINR, lineMoney } from "@/lib/money";
 import { formatDay, qtyLabel } from "./format";
 
 /**
@@ -30,14 +30,15 @@ export type OrderTotals = {
   totalAmount: number;
   couponCode?: string | null;
   deliveryDate?: string | Date | null;
+  /** Item rates include GST. */
+  taxInclusive?: boolean | null;
 };
 
 export const isFreeLine = (i: Pick<OrderLineItem, "price" | "freeSchemeId">) => i.price === 0 && !!i.freeSchemeId;
 
-/** Line value after scheme discount, with GST. */
-export function lineTotal(i: OrderLineItem): number {
-  const taxable = i.price * i.quantity - (i.discount ?? 0);
-  return taxable + gstOn(taxable, i.gstRate);
+/** Line value after scheme discount, with GST. inclusive: the rate already includes GST. */
+export function lineTotal(i: OrderLineItem, inclusive = false): number {
+  return lineMoney(i.price, i.quantity, i.discount ?? 0, i.gstRate, inclusive).total;
 }
 
 export function OrderMeta({ order }: { order: Pick<OrderTotals, "couponCode" | "deliveryDate"> }) {
@@ -93,13 +94,13 @@ export default function OrderLines({
               <p className="text-xs text-[var(--muted)] mt-0.5">
                 {qtyLabel(i.quantity, i.product.unit, i.cases, i.caseSize, i.product.caseUnit)} · {formatINR(i.price)}
                 {i.product.unit ? ` / ${i.product.unit}` : ""}
-                {i.gstRate > 0 && ` · GST ${i.gstRate}%`}
+                {i.gstRate > 0 && (order.taxInclusive ? ` · incl. GST ${i.gstRate}%` : ` · GST ${i.gstRate}%`)}
               </p>
               {(i.discount ?? 0) > 0 && (
                 <p className="text-xs font-semibold text-[var(--mint-text)] mt-0.5">Scheme discount −{formatINR(i.discount!)}</p>
               )}
             </div>
-            <span className="shrink-0 font-semibold">{formatINR(lineTotal(i))}</span>
+            <span className="shrink-0 font-semibold">{formatINR(lineTotal(i, !!order.taxInclusive))}</span>
           </div>
         ))}
         {!freeCallout &&

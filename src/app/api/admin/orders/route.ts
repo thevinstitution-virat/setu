@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   const raw = url.searchParams.get("status");
   const status = raw && (STATUSES as string[]).includes(raw) ? (raw as OrderStatus) : null;
 
-  const [orders, byStatus] = await Promise.all([
+  const [orders, byStatus, salesmen] = await Promise.all([
     db.order.findMany({
       where: status ? { status } : {},
       orderBy: { createdAt: "desc" },
@@ -31,8 +31,10 @@ export async function GET(req: Request) {
     }),
     // How many orders each status has, for the page's tabs.
     db.order.groupBy({ by: ["status"], _count: true }),
+    // Who an order can be credited to (salesman on the bill and in the outstanding reports).
+    db.user.findMany({ where: { active: true, role: { in: ["SALES_AGENT", "SUPERVISOR"] } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   const counts = Object.fromEntries(STATUSES.map((s) => [s, byStatus.find((g) => g.status === s)?._count ?? 0]));
-  return NextResponse.json({ orders, counts });
+  return NextResponse.json({ orders, counts, salesmen });
 }

@@ -7,6 +7,7 @@ import { cartRetailer } from "@/lib/cart-api";
 import { stockBadges } from "@/lib/stock";
 import { automationSettings } from "@/lib/automation-settings";
 import { usualOrderFor } from "@/lib/automation";
+import { invoiceSettings } from "@/lib/invoice-settings";
 
 /**
  * The storefront for one retailer: products they can see at their rates,
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
         where: { id: r.id },
         select: { id: true, outletName: true, area: { select: { name: true } }, priceList: { select: { name: true } } },
       }),
-      catalogueFor(tx, r),
+      catalogueFor(tx, r, { inclusive: invoiceSettings(tenant.settings).ratesIncludeGst }),
       schemesFor(tx, r, now),
       tx.category.findMany({ where: { active: true }, orderBy: [{ sort: "asc" }, { name: "asc" }], select: { id: true, name: true, parentId: true, imageKey: true } }),
       tx.brand.findMany({ where: { active: true }, orderBy: [{ sort: "asc" }, { name: "asc" }], select: { id: true, name: true, logoKey: true } }),

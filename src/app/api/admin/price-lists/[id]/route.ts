@@ -4,6 +4,7 @@ import { audit, requestIp } from "@/lib/audit";
 import { withTenantTx } from "@/lib/db";
 import { bad, optText, ownIds, paise, text } from "@/lib/catalogue-api";
 import { marginPct } from "@/lib/pricing";
+import { invoiceSettings } from "@/lib/invoice-settings";
 
 /** The list with every active product: default rate, this list's rate (or null), margin. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -18,12 +19,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     select: { id: true, name: true, sku: true, unit: true, price: true, mrp: true, gstRate: true, category: { select: { name: true } }, brand: { select: { name: true } } },
   });
   const rate = new Map(list.items.map((i) => [i.productId, i.price]));
+  const inclusive = invoiceSettings(auth.tenant.settings).ratesIncludeGst;
   return NextResponse.json({
     list: { id: list.id, name: list.name, description: list.description, active: list.active, retailers: list._count.retailers },
     products: products.map((p) => {
       const listPrice = rate.get(p.id) ?? null;
-      return { ...p, listPrice, margin: marginPct(listPrice ?? p.price, p.gstRate, p.mrp) };
+      return { ...p, listPrice, margin: marginPct(listPrice ?? p.price, p.gstRate, p.mrp, inclusive) };
     }),
+    ratesIncludeGst: inclusive,
   });
 }
 

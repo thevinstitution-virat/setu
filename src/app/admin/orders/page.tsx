@@ -27,9 +27,12 @@ type Order = OrderTotals & {
   delivery: { deliveryAgent: { id: string; user: { name: string } } } | null;
   /** The sale invoice, once issued (at most one). */
   invoices: { id: string; number: string }[];
+  /** Salesman credited with the sale (User id). */
+  salesmanId: string | null;
 };
 
 type Agent = { id: string; user: { name: string } };
+type Salesman = { id: string; name: string };
 
 const FILTERS: (OrderStatus | "ALL")[] = ["ALL", "PLACED", "CONFIRMED", "PACKED", "OUT_FOR_DELIVERY", "DELIVERED", "CANCELLED"];
 const STEPS: OrderStatus[] = ["PLACED", "CONFIRMED", "PACKED", "OUT_FOR_DELIVERY", "DELIVERED"];
@@ -51,6 +54,7 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
   const [orders, setOrders] = useState<Order[]>([]);
   const [counts, setCounts] = useState<Partial<Record<OrderStatus, number>>>({});
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [salesmen, setSalesmen] = useState<Salesman[]>([]);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>(
     typeof initialStatus === "string" && (FILTERS as string[]).includes(initialStatus) ? (initialStatus as OrderStatus) : "ALL"
   );
@@ -59,7 +63,7 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
   const [busyId, setBusyId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   /** Last failed action, shown in that order's panel. */
-  const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
+  const [actionError, setActionError] = useState<{ id: string; message: string; ok?: boolean } | null>(null);
 
   async function load() {
     const qs = filter === "ALL" ? "" : `?status=${filter}`;
@@ -70,6 +74,7 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
       const list: Order[] = o.orders ?? [];
       setOrders(list);
       setCounts(o.counts ?? {});
+      setSalesmen(o.salesmen ?? []);
       setAgents(aRes.ok ? (a.agents ?? []) : []);
       setLoadError(null);
       // Opened from a link to one order (dashboard): show it straight away.
@@ -97,10 +102,9 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setActionError({ id, message: data.error ?? "Something went wrong" });
-      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setActionError({ id, message: data.error ?? "Something went wrong" });
+      else if (data.note) setActionError({ id, message: data.note, ok: true });
     } catch {
       setActionError({ id, message: "Network error. Try again." });
     }
@@ -115,6 +119,7 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
     assign: (id: string, deliveryAgentId: string) => {
       if (deliveryAgentId) send(id, `/api/orders/${id}/assign-delivery`, "POST", { deliveryAgentId });
     },
+    salesman: (id: string, salesmanId: string | null) => send(id, `/api/orders/${id}/salesman`, "POST", { salesmanId }),
   };
 
   const needle = q.trim().toLowerCase();
@@ -277,8 +282,10 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
             key={selected.id}
             order={selected}
             agents={agents}
+            salesmen={salesmen}
             busy={busyId === selected.id}
-            error={actionError?.id === selected.id ? actionError.message : null}
+            error={actionError?.id === selected.id && !actionError.ok ? actionError.message : null}
+            note={actionError?.id === selected.id && actionError.ok ? actionError.message : null}
             actions={actions}
             onClose={() => setSelectedId(null)}
           />
@@ -297,20 +304,25 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
 function OrderPanel({
   order: o,
   agents,
+  salesmen,
   busy,
   error,
+  note,
   actions,
   onClose,
 }: {
   order: Order;
   agents: Agent[];
+  salesmen: Salesman[];
   busy: boolean;
   error: string | null;
+  note: string | null;
   actions: {
     advance: (id: string) => void;
     approveCredit: (id: string) => void;
     cancel: (id: string) => void;
     assign: (id: string, agentId: string) => void;
+    salesman: (id: string, salesmanId: string | null) => void;
   };
   onClose: () => void;
 }) {
@@ -419,11 +431,34 @@ function OrderPanel({
             </div>
           )}
 
+          {o.status !== "CANCELLED" && (
+            <label className="block">
+              <span className="block text-xs font-semibold text-[var(--muted)] mb-1">Salesman</span>
+              <select
+                className="input !py-2.5"
+                value={o.salesmanId ?? ""}
+                disabled={busy}
+                onChange={(e) => actions.salesman(o.id, e.target.value || null)}
+              >
+                <option value="">No salesman</option>
+                {/* Someone no longer active still shows while the order is theirs. */}
+                {o.salesmanId && !salesmen.some((s) => s.id === o.salesmanId) && <option value={o.salesmanId}>Former salesman</option>}
+                {salesmen.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <span className="block text-xs text-[var(--muted)] mt-1">Printed on the bill and used in the salesman-wise outstanding.</span>
+            </label>
+          )}
+
           {error && (
             <p className="text-sm text-[#a8281e]" role="alert">
               {error}
             </p>
           )}
+          {note && <p className="text-sm text-[var(--mint-text)]">{note}</p>}
 
           <div>
             <h3 className="text-xs font-bold uppercase tracking-[.05em] text-[var(--muted)] mb-2">

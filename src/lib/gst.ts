@@ -153,6 +153,16 @@ export function docNumber(prefix: string, fy: string, seq: number) {
   return n;
 }
 
+/**
+ * A running series that keeps counting across financial years: <prefix><seq>
+ * padded to `digits`, e.g. A004262 (still unique within every year, as GST needs).
+ */
+export function runningNumber(prefix: string, seq: number, digits: number) {
+  const n = `${prefix}${String(seq).padStart(digits, "0")}`;
+  if (n.length > 16) throw new Error(`Document number ${n} is longer than 16 characters`);
+  return n;
+}
+
 export const PREFIX_RE = /^[A-Z][A-Z0-9/]{0,4}$/;
 
 /** Unit name → GST Unique Quantity Code. */

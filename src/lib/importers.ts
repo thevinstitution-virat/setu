@@ -7,7 +7,8 @@ import { toPaise } from "@/lib/money";
  * retailers by phone, products by SKU.
  */
 
-export type ImportType = "retailers" | "products" | "balances" | "prices";
+export type ImportType = "retailers" | "products" | "balances" | "prices" | "bills";
+export const IMPORT_TYPES: ImportType[] = ["retailers", "products", "balances", "prices", "bills"];
 export type Row = Record<string, string>;
 export type RowError = { row: number; message: string };
 
@@ -15,9 +16,10 @@ export const MAX_ROWS = 5000;
 
 export const TEMPLATES: Record<ImportType, { columns: string[]; required: string[]; example: string[] }> = {
   retailers: {
-    columns: ["outlet_name", "phone", "shop_number", "complex_name", "pin_code", "region", "area", "sales_agent"],
-    required: ["outlet_name", "phone", "pin_code", "region", "area"],
-    example: ["Agarwal General Store", "9876543210", "G-12", "Shree Complex", "400058", "Mumbai", "Andheri", "Test agent"],
+    // phone is optional: a shop without one is matched by outlet_name + area. pin_code blank = the business's own PIN.
+    columns: ["outlet_name", "phone", "shop_number", "complex_name", "pin_code", "region", "area", "sales_agent", "contact_name", "alt_phone"],
+    required: ["outlet_name", "region", "area"],
+    example: ["Agarwal General Store", "9876543210", "G-12", "Shree Complex", "400058", "Mumbai", "Andheri", "Test agent", "Ramesh", "02226345678"],
   },
   products: {
     columns: ["name", "sku", "category", "unit", "price", "mrp", "gst_rate", "special_offer", "brand", "hsn_code", "name_hi", "case_unit", "case_size", "moq"],
@@ -35,6 +37,14 @@ export const TEMPLATES: Record<ImportType, { columns: string[]; required: string
     columns: ["price_list", "phone", "sku", "price"],
     required: ["sku", "price"],
     example: ["Wholesale", "", "BEV-001", "80"],
+  },
+  bills: {
+    // Open bills from the old book (e.g. its "debtors outstanding" report), one row per bill.
+    // The shop is found by phone, else by party (+ area when two shops share a name).
+    // A row with no invoice_no and a negative bill_value is money the shop paid in advance.
+    columns: ["party", "area", "phone", "invoice_no", "date", "bill_value", "received", "due_date", "salesman"],
+    required: ["party", "bill_value"],
+    example: ["Shree Ganesh Kirana", "Station Road", "9876543210", "A004231", "21/11/2026", "9520", "0", "21/11/2026", "Ravi Sales"],
   },
 };
 
@@ -166,14 +176,21 @@ export function cleanPhone(raw: string) {
 export type RetailerRow = {
   row: number;
   outletName: string;
-  phone: string;
+  /** null = no mobile number: the shop is matched by outlet name + area. */
+  phone: string | null;
   shopNumber: string;
   complexName: string;
+  /** "" = use the business's own PIN code. */
   pinCode: string;
   region: string;
   area: string;
   salesAgent: string;
+  contactName: string | null;
+  altPhone: string | null;
 };
+
+/** Key for a shop without a phone: outlet name + area, ignoring case and extra spaces. */
+export const shopKey = (outletName: string, area: string) => `${outletName.trim().replace(/\s+/g, " ").toLowerCase()}|${area.trim().replace(/\s+/g, " ").toLowerCase()}`;
 
 export type ProductRow = {
   row: number;
@@ -214,21 +231,28 @@ export function validateRetailers(rows: Row[]): { valid: RetailerRow[]; errors: 
     const row = i + 2;
     const miss = missing(r, TEMPLATES.retailers.required);
     if (miss.length) return errors.push({ row, message: `Missing ${miss.join(", ")}` });
-    const phone = cleanPhone(r.phone);
-    if (!/^[6-9]\d{9}$/.test(phone)) return errors.push({ row, message: `Phone "${r.phone}" is not a 10-digit mobile number` });
-    if (!/^\d{6}$/.test(r.pin_code)) return errors.push({ row, message: `PIN code "${r.pin_code}" must be 6 digits` });
-    if (seen.has(phone)) return errors.push({ row, message: `Phone ${phone} is repeated (first on row ${seen.get(phone)})` });
-    seen.set(phone, row);
+    const phone = (r.phone ?? "").trim() ? cleanPhone(r.phone) : null;
+    if (phone !== null && !/^[6-9]\d{9}$/.test(phone)) return errors.push({ row, message: `Phone "${r.phone}" is not a 10-digit mobile number` });
+    const pin = (r.pin_code ?? "").trim();
+    if (pin && !/^\d{6}$/.test(pin)) return errors.push({ row, message: `PIN code "${r.pin_code}" must be 6 digits` });
+    const key = phone ?? shopKey(r.outlet_name, r.area);
+    if (seen.has(key)) {
+      return errors.push({ row, message: phone ? `Phone ${phone} is repeated (first on row ${seen.get(key)})` : `${r.outlet_name} in ${r.area} is repeated (first on row ${seen.get(key)})` });
+    }
+    seen.set(key, row);
+    const alt = (r.alt_phone ?? "").replace(/[^\d+\-\s]/g, "").trim().slice(0, 20);
     valid.push({
       row,
-      outletName: r.outlet_name,
+      outletName: r.outlet_name.trim(),
       phone,
       shopNumber: r.shop_number ?? "",
       complexName: r.complex_name ?? "",
-      pinCode: r.pin_code,
-      region: r.region,
-      area: r.area,
+      pinCode: pin,
+      region: r.region.trim(),
+      area: r.area.trim(),
       salesAgent: r.sales_agent ?? "",
+      contactName: (r.contact_name ?? "").trim().slice(0, 80) || null,
+      altPhone: alt || null,
     });
   });
   return { valid, errors };
@@ -331,6 +355,66 @@ export function validateBalances(rows: Row[], today = new Date()): { valid: Bala
     }
     seen.set(phone, row);
     valid.push({ row, phone, amount, asOf, note: (r.note ?? "").slice(0, 200) });
+  });
+  return { valid, errors };
+}
+
+export type BillRow = {
+  row: number;
+  party: string;
+  area: string;
+  phone: string | null;
+  /** null with a negative amount = advance. */
+  number: string | null;
+  date: Date | null;
+  dueDate: Date | null;
+  /** Bill value, paise (negative = advance). */
+  amount: number;
+  /** Already received in the old book, paise. */
+  paid: number;
+  salesman: string;
+};
+
+/** Open bills from the old book, one row per bill (see TEMPLATES.bills). */
+export function validateBills(rows: Row[], today = new Date()): { valid: BillRow[]; errors: RowError[] } {
+  const valid: BillRow[] = [];
+  const errors: RowError[] = [];
+  const seen = new Map<string, number>();
+  rows.forEach((r, i) => {
+    const row = i + 2;
+    const miss = missing(r, TEMPLATES.bills.required);
+    if (miss.length) return errors.push({ row, message: `Missing ${miss.join(", ")}` });
+    const phone = (r.phone ?? "").trim() ? cleanPhone(r.phone) : null;
+    if (phone !== null && !/^[6-9]\d{9}$/.test(phone)) return errors.push({ row, message: `Phone "${r.phone}" is not a 10-digit mobile number` });
+    let amount: number, paid: number;
+    try {
+      amount = toPaise(r.bill_value);
+      paid = (r.received ?? "").trim() ? toPaise(r.received) : 0;
+    } catch {
+      return errors.push({ row, message: "bill_value and received must be numbers in rupees" });
+    }
+    const number = (r.invoice_no ?? "").trim().toUpperCase() || null;
+    if (!number) {
+      if (amount >= 0) return errors.push({ row, message: "Missing invoice_no (only an advance, a negative bill_value, may leave it blank)" });
+      valid.push({ row, party: r.party.trim(), area: (r.area ?? "").trim(), phone, number: null, date: null, dueDate: null, amount, paid: 0, salesman: "" });
+      return;
+    }
+    if (!/^[A-Z0-9/-]{1,16}$/.test(number)) return errors.push({ row, message: `Invoice number "${r.invoice_no}" may have only letters, digits, / and - (16 at most)` });
+    if (seen.has(number)) return errors.push({ row, message: `Invoice ${number} is repeated (first on row ${seen.get(number)})` });
+    if (amount <= 0) return errors.push({ row, message: "bill_value must be more than 0" });
+    if (paid < 0) return errors.push({ row, message: "received can't be negative" });
+    if (paid >= amount) return errors.push({ row, message: "received is the whole bill: it isn't outstanding (leave the row out)" });
+    const date = parseIndianDate(r.date ?? "");
+    if (!date) return errors.push({ row, message: `Date "${r.date ?? ""}" should look like 21/11/2026 or 2026-11-21` });
+    if (date > today) return errors.push({ row, message: "Date is in the future" });
+    let dueDate: Date | null = null;
+    if ((r.due_date ?? "").trim()) {
+      dueDate = parseIndianDate(r.due_date);
+      if (!dueDate) return errors.push({ row, message: `Due date "${r.due_date}" should look like 21/11/2026 or 2026-11-21` });
+      if (dueDate < date) return errors.push({ row, message: "Due date is before the bill date" });
+    }
+    seen.set(number, row);
+    valid.push({ row, party: r.party.trim(), area: (r.area ?? "").trim(), phone, number, date, dueDate, amount, paid, salesman: (r.salesman ?? "").trim() });
   });
   return { valid, errors };
 }

@@ -19,7 +19,7 @@ type Result = {
 const TYPES = {
   retailers: {
     label: "Retailers",
-    hint: "outlet_name, phone, shop_number, complex_name, pin_code, region, area, sales_agent (login id). Existing phones are updated; new regions and areas are created.",
+    hint: "outlet_name, region, area, plus phone, contact_name, alt_phone, shop_number, complex_name, pin_code, sales_agent (login id) when you have them. A shop without a phone is matched by name + area; a blank PIN uses your business's PIN. Existing shops are updated; new regions and areas are created.",
   },
   products: {
     label: "Products",
@@ -32,6 +32,10 @@ const TYPES = {
   prices: {
     label: "Prices",
     hint: "price_list or phone, sku, price (₹ before GST). With price_list: the rate in that list (new lists are created). With phone: that retailer's special rate. Import products first.",
+  },
+  bills: {
+    label: "Open bills",
+    hint: "party, area, phone, invoice_no, date, bill_value (₹), received (₹ already paid on it), due_date, salesman. One row per unpaid bill from your old software's outstanding report; each keeps its number, date and due date, so ageing and salesman-wise outstanding carry on. A row with no invoice_no and a negative bill_value is an advance. All of a shop's bills go in together, once. Import retailers first.",
   },
 } as const;
 

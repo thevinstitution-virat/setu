@@ -757,6 +757,10 @@ type GstForm = {
   scheme: InvoiceSettings["scheme"];
   issueAt: InvoiceSettings["issueAt"];
   prefixes: InvoiceSettings["prefixes"];
+  ratesIncludeGst: boolean;
+  layout: InvoiceSettings["layout"];
+  numberingStyle: InvoiceSettings["numbering"]["style"];
+  numberingDigits: string;
   city: string;
   pinCode: string;
   terms: string;
@@ -772,7 +776,7 @@ type GstForm = {
 };
 
 const BUSINESS_KEYS = ["legalName", "gstin", "stateCode", "address", "phone"] as const;
-const INVOICE_KEYS = ["scheme", "issueAt", "city", "pinCode", "terms", "bankName", "bankAccount", "bankIfsc", "upiQr", "deliverySac"] as const;
+const INVOICE_KEYS = ["scheme", "issueAt", "ratesIncludeGst", "layout", "city", "pinCode", "terms", "bankName", "bankAccount", "bankIfsc", "upiQr", "deliverySac"] as const;
 const STATE_OPTIONS = Object.entries(STATE_NAMES).sort((a, b) => a[1].localeCompare(b[1]));
 const TALLY_FIELDS: { key: keyof InvoiceSettings["tally"]; label: string; hint?: string }[] = [
   { key: "sales", label: "Sales", hint: "Put {rate} in the name for one ledger per GST rate, e.g. “Sales @{rate}%” becomes Sales @18%." },
@@ -795,6 +799,10 @@ function toGstForm(inv: InvoiceSettings, b: Business): GstForm {
     scheme: inv.scheme,
     issueAt: inv.issueAt,
     prefixes: { ...inv.prefixes },
+    ratesIncludeGst: inv.ratesIncludeGst,
+    layout: inv.layout,
+    numberingStyle: inv.numbering.style,
+    numberingDigits: String(inv.numbering.digits),
     city: inv.city,
     pinCode: inv.pinCode,
     terms: inv.terms,
@@ -829,6 +837,11 @@ function toGstPatch(f: GstForm, was: GstForm): GstPatch | string {
   }
   if (JSON.stringify(f.tally) !== JSON.stringify(was.tally)) {
     invoice.tally = Object.fromEntries(Object.entries(f.tally).map(([k, v]) => [k, v.trim()]));
+  }
+  if (f.numberingStyle !== was.numberingStyle || f.numberingDigits.trim() !== was.numberingDigits) {
+    const digits = Number(f.numberingDigits.trim());
+    if (!Number.isInteger(digits) || digits < 3 || digits > 8) return "Number width must be 3 to 8 digits";
+    invoice.numbering = { style: f.numberingStyle, digits };
   }
   if (f.einvEnabled !== was.einvEnabled || f.einvProvider !== was.einvProvider) {
     invoice.einvoice = { enabled: f.einvEnabled, provider: f.einvProvider };
@@ -874,6 +887,105 @@ function Choice<T extends string>({
           <span className={`block text-[11px] font-normal ${value === v ? "text-white/75" : "text-[var(--muted)]"}`}>{hint}</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+const NUMBER_TYPES = [
+  ["TAX_INVOICE", "Tax invoice"],
+  ["BILL_OF_SUPPLY", "Bill of supply"],
+  ["CREDIT_NOTE", "Credit note"],
+  ["DEBIT_NOTE", "Debit note"],
+] as const;
+type NumberType = (typeof NUMBER_TYPES)[number][0];
+type NextInfo = Record<NumberType, { next: number; printed: string }>;
+
+/**
+ * Carry on the old book's series: the next number per document type. Saved on
+ * its own (not with the form) because it moves a counter, and only forward.
+ */
+function NextNumbers() {
+  const [info, setInfo] = useState<NextInfo | null>(null);
+  const [typed, setTyped] = useState<Partial<Record<NumberType, string>>>({});
+  const [busy, setBusy] = useState<NumberType | null>(null);
+  const [msg, setMsg] = useState<{ type: NumberType; text: string; ok: boolean } | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    fetch("/api/admin/settings/numbering")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => live && d && setInfo(d.next))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  async function apply(type: NumberType) {
+    const next = Number((typed[type] ?? "").trim());
+    if (!Number.isInteger(next) || next < 1) return setMsg({ type, text: "Type the number only, e.g. 4262 for A004262", ok: false });
+    setBusy(type);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/settings/numbering", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Could not set the number");
+      setInfo((prev) => (prev ? { ...prev, [type]: { next: data.next, printed: data.printed } } : prev));
+      setTyped((prev) => ({ ...prev, [type]: "" }));
+      setMsg({ type, text: `Next one will be ${data.printed}`, ok: true });
+    } catch (err) {
+      setMsg({ type, text: err instanceof Error ? err.message : "Could not set the number", ok: false });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (!info) return null;
+  return (
+    <div className="mt-4 rounded-2xl bg-ink/5 p-4 space-y-3">
+      <div>
+        <p className="text-sm font-semibold text-[var(--ink)]">Carry on from your old software</p>
+        <p className="text-xs text-[var(--muted)] mt-0.5">
+          If the last bill in your old software was A004261, set the tax invoice&apos;s next number to 4262. Numbers can only move forward, never back.
+        </p>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        {NUMBER_TYPES.map(([type, label]) => (
+          <div key={type} className="min-w-0">
+            <p className="text-xs font-medium text-[var(--ink-2)]">
+              {label}: next is <span className="font-bold text-[var(--ink)]">{info[type].printed}</span>
+            </p>
+            <div className="flex gap-2 mt-1">
+              <input
+                className="input !py-1.5 min-w-0"
+                inputMode="numeric"
+                maxLength={8}
+                placeholder={String(info[type].next)}
+                aria-label={`${label} next number`}
+                value={typed[type] ?? ""}
+                onChange={(e) => setTyped((prev) => ({ ...prev, [type]: e.target.value.replace(/\D/g, "") }))}
+                onKeyDown={(e) => {
+                  // Enter sets this number; it must not submit the settings form around it.
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (typed[type] && busy === null) apply(type);
+                  }
+                }}
+              />
+              <button type="button" className="btn btn-quiet btn-sm shrink-0" disabled={busy !== null || !typed[type]} onClick={() => apply(type)}>
+                {busy === type ? "Setting…" : "Set"}
+              </button>
+            </div>
+            {msg?.type === type && (
+              <p className={`text-xs mt-1 ${msg.ok ? "text-[var(--mint-text)]" : "text-[#a8281e]"}`}>{msg.text}</p>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1059,7 +1171,53 @@ function GstSettings({ invoice, business }: { invoice: InvoiceSettings; business
             ))}
           </div>
           <span className="block text-xs text-[var(--muted)] mt-1">
-            Numbers look like {f.prefixes.tax || "INV"}2627-00001: prefix, financial year, running number. Up to 5 letters or digits.
+            {f.numberingStyle === "running"
+              ? `Numbers look like ${f.prefixes.tax || "INV"}${"1".padStart(Number(f.numberingDigits) || 6, "0")}: prefix, then a number that keeps counting across years.`
+              : `Numbers look like ${f.prefixes.tax || "INV"}2627-00001: prefix, financial year, running number.`}{" "}
+            Up to 5 letters or digits.
+          </span>
+        </div>
+        <div>
+          <span className="block text-sm font-medium text-[var(--ink-2)] mb-1.5">Invoice numbers</span>
+          <Choice
+            value={f.numberingStyle}
+            onChange={(v) => set("numberingStyle", v)}
+            options={[
+              ["fy", "New series each year", "INV2627-00001"],
+              ["running", "One running series", "A004262, A004263…"],
+            ]}
+          />
+          {f.numberingStyle === "running" && (
+            <Field label="Digits after the prefix" hint="A004262 has 6. 3 to 8." className="max-w-[12rem] mt-3">
+              <input
+                className="input"
+                inputMode="numeric"
+                maxLength={1}
+                value={f.numberingDigits}
+                onChange={(e) => set("numberingDigits", e.target.value.replace(/\D/g, ""))}
+              />
+            </Field>
+          )}
+          {saved.numberingStyle === "running" && <NextNumbers />}
+        </div>
+        <Toggle
+          checked={f.ratesIncludeGst}
+          onChange={(v) => set("ratesIncludeGst", v)}
+          label="Rates include GST"
+          hint="Product rates, price lists and special rates already have GST in them (the RATE most dealer billing software prints). GST is taken out of each line instead of added on top. Applies to orders placed after you switch."
+        />
+        <div>
+          <span className="block text-sm font-medium text-[var(--ink-2)] mb-1.5">Bill layout</span>
+          <Choice
+            value={f.layout}
+            onChange={(v) => set("layout", v)}
+            options={[
+              ["standard", "Standard", "Clean GST invoice"],
+              ["trade", "Trade bill", "Cases, MRP, salesman, GST table"],
+            ]}
+          />
+          <span className="block text-xs text-[var(--muted)] mt-1">
+            Trade bill prints cases and pieces, MRP, rate with GST, net rate, SGST/CGST %, the salesman, the due date, a GST class table and sign boxes.
           </span>
         </div>
         <Field label="SAC code for the delivery charge" hint="Printed on the delivery charge line. 996511 is road transport of goods." className="max-w-xs">

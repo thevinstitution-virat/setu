@@ -84,10 +84,14 @@ export function readInt(s: string, min = 0): number | null | "bad" {
   return n;
 }
 
-/** Retailer's margin % on MRP after paying rate + GST (one decimal). */
-export function margin(price: number, gstRate: number, mrp: number): number | null {
+/** What the retailer pays per unit: rate + GST, or the rate itself when rates include GST. */
+export const landedPrice = (price: number, gstRate: number, inclusive = false) =>
+  inclusive ? price : Math.round(price * (1 + gstRate / 100));
+
+/** Retailer's margin % on MRP after paying rate + GST (one decimal). inclusive: the rate already includes GST. */
+export function margin(price: number, gstRate: number, mrp: number, inclusive = false): number | null {
   if (!mrp || mrp <= 0) return null;
-  return Math.round(((mrp - price * (1 + gstRate / 100)) / mrp) * 1000) / 10;
+  return Math.round(((mrp - landedPrice(price, gstRate, inclusive)) / mrp) * 1000) / 10;
 }
 
 export function MarginText({ value }: { value: number | null }) {
