@@ -6,6 +6,7 @@ import { audit, requestIp } from "@/lib/audit";
 import { emit } from "@/lib/jobs";
 import { MoneyError, openingBalance, openingBills, type OpeningBill } from "@/lib/ledger";
 import { can } from "@/lib/permissions";
+import type { Role } from "@/generated/prisma/client";
 import { importPurchases, importSupplierBills, importSuppliers } from "@/lib/books-import";
 import { invoiceSettings } from "@/lib/invoice-settings";
 import {
@@ -365,13 +366,17 @@ async function importBooks(tx: Tx, type: ImportType, valid: unknown[], tenantId:
   return { ...r, newRegions: 0, newAreas: 0 };
 }
 
+/** The owner imports anything; whoever enters purchases may import the suppliers' and purchase sheets. */
+const mayImport = (role: Role, type: ImportType) => can(role, "import.run") || (BOOKS_IMPORTS.includes(type) && can(role, "purchases.manage"));
+
 export async function GET(req: Request) {
-  const auth = await guard("import.run");
+  const auth = await guard();
   if (!auth.ok) return auth.res;
   const type = new URL(req.url).searchParams.get("type") as ImportType;
   if (!IMPORT_TYPES.includes(type)) {
     return NextResponse.json({ error: `type must be one of ${IMPORT_TYPES.join(", ")}` }, { status: 400 });
   }
+  if (!mayImport(auth.session.role, type)) return NextResponse.json({ error: "You don't have access to this" }, { status: 403 });
   return new NextResponse("﻿" + templateCsv(type), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
@@ -382,7 +387,7 @@ export async function GET(req: Request) {
 
 /** multipart: file, type (retailers|products), mode (preview|commit) */
 export async function POST(req: Request) {
-  const auth = await guard("import.run");
+  const auth = await guard();
   if (!auth.ok) return auth.res;
   const { session, tenant, db } = auth;
 
@@ -396,7 +401,9 @@ export async function POST(req: Request) {
   if (!IMPORT_TYPES.includes(type)) {
     return NextResponse.json({ error: `Choose one of ${IMPORT_TYPES.join(", ")}` }, { status: 400 });
   }
-  if (BOOKS_IMPORTS.includes(type) && !can(session.role, "purchases.manage")) return NextResponse.json({ error: "Only someone who enters purchases can import suppliers and their bills" }, { status: 403 });
+  if (!mayImport(session.role, type)) {
+    return NextResponse.json({ error: BOOKS_IMPORTS.includes(type) ? "Only someone who enters purchases can import suppliers and their bills" : "You don't have access to this" }, { status: 403 });
+  }
   if (!/\.(csv|xlsx)$/i.test(file.name)) {
     return NextResponse.json({ error: "Use a .csv or .xlsx file (old .xls: save as .xlsx first)" }, { status: 415 });
   }

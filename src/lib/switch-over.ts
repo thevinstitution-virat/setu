@@ -112,8 +112,8 @@ export async function switchOver(ctx: Ctx) {
       text:
         suppliersWithOpening || v.suppliers.count
           ? `${v.suppliers.count} supplier${v.suppliers.count === 1 ? "" : "s"} with opening bills: ${inr(v.suppliers.owed)} owed.`
-          : "Import the suppliers, then what you owed each one bill by bill (Import → Suppliers, then Suppliers' open bills).",
-      href: "/admin/import",
+          : "Import the suppliers, then what you owed each one bill by bill (Suppliers, then Suppliers' open bills).",
+      href: "/admin/books/import?type=supplier_bills",
       cta: "Import",
     },
     {
