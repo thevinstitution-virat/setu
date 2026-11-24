@@ -121,6 +121,11 @@ export default async function PurchaseDocPage({ params }: { params: Promise<{ id
               <tr key={l.id}>
                 <td className="px-4 py-2">
                   <span className="font-medium text-[var(--ink)]">{l.description}</span>
+                  {l.claimId && (
+                    <Link href={`/admin/books/claims/${l.claimId}`} className="block text-xs font-semibold text-[var(--kesar-text)]">
+                      Settles our claim
+                    </Link>
+                  )}
                   <span className="block text-xs text-[var(--muted)]">
                     {[l.target === "HEAD" ? "Expense / asset" : l.target === "CLAIM" ? "Scheme or claim" : null, l.hsnCode ? `HSN ${l.hsnCode}` : null, l.batch ? `Batch ${l.batch}` : null, l.itc ? null : "No input credit"].filter(Boolean).join(" · ")}
                   </span>

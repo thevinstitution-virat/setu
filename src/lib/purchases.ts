@@ -5,6 +5,7 @@ import { docNumber, fyCode, isStateCode } from "@/lib/gst";
 import { nextSequence } from "@/lib/orders";
 import { defaultWarehouse, receiveGoods, stockOn, stockOut } from "@/lib/stock";
 import { dayEnd, dayStart, isDay, todayIst } from "@/lib/books";
+import { checkClaimLines, settleByCreditNote, unsettleCreditNote } from "@/lib/claims";
 
 /**
  * Purchases (A2): a supplier's bill, our debit note to them, their credit
@@ -16,6 +17,7 @@ import { dayEnd, dayStart, isDay, todayIst } from "@/lib/books";
  *                 Dr GST input (tax we can claim)       Cr Supplier (total)
  *   Debit note:   Dr Supplier                          Cr Purchase returns / head, GST input
  *   Credit note:  Dr Supplier                          Cr Purchases / head / claims, GST input
+ *                 (a claim line against a raised claim (A4) credits Claims receivable and settles it)
  *   Reverse charge: the supplier is owed the value only; the tax is ours to pay (GST output).
  */
 
@@ -41,6 +43,8 @@ export type PurchaseLineInput = {
   purchaseLineId?: string | null;
   batch?: string | null;
   expiry?: string | null;
+  /** Credit note, CLAIM line: the claim (A4) it settles. */
+  claimId?: string | null;
 };
 
 export type PurchaseInput = {
@@ -120,6 +124,7 @@ export async function recordPurchase(ctx: Ctx, input: PurchaseInput) {
     let hsnCode: string | null = null;
     let productId: string | null = null;
     let headId: string | null = null;
+    let claimId: string | null = null;
     if (target === "GOODS") {
       const p = raw.productId ? await ctx.tx.product.findUnique({ where: { id: String(raw.productId) }, select: { id: true, name: true, hsnCode: true } }) : null;
       if (!p) throw new MoneyError(`${n}: pick the product`);
@@ -135,6 +140,7 @@ export async function recordPurchase(ctx: Ctx, input: PurchaseInput) {
     } else if (target === "CLAIM") {
       if (type !== "CREDIT_NOTE") throw new MoneyError(`${n}: scheme and claim money comes on a credit note`);
       description ||= "Scheme / claim";
+      claimId = raw.claimId ? String(raw.claimId) : null;
     } else throw new MoneyError(`${n}: unknown line type`);
     const quantity = Number(raw.quantity);
     const freeQty = Number(raw.freeQty ?? 0);
@@ -158,8 +164,11 @@ export async function recordPurchase(ctx: Ctx, input: PurchaseInput) {
     }
     const expiry = raw.expiry ? (isDay(raw.expiry) ? raw.expiry : null) : null;
     if (raw.expiry && !expiry) throw new MoneyError(`${n}: expiry must be a date`);
-    lines.push({ target, productId, headId, description, hsnCode, quantity, freeQty, rate, discountPct, gstRate, itc: raw.itc !== false, purchaseLineId, batch: text(raw.batch, 40) || null, expiry, m });
+    lines.push({ target, productId, headId, description, hsnCode, quantity, freeQty, rate, discountPct, gstRate, itc: raw.itc !== false, purchaseLineId, batch: text(raw.batch, 40) || null, expiry, claimId, m });
   }
+  // Claim lines against raised claims: each claim must have room for them.
+  const claimWants = lines.filter((l) => l.claimId).map((l) => ({ claimId: l.claimId!, amount: l.m.taxable + (l.itc ? 0 : l.m.tax) }));
+  const claimPer = claimWants.length ? await checkClaimLines(ctx, supplier.id, claimWants) : null;
 
   const taxable = lines.reduce((s, l) => s + l.m.taxable, 0);
   const cgst = lines.reduce((s, l) => s + l.m.cgst, 0);
@@ -231,6 +240,7 @@ export async function recordPurchase(ctx: Ctx, input: PurchaseInput) {
             purchaseLineId: l.purchaseLineId,
             batch: l.batch,
             expiry: l.expiry ? new Date(`${l.expiry}T00:00:00Z`) : null,
+            claimId: l.claimId,
           })),
         },
       },
@@ -253,7 +263,7 @@ export async function recordPurchase(ctx: Ctx, input: PurchaseInput) {
   for (const l of lines) {
     const cost = l.m.taxable + (l.itc ? 0 : l.m.tax);
     const account: AccountRef =
-      l.target === "HEAD" ? { type: "HEAD", headId: l.headId! } : l.target === "CLAIM" ? { type: "CLAIM_INCOME" } : { type: type === "DEBIT_NOTE" ? "PURCHASE_RETURNS" : "PURCHASES" };
+      l.target === "HEAD" ? { type: "HEAD", headId: l.headId! } : l.target === "CLAIM" ? (l.claimId ? { type: "CLAIMS_RECEIVABLE", supplierId: supplier.id } : { type: "CLAIM_INCOME" }) : { type: type === "DEBIT_NOTE" ? "PURCHASE_RETURNS" : "PURCHASES" };
     add(account, sign * cost);
   }
   add({ type: "GST_INPUT" }, sign * itcTax);
@@ -269,6 +279,7 @@ export async function recordPurchase(ctx: Ctx, input: PurchaseInput) {
     lines: entryLines,
   });
   await ctx.tx.purchaseBill.update({ where: { id: doc.id }, data: { entryId: entry.id } });
+  if (claimPer) await settleByCreditNote(ctx, { id: doc.id, date: input.date }, claimPer, supplierRef);
 
   // What we owe, bill by bill.
   if (type === "BILL") {
@@ -346,6 +357,7 @@ export async function cancelPurchase(ctx: Ctx, id: string, reason: string) {
       await deallocateCredit(ctx, cr.id);
       await ctx.tx.supplierCredit.delete({ where: { id: cr.id } });
     }
+    await unsettleCreditNote(ctx, doc.id);
   }
   if (doc.entryId) await reverseEntry(ctx, doc.entryId, `${DOC_LABEL[doc.type]} ${doc.number} cancelled: ${why}`);
   await ctx.tx.purchaseBill.update({

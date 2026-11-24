@@ -95,6 +95,9 @@ export const KIND_LABEL: Record<EntryKind, string> = {
   PURCHASE_CREDIT_NOTE: "Credit note from supplier",
   SUPPLIER_PAYMENT: "Payment to supplier",
   ISSUED_CHEQUE_CLEAR: "Our cheque cleared",
+  CLAIM_RAISE: "Claim on a company",
+  CLAIM_RECEIPT: "Claim money received",
+  CLAIM_WRITE_OFF: "Claim written off",
 };
 
 export const BANK_KINDS: Record<BankKind, string> = { CURRENT: "Current account", SAVINGS: "Savings account", OD: "Overdraft (OD)", CC: "Cash credit (CC)" };
@@ -378,7 +381,7 @@ export async function chartOfAccounts(ctx: Ctx, asOn?: string) {
     WALLET_HOLD: { name: "Wallet money reserved for orders", href: "/admin/khata" },
     STAFF_CASH: { name: "Cash with staff", href: "/admin/cash" },
     PAYABLE: { name: "Suppliers' bills", href: "/admin/books/suppliers" },
-    CLAIMS_RECEIVABLE: { name: "Claims on companies", href: "/admin/books/suppliers" },
+    CLAIMS_RECEIVABLE: { name: "Claims on companies", href: "/admin/books/claims" },
   };
   const byHead = new Map<string, number>();
   const byBank = new Map<string, number>();
@@ -629,6 +632,11 @@ export async function checkBooks(ctx: Ctx): Promise<{ ok: boolean; results: Chec
   const cheques = await q`WITH acc AS (SELECT coalesce(sum(l.amount), 0) bal FROM "LedgerAccount" a JOIN "LedgerLine" l ON l."accountId" = a.id WHERE a."tenantId" = ${t} AND a.type = 'ISSUED_CHEQUES'),
     open AS (SELECT coalesce(sum(amount), 0) amt FROM "IssuedCheque" WHERE "tenantId" = ${t} AND status = 'ISSUED')
     SELECT CASE WHEN acc.bal + open.amt = 0 THEN 0 ELSE 1 END c FROM acc, open`;
+  const claims = await q`WITH acc AS (SELECT a."supplierId" s, sum(l.amount) bal FROM "LedgerAccount" a JOIN "LedgerLine" l ON l."accountId" = a.id WHERE a."tenantId" = ${t} AND a.type = 'CLAIMS_RECEIVABLE' GROUP BY 1),
+    cl AS (SELECT "supplierId" s, sum(amount - settled - "writtenOff") amt FROM "Claim" WHERE "tenantId" = ${t} AND "cancelledAt" IS NULL GROUP BY 1),
+    st AS (SELECT c.id, c.settled, c."writtenOff", coalesce(sum(x.amount) FILTER (WHERE x.kind <> 'WRITE_OFF'), 0) got, coalesce(sum(x.amount) FILTER (WHERE x.kind = 'WRITE_OFF'), 0) lost
+      FROM "Claim" c LEFT JOIN "ClaimSettlement" x ON x."claimId" = c.id AND x."reversedAt" IS NULL WHERE c."tenantId" = ${t} GROUP BY c.id)
+    SELECT (SELECT count(*) FROM acc FULL JOIN cl ON acc.s = cl.s WHERE coalesce(acc.bal, 0) <> coalesce(cl.amt, 0)) + (SELECT count(*) FROM st WHERE settled <> got OR "writtenOff" <> lost) c`;
   const lock = await booksLock(ctx);
   const afterLock = lock
     ? await q`SELECT count(*) c FROM "JournalEntry" WHERE "tenantId" = ${t} AND "occurredAt" < ${dayEnd(lock)} AND "createdAt" > (SELECT coalesce(max("createdAt"), now()) FROM "AuditLog" WHERE "tenantId" = ${t} AND action = 'books.lock')`
@@ -649,6 +657,7 @@ export async function checkBooks(ctx: Ctx): Promise<{ ok: boolean; results: Chec
     { key: "supplier-credits", title: "Notes and payments to suppliers are set correctly", ok: !supCredits, found: supCredits, detail: supCredits ? `${supCredits} notes or payments to suppliers are set against more or less than they should be` : "Every note and payment to a supplier matches its bills", fix: "Tell VBiz Pro support." },
     { key: "suppliers", title: "Each supplier's account matches their bills", ok: !suppliers, found: suppliers, detail: suppliers ? `${suppliers} suppliers' accounts differ from their open bills less unused notes and payments` : "Every supplier's account equals their open bills less unused notes and payments", fix: "Open Books, Suppliers to find the supplier, then tell support." },
     { key: "issued-cheques", title: "Our uncleared cheques add up", ok: !cheques, found: cheques, detail: cheques ? "Cheques issued in the books differ from the cheques not yet cleared" : "Cheques issued in the books equal the cheques not yet cleared", fix: "Open Books, Payments, Cheques we wrote, then tell support." },
+    { key: "claims", title: "Claims on companies add up", ok: !claims, found: claims, detail: claims ? "Claims receivable in the books differ from the claims still open" : "Each company's claims receivable equals its open claims", fix: "Open Books, Claims, then tell support." },
     { key: "lock", title: "Nothing new in closed days", ok: !afterLock, found: afterLock, detail: lock ? (afterLock ? `${afterLock} entries were added on or before ${showDay(lock)} after the books were closed` : `Closed up to ${showDay(lock)}; nothing was added there since`) : "The books are not closed for any days yet", fix: "Ask the owner to look at the day book for those days." },
   ];
   return { ok: results.every((r) => r.ok), results, counts: { entries, lines } };

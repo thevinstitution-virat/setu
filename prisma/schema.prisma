@@ -192,6 +192,9 @@ model Tenant {
   supplierCredits    SupplierCredit[]
   supplierPayments   SupplierPayment[]
   issuedCheques      IssuedCheque[]
+  claims             Claim[]
+  claimLines         ClaimLine[]
+  claimSettlements   ClaimSettlement[]
   supplierAllocs     SupplierAllocation[]
 }
 
@@ -1091,6 +1094,9 @@ enum EntryKind {
   PURCHASE_CREDIT_NOTE // a supplier's credit note to us
   SUPPLIER_PAYMENT // we paid a supplier (bank, cash or our cheque)
   ISSUED_CHEQUE_CLEAR // a cheque we wrote was paid by our bank
+  CLAIM_RAISE // a claim raised on a company
+  CLAIM_RECEIPT // money from a company against a claim
+  CLAIM_WRITE_OFF // the part of a claim we won't get
 }
 
 enum PayMethod {
@@ -1201,6 +1207,7 @@ model BankAccount {
   statements       BankStatement[]
   supplierPayments SupplierPayment[]
   issuedCheques    IssuedCheque[]
+  claimSettlements ClaimSettlement[]
 
   @@unique([tenantId, name])
   @@unique([tenantId, ledgerCode])
@@ -2032,6 +2039,7 @@ model Supplier {
   supplierCredits SupplierCredit[]
   payments        SupplierPayment[]
   issuedCheques   IssuedCheque[]
+  claims          Claim[]
 
   @@unique([tenantId, name])
 }
@@ -3247,6 +3255,8 @@ model PurchaseBillLine {
   purchaseLineId String?
   batch          String?
   expiry         DateTime?          @db.Date
+  /// Credit note, CLAIM line: the claim it settles.
+  claimId        String?
 
   @@index([tenantId, billId])
   @@index([tenantId, productId])
@@ -3390,4 +3400,122 @@ model IssuedCheque {
 
   @@unique([tenantId, bankAccountId, number])
   @@index([tenantId, status])
+}
+
+// ───────────────────────────── Claims on companies (A4) ─────────────────────────────
+
+enum ClaimType {
+  /// Free goods and scheme discounts we gave shops on the company's products.
+  SCHEME
+  /// Goods that came back damaged or expired, or went bad with us.
+  DAMAGE
+  /// The company cut its rate: our stock on that day × the difference.
+  RATE_DIFF
+  OTHER
+}
+
+/// Kept from the amounts: open > 0 → RAISED / PART_SETTLED; nothing open →
+/// SETTLED (all received), REJECTED (nothing received) or WRITTEN_OFF (part received).
+enum ClaimStatus {
+  RAISED
+  PART_SETTLED
+  SETTLED
+  REJECTED
+  WRITTEN_OFF
+}
+
+enum ClaimSettlementKind {
+  /// The company's credit note: a CLAIM line on a purchase credit note.
+  CREDIT_NOTE
+  /// Money from the company into a bank account or office cash.
+  RECEIPT
+  /// The part we won't get.
+  WRITE_OFF
+}
+
+/// A claim on a company (CL2627-00001). Raising it posts Dr Claims receivable (that company), Cr Claims income.
+model Claim {
+  id           String      @id @default(cuid())
+  tenantId     String      @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+  number       String
+  supplierId   String
+  supplier     Supplier    @relation(fields: [supplierId], references: [id])
+  type         ClaimType
+  /// The day it was raised.
+  date         DateTime    @db.Date
+  /// What it covers. Rate difference: both are the day the rate was cut.
+  periodFrom   DateTime?   @db.Date
+  periodTo     DateTime?   @db.Date
+  /// The company's scheme name or reference.
+  reference    String?
+  note         String?
+  /// Paise.
+  amount       Int
+  /// Credit notes and money received.
+  settled      Int         @default(0)
+  writtenOff   Int         @default(0)
+  status       ClaimStatus @default(RAISED)
+  /// Why the rest was written off / rejected.
+  closeReason  String?
+  entryId      String?     @unique
+  cancelledAt  DateTime?
+  cancelReason String?
+  createdById  String?
+  createdAt    DateTime    @default(now())
+
+  lines       ClaimLine[]
+  settlements ClaimSettlement[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, supplierId])
+  @@index([tenantId, status])
+  @@index([tenantId, date])
+}
+
+model ClaimLine {
+  id          String  @id @default(cuid())
+  tenantId    String  @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant  @relation(fields: [tenantId], references: [id])
+  claimId     String
+  claim       Claim   @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  sl          Int
+  productId   String?
+  description String
+  quantity    Int
+  /// Paise per unit.
+  rate        Int
+  amount      Int
+  /// Where it comes from: invoice / note numbers, photo or document reference.
+  evidence    String?
+
+  @@index([tenantId, claimId])
+}
+
+/// Money in against a claim (a credit note or a receipt), or the part written off. Reversed, never edited.
+model ClaimSettlement {
+  id             String              @id @default(cuid())
+  tenantId       String              @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant         Tenant              @relation(fields: [tenantId], references: [id])
+  claimId        String
+  claim          Claim               @relation(fields: [claimId], references: [id])
+  kind           ClaimSettlementKind
+  date           DateTime            @db.Date
+  amount         Int
+  /// Credit note: the purchase credit note (its own entry carries the money).
+  purchaseBillId String?
+  /// Receipt: the bank account, or office cash when cash is set.
+  bankAccountId  String?
+  bankAccount    BankAccount?        @relation(fields: [bankAccountId], references: [id])
+  cash           Boolean             @default(false)
+  reference      String?
+  note           String?
+  entryId        String?             @unique
+  reversedAt     DateTime?
+  createdById    String?
+  createdAt      DateTime            @default(now())
+
+  @@index([tenantId, claimId])
+  @@index([tenantId, date])
+  @@index([tenantId, purchaseBillId])
 }

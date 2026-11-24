@@ -80,6 +80,11 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
               <Icon name="rupee" className="h-3.5 w-3.5" /> Pay
             </Link>
           )}
+          {s.kind === "GOODS" && (
+            <Link className="btn btn-outline btn-xs" href={`/admin/books/claims?supplier=${s.id}`}>
+              <Icon name="receipt" className="h-3.5 w-3.5" /> Claims
+            </Link>
+          )}
           {r.me.canPurchase && s.active && (
             <>
               <Link className="btn btn-outline btn-xs" href={`/admin/books/purchases/new?supplier=${s.id}`}>

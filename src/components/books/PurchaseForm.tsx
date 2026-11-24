@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import Icon from "@/components/Icon";
 import { errText, ErrorBox, Field, readRupees, SearchPick, send, useFetch } from "@/components/admin/AdminKit";
+import { CLAIM_TYPE_LABEL } from "@/lib/claim-labels";
+import type { ClaimType } from "@/generated/prisma/enums";
 import { DOC_LABEL, purchaseLineMoney, type PurchaseDocType } from "@/lib/purchase-math";
 import { STATES } from "@/lib/gst";
 import { formatINR } from "@/lib/money";
@@ -20,6 +22,7 @@ type Options = {
   gstRates: number[];
 };
 
+type OpenClaims = { claims: { id: string; number: string; type: ClaimType; date: string; reference: string | null; amount: number; open: number }[] };
 type SupplierDocs = { docs: { id: string; type: PurchaseDocType; number: string; supplierRef: string; date: string; total: number; cancelled: boolean }[] };
 
 type LineForm = {
@@ -37,12 +40,14 @@ type LineForm = {
   batch: string;
   expiry: string;
   purchaseLineId: string | null;
+  /** CLAIM line: the raised claim it settles ("" = straight to claims income). */
+  claimId: string;
 };
 
 const GROUP_LABEL: Record<string, string> = { DIRECT_EXPENSES: "Direct expenses", INDIRECT_EXPENSES: "Indirect expenses", FIXED_ASSETS: "Fixed assets", CURRENT_ASSETS: "Current assets" };
 const todayIst = () => new Date(Date.now() + 5.5 * 3_600_000).toISOString().slice(0, 10);
 let seq = 1;
-const blankLine = (target: LineForm["target"] = "GOODS"): LineForm => ({ key: seq++, target, productId: null, headId: "", description: "", quantity: "1", freeQty: "", rate: "", discountPct: "", gstRate: target === "CLAIM" ? "0" : "18", itc: true, batch: "", expiry: "", purchaseLineId: null });
+const blankLine = (target: LineForm["target"] = "GOODS"): LineForm => ({ key: seq++, target, productId: null, headId: "", description: "", quantity: "1", freeQty: "", rate: "", discountPct: "", gstRate: target === "CLAIM" ? "0" : "18", itc: true, batch: "", expiry: "", purchaseLineId: null, claimId: "" });
 const int = (s: string) => (s.trim() === "" ? 0 : Number(s));
 const rupees = (p: number) => (p / 100).toFixed(2);
 
@@ -51,7 +56,7 @@ const rupees = (p: number) => (p / 100).toFixed(2);
  * The figures are worked out here the same way the server works them, so
  * the total can be checked against the printed bill before saving.
  */
-export default function PurchaseForm({ initial }: { initial: { type: PurchaseDocType; grn: string | null; supplier: string | null; against: string | null } }) {
+export default function PurchaseForm({ initial }: { initial: { type: PurchaseDocType; grn: string | null; supplier: string | null; against: string | null; claim?: string | null } }) {
   const router = useRouter();
   const { data: o, error, reload } = useFetch<Options>("/api/admin/books/purchase-options");
   const [type, setType] = useState<PurchaseDocType>(initial.type);
@@ -68,11 +73,13 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [billTotal, setBillTotal] = useState("");
-  const [lines, setLines] = useState<LineForm[]>([blankLine(initial.type === "CREDIT_NOTE" ? "CLAIM" : "GOODS")]);
+  const [lines, setLines] = useState<LineForm[]>(() => [{ ...blankLine(initial.type === "CREDIT_NOTE" ? "CLAIM" : "GOODS"), claimId: initial.type === "CREDIT_NOTE" ? (initial.claim ?? "") : "" }]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const supplier = o?.suppliers.find((s) => s.id === supplierId) ?? null;
+  const { data: oc } = useFetch<OpenClaims>(supplierId && type === "CREDIT_NOTE" ? `/api/admin/books/claims?open=1&supplier=${supplierId}` : null);
+  const openClaims = oc && supplierId && type === "CREDIT_NOTE" ? oc.claims : [];
   const { data: sdocs } = useFetch<SupplierDocs>(supplierId && type !== "BILL" ? `/api/admin/books/suppliers/${supplierId}` : null);
   const bills = (sdocs?.docs ?? []).filter((d) => d.type === "BILL" && !d.cancelled);
 
@@ -170,6 +177,7 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
         batch: l.batch || null,
         expiry: l.expiry || null,
         purchaseLineId: l.purchaseLineId,
+        claimId: l.target === "CLAIM" && l.claimId ? l.claimId : null,
       });
     }
     setBusy(true);
@@ -353,9 +361,30 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
                     </select>
                   </Field>
                 ) : (
-                  <Field label="What it is for" hint="Goes to claims income.">
-                    <input className="input" value={l.description} maxLength={120} placeholder="Like Diwali scheme, rate difference, damages" onChange={(e) => setLine(l.key, { description: e.target.value })} />
-                  </Field>
+                  <>
+                    {openClaims.length > 0 && (
+                      <Field label="Against our claim" hint={l.claimId ? "Settles that claim (in full or part)." : "Pick the claim this note pays, if any."}>
+                        <select
+                          className="input"
+                          value={l.claimId}
+                          onChange={(e) => {
+                            const c = openClaims.find((x) => x.id === e.target.value);
+                            setLine(l.key, { claimId: e.target.value, description: c ? `Claim ${c.number}${c.reference ? ` · ${c.reference}` : ""}` : l.description });
+                          }}
+                        >
+                          <option value="">No claim: straight to claims income</option>
+                          {openClaims.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.number} · {CLAIM_TYPE_LABEL[c.type]} · {formatINR(c.open)} open
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    )}
+                    <Field label="What it is for" hint={l.claimId ? undefined : "Goes to claims income."}>
+                      <input className="input" value={l.description} maxLength={120} placeholder="Like Diwali scheme, rate difference, damages" onChange={(e) => setLine(l.key, { description: e.target.value })} />
+                    </Field>
+                  </>
                 )}
                 {l.target !== "CLAIM" && (
                   <Field label="Description (optional)">
