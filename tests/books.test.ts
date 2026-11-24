@@ -11,7 +11,7 @@ import "dotenv/config";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { tenantDb } from "@/lib/db";
-import { MoneyError, post, reverseEntry, withMoney, type Ctx } from "@/lib/ledger";
+import { balanceOf, MoneyError, post, reverseEntry, withMoney, type Ctx } from "@/lib/ledger";
 import {
   accountLedger,
   chartOfAccounts,
@@ -52,6 +52,20 @@ beforeAll(async () => {
 afterAll(async () => {
   await prisma.tenant.update({ where: { id: T }, data: { booksLockedUntil: null } });
   if (originalDefault) await books((ctx) => setDefaultBank(ctx, originalDefault));
+  // Leave the demo books tidy: test heads back to ₹0 and hidden, test banks closed.
+  await books(async (ctx) => {
+    for (const h of await ctx.tx.ledgerHead.findMany({ where: { name: { startsWith: "Test " }, key: null } })) {
+      const left = await balanceOf(ctx, { type: "HEAD", headId: h.id });
+      if (left) {
+        if (!h.active) await updateHead(ctx, h.id, { active: true });
+        await post(ctx, { kind: "OPENING", memo: "Test clean-up", lines: [{ account: { type: "HEAD", headId: h.id }, amount: -left }, { account: { type: "OFFICE_CASH" }, amount: left }] });
+      }
+      if (h.active || left) await updateHead(ctx, h.id, { active: false });
+    }
+    for (const b of await ctx.tx.bankAccount.findMany({ where: { name: { startsWith: "Test " }, isDefault: false, active: true } })) {
+      if (!(await balanceOf(ctx, { type: "BANK", bankAccountId: b.id }))) await updateBank(ctx, b.id, { active: false });
+    }
+  });
 });
 
 describe("set-up", () => {

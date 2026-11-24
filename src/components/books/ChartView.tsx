@@ -39,10 +39,12 @@ export default function ChartView({ groups, headGroups, canSetup }: { groups: Ch
     }
   }
 
-  const hiddenCount = groups.reduce((s, g) => s + g.rows.filter((r) => !r.active).length, 0);
+  // Hidden heads and closed banks drop out of view only once they are at ₹0, so groups still add up.
+  const tucked = (r: ChartRowView) => !r.active && r.balance === 0;
+  const hiddenCount = groups.reduce((s, g) => s + g.rows.filter(tucked).length, 0);
   // Groups with something to show, each marked when it starts a new side (assets, liabilities ...).
   const visible = groups
-    .map((g) => ({ ...g, rows: g.rows.filter((r) => r.active || showHidden) }))
+    .map((g) => ({ ...g, rows: g.rows.filter((r) => !tucked(r) || showHidden) }))
     .filter((g) => g.rows.length)
     .map((g, i, all) => ({ ...g, sideHead: i === 0 || all[i - 1].side !== g.side ? SIDE[g.side] : null }));
 
@@ -69,7 +71,7 @@ export default function ChartView({ groups, headGroups, canSetup }: { groups: Ch
       </div>
       {hiddenCount > 0 && (
         <button type="button" className="text-xs font-semibold text-[var(--kesar-text)]" onClick={() => setShowHidden((v) => !v)}>
-          {showHidden ? "Hide" : "Show"} {hiddenCount} hidden head{hiddenCount === 1 ? "" : "s"}
+          {showHidden ? "Hide" : "Show"} {hiddenCount} hidden head{hiddenCount === 1 ? "" : "s"} and closed bank{hiddenCount === 1 ? "" : "s"}
         </button>
       )}
       <div className="divide-y divide-[var(--line)]">

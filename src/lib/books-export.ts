@@ -83,6 +83,7 @@ export function dayBookCsv(d: DayBook) {
 export function trialSheet(c: Chart, asOn: string): Sheet {
   const rows: SheetRow[] = [];
   for (const g of c.groups) {
+    if (!g.rows.some((r) => r.balance)) continue;
     rows.push({ kind: "group", text: g.label });
     for (const r of g.rows) {
       if (!r.balance) continue;
