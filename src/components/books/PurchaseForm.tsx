@@ -81,6 +81,11 @@ const blankLine = (target: LineForm["target"] = "GOODS"): LineForm => ({
 });
 const int = (s: string) => (s.trim() === "" ? 0 : Number(s));
 const rupees = (p: number) => (p / 100).toFixed(2);
+/** "box" → "Boxes", "carton" → "Cartons". */
+const casesLabel = (unit?: string | null) => {
+  const u = (unit || "case").trim();
+  return u.charAt(0).toUpperCase() + u.slice(1) + (/(x|s|ch|sh)$/i.test(u) ? "es" : "s");
+};
 
 /** A line's quantity, rate (per unit) and money, or why it can't be worked out yet. */
 function lineMoney(l: LineForm, inclusive: boolean, interState: boolean) {
@@ -510,7 +515,7 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
               <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
                 {l.byCase && l.caseSize ? (
                   <>
-                    <Field label={`${(product?.caseUnit || "case").replace(/^./, (c) => c.toUpperCase())}s`}>
+                    <Field label={casesLabel(product?.caseUnit)}>
                       <input className="input" inputMode="numeric" value={l.cases} onChange={(e) => setLine(l.key, { cases: e.target.value.replace(/\D/g, "") })} />
                     </Field>
                     <Field label={`Loose ${product?.unit ?? "units"}`}>
@@ -571,7 +576,7 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
               )}
               {m && (
                 <p className="text-xs text-[var(--muted)] tabular-nums">
-                  {l.byCase && l.caseSize ? `${int(l.cases) * l.caseSize + int(l.loose)} ${product?.unit ?? "units"} · ` : ""}
+                  {l.byCase && l.caseSize ? `${int(l.cases)} × ${l.caseSize}${int(l.loose) ? ` + ${int(l.loose)} loose` : ""} = ${int(l.cases) * l.caseSize + int(l.loose)} ${product?.unit ?? "units"} · ` : ""}
                   Taxable {formatINR(m.taxable)}
                   {m.discount ? ` after ${formatINR(m.discount)} discount` : ""} · {interState ? `IGST ${formatINR(m.igst)}` : `CGST ${formatINR(m.cgst)} + SGST ${formatINR(m.sgst)}`}
                   {!l.itc && m.tax ? " · tax added to the cost" : ""}
