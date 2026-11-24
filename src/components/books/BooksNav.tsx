@@ -12,6 +12,7 @@ const TABS = [
   { href: "/admin/books/payables", label: "Payables" },
   { href: "/admin/books/claims", label: "Claims" },
   { href: "/admin/books/vouchers", label: "Vouchers" },
+  { href: "/admin/books/gst", label: "GST" },
   { href: "/admin/books/cashbook", label: "Cash & bank books" },
   { href: "/admin/books/stock", label: "Stock" },
   { href: "/admin/books/suppliers", label: "Suppliers" },

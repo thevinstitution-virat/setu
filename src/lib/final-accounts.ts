@@ -167,7 +167,7 @@ async function plCore(ctx: Ctx, from: string, to: string, s: Start) {
 /** Month by month: sales, purchases, gross profit, running costs, net profit (each month's stock at its end). */
 async function plMonths(ctx: Ctx, from: string, to: string, openingStock: number) {
   const rows = await ctx.tx.$queryRaw<{ m: string; g: string; dr: bigint; cr: bigint }[]>`
-    SELECT to_char(e."occurredAt" AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM') AS m, a."group"::text AS g,
+    SELECT to_char((e."occurredAt" AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM') AS m, a."group"::text AS g,
       COALESCE(SUM(l.amount) FILTER (WHERE l.amount > 0), 0)::bigint AS dr,
       COALESCE(SUM(-l.amount) FILTER (WHERE l.amount < 0), 0)::bigint AS cr
     FROM "LedgerLine" l JOIN "JournalEntry" e ON e.id = l."entryId" JOIN "LedgerAccount" a ON a.id = l."accountId"

@@ -122,7 +122,7 @@ export default async function YearEndPage({ searchParams }: { searchParams: Prom
           <h2 className="font-heading text-lg font-bold text-[var(--ink)]">CA pack</h2>
           <p className="text-sm text-[var(--ink-2)]">
             One zip for the CA: trial balance, profit and loss (with months) and balance sheet as PDFs; a workbook with the day book, every ledger, cash and bank books, purchase register, debtors,
-            creditors, claims and stock; and the sales register. The GST set-off working and TDS register are not in it yet.
+            creditors, claims, stock, the GSTR-3B working by month and the input credit register; and the sales register. The TDS register is not in it yet.
           </p>
         </div>
         <form method="get" action="/api/admin/books/ca-pack" className="flex flex-wrap items-end gap-3">

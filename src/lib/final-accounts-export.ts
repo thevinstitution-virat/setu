@@ -15,6 +15,9 @@ import { countList, stockChoices, stockValuation } from "@/lib/stock-counts";
 import { valuationCsv } from "@/lib/stock-counts-export";
 import { salesRegisterWorkbook, type ExportDoc } from "@/lib/gst-exports";
 import { zip, type ZipFile } from "@/lib/zip";
+import { gstMonth, itcRegister } from "@/lib/gst-returns";
+import { itcCsv, monthsCsv } from "@/lib/gst-returns-export";
+import { periodOf, shiftPeriod } from "@/lib/gst-math";
 import type { AccountGroup } from "@/generated/prisma/client";
 import type { Ctx } from "@/lib/ledger";
 
@@ -307,6 +310,9 @@ export async function caPackData(ctx: Ctx, from: string, to: string) {
     orderBy: [{ date: "asc" }, { number: "asc" }],
     include: { lines: { orderBy: { sl: "asc" } }, original: { select: { id: true, number: true, date: true, b2b: true, interState: true, total: true } }, order: { select: { orderNumber: true } } },
   })) as ExportDoc[];
+  // GSTR-3B of each month the period touches.
+  const gst = [];
+  for (let p = periodOf(from); p <= periodOf(to) && gst.length < 14; p = shiftPeriod(p, 1)) gst.push(await gstMonth(ctx, p));
   return {
     from,
     to,
@@ -324,6 +330,8 @@ export async function caPackData(ctx: Ctx, from: string, to: string) {
     stock: choices.tracking ? valuationCsv(await stockValuation(ctx, { day: to, by: "product" })) : null,
     counts: (await countList(ctx)).filter((c) => c.date >= from && c.date <= to),
     docs,
+    gst,
+    itc: await itcRegister(ctx, from, to),
   };
 }
 
@@ -360,6 +368,8 @@ export async function buildCaPack(d: Awaited<ReturnType<typeof caPackData>>) {
     ["Number", "Date", "What", "How", "Status", "Counted value", "Short", "Over"],
     ...d.counts.map((c) => [c.number, c.date, c.what, c.mode, c.statusLabel, rupees(c.countedValue), rupees(c.shortage), rupees(c.excess)]),
   ]);
+  addSheet(wb, "GSTR-3B by month", monthsCsv(d.gst));
+  addSheet(wb, "Input credit", itcCsv(d.itc));
   files.push({ name: `05 Books ${from} to ${to}.xlsx`, data: Buffer.from(await wb.xlsx.writeBuffer()) });
   files.push({ name: `06 Sales register ${from} to ${to}.xlsx`, data: await salesRegisterWorkbook(d.docs) });
   files.push({
@@ -370,11 +380,12 @@ export async function buildCaPack(d: Awaited<ReturnType<typeof caPackData>>) {
       "",
       "01-04  Trial balance, profit and loss (and by month), balance sheet (PDF).",
       "05     Workbook: the same reports, day book, every ledger, cash and bank books, purchase register,",
-      "       debtors, creditors, pending claims, stock value and stock counts.",
+      "       debtors, creditors, pending claims, stock value, stock counts, the GSTR-3B working by month",
+      "       (with the set-off and payment of each settled month) and the input credit register.",
       "06     Sales register: invoices and notes, items, and totals by GST rate.",
       "",
       "Amounts are in rupees. Stock is at cost; closing stock is the accepted count on the day, else the app's stock at cost.",
-      "Not in this pack yet: the GST set-off working and the TDS register.",
+      "Not in this pack yet: the TDS register.",
       ...(tb.difference || bs.difference ? ["", "WARNING: the books do not balance. See the trial balance and balance sheet notes."] : []),
       ...pl.warnings.map((w) => `Note: ${w}`),
     ].join(String.fromCharCode(13, 10)),

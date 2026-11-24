@@ -103,6 +103,7 @@ export const KIND_LABEL: Record<EntryKind, string> = {
   CONTRA: "Contra",
   JOURNAL: "Journal voucher",
   STOCK_COUNT: "Stock count",
+  GST_PAYMENT: "GST paid",
 };
 
 export const BANK_KINDS: Record<BankKind, string> = { CURRENT: "Current account", SAVINGS: "Savings account", OD: "Overdraft (OD)", CC: "Cash credit (CC)" };
@@ -691,6 +692,18 @@ export async function checkBooks(ctx: Ctx): Promise<{ ok: boolean; results: Chec
     el AS (SELECT l."entryId", sum(l.amount) amt FROM "LedgerLine" l JOIN "LedgerAccount" a ON a.id = l."accountId" WHERE l."tenantId" = ${t} AND a.type = 'STOCK_LOSS' GROUP BY 1)
     SELECT (SELECT count(*) FROM sc LEFT JOIN el ON el."entryId" = sc."entryId" WHERE coalesce(el.amt, 0) <> sc.net OR (sc.net <> 0 AND sc."entryId" IS NULL))
       + (SELECT count(*) FROM "JournalEntry" j WHERE j."tenantId" = ${t} AND j.kind = 'STOCK_COUNT' AND NOT EXISTS (SELECT 1 FROM "StockCount" s WHERE s."entryId" = j.id)) c`;
+  const gst = await q`WITH gl AS (SELECT l."entryId", a.type, sum(l.amount) amt FROM "LedgerLine" l JOIN "LedgerAccount" a ON a.id = l."accountId"
+      WHERE l."tenantId" = ${t} AND a.type IN ('GST_INPUT', 'GST_OUTPUT') GROUP BY 1, 2),
+    pb AS (SELECT p."entryId", CASE WHEN p.type = 'BILL' THEN p."itcTax" ELSE -p."itcTax" END itc FROM "PurchaseBill" p WHERE p."tenantId" = ${t} AND p."entryId" IS NOT NULL),
+    st AS (SELECT s."entryId", s."cancelledAt",
+        s."liabIgst" + s."liabCgst" + s."liabSgst" + s."rcmIgst" + s."rcmCgst" + s."rcmSgst" liab, s."cashIgst" + s."cashCgst" + s."cashSgst" cash
+      FROM "GstSettlement" s WHERE s."tenantId" = ${t})
+    SELECT (SELECT count(*) FROM pb LEFT JOIN gl ON gl."entryId" = pb."entryId" AND gl.type = 'GST_INPUT' WHERE coalesce(gl.amt, 0) <> pb.itc)
+      + (SELECT count(*) FROM st WHERE "entryId" IS NULL AND (liab <> 0 OR cash <> 0))
+      + (SELECT count(*) FROM st LEFT JOIN gl o ON o."entryId" = st."entryId" AND o.type = 'GST_OUTPUT' LEFT JOIN gl i ON i."entryId" = st."entryId" AND i.type = 'GST_INPUT'
+          WHERE st."entryId" IS NOT NULL AND (coalesce(o.amt, 0) <> liab OR coalesce(i.amt, 0) <> cash - liab))
+      + (SELECT count(*) FROM st LEFT JOIN "JournalEntry" r ON r."reversesId" = st."entryId" WHERE st."entryId" IS NOT NULL AND (st."cancelledAt" IS NULL) <> (r.id IS NULL))
+      + (SELECT count(*) FROM "JournalEntry" j WHERE j."tenantId" = ${t} AND j.kind = 'GST_PAYMENT' AND NOT EXISTS (SELECT 1 FROM "GstSettlement" s WHERE s."entryId" = j.id)) c`;
   const lock = await booksLock(ctx);
   const afterLock = lock
     ? await q`SELECT count(*) c FROM "JournalEntry" WHERE "tenantId" = ${t} AND "occurredAt" < ${dayEnd(lock)} AND "createdAt" > (SELECT coalesce(max("createdAt"), now()) FROM "AuditLog" WHERE "tenantId" = ${t} AND action = 'books.lock')`
@@ -715,6 +728,7 @@ export async function checkBooks(ctx: Ctx): Promise<{ ok: boolean; results: Chec
     { key: "vouchers", title: "Vouchers agree with the ledger", ok: !vouchers, found: vouchers, detail: vouchers ? `${vouchers} vouchers differ from their entries` : "Every voucher's lines are in the ledger as entered, and every cancelled one is reversed", fix: "Open Books, Vouchers, then tell support." },
     { key: "cash", title: "No cash below zero", ok: !cashBelow, found: cashBelow, detail: cashBelow ? `${cashBelow} cash accounts show less than nothing` : "Office cash, petty cash and staff cash are all ₹0 or more", fix: "Open the cash book: a payment from cash was entered before the cash came in, or a receipt or handover is missing." },
     { key: "stock-counts", title: "Stock counts agree with the ledger", ok: !stockCounts, found: stockCounts, detail: stockCounts ? `${stockCounts} stock counts differ from their stock shortage entries` : "Every accepted count's shortage and excess at cost is in stock shortage", fix: "Open Books, Stock, Counts, then tell support." },
+    { key: "gst", title: "GST input credit agrees with the bills", ok: !gst, found: gst, detail: gst ? `${gst} purchase bills, notes or GST settlements differ from their GST input / output entries` : "Every bill's and note's input credit, and every month's GST set-off, is in the ledger as worked out", fix: "Open Books, GST, then tell support." },
     { key: "lock", title: "Nothing new in closed days", ok: !afterLock, found: afterLock, detail: lock ? (afterLock ? `${afterLock} entries were added on or before ${showDay(lock)} after the books were closed` : `Closed up to ${showDay(lock)}; nothing was added there since`) : "The books are not closed for any days yet", fix: "Ask the owner to look at the day book for those days." },
   ];
   return { ok: results.every((r) => r.ok), results, counts: { entries, lines } };

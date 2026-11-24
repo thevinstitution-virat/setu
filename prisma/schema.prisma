@@ -206,6 +206,9 @@ model Tenant {
   voucherLines       VoucherLine[]
   stockCounts        StockCount[]
   stockCountLines    StockCountLine[]
+  gstSettlements     GstSettlement[]
+  gstr2bImports      Gstr2bImport[]
+  gstr2bRows         Gstr2bRow[]
 }
 
 /// Custom domains a tenant has verified (e.g. order.agencyname.in).
@@ -1113,6 +1116,7 @@ enum EntryKind {
   CONTRA // money moved between our own cash and banks
   JOURNAL // a journal voucher: any balanced lines, with a reason
   STOCK_COUNT // a physical stock count accepted: the net shortage moved from purchases to stock shortage
+  GST_PAYMENT // a month's GST set off: output tax paid from input credit and from the bank
 }
 
 enum PayMethod {
@@ -1225,6 +1229,7 @@ model BankAccount {
   issuedCheques    IssuedCheque[]
   claimSettlements ClaimSettlement[]
   vouchers         Voucher[]
+  gstSettlements   GstSettlement[]
 
   @@unique([tenantId, name])
   @@unique([tenantId, ledgerCode])
@@ -3728,4 +3733,105 @@ model VoucherLine {
 
   @@index([tenantId, voucherId])
   @@index([tenantId, code])
+}
+
+/// A month's GST set off (GSTR-3B table 6.1): output tax and reverse charge paid from input credit (in the legal order) and from a bank.
+/// One live settlement per month (a partial unique index); cancelled by reversal. Months are settled in order.
+model GstSettlement {
+  id            String       @id @default(cuid())
+  tenantId      String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  /// "2026-10".
+  period        String
+  /// Paise, by head: output tax less notes (liability), reverse charge (paid in cash only), credit brought forward and credit of the month.
+  liabIgst      Int
+  liabCgst      Int
+  liabSgst      Int
+  rcmIgst       Int
+  rcmCgst       Int
+  rcmSgst       Int
+  openIgst      Int
+  openCgst      Int
+  openSgst      Int
+  itcIgst       Int
+  itcCgst       Int
+  itcSgst       Int
+  /// Credit used: from head (first) against head (second).
+  useIgstIgst   Int
+  useIgstCgst   Int
+  useIgstSgst   Int
+  useCgstCgst   Int
+  useCgstIgst   Int
+  useSgstSgst   Int
+  useSgstIgst   Int
+  cashIgst      Int
+  cashCgst      Int
+  cashSgst      Int
+  closeIgst     Int
+  closeCgst     Int
+  closeSgst     Int
+  bankAccountId String?
+  bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id])
+  /// Challan identification number (CIN) or CPIN of the payment.
+  challan       String?
+  paidOn        DateTime     @db.Date
+  /// ARN of the filed return.
+  arn           String?
+  /// The GSTR-3B working as it was when settled.
+  working       Json
+  entryId       String?      @unique
+  cancelledAt   DateTime?
+  cancelReason  String?
+  createdById   String?
+  createdAt     DateTime     @default(now())
+
+  @@index([tenantId, period])
+}
+
+/// A GSTR-2B file from the GST portal, one per month (a new upload replaces it).
+model Gstr2bImport {
+  id          String   @id @default(cuid())
+  tenantId    String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  /// "2026-10".
+  period      String
+  fileName    String
+  /// GSTIN the file is for (JSON files say so).
+  gstin       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  rows Gstr2bRow[]
+
+  @@unique([tenantId, period])
+}
+
+/// One supplier document in a GSTR-2B file.
+model Gstr2bRow {
+  id            String       @id @default(cuid())
+  tenantId      String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  importId      String
+  import        Gstr2bImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+  /// INV (a bill), CN (their credit note), DN (their debit note).
+  kind          String
+  gstin         String
+  name          String?
+  number        String
+  /// The number reduced for matching: capitals and digits, no leading zeros.
+  numberKey     String
+  date          DateTime?    @db.Date
+  /// Paise.
+  taxable       Int
+  igst          Int
+  cgst          Int
+  sgst          Int
+  cess          Int          @default(0)
+  total         Int
+  reverseCharge Boolean      @default(false)
+  /// The portal says the credit is available.
+  itcAvailable  Boolean      @default(true)
+
+  @@index([tenantId, gstin, numberKey])
+  @@index([importId])
 }
