@@ -38,6 +38,8 @@ export type StockRefs = {
   docId?: string | null;
   reason?: string | null;
   note?: string | null;
+  /** When the move happened, if not now (a stock count dated an earlier day: the end of that day). */
+  at?: Date | null;
 };
 type Pick = { lotId: string; qty: number; batch: string; expiry: Date | null; mfgDate: Date | null; unitCost: number | null };
 
@@ -135,6 +137,7 @@ const refData = (r: StockRefs) => ({
   docId: r.docId ?? null,
   reason: r.reason ?? null,
   note: r.note?.trim().slice(0, 300) || null,
+  ...(r.at ? { createdAt: r.at } : {}),
 });
 
 /** Stock in at one place (purchase, opening, return, adjustment). The caller need not lock. */

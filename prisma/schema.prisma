@@ -198,6 +198,8 @@ model Tenant {
   supplierAllocs     SupplierAllocation[]
   vouchers           Voucher[]
   voucherLines       VoucherLine[]
+  stockCounts        StockCount[]
+  stockCountLines    StockCountLine[]
 }
 
 /// Custom domains a tenant has verified (e.g. order.agencyname.in).
@@ -557,6 +559,7 @@ model Product {
   stockMoves     StockMove[]
   poLines        PurchaseOrderLine[]
   purchaseLines  PurchaseLine[]
+  countLines     StockCountLine[]
 
   @@unique([tenantId, sku])
   @@index([tenantId, active])
@@ -1103,6 +1106,7 @@ enum EntryKind {
   VOUCHER_RECEIPT // a receipt voucher: money in that is not from a shop
   CONTRA // money moved between our own cash and banks
   JOURNAL // a journal voucher: any balanced lines, with a reason
+  STOCK_COUNT // a physical stock count accepted: the net shortage moved from purchases to stock shortage
 }
 
 enum PayMethod {
@@ -1446,7 +1450,8 @@ model Category {
   active    Boolean    @default(true)
   createdAt DateTime   @default(now())
 
-  products Product[]
+  products    Product[]
+  stockCounts StockCount[]
 
   @@unique([tenantId, name])
 }
@@ -1943,6 +1948,7 @@ model StockLocation {
 
   lots      StockLot[]
   purchases Purchase[]
+  counts    StockCount[]
 
   @@unique([tenantId, name])
   @@index([tenantId, kind])
@@ -1972,6 +1978,96 @@ model StockLot {
 
   @@index([tenantId, productId, locationId])
   @@index([tenantId, locationId])
+}
+
+enum StockCountMode {
+  /// Stock tracking on: one place, per batch, against the app's stock; accepting adjusts the stock.
+  TRACKED
+  /// Stock tracking off: quantities × rates.
+  QUANTITY
+  /// Stock tracking off: a total value per company.
+  VALUE
+}
+
+enum StockCountStatus {
+  DRAFT
+  ACCEPTED
+  CANCELLED
+}
+
+/// A physical stock count (A6). Accepted, it is the closing stock for its date.
+model StockCount {
+  id           String           @id @default(cuid())
+  tenantId     String           @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant           @relation(fields: [tenantId], references: [id])
+  /// SC<fy>-NNNNN.
+  number       String
+  /// The day counted; quantities are as at the end of that day.
+  date         DateTime         @db.Date
+  mode         StockCountMode
+  status       StockCountStatus @default(DRAFT)
+  /// TRACKED: the place counted.
+  locationId   String?
+  location     StockLocation?   @relation(fields: [locationId], references: [id])
+  /// TRACKED: only this company's products (blank = all).
+  supplierId   String?
+  supplier     Supplier?        @relation(fields: [supplierId], references: [id])
+  /// TRACKED: only this category (blank = all).
+  categoryId   String?
+  category     Category?        @relation(fields: [categoryId], references: [id])
+  note         String?
+  /// Set when accepted, in paise: the app's stock value, the counted value, and the shortage and excess at cost.
+  bookValue    BigInt           @default(0)
+  countedValue BigInt           @default(0)
+  shortage     BigInt           @default(0)
+  excess       BigInt           @default(0)
+  /// The ledger entry for the net shortage or excess (TRACKED, when not zero).
+  entryId      String?          @unique
+  createdById  String?
+  createdAt    DateTime         @default(now())
+  acceptedById String?
+  acceptedAt   DateTime?
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  lines StockCountLine[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, date])
+  @@index([tenantId, status])
+}
+
+/// One line of a count: a batch at the place (TRACKED), a product (QUANTITY) or a company (VALUE).
+model StockCountLine {
+  id         String     @id @default(cuid())
+  tenantId   String     @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant     @relation(fields: [tenantId], references: [id])
+  countId    String
+  count      StockCount @relation(fields: [countId], references: [id], onDelete: Cascade)
+  sl         Int
+  productId  String?
+  product    Product?   @relation(fields: [productId], references: [id])
+  /// VALUE: the company (blank = other goods).
+  supplierId String?
+  supplier   Supplier?  @relation(fields: [supplierId], references: [id])
+  /// TRACKED: the batch as found in the app; blank = a product or batch found that the app had none of.
+  lotId      String?
+  batch      String     @default("")
+  expiry     DateTime?  @db.Date
+  /// TRACKED: the app's quantity as at the end of the count day (fixed when accepted).
+  bookQty    Int        @default(0)
+  /// Base units counted; blank = not counted yet.
+  countedQty Int?
+  /// Paise per base unit; blank = the batch's cost, else the product's last cost.
+  rate       Int?
+  /// VALUE: the company's stock value in paise; blank = not entered yet.
+  value      BigInt?
+  /// Added by hand while counting (not on the sheet as made).
+  added      Boolean    @default(false)
+  note       String?
+
+  @@index([countId])
+  @@index([tenantId, productId])
 }
 
 /// Append-only stock history (a trigger refuses edits and deletes).
@@ -2049,6 +2145,8 @@ model Supplier {
   payments        SupplierPayment[]
   issuedCheques   IssuedCheque[]
   claims          Claim[]
+  stockCounts     StockCount[]
+  stockCountLines StockCountLine[]
 
   @@unique([tenantId, name])
 }

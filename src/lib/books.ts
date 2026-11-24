@@ -102,6 +102,7 @@ export const KIND_LABEL: Record<EntryKind, string> = {
   VOUCHER_RECEIPT: "Receipt voucher",
   CONTRA: "Contra",
   JOURNAL: "Journal voucher",
+  STOCK_COUNT: "Stock count",
 };
 
 export const BANK_KINDS: Record<BankKind, string> = { CURRENT: "Current account", SAVINGS: "Savings account", OD: "Overdraft (OD)", CC: "Cash credit (CC)" };
@@ -666,6 +667,10 @@ export async function checkBooks(ctx: Ctx): Promise<{ ok: boolean; results: Chec
     SELECT (SELECT count(*) FROM diff) + (SELECT count(*) FROM bad WHERE id NOT IN (SELECT v FROM diff)) c`;
   const cashBelow = await q`SELECT count(*) c FROM (SELECT a.id FROM "LedgerAccount" a JOIN "LedgerLine" l ON l."accountId" = a.id
     WHERE a."tenantId" = ${t} AND (a.type IN ('OFFICE_CASH', 'STAFF_CASH') OR (a.type = 'HEAD' AND a."group" = 'CASH')) GROUP BY a.id HAVING sum(l.amount) < 0) x`;
+  const stockCounts = await q`WITH sc AS (SELECT id, "entryId", shortage - excess net FROM "StockCount" WHERE "tenantId" = ${t} AND mode = 'TRACKED' AND status = 'ACCEPTED'),
+    el AS (SELECT l."entryId", sum(l.amount) amt FROM "LedgerLine" l JOIN "LedgerAccount" a ON a.id = l."accountId" WHERE l."tenantId" = ${t} AND a.type = 'STOCK_LOSS' GROUP BY 1)
+    SELECT (SELECT count(*) FROM sc LEFT JOIN el ON el."entryId" = sc."entryId" WHERE coalesce(el.amt, 0) <> sc.net OR (sc.net <> 0 AND sc."entryId" IS NULL))
+      + (SELECT count(*) FROM "JournalEntry" j WHERE j."tenantId" = ${t} AND j.kind = 'STOCK_COUNT' AND NOT EXISTS (SELECT 1 FROM "StockCount" s WHERE s."entryId" = j.id)) c`;
   const lock = await booksLock(ctx);
   const afterLock = lock
     ? await q`SELECT count(*) c FROM "JournalEntry" WHERE "tenantId" = ${t} AND "occurredAt" < ${dayEnd(lock)} AND "createdAt" > (SELECT coalesce(max("createdAt"), now()) FROM "AuditLog" WHERE "tenantId" = ${t} AND action = 'books.lock')`
@@ -689,6 +694,7 @@ export async function checkBooks(ctx: Ctx): Promise<{ ok: boolean; results: Chec
     { key: "claims", title: "Claims on companies add up", ok: !claims, found: claims, detail: claims ? "Claims receivable in the books differ from the claims still open" : "Each company's claims receivable equals its open claims", fix: "Open Books, Claims, then tell support." },
     { key: "vouchers", title: "Vouchers agree with the ledger", ok: !vouchers, found: vouchers, detail: vouchers ? `${vouchers} vouchers differ from their entries` : "Every voucher's lines are in the ledger as entered, and every cancelled one is reversed", fix: "Open Books, Vouchers, then tell support." },
     { key: "cash", title: "No cash below zero", ok: !cashBelow, found: cashBelow, detail: cashBelow ? `${cashBelow} cash accounts show less than nothing` : "Office cash, petty cash and staff cash are all ₹0 or more", fix: "Open the cash book: a payment from cash was entered before the cash came in, or a receipt or handover is missing." },
+    { key: "stock-counts", title: "Stock counts agree with the ledger", ok: !stockCounts, found: stockCounts, detail: stockCounts ? `${stockCounts} stock counts differ from their stock shortage entries` : "Every accepted count's shortage and excess at cost is in stock shortage", fix: "Open Books, Stock, Counts, then tell support." },
     { key: "lock", title: "Nothing new in closed days", ok: !afterLock, found: afterLock, detail: lock ? (afterLock ? `${afterLock} entries were added on or before ${showDay(lock)} after the books were closed` : `Closed up to ${showDay(lock)}; nothing was added there since`) : "The books are not closed for any days yet", fix: "Ask the owner to look at the day book for those days." },
   ];
   return { ok: results.every((r) => r.ok), results, counts: { entries, lines } };
