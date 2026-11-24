@@ -212,7 +212,7 @@ export function csvFor(r: DuesReport): (string | number | null)[][] {
 export function summaryText(r: DuesReport, business: string, filters: string) {
   const head = `${business}: ${DUES_TITLE[r.view]} (${asOnLine(r, filters)})`;
   if (r.view === "collections") return `${head}\nCollected ₹${money(r.totals.total)} from ${count(r.rows.length, "party", "parties")} (${COLLECTION_METHODS.filter((m) => r.totals.byMethod[m]).map((m) => `${METHOD_LABEL[m]} ₹${money(r.totals.byMethod[m])}`).join(", ") || "nothing yet"}).`;
-  if (r.view === "companies") return `${head}\nOutstanding ₹${money(r.totals.balance)} across ${count(r.companies.filter((c) => c.companyId).length, "company", "companies")} (${r.companies.slice(0, 4).map((c) => `${c.company} ₹${money(c.totals.balance)}`).join(", ")}${r.companies.length > 4 ? ", …" : ""}).`;
+  if (r.view === "companies") return `${head}\nOutstanding ₹${money(r.totals.balance)} across ${count(r.companies.filter((c) => c.companyId).length, "company", "companies")} (${[...r.companies].sort((x, y) => y.totals.balance - x.totals.balance).slice(0, 4).map((c) => `${c.company} ₹${money(c.totals.balance)}`).join(", ")}${r.companies.length > 4 ? ", …" : ""}).`;
   const n = r.view === "bills" ? r.bills.length : r.view === "parties" ? r.parties.reduce((s, p) => s + p.bills.length, 0) : r.agents.reduce((s, a) => s + a.parties.reduce((t, p) => t + p.bills.length, 0), 0);
   return `${head}\nOutstanding ₹${money(r.totals.balance)} on ${count(n, "bill")}.`;
 }
