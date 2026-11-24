@@ -5,8 +5,11 @@ import { countRetailers, entitlements } from "@/lib/plans";
 import { audit, requestIp } from "@/lib/audit";
 import { emit } from "@/lib/jobs";
 import { MoneyError, openingBalance, openingBills, type OpeningBill } from "@/lib/ledger";
+import { can } from "@/lib/permissions";
+import { importPurchases, importSupplierBills, importSuppliers } from "@/lib/books-import";
 import { invoiceSettings } from "@/lib/invoice-settings";
 import {
+  BOOKS_IMPORTS,
   IMPORT_TYPES,
   MAX_ROWS,
   parseSheet,
@@ -26,6 +29,12 @@ import {
   type ProductRow,
   type RetailerRow,
   type RowError,
+  validatePurchases,
+  validateSupplierBills,
+  validateSuppliers,
+  type PurchaseImportBill,
+  type SupplierBillImportRow,
+  type SupplierImportRow,
 } from "@/lib/importers";
 import { applyBillShares } from "@/lib/bill-shares";
 import { tidyProductRows, type TidyChange, type TidyDuplicate } from "@/lib/catalogue-rules";
@@ -345,12 +354,23 @@ async function importBillShares(tx: Tx, rows: BillShareRow[]): Promise<Summary> 
   return { ...(await applyBillShares(tx, rows)), newRegions: 0, newAreas: 0 };
 }
 
+async function importBooks(tx: Tx, type: ImportType, valid: unknown[], tenantId: string, actorId: string): Promise<Summary> {
+  const ctx = { tx, tenantId, actorId };
+  const r =
+    type === "suppliers"
+      ? await importSuppliers(ctx, valid as SupplierImportRow[])
+      : type === "supplier_bills"
+        ? await importSupplierBills(ctx, valid as SupplierBillImportRow[])
+        : await importPurchases(ctx, valid as PurchaseImportBill[]);
+  return { ...r, newRegions: 0, newAreas: 0 };
+}
+
 export async function GET(req: Request) {
   const auth = await guard("import.run");
   if (!auth.ok) return auth.res;
   const type = new URL(req.url).searchParams.get("type") as ImportType;
   if (!IMPORT_TYPES.includes(type)) {
-    return NextResponse.json({ error: "type must be retailers, products, balances, prices, bills or bill_shares" }, { status: 400 });
+    return NextResponse.json({ error: `type must be one of ${IMPORT_TYPES.join(", ")}` }, { status: 400 });
   }
   return new NextResponse("﻿" + templateCsv(type), {
     headers: {
@@ -374,8 +394,9 @@ export async function POST(req: Request) {
   const mode = String(form?.get("mode") ?? "preview");
   if (!(file instanceof File)) return NextResponse.json({ error: "Attach a CSV or Excel file" }, { status: 400 });
   if (!IMPORT_TYPES.includes(type)) {
-    return NextResponse.json({ error: "Choose retailers, products, balances, prices, bills or bill_shares" }, { status: 400 });
+    return NextResponse.json({ error: `Choose one of ${IMPORT_TYPES.join(", ")}` }, { status: 400 });
   }
+  if (BOOKS_IMPORTS.includes(type) && !can(session.role, "purchases.manage")) return NextResponse.json({ error: "Only someone who enters purchases can import suppliers and their bills" }, { status: 403 });
   if (!/\.(csv|xlsx)$/i.test(file.name)) {
     return NextResponse.json({ error: "Use a .csv or .xlsx file (old .xls: save as .xlsx first)" }, { status: 415 });
   }
@@ -415,7 +436,13 @@ export async function POST(req: Request) {
             ? validateBills(rows)
             : type === "bill_shares"
               ? validateBillShares(rows)
-              : validateBalances(rows);
+              : type === "suppliers"
+                ? validateSuppliers(rows)
+                : type === "supplier_bills"
+                  ? validateSupplierBills(rows)
+                  : type === "purchases"
+                    ? validatePurchases(rows)
+                    : validateBalances(rows);
 
   // Preview runs the exact same writes inside a transaction and rolls it back,
   // so what it reports is exactly what commit will do.
@@ -435,7 +462,9 @@ export async function POST(req: Request) {
                   ? await importBills(tx, checked.valid as BillRow[], tenant.id, session.userId)
                   : type === "bill_shares"
                     ? await importBillShares(tx, checked.valid as BillShareRow[])
-                    : await importBalances(tx, checked.valid as BalanceRow[], tenant.id, session.userId);
+                    : BOOKS_IMPORTS.includes(type)
+                      ? await importBooks(tx, type, checked.valid, tenant.id, session.userId)
+                      : await importBalances(tx, checked.valid as BalanceRow[], tenant.id, session.userId);
         s.errors = [...checked.errors, ...s.errors].sort((a, b) => a.row - b.row);
         if (mode !== "commit" || s.errors.length) throw new Rollback(s);
         return s;

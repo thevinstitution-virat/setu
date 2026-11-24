@@ -21,6 +21,7 @@ const TABS = [
   { href: "/admin/books/ledger", label: "Ledger" },
   { href: "/admin/books/daybook", label: "Day book" },
   { href: "/admin/books/opening", label: "Opening balances" },
+  { href: "/admin/books/switch", label: "Move books here" },
   { href: "/admin/books/year-end", label: "Year end" },
   { href: "/admin/books/check", label: "Check my books" },
 ];

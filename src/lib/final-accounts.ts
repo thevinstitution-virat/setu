@@ -87,7 +87,7 @@ export async function trialBalance(ctx: Ctx, from: string, to: string) {
 // ───────────────────────────── stock for the accounts ─────────────────────────────
 
 /** The switch date (or the first entry's day) and the stock brought in then. */
-async function booksStart(ctx: Ctx) {
+export async function booksStart(ctx: Ctx) {
   const t = await ctx.tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { booksStartOn: true, openingStock: true, openingEntryId: true } });
   let start = t.booksStartOn ? t.booksStartOn.toISOString().slice(0, 10) : null;
   if (!start) {

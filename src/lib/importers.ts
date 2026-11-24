@@ -7,8 +7,10 @@ import { toPaise } from "@/lib/money";
  * retailers by phone, products by SKU.
  */
 
-export type ImportType = "retailers" | "products" | "balances" | "prices" | "bills" | "bill_shares";
-export const IMPORT_TYPES: ImportType[] = ["retailers", "products", "balances", "prices", "bills", "bill_shares"];
+export type ImportType = "retailers" | "products" | "balances" | "prices" | "bills" | "bill_shares" | "suppliers" | "supplier_bills" | "purchases";
+export const IMPORT_TYPES: ImportType[] = ["retailers", "products", "balances", "prices", "bills", "bill_shares", "suppliers", "supplier_bills", "purchases"];
+/** Imports that write to the books (they also need purchases.manage). */
+export const BOOKS_IMPORTS: ImportType[] = ["suppliers", "supplier_bills", "purchases"];
 export type Row = Record<string, string>;
 export type RowError = { row: number; message: string };
 
@@ -53,6 +55,28 @@ export const TEMPLATES: Record<ImportType, { columns: string[]; required: string
     columns: ["invoice_no", "company", "value"],
     required: ["invoice_no", "company", "value"],
     example: ["A004231", "Chaiwala Foods Pvt Ltd", "6240.50"],
+  },
+  suppliers: {
+    // Matched by name: a supplier already here is updated (blank cells leave a field as it is).
+    // kind: goods (a company whose products we sell), services or other. PAN and state come from the GSTIN when blank.
+    columns: ["name", "kind", "gstin", "pan", "state_code", "phone", "email", "contact_name", "address", "credit_days", "tds_section", "bank_name", "bank_ifsc", "bank_account_no"],
+    required: ["name"],
+    example: ["Chaiwala Foods Pvt Ltd", "goods", "", "AABCC1234D", "27", "9822012345", "accounts@example.com", "Mr Joshi", "MIDC, Pune", "30", "", "State Bank of India", "SBIN0001234", "12345678901"],
+  },
+  supplier_bills: {
+    // What we owed each supplier on the switch date (the old software's creditors outstanding), one row per bill.
+    // A row with no bill_no and a negative amount is an advance we had paid them. All of a supplier's bills go in together, once.
+    columns: ["supplier", "bill_no", "date", "amount", "paid", "due_date"],
+    required: ["supplier", "amount"],
+    example: ["Chaiwala Foods Pvt Ltd", "CF/2526/0912", "18/03/2026", "48250", "10000", "17/04/2026"],
+  },
+  purchases: {
+    // Purchase bills, one row per line; the rows of a bill share supplier + bill_no (and its date).
+    // sku = one of our products; else head = an account head (rent, freight ...) by name.
+    // gst_rate blank = the product's rate. bill_total = the total printed on the bill (rounding up to Rs 1).
+    columns: ["supplier", "bill_no", "date", "due_date", "sku", "head", "item", "qty", "free_qty", "rate", "discount_pct", "gst_rate", "rates_include_gst", "reverse_charge", "bill_total"],
+    required: ["supplier", "bill_no", "date", "qty", "rate"],
+    example: ["Chaiwala Foods Pvt Ltd", "CF/2627/0457", "21/11/2026", "", "BEV-001", "", "", "48", "2", "70.50", "3", "5", "no", "no", "3388"],
   },
 };
 
@@ -484,5 +508,203 @@ export function validateBillShares(rows: Row[]): { valid: BillShareRow[]; errors
     seen.set(key, row);
     valid.push({ row, number, company, amount });
   });
+  return { valid, errors };
+}
+
+// ───────────────────────────── A2.6 books imports ─────────────────────────────
+
+/** Excel's dates arrive as "2026-03-18"; a person's as 18/03/2026. → "YYYY-MM-DD" (IST). */
+export function importDay(raw: string): string | null {
+  const d = parseIndianDate(raw ?? "");
+  return d ? new Date(d.getTime() + 5.5 * 3_600_000).toISOString().slice(0, 10) : null;
+}
+const istToday = (today: Date) => new Date(today.getTime() + 5.5 * 3_600_000).toISOString().slice(0, 10);
+const yes = (v: string | undefined) => /^(y|yes|true|1|haan|ha)$/i.test((v ?? "").trim());
+
+export type SupplierImportRow = { row: number; name: string; fields: Record<string, unknown> };
+
+/** Suppliers: the cells sent (blank = leave as it is), checked again by the supplier rules when saved. */
+export function validateSuppliers(rows: Row[]): { valid: SupplierImportRow[]; errors: RowError[] } {
+  const valid: SupplierImportRow[] = [];
+  const errors: RowError[] = [];
+  const seen = new Map<string, number>();
+  const map: Record<string, string> = {
+    kind: "kind",
+    gstin: "gstin",
+    pan: "pan",
+    state_code: "stateCode",
+    phone: "phone",
+    email: "email",
+    contact_name: "contactName",
+    address: "address",
+    credit_days: "creditDays",
+    tds_section: "tdsSection",
+    bank_name: "bankName",
+    bank_ifsc: "bankIfsc",
+    bank_account_no: "bankAccountNo",
+  };
+  rows.forEach((r, i) => {
+    const row = i + 2;
+    const name = (r.name ?? "").trim().replace(/\s+/g, " ");
+    if (name.length < 2) return errors.push({ row, message: "Missing name" });
+    const k = name.toLowerCase();
+    if (seen.has(k)) return errors.push({ row, message: `${name} is repeated (first on row ${seen.get(k)})` });
+    seen.set(k, row);
+    const fields: Record<string, unknown> = {};
+    for (const [col, key] of Object.entries(map)) {
+      const v = (r[col] ?? "").trim();
+      if (!v) continue;
+      fields[key] = key === "creditDays" ? Number(v) : key === "kind" ? v.toUpperCase() : v;
+    }
+    if (fields.stateCode && /^\d$/.test(String(fields.stateCode))) fields.stateCode = `0${fields.stateCode}`;
+    valid.push({ row, name, fields });
+  });
+  return { valid, errors };
+}
+
+export type SupplierBillImportRow = { row: number; supplier: string; number: string | null; date: string | null; dueDate: string | null; amount: number; paid: number };
+
+/** Suppliers' open bills on the switch date (see TEMPLATES.supplier_bills). */
+export function validateSupplierBills(rows: Row[], today = new Date()): { valid: SupplierBillImportRow[]; errors: RowError[] } {
+  const valid: SupplierBillImportRow[] = [];
+  const errors: RowError[] = [];
+  const seen = new Map<string, number>();
+  const now = istToday(today);
+  rows.forEach((r, i) => {
+    const row = i + 2;
+    const miss = missing(r, TEMPLATES.supplier_bills.required);
+    if (miss.length) return errors.push({ row, message: `Missing ${miss.join(", ")}` });
+    const supplier = r.supplier.trim().replace(/\s+/g, " ");
+    let amount: number, paid: number;
+    try {
+      amount = toPaise(r.amount);
+      paid = (r.paid ?? "").trim() ? toPaise(r.paid) : 0;
+    } catch {
+      return errors.push({ row, message: "amount and paid must be numbers in rupees" });
+    }
+    const number = (r.bill_no ?? "").trim() || null;
+    if (!number) {
+      if (amount >= 0) return errors.push({ row, message: "Missing bill_no (only an advance, a negative amount, may leave it blank)" });
+      valid.push({ row, supplier, number: null, date: null, dueDate: null, amount, paid: 0 });
+      return;
+    }
+    if (number.length > 40) return errors.push({ row, message: "bill_no is longer than 40 characters" });
+    const key = `${supplier.toLowerCase()}|${number.toLowerCase()}`;
+    if (seen.has(key)) return errors.push({ row, message: `Bill ${number} of ${supplier} is repeated (first on row ${seen.get(key)})` });
+    if (amount <= 0) return errors.push({ row, message: "amount must be more than 0" });
+    if (paid < 0) return errors.push({ row, message: "paid can't be negative" });
+    if (paid >= amount) return errors.push({ row, message: "paid is the whole bill: it isn't outstanding (leave the row out)" });
+    const date = importDay(r.date ?? "");
+    if (!date) return errors.push({ row, message: `Date "${r.date ?? ""}" should look like 21/11/2026 or 2026-11-21` });
+    if (date > now) return errors.push({ row, message: "Date is in the future" });
+    let dueDate: string | null = null;
+    if ((r.due_date ?? "").trim()) {
+      dueDate = importDay(r.due_date);
+      if (!dueDate) return errors.push({ row, message: `Due date "${r.due_date}" should look like 21/11/2026 or 2026-11-21` });
+      if (dueDate < date) return errors.push({ row, message: "Due date is before the bill date" });
+    }
+    seen.set(key, row);
+    valid.push({ row, supplier, number, date, dueDate, amount, paid });
+  });
+  return { valid, errors };
+}
+
+export type PurchaseImportLine = { row: number; sku: string | null; head: string | null; item: string | null; quantity: number; freeQty: number; rate: number; discountPct: number; gstRate: number | null };
+export type PurchaseImportBill = {
+  rows: number[];
+  supplier: string;
+  number: string;
+  date: string;
+  dueDate: string | null;
+  ratesIncludeGst: boolean;
+  reverseCharge: boolean;
+  billTotal: number | null;
+  lines: PurchaseImportLine[];
+};
+
+const num = (v: string | undefined) => {
+  const t = (v ?? "").trim().replace(/,/g, "");
+  return t ? Number(t) : 0;
+};
+
+/** Purchase bills, one row per line, grouped by supplier + bill_no (see TEMPLATES.purchases). */
+export function validatePurchases(rows: Row[], today = new Date()): { valid: PurchaseImportBill[]; errors: RowError[] } {
+  const errors: RowError[] = [];
+  const bills = new Map<string, PurchaseImportBill>();
+  const now = istToday(today);
+  rows.forEach((r, i) => {
+    const row = i + 2;
+    const miss = missing(r, TEMPLATES.purchases.required);
+    if (miss.length) return errors.push({ row, message: `Missing ${miss.join(", ")}` });
+    const supplier = r.supplier.trim().replace(/\s+/g, " ");
+    const number = r.bill_no.trim();
+    if (number.length > 40) return errors.push({ row, message: "bill_no is longer than 40 characters" });
+    const date = importDay(r.date);
+    if (!date) return errors.push({ row, message: `Date "${r.date}" should look like 21/11/2026 or 2026-11-21` });
+    if (date > now) return errors.push({ row, message: "Date is in the future" });
+    const dueDate = (r.due_date ?? "").trim() ? importDay(r.due_date) : null;
+    if ((r.due_date ?? "").trim() && !dueDate) return errors.push({ row, message: `Due date "${r.due_date}" should look like 21/11/2026 or 2026-11-21` });
+    const sku = (r.sku ?? "").trim() || null;
+    const head = (r.head ?? "").trim() || null;
+    if (!sku && !head) return errors.push({ row, message: "Give the sku of one of our products, or the account head (like Rent or Freight)" });
+    const quantity = num(r.qty);
+    const freeQty = num(r.free_qty);
+    const discountPct = num(r.discount_pct);
+    const gstText = (r.gst_rate ?? "").trim().replace(/%$/, "");
+    const gstRate = gstText ? Number(gstText) : null;
+    let rate: number;
+    try {
+      rate = toPaise(r.rate);
+    } catch {
+      return errors.push({ row, message: "rate must be a number in rupees" });
+    }
+    if (!Number.isInteger(quantity) || quantity <= 0) return errors.push({ row, message: "qty must be a whole number more than 0" });
+    if (!Number.isInteger(freeQty) || freeQty < 0) return errors.push({ row, message: "free_qty must be a whole number" });
+    if (!Number.isFinite(discountPct) || discountPct < 0 || discountPct >= 100) return errors.push({ row, message: "discount_pct must be 0 to 99.99" });
+    if (gstRate !== null && !Number.isFinite(gstRate)) return errors.push({ row, message: "gst_rate must be a number, like 5 or 18" });
+    if (rate <= 0) return errors.push({ row, message: "rate must be more than 0" });
+    let billTotal: number | null = null;
+    if ((r.bill_total ?? "").trim()) {
+      try {
+        billTotal = toPaise(r.bill_total);
+      } catch {
+        return errors.push({ row, message: "bill_total must be a number in rupees" });
+      }
+    }
+    const key = `${supplier.toLowerCase()}|${number.toLowerCase()}`;
+    let b = bills.get(key);
+    if (!b) {
+      b = { rows: [], supplier, number, date, dueDate, ratesIncludeGst: yes(r.rates_include_gst), reverseCharge: yes(r.reverse_charge), billTotal, lines: [] };
+      bills.set(key, b);
+    } else if (b.date !== date) return errors.push({ row, message: `Bill ${number} has another date on row ${b.rows[0]}` });
+    else if (billTotal !== null && b.billTotal !== null && billTotal !== b.billTotal) return errors.push({ row, message: `Bill ${number} has another bill_total on row ${b.rows[0]}` });
+    if (b.billTotal === null && billTotal !== null) b.billTotal = billTotal;
+    if (!b.dueDate && dueDate) b.dueDate = dueDate;
+    b.rows.push(row);
+    b.lines.push({ row, sku, head, item: (r.item ?? "").trim() || null, quantity, freeQty, rate, discountPct: Math.round(discountPct * 100) / 100, gstRate });
+  });
+  // A bill with a bad row is left out whole, so it isn't entered half.
+  const bad = new Set(errors.map((e) => e.row));
+  const badBills = new Map<string, number>();
+  for (const e of errors) {
+    const r = rows[e.row - 2];
+    if (!r) continue;
+    const key = `${(r.supplier ?? "").trim().replace(/\s+/g, " ").toLowerCase()}|${(r.bill_no ?? "").trim().toLowerCase()}`;
+    if (!badBills.has(key)) badBills.set(key, e.row);
+  }
+  const valid: PurchaseImportBill[] = [];
+  for (const [key, b] of bills) {
+    const hit = badBills.get(key);
+    if (hit) {
+      for (const x of b.rows) if (!bad.has(x)) errors.push({ row: x, message: `Bill ${b.number} has a problem on row ${hit}` });
+      continue;
+    }
+    if (b.lines.length > 300) {
+      for (const x of b.rows) errors.push({ row: x, message: `Bill ${b.number} has more than 300 lines` });
+      continue;
+    }
+    valid.push(b);
+  }
+  errors.sort((a, c) => a.row - c.row);
   return { valid, errors };
 }

@@ -41,6 +41,18 @@ const TYPES = {
     label: "Company split of open bills",
     hint: "invoice_no, company, value (₹). From your old software's company-wise outstanding: how much of each open bill is each company's, one row per bill and company. A bill's rows must add up to the bill (up to ₹1 off is fine) and replace any split it had. New companies are added as suppliers. Import open bills first; bills raised in VBiz Pro are split from their invoices.",
   },
+  suppliers: {
+    label: "Suppliers",
+    hint: "name, kind (goods, services or other), gstin, pan, state_code, phone, email, contact_name, address, credit_days, tds_section, bank_name, bank_ifsc, bank_account_no. Only the name is needed. A supplier already here (same name) is updated with the cells you filled; blank cells leave it as it is. PAN and state come from the GSTIN when blank.",
+  },
+  supplier_bills: {
+    label: "Suppliers' open bills",
+    hint: "supplier, bill_no, date, amount (₹), paid (₹ already paid on it), due_date. What you owed each supplier on the day the books start here, one row per unpaid bill (your old software's creditors outstanding). A row with no bill_no and a negative amount is an advance you had paid them. All of a supplier's bills go in together, once. Import suppliers first.",
+  },
+  purchases: {
+    label: "Purchase bills",
+    hint: "supplier, bill_no, date, due_date, sku, head, item, qty, free_qty, rate (₹), discount_pct, gst_rate, rates_include_gst (yes/no), reverse_charge (yes/no), bill_total (₹). One row per line; the rows of one bill share supplier, bill_no and date. sku = one of your products, else head = an account head such as Freight. gst_rate blank = the product's rate. Goods are not moved into stock: count the stock instead. A bill with a bad row is left out whole.",
+  },
 } as const;
 
 type ImportType = keyof typeof TYPES;

@@ -19,6 +19,7 @@ import { gstMonth, itcRegister } from "@/lib/gst-returns";
 import { itcCsv, monthsCsv } from "@/lib/gst-returns-export";
 import { periodOf, shiftPeriod } from "@/lib/gst-math";
 import { tdsReceived, tdsRegister } from "@/lib/tds";
+import { debtorsOn } from "@/lib/switch-over";
 import { receivedCsv, registerCsv } from "@/lib/tds-export";
 import type { AccountGroup } from "@/generated/prisma/client";
 import type { Ctx } from "@/lib/ledger";
@@ -258,25 +259,7 @@ async function allLedgers(ctx: Ctx, from: string, to: string): Promise<Cell[][]>
 
 /** Debtors as at a day: each shop's dues and unused money (advances) from its accounts. */
 async function debtors(ctx: Ctx, asOn: string): Promise<Cell[][]> {
-  const sums = await ctx.tx.ledgerLine.groupBy({
-    by: ["accountId"],
-    where: { account: { type: { in: ["RECEIVABLE", "WALLET"] } }, entry: { occurredAt: { lte: dayEnd(asOn) } } },
-    _sum: { amount: true },
-  });
-  const accs = await ctx.tx.ledgerAccount.findMany({
-    where: { id: { in: sums.map((s) => s.accountId) } },
-    select: { id: true, type: true, retailerId: true, retailer: { select: { outletName: true, user: { select: { phone: true } } } } },
-  });
-  const shops = new Map<string, { name: string; phone: string; dues: number; advance: number }>();
-  for (const s of sums) {
-    const a = accs.find((x) => x.id === s.accountId);
-    if (!a?.retailerId) continue;
-    const r = shops.get(a.retailerId) ?? { name: a.retailer?.outletName ?? "Shop", phone: a.retailer?.user?.phone ?? "", dues: 0, advance: 0 };
-    if (a.type === "RECEIVABLE") r.dues += Number(s._sum.amount ?? 0);
-    else r.advance -= Number(s._sum.amount ?? 0);
-    shops.set(a.retailerId, r);
-  }
-  const rows = [...shops.values()].filter((r) => r.dues || r.advance).sort((a, b) => b.dues - b.advance - (a.dues - a.advance));
+  const rows = await debtorsOn(ctx, asOn);
   return [
     ["Shop", "Phone", "Dues", "Unused money (advance)", "Net"],
     ...rows.map((r) => [r.name, r.phone, rupees(r.dues), rupees(r.advance), rupees(r.dues - r.advance)]),
