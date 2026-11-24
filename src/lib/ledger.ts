@@ -1,4 +1,5 @@
 import type {
+  AccountGroup,
   AccountType,
   BillKind,
   EntryKind,
@@ -50,10 +51,15 @@ export { MoneyError };
 
 // ───────────────────────────── accounts & entries ─────────────────────────────
 
-export type AccountRef = { type: AccountType; retailerId?: string; userId?: string };
+/**
+ * Which account. BANK with no bankAccountId is the business's default bank;
+ * HEAD is one of the business's own heads (rent, salaries, capital …).
+ */
+export type AccountRef = { type: AccountType; retailerId?: string; userId?: string; headId?: string; bankAccountId?: string };
 
 const PER_RETAILER: AccountType[] = ["RECEIVABLE", "WALLET", "WALLET_HOLD"];
 
+/** The account code, for every account whose code needs no lookup (not a chosen bank). */
 export function accountCode(ref: AccountRef): string {
   if (PER_RETAILER.includes(ref.type)) {
     if (!ref.retailerId) throw new Error(`${ref.type} needs a retailerId`);
@@ -63,10 +69,47 @@ export function accountCode(ref: AccountRef): string {
     if (!ref.userId) throw new Error("STAFF_CASH needs a userId");
     return `STAFF_CASH:${ref.userId}`;
   }
+  if (ref.type === "HEAD") {
+    if (!ref.headId) throw new Error("HEAD needs a headId");
+    return `HEAD:${ref.headId}`;
+  }
+  if (ref.type === "BANK" && ref.bankAccountId) throw new Error("A chosen bank's code comes from its bank account");
   return ref.type;
 }
 
-const NAMES: Record<AccountType, string> = {
+/** Where each built-in account sits in the trial balance, P&L and balance sheet. */
+export const GROUP_OF: Record<Exclude<AccountType, "HEAD">, AccountGroup> = {
+  RECEIVABLE: "DEBTORS",
+  WALLET: "CURRENT_LIABILITIES",
+  WALLET_HOLD: "CURRENT_LIABILITIES",
+  STAFF_CASH: "CASH",
+  OFFICE_CASH: "CASH",
+  BANK: "BANK",
+  UPI_CLEARING: "IN_TRANSIT",
+  CHEQUES_IN_HAND: "IN_TRANSIT",
+  GATEWAY_CLEARING: "IN_TRANSIT",
+  ISSUED_CHEQUES: "IN_TRANSIT",
+  SALES: "SALES",
+  GST_OUTPUT: "DUTIES_TAXES",
+  GST_INPUT: "DUTIES_TAXES",
+  TDS_PAYABLE: "DUTIES_TAXES",
+  TDS_RECEIVABLE: "DUTIES_TAXES",
+  OPENING_EQUITY: "CAPITAL",
+  DISCOUNT: "INDIRECT_EXPENSES",
+  CASH_SHORTAGE: "INDIRECT_EXPENSES",
+  PROMOTIONS: "INDIRECT_EXPENSES",
+  GATEWAY_FEES: "INDIRECT_EXPENSES",
+  ROUND_OFF: "INDIRECT_EXPENSES",
+  STOCK_LOSS: "INDIRECT_EXPENSES",
+  PENALTY_INCOME: "OTHER_INCOME",
+  CLAIM_INCOME: "OTHER_INCOME",
+  PAYABLE: "CREDITORS",
+  CLAIMS_RECEIVABLE: "CLAIMS",
+  PURCHASES: "PURCHASES",
+  PURCHASE_RETURNS: "PURCHASES",
+};
+
+export const NAMES: Record<AccountType, string> = {
   RECEIVABLE: "Receivable",
   WALLET: "Wallet",
   WALLET_HOLD: "Wallet (reserved)",
@@ -84,33 +127,100 @@ const NAMES: Record<AccountType, string> = {
   PROMOTIONS: "Promotions and rewards",
   GATEWAY_CLEARING: "Online payments to be settled",
   GATEWAY_FEES: "Payment gateway fees",
+  PAYABLE: "Payable",
+  PURCHASES: "Purchases",
+  PURCHASE_RETURNS: "Purchase returns",
+  GST_INPUT: "GST input credit",
+  TDS_PAYABLE: "TDS payable",
+  TDS_RECEIVABLE: "TDS deducted by customers",
+  CLAIMS_RECEIVABLE: "Claims receivable",
+  CLAIM_INCOME: "Claims on companies",
+  ROUND_OFF: "Rounding off",
+  STOCK_LOSS: "Stock shortage",
+  ISSUED_CHEQUES: "Cheques issued, not cleared",
+  HEAD: "Account head",
 };
+
+type Resolved = { code: string; name: string; group: AccountGroup; headId: string | null; bankAccountId: string | null };
+
+/**
+ * The code, name and group of an account. For posting (`posting`), a hidden
+ * head or a closed bank is refused; for reading balances it is not.
+ */
+async function resolveAccount(ctx: Ctx, ref: AccountRef, posting: boolean): Promise<Resolved> {
+  if (ref.type === "HEAD") {
+    const h = ref.headId ? await ctx.tx.ledgerHead.findUnique({ where: { id: ref.headId } }) : null;
+    if (!h) throw new MoneyError("Account head not found", 404);
+    if (posting && !h.active) throw new MoneyError(`${h.name} is hidden. Show it again under Books → Accounts to post to it.`);
+    return { code: `HEAD:${h.id}`, name: h.name, group: h.group, headId: h.id, bankAccountId: null };
+  }
+  if (ref.type === "BANK") {
+    const b = ref.bankAccountId
+      ? await ctx.tx.bankAccount.findUnique({ where: { id: ref.bankAccountId } })
+      : await ctx.tx.bankAccount.findFirst({ where: { isDefault: true } });
+    if (ref.bankAccountId && !b) throw new MoneyError("Bank account not found", 404);
+    if (b) {
+      if (posting && !b.active) throw new MoneyError(`${b.name} is closed. Open it again under Books → Bank accounts to post to it.`);
+      return { code: b.ledgerCode, name: b.name, group: "BANK", headId: null, bankAccountId: b.id };
+    }
+    // No bank accounts set up yet: the business's one bank, as before.
+    return { code: "BANK", name: NAMES.BANK, group: "BANK", headId: null, bankAccountId: null };
+  }
+  return { code: accountCode(ref), name: NAMES[ref.type], group: GROUP_OF[ref.type], headId: null, bankAccountId: null };
+}
+
+const refKey = (ref: AccountRef) =>
+  ref.type === "HEAD" ? `HEAD:${ref.headId}` : ref.type === "BANK" ? `BANK#${ref.bankAccountId ?? "default"}` : accountCode(ref);
 
 // Per-transaction cache: an account created in a transaction that rolls back
 // must not be remembered, so the cache lives and dies with the tx object.
 const accountCache = new WeakMap<object, Map<string, string>>();
 
 export async function accountId(ctx: Ctx, ref: AccountRef): Promise<string> {
-  const code = accountCode(ref);
+  const key = refKey(ref);
   let cache = accountCache.get(ctx.tx);
   if (!cache) accountCache.set(ctx.tx, (cache = new Map()));
-  const hit = cache.get(code);
+  const hit = cache.get(key);
   if (hit) return hit;
+  const r = await resolveAccount(ctx, ref, true);
   const acc = await ctx.tx.ledgerAccount.upsert({
-    where: { tenantId_code: { tenantId: ctx.tenantId, code } },
+    where: { tenantId_code: { tenantId: ctx.tenantId, code: r.code } },
     create: {
       tenantId: ctx.tenantId,
       type: ref.type,
-      code,
-      name: NAMES[ref.type],
+      code: r.code,
+      name: r.name,
+      group: r.group,
       retailerId: ref.retailerId ?? null,
       userId: ref.userId ?? null,
+      headId: r.headId,
+      bankAccountId: r.bankAccountId,
     },
-    update: {},
+    // The first bank account takes over the old "BANK" ledger account.
+    update: r.bankAccountId ? { bankAccountId: r.bankAccountId, name: r.name } : {},
     select: { id: true },
   });
-  cache.set(code, acc.id);
+  cache.set(key, acc.id);
   return acc.id;
+}
+
+// ───────────────────────────── books lock ─────────────────────────────
+
+const lockCache = new WeakMap<object, number | null>();
+const dayOfDate = (d: Date) => Math.floor(d.getTime() / DAY_MS);
+const ddmmyyyy = (day: number) => new Date(day * DAY_MS).toISOString().slice(0, 10).split("-").reverse().join("/");
+
+/** Refuses a posting dated on or before the day the books are closed up to. */
+export async function assertBooksOpen(ctx: Ctx, when: Date) {
+  let locked = lockCache.get(ctx.tx);
+  if (locked === undefined) {
+    const t = await ctx.tx.tenant.findUnique({ where: { id: ctx.tenantId }, select: { booksLockedUntil: true } });
+    locked = t?.booksLockedUntil ? dayOfDate(t.booksLockedUntil) : null;
+    lockCache.set(ctx.tx, locked);
+  }
+  if (locked !== null && istDay(when) <= locked) {
+    throw new MoneyError(`The books are closed up to ${ddmmyyyy(locked)}. Ask the owner to open them to post on ${ddmmyyyy(istDay(when))}.`, 409);
+  }
 }
 
 export type Line = { account: AccountRef; amount: number };
@@ -134,6 +244,7 @@ export async function post(
   const total = lines.reduce((s, l) => s + l.amount, 0);
   if (total !== 0) throw new Error(`Unbalanced entry (${total} paise)`);
   if (lines.length < 2) throw new Error("An entry needs at least two non-zero lines");
+  await assertBooksOpen(ctx, e.occurredAt ?? new Date());
 
   const resolved = [];
   for (const l of lines) resolved.push({ accountId: await accountId(ctx, l.account), amount: l.amount });
@@ -161,6 +272,7 @@ export async function reverseEntry(ctx: Ctx, entryId: string, memo: string) {
   });
   if (!orig) throw new MoneyError("Entry not found", 404);
   if (orig.reversedBy) throw new MoneyError("This entry was already reversed", 409);
+  await assertBooksOpen(ctx, new Date());
   return ctx.tx.journalEntry.create({
     data: {
       kind: "REVERSAL",
@@ -177,8 +289,9 @@ export async function reverseEntry(ctx: Ctx, entryId: string, memo: string) {
 }
 
 export async function balanceOf(ctx: Ctx, ref: AccountRef): Promise<number> {
+  const code = ref.type === "HEAD" || ref.type === "BANK" ? (await resolveAccount(ctx, ref, false)).code : accountCode(ref);
   const acc = await ctx.tx.ledgerAccount.findUnique({
-    where: { tenantId_code: { tenantId: ctx.tenantId, code: accountCode(ref) } },
+    where: { tenantId_code: { tenantId: ctx.tenantId, code } },
     select: { id: true },
   });
   if (!acc) return 0;

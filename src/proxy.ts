@@ -3,11 +3,13 @@ import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { crossSiteRefused } from "@/lib/security";
 import { appSecret } from "@/lib/app-secret";
+import { officeAllows } from "@/lib/permissions";
 
 const SESSION_COOKIE = "setu_session";
 
 const roleHomes: Record<string, string> = {
   ADMIN: "/admin",
+  ACCOUNTANT: "/admin/books",
   RETAILER: "/retailer",
   SALES_AGENT: "/sales",
   DELIVERY_AGENT: "/delivery",
@@ -57,6 +59,10 @@ export async function proxy(request: NextRequest) {
   try {
     const { payload } = await jwtVerify(token, new TextEncoder().encode(appSecret("SESSION_SECRET")), { algorithms: ["HS256"] });
     const role = payload.role as string;
+    // The accountant shares the office, but only its books and money pages.
+    if (matchedPrefix === "/admin" && role === "ACCOUNTANT") {
+      return officeAllows(role, pathname) ? next() : to(roleHomes.ACCOUNTANT);
+    }
     if (role !== protectedPrefixes[matchedPrefix]) {
       return to(roleHomes[role] ?? "/login");
     }

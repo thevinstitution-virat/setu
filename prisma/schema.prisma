@@ -28,6 +28,8 @@ enum Role {
   DELIVERY_AGENT
   /// Leads a team of field staff (sales agents, drivers): attendance, beats, leave, targets, reports.
   SUPERVISOR
+  /// Keeps the books: accounts, banks, purchases, suppliers, GST, TDS, final accounts.
+  ACCOUNTANT
 }
 
 enum OrderStatus {
@@ -76,6 +78,8 @@ model Tenant {
   brand             Json         @default("{}")
   /// Business rules: { orderCutoff, slots, minOrderPaise, ... }
   settings          Json         @default("{}")
+  /// Books closed up to this day (inclusive): nothing may be posted on or before it.
+  booksLockedUntil  DateTime?    @db.Date
   /// Platform overrides of the plan: { features: { inventory: true }, limits: { staff: 80 } }
   overrides         Json         @default("{}")
   /// Set-up checklist steps the owner ticked off or skipped.
@@ -180,6 +184,8 @@ model Tenant {
   platformInvoices   PlatformInvoice[]
   supportSessions    SupportSession[]
   exports            TenantExport[]
+  ledgerHeads        LedgerHead[]
+  bankAccounts       BankAccount[]
 }
 
 /// Custom domains a tenant has verified (e.g. order.agencyname.in).
@@ -1011,6 +1017,47 @@ enum AccountType {
   PROMOTIONS // rewards we give away (refer and earn)
   GATEWAY_CLEARING // paid online, not yet settled to our bank by the gateway
   GATEWAY_FEES // the gateway's fee and its GST
+  PAYABLE // per supplier: what we owe them
+  PURCHASES
+  PURCHASE_RETURNS
+  GST_INPUT
+  TDS_PAYABLE // TDS we deducted, to pay to the government
+  TDS_RECEIVABLE // TDS customers deducted from what they paid us
+  CLAIMS_RECEIVABLE // per supplier: claims raised on the company, not yet settled
+  CLAIM_INCOME
+  ROUND_OFF
+  STOCK_LOSS // shortage found in a physical count
+  ISSUED_CHEQUES // cheques we wrote, not yet cleared by our bank
+  HEAD // the business's own account head (LedgerHead), code HEAD:<id>
+}
+
+/// Where an account sits in the trial balance, P&L and balance sheet.
+enum AccountGroup {
+  CAPITAL
+  DRAWINGS
+  LOANS
+  CURRENT_LIABILITIES
+  CREDITORS
+  DUTIES_TAXES
+  FIXED_ASSETS
+  DEBTORS
+  CLAIMS
+  CASH
+  BANK
+  IN_TRANSIT
+  CURRENT_ASSETS
+  SALES
+  PURCHASES
+  DIRECT_EXPENSES
+  INDIRECT_EXPENSES
+  OTHER_INCOME
+}
+
+enum BankKind {
+  CURRENT
+  SAVINGS
+  OD
+  CC
 }
 
 enum EntryKind {
@@ -1071,22 +1118,75 @@ enum BillKind {
 }
 
 model LedgerAccount {
-  id         String           @id @default(cuid())
-  tenantId   String           @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant     Tenant           @relation(fields: [tenantId], references: [id])
-  type       AccountType
+  id            String           @id @default(cuid())
+  tenantId      String           @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant           @relation(fields: [tenantId], references: [id])
+  type          AccountType
   /// e.g. "RECEIVABLE:<retailerId>", "STAFF_CASH:<userId>", "BANK"
-  code       String
-  name       String
-  retailerId String?
-  retailer   RetailerProfile? @relation(fields: [retailerId], references: [id])
-  userId     String?
-  createdAt  DateTime         @default(now())
+  code          String
+  name          String
+  retailerId    String?
+  retailer      RetailerProfile? @relation(fields: [retailerId], references: [id])
+  userId        String?
+  group         AccountGroup
+  headId        String?
+  head          LedgerHead?      @relation(fields: [headId], references: [id])
+  bankAccountId String?
+  bankAccount   BankAccount?     @relation(fields: [bankAccountId], references: [id])
+  createdAt     DateTime         @default(now())
 
   lines LedgerLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId, type])
+  @@index([tenantId, group])
+}
+
+/// The business's own accounts: rent, salaries, capital, loans, vehicles ...
+model LedgerHead {
+  id        String       @id @default(cuid())
+  tenantId  String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant       @relation(fields: [tenantId], references: [id])
+  name      String
+  group     AccountGroup
+  /// Hidden heads keep their entries but take no new ones.
+  active    Boolean      @default(true)
+  /// Starter heads carry a key (e.g. "rent") so they are created once.
+  key       String?
+  note      String?
+  createdAt DateTime     @default(now())
+
+  accounts LedgerAccount[]
+
+  @@unique([tenantId, name])
+  @@unique([tenantId, key])
+}
+
+/// A bank account of the business (any number; OD / CC may run below zero).
+model BankAccount {
+  id         String   @id @default(cuid())
+  tenantId   String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  name       String
+  kind       BankKind @default(CURRENT)
+  bankName   String?
+  last4      String?
+  ifsc       String?
+  branch     String?
+  /// OD / CC limit, paise.
+  odLimit    Int?
+  /// Ledger account code: "BANK" for the first one (older entries), else "BANK:<id>".
+  ledgerCode String
+  /// Money with no bank chosen goes here.
+  isDefault  Boolean  @default(false)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  accounts   LedgerAccount[]
+  statements BankStatement[]
+
+  @@unique([tenantId, name])
+  @@unique([tenantId, ledgerCode])
 }
 
 model JournalEntry {
@@ -2344,19 +2444,21 @@ model GatewaySettlement {
 }
 
 model BankStatement {
-  id           String    @id @default(cuid())
-  tenantId     String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant       Tenant    @relation(fields: [tenantId], references: [id])
-  fileName     String
+  id            String       @id @default(cuid())
+  tenantId      String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  fileName      String
   /// Which bank account (a label the office types, e.g. "HDFC current").
-  account      String
-  fromDate     DateTime?
-  toDate       DateTime?
-  lineCount    Int       @default(0)
-  skipped      Int       @default(0)
-  uploadedById String
-  uploadedBy   User      @relation(fields: [uploadedById], references: [id])
-  createdAt    DateTime  @default(now())
+  account       String
+  bankAccountId String?
+  bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id])
+  fromDate      DateTime?
+  toDate        DateTime?
+  lineCount     Int          @default(0)
+  skipped       Int          @default(0)
+  uploadedById  String
+  uploadedBy    User         @relation(fields: [uploadedById], references: [id])
+  createdAt     DateTime     @default(now())
 
   lines BankLine[]
 

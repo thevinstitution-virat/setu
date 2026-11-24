@@ -7,7 +7,7 @@ import { checkLimit, entitlements, LimitError } from "@/lib/plans";
 import { addProblem, managesAdmins } from "@/lib/team-rules";
 import { passwordProblem } from "@/lib/email-auth";
 
-const STAFF_ROLES = ["ADMIN", "SALES_AGENT", "DELIVERY_AGENT", "SUPERVISOR"] as const;
+const STAFF_ROLES = ["ADMIN", "SALES_AGENT", "DELIVERY_AGENT", "SUPERVISOR", "ACCOUNTANT"] as const;
 
 export async function GET() {
   const auth = await guard("team.view");

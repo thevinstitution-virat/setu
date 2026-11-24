@@ -14,6 +14,7 @@ const ROLE: Record<string, string> = {
   SALES_AGENT: "Sales",
   DELIVERY_AGENT: "Delivery",
   SUPERVISOR: "Supervisor",
+  ACCOUNTANT: "Accountant",
 };
 
 /**

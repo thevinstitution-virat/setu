@@ -6,7 +6,7 @@ import Icon from "@/components/Icon";
 import { ErrorBox, Field, Flash, Sheet, TabBar, errText, send, useFetch } from "@/components/admin/AdminKit";
 import { validMobile } from "@/lib/field-math";
 
-type Role = "ADMIN" | "SALES_AGENT" | "DELIVERY_AGENT" | "SUPERVISOR";
+type Role = "ADMIN" | "SALES_AGENT" | "DELIVERY_AGENT" | "SUPERVISOR" | "ACCOUNTANT";
 
 type TeamUser = {
   id: string;
@@ -38,6 +38,7 @@ const ROLES: readonly { role: Role; label: string; plural: string; chip: string 
   { role: "SALES_AGENT", label: "Sales agent", plural: "Sales agents", chip: "chip-kesar" },
   { role: "DELIVERY_AGENT", label: "Delivery agent", plural: "Delivery agents", chip: "chip-mor" },
   { role: "SUPERVISOR", label: "Supervisor", plural: "Supervisors", chip: "chip-genda" },
+  { role: "ACCOUNTANT", label: "Accountant", plural: "Accountants", chip: "chip-mint" },
   { role: "ADMIN", label: "Admin", plural: "Admins", chip: "chip-mint" },
 ];
 const roleInfo = (r: Role) => ROLES.find((x) => x.role === r) ?? ROLES[0];
@@ -137,7 +138,7 @@ export default function AdminTeamPage() {
         role: form.role,
         ...(form.phone ? { phone: form.phone } : {}),
         ...(form.email.trim() ? { email: form.email.trim() } : {}),
-        ...(form.role !== "SUPERVISOR" && form.role !== "ADMIN" && form.supervisorId ? { supervisorId: form.supervisorId } : {}),
+        ...(form.role !== "SUPERVISOR" && form.role !== "ADMIN" && form.role !== "ACCOUNTANT" && form.supervisorId ? { supervisorId: form.supervisorId } : {}),
       });
       setFlash(`${form.name.trim()} added`);
       setForm({ ...EMPTY, role: form.role, supervisorId: form.supervisorId });
@@ -253,7 +254,7 @@ export default function AdminTeamPage() {
           <Field label="Email" hint={EMAIL_HINT}>
             <input className="input" type="email" autoCapitalize="none" autoComplete="off" placeholder="name@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           </Field>
-          {form.role !== "SUPERVISOR" && form.role !== "ADMIN" && (
+          {form.role !== "SUPERVISOR" && form.role !== "ADMIN" && form.role !== "ACCOUNTANT" && (
             <Field label="Supervisor" hint={supervisors.length ? undefined : "Add a supervisor first to build a team."}>
               <SupervisorSelect value={form.supervisorId} onChange={(id) => setForm({ ...form, supervisorId: id })} options={supervisors} />
             </Field>
@@ -311,6 +312,8 @@ export default function AdminTeamPage() {
                         ? "Business owner: only they change their own sign-in"
                         : u.role === "ADMIN"
                         ? "Admin: everything except changing the owner"
+                        : u.role === "ACCOUNTANT"
+                        ? "Accountant: the books, khata, invoices, payments, cash, bank and reports"
                         : u.role === "SUPERVISOR"
                         ? `Team of ${teamSize(u.id)}`
                         : u.supervisor
@@ -540,7 +543,7 @@ function EditStaff({
       <Field label="Email" hint={`${EMAIL_HINT} Leave blank to remove.`}>
         <input className="input" type="email" autoCapitalize="none" autoComplete="off" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
       </Field>
-      {user.role === "ADMIN" ? null : user.role !== "SUPERVISOR" ? (
+      {user.role === "ADMIN" || user.role === "ACCOUNTANT" ? null : user.role !== "SUPERVISOR" ? (
         <Field label="Supervisor" hint={options.length ? "Their supervisor sees their day, visits and leave." : "Add a supervisor first to build a team."}>
           <SupervisorSelect value={supervisorId} onChange={setSupervisorId} options={options} />
         </Field>
