@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 
 const TABS = [
   { href: "/admin/books", label: "Accounts" },
+  { href: "/admin/books/final", label: "Final accounts" },
   { href: "/admin/books/purchases", label: "Purchases" },
   { href: "/admin/books/payments", label: "Payments" },
   { href: "/admin/books/payables", label: "Payables" },
@@ -17,6 +18,8 @@ const TABS = [
   { href: "/admin/books/banks", label: "Bank accounts" },
   { href: "/admin/books/ledger", label: "Ledger" },
   { href: "/admin/books/daybook", label: "Day book" },
+  { href: "/admin/books/opening", label: "Opening balances" },
+  { href: "/admin/books/year-end", label: "Year end" },
   { href: "/admin/books/check", label: "Check my books" },
 ];
 

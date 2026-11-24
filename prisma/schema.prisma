@@ -80,6 +80,12 @@ model Tenant {
   settings          Json         @default("{}")
   /// Books closed up to this day (inclusive): nothing may be posted on or before it.
   booksLockedUntil  DateTime?    @db.Date
+  /// The first day kept in these books (the switch date); opening balances are dated the day before.
+  booksStartOn      DateTime?    @db.Date
+  /// Stock at cost at the start of the first year in these books (the opening trial balance's stock line), paise.
+  openingStock      BigInt?
+  /// The opening balances entry (heads, banks, cash, taxes) made on the Opening page.
+  openingEntryId    String?
   /// Platform overrides of the plan: { features: { inventory: true }, limits: { staff: 80 } }
   overrides         Json         @default("{}")
   /// Set-up checklist steps the owner ticked off or skipped.

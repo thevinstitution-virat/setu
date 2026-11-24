@@ -372,51 +372,71 @@ export async function chartOfAccounts(ctx: Ctx, asOn?: string) {
     where: asOn ? { entry: { occurredAt: { lte: dayEnd(asOn) } } } : undefined,
     _sum: { amount: true },
   });
-  const bal = new Map(sums.map((s) => [s.accountId, Number(s._sum.amount ?? 0)]));
-  const [accounts, heads, banks] = await Promise.all([
-    ctx.tx.ledgerAccount.findMany({ select: { id: true, code: true, type: true, name: true, group: true, headId: true, bankAccountId: true } }),
-    ctx.tx.ledgerHead.findMany({ orderBy: { name: "asc" } }),
-    ctx.tx.bankAccount.findMany({ orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
-  ]);
-  const rows: ChartRow[] = [];
-  const rolled = new Map<string, ChartRow>();
-  const ROLL: Partial<Record<AccountType, { name: string; href: string }>> = {
-    RECEIVABLE: { name: "Shops' dues", href: "/admin/khata" },
-    WALLET: { name: "Shops' wallets", href: "/admin/khata" },
-    WALLET_HOLD: { name: "Wallet money reserved for orders", href: "/admin/khata" },
-    STAFF_CASH: { name: "Cash with staff", href: "/admin/cash" },
-    PAYABLE: { name: "Suppliers' bills", href: "/admin/books/suppliers" },
-    CLAIMS_RECEIVABLE: { name: "Claims on companies", href: "/admin/books/claims" },
-  };
-  const byHead = new Map<string, number>();
-  const byBank = new Map<string, number>();
-  for (const a of accounts) {
-    const b = bal.get(a.id) ?? 0;
-    const roll = ROLL[a.type];
-    if (roll) {
-      const r = rolled.get(a.type) ?? { key: a.type, name: roll.name, group: GROUP_OF[a.type as Exclude<AccountType, "HEAD">], balance: 0, code: null, href: roll.href, count: 0, active: true };
-      r.balance += b;
-      r.count = (r.count ?? 0) + 1;
-      rolled.set(a.type, r);
-    } else if (a.headId) byHead.set(a.headId, (byHead.get(a.headId) ?? 0) + b);
-    else if (a.bankAccountId) byBank.set(a.bankAccountId, (byBank.get(a.bankAccountId) ?? 0) + b);
-    else rows.push({ key: a.code, name: a.name, group: a.group, balance: b, code: a.code, href: ledgerHref(a.code), active: true });
-  }
-  rows.push(...rolled.values());
-  for (const h of heads) {
-    const code = `HEAD:${h.id}`;
-    rows.push({ key: code, name: h.name, group: h.group, balance: byHead.get(h.id) ?? 0, code, href: ledgerHref(code), headId: h.id, active: h.active, note: h.note });
-  }
-  for (const b of banks) {
-    rows.push({ key: b.ledgerCode, name: b.name, group: "BANK", balance: byBank.get(b.id) ?? 0, code: b.ledgerCode, href: ledgerHref(b.ledgerCode), bankAccountId: b.id, active: b.active, note: b.isDefault ? "Default" : null });
-  }
+  const rolled = await rollAccounts(ctx, new Map(sums.map((s) => [s.accountId, [Number(s._sum.amount ?? 0)]])), 1);
+  const rows: ChartRow[] = rolled.map(({ v, ...r }) => ({ ...r, balance: v[0] }));
   const groups: ChartGroup[] = GROUP_ORDER.map((g) => {
-    const rs = rows.filter((r) => r.group === g).sort((x, y) => x.name.localeCompare(y.name));
+    const rs = rows.filter((r) => r.group === g);
     return { group: g, label: GROUPS[g].label, side: GROUPS[g].side, rows: rs, total: rs.reduce((s, r) => s + r.balance, 0) };
   }).filter((g) => g.rows.length);
   const debit = rows.reduce((s, r) => s + Math.max(0, r.balance), 0);
   const credit = rows.reduce((s, r) => s + Math.max(0, -r.balance), 0);
   return { groups, debit, credit, difference: debit - credit };
+}
+
+export type RolledRow = Omit<ChartRow, "balance"> & {
+  /** One figure per column asked for (debit positive). */
+  v: number[];
+};
+
+const ROLL: Partial<Record<AccountType, { name: string; href: string }>> = {
+  RECEIVABLE: { name: "Shops' dues", href: "/admin/khata" },
+  WALLET: { name: "Shops' wallets", href: "/admin/khata" },
+  WALLET_HOLD: { name: "Wallet money reserved for orders", href: "/admin/khata" },
+  STAFF_CASH: { name: "Cash with staff", href: "/admin/cash" },
+  PAYABLE: { name: "Suppliers' bills", href: "/admin/books/suppliers" },
+  CLAIMS_RECEIVABLE: { name: "Claims on companies", href: "/admin/books/claims" },
+};
+
+/**
+ * Accounts as the reports show them, each with `width` figures taken from
+ * `vals` (by ledger account id): one row per head, bank and built-in
+ * account; shops', staff and suppliers' accounts rolled into one row of each
+ * kind. Sorted by group order, then name.
+ */
+export async function rollAccounts(ctx: Ctx, vals: Map<string, number[]>, width: number): Promise<RolledRow[]> {
+  const zero = () => Array.from({ length: width }, () => 0);
+  const add = (a: number[], b: number[] | undefined) => (b ? a.map((x, i) => x + (b[i] ?? 0)) : a);
+  const [accounts, heads, banks] = await Promise.all([
+    ctx.tx.ledgerAccount.findMany({ select: { id: true, code: true, type: true, name: true, group: true, headId: true, bankAccountId: true } }),
+    ctx.tx.ledgerHead.findMany({ orderBy: { name: "asc" } }),
+    ctx.tx.bankAccount.findMany({ orderBy: [{ isDefault: "desc" }, { name: "asc" }] }),
+  ]);
+  const rows: RolledRow[] = [];
+  const rolled = new Map<string, RolledRow>();
+  const byHead = new Map<string, number[]>();
+  const byBank = new Map<string, number[]>();
+  for (const a of accounts) {
+    const b = vals.get(a.id);
+    const roll = ROLL[a.type];
+    if (roll) {
+      const r = rolled.get(a.type) ?? { key: a.type, name: roll.name, group: GROUP_OF[a.type as Exclude<AccountType, "HEAD">], v: zero(), code: null, href: roll.href, count: 0, active: true };
+      r.v = add(r.v, b);
+      r.count = (r.count ?? 0) + 1;
+      rolled.set(a.type, r);
+    } else if (a.headId) byHead.set(a.headId, add(byHead.get(a.headId) ?? zero(), b));
+    else if (a.bankAccountId) byBank.set(a.bankAccountId, add(byBank.get(a.bankAccountId) ?? zero(), b));
+    else rows.push({ key: a.code, name: a.name, group: a.group, v: add(zero(), b), code: a.code, href: ledgerHref(a.code), active: true });
+  }
+  rows.push(...rolled.values());
+  for (const h of heads) {
+    const code = `HEAD:${h.id}`;
+    rows.push({ key: code, name: h.name, group: h.group, v: byHead.get(h.id) ?? zero(), code, href: ledgerHref(code), headId: h.id, active: h.active, note: h.note });
+  }
+  for (const b of banks) {
+    rows.push({ key: b.ledgerCode, name: b.name, group: "BANK", v: byBank.get(b.id) ?? zero(), code: b.ledgerCode, href: ledgerHref(b.ledgerCode), bankAccountId: b.id, active: b.active, note: b.isDefault ? "Default" : null });
+  }
+  const order = new Map(GROUP_ORDER.map((g, i) => [g, i]));
+  return rows.sort((x, y) => (order.get(x.group) ?? 0) - (order.get(y.group) ?? 0) || x.name.localeCompare(y.name));
 }
 
 export const ledgerHref = (code: string) => `/admin/books/ledger?account=${encodeURIComponent(code)}`;

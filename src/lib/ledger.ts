@@ -273,15 +273,15 @@ export async function post(
   });
 }
 
-/** Cancel an entry with an equal and opposite one. Each entry can be reversed once. */
-export async function reverseEntry(ctx: Ctx, entryId: string, memo: string) {
+/** Cancel an entry with an equal and opposite one. Each entry can be reversed once. `at` dates the reversal (default now). */
+export async function reverseEntry(ctx: Ctx, entryId: string, memo: string, at?: Date) {
   const orig = await ctx.tx.journalEntry.findUnique({
     where: { id: entryId },
     include: { lines: true, reversedBy: { select: { id: true } } },
   });
   if (!orig) throw new MoneyError("Entry not found", 404);
   if (orig.reversedBy) throw new MoneyError("This entry was already reversed", 409);
-  await assertBooksOpen(ctx, new Date());
+  await assertBooksOpen(ctx, at ?? new Date());
   return ctx.tx.journalEntry.create({
     data: {
       kind: "REVERSAL",
@@ -292,6 +292,7 @@ export async function reverseEntry(ctx: Ctx, entryId: string, memo: string) {
       supplierId: orig.supplierId,
       reversesId: orig.id,
       createdById: ctx.actorId,
+      ...(at ? { occurredAt: at } : {}),
       lines: { create: orig.lines.map((l) => ({ accountId: l.accountId, amount: -l.amount })) },
     },
     select: { id: true },
