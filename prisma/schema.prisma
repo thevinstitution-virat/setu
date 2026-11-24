@@ -209,6 +209,8 @@ model Tenant {
   gstSettlements     GstSettlement[]
   gstr2bImports      Gstr2bImport[]
   gstr2bRows         Gstr2bRow[]
+  tdsSections        TdsSection[]
+  tdsChallans        TdsChallan[]
 }
 
 /// Custom domains a tenant has verified (e.g. order.agencyname.in).
@@ -1117,6 +1119,8 @@ enum EntryKind {
   JOURNAL // a journal voucher: any balanced lines, with a reason
   STOCK_COUNT // a physical stock count accepted: the net shortage moved from purchases to stock shortage
   GST_PAYMENT // a month's GST set off: output tax paid from input credit and from the bank
+  TDS_DEDUCTION // TDS kept back on a supplier's bill: Dr supplier, Cr TDS payable
+  TDS_PAYMENT // a TDS challan: Dr TDS payable (+ interest / late fee), Cr bank
 }
 
 enum PayMethod {
@@ -1127,6 +1131,7 @@ enum PayMethod {
   WALLET
   CREDIT_NOTE
   ONLINE // paid through the payment gateway (link or QR)
+  TDS // TDS the shop deducted and paid to the government for us (A9): Dr TDS deducted by customers
 }
 
 enum PayPurpose {
@@ -1230,6 +1235,7 @@ model BankAccount {
   claimSettlements ClaimSettlement[]
   vouchers         Voucher[]
   gstSettlements   GstSettlement[]
+  tdsChallans      TdsChallan[]
 
   @@unique([tenantId, name])
   @@unique([tenantId, ledgerCode])
@@ -1321,8 +1327,10 @@ model Payment {
   state         PaymentState
   /// Paise.
   amount        Int
-  /// UPI reference (UTR), bank reference or cheque number.
+  /// UPI reference (UTR), bank reference or cheque number; method TDS: the TDS certificate (Form 16A) number.
   reference     String?
+  /// Method TDS: the section the shop deducted under (usually 194Q).
+  tdsSection    String?
   proofKey      String?
   note          String?
   /// Collected against this order at delivery (allocated to its bill first).
@@ -3290,6 +3298,7 @@ enum SupplierCreditKind {
   CREDIT_NOTE
   OPENING_ADVANCE
   PAYMENT
+  TDS // TDS kept back on one of their bills (A9)
 }
 
 /// A purchase bill, or a debit / credit note with a supplier. Posted once; cancelled by reversal.
@@ -3424,6 +3433,10 @@ model SupplierCredit {
   againstBillId  String?
   entryId        String?
   note           String?
+  /// Kind TDS: the section, and the amount the TDS was worked out on (paise).
+  tdsSection     String?
+  tdsBase        Int?
+  createdById    String?
   createdAt      DateTime           @default(now())
 
   allocations SupplierAllocation[]
@@ -3477,6 +3490,8 @@ model SupplierPayment {
   /// TDS kept back and owed to the government; the supplier's bills are settled by amount + tds.
   tds           Int               @default(0)
   tdsSection    String?
+  /// Why the TDS differs from what the app worked out (A9).
+  tdsNote       String?
   /// UTR / transaction reference.
   reference     String?
   note          String?
@@ -3694,6 +3709,10 @@ model Voucher {
   /// TDS kept back (payment) or deducted by the payer (receipt), paise.
   tds           Int            @default(0)
   tdsSection    String?
+  /// Why the TDS differs from what the app worked out (A9).
+  tdsNote       String?
+  /// The party's PAN, for the TDS return.
+  partyPan      String?
   /// UTR / bill number / slip number.
   reference     String?
   narration     String?
@@ -3834,4 +3853,59 @@ model Gstr2bRow {
 
   @@index([tenantId, gstin, numberKey])
   @@index([importId])
+}
+
+/// A TDS section with its rates and limits (A9). Starter rows are added on first use; the CA should check them.
+model TdsSection {
+  id        String   @id @default(cuid())
+  tenantId  String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  /// "194C", "194J(B)" ...
+  code      String
+  name      String
+  /// Rates in hundredths of a per cent (1% = 100): individual / HUF, others, no PAN.
+  rateInd   Int
+  rateOther Int
+  rateNoPan Int
+  /// Paise. Deduct when one payment or bill is above `single`, or the year's total to the party is above `yearly`.
+  single    Int?
+  yearly    Int?
+  /// 194Q: only the part of the year's total above `yearly` is taxed.
+  overOnly  Boolean  @default(false)
+  active    Boolean  @default(true)
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, code])
+}
+
+/// TDS paid to the government: one challan for one section and one month's deductions.
+model TdsChallan {
+  id            String       @id @default(cuid())
+  tenantId      String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  /// Ours: TC2627-00001.
+  number        String
+  section       String
+  /// The month the TDS was deducted in, "YYYY-MM".
+  period        String
+  /// Paise.
+  tax           Int
+  interest      Int          @default(0)
+  lateFee       Int          @default(0)
+  bankAccountId String?
+  bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id])
+  paidOn        DateTime     @db.Date
+  /// From the challan counterfoil: BSR code (7 digits) and challan serial number (5 digits).
+  bsrCode       String
+  serial        String
+  note          String?
+  entryId       String?      @unique
+  cancelledAt   DateTime?
+  cancelReason  String?
+  createdById   String?
+  createdAt     DateTime     @default(now())
+
+  @@unique([tenantId, number])
+  @@index([tenantId, period, section])
 }

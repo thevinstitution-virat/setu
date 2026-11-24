@@ -473,6 +473,9 @@ function debitAccountFor(method: PayMethod, retailerId: string, collector: { use
     case "ONLINE":
       // Held by the gateway until it settles to our bank (lib/gateway.ts).
       return { type: "GATEWAY_CLEARING" };
+    case "TDS":
+      // The shop paid this to the government for us (A9): we claim it against our income tax.
+      return { type: "TDS_RECEIVABLE" };
   }
 }
 
@@ -497,15 +500,18 @@ export type PaymentInput = {
   occurredAt?: Date;
   /** Paid through the gateway: our request and the gateway's payment id (unique, so never posted twice). */
   gateway?: { intentId: string | null; paymentId: string } | null;
+  /** Method TDS: the section the shop kept it back under. */
+  tdsSection?: string | null;
 };
 
 export async function recordPayment(ctx: Ctx, p: PaymentInput) {
   const purpose = p.purpose ?? "DUES";
   if (!Number.isInteger(p.amount) || p.amount <= 0) throw new MoneyError("Amount must be more than ₹0");
   if (p.amount > 1_000_000_000) throw new MoneyError("Amount is too large");
-  if (purpose === "WALLET" && (p.method === "WALLET" || p.method === "CREDIT_NOTE")) {
+  if (purpose === "WALLET" && (p.method === "WALLET" || p.method === "CREDIT_NOTE" || p.method === "TDS")) {
     throw new MoneyError("A wallet recharge must be cash, UPI, cheque or bank");
   }
+  if (p.method === "TDS" && p.needsVerification) throw new MoneyError("TDS kept back by a shop is entered by the office");
   if (p.method === "CHEQUE" && (!p.cheque?.number || !p.cheque.bank)) {
     throw new MoneyError("Cheque number and bank are required");
   }
@@ -518,7 +524,7 @@ export async function recordPayment(ctx: Ctx, p: PaymentInput) {
     }
   }
 
-  const prefix = p.method === "CREDIT_NOTE" ? "CN" : purpose === "WALLET" ? "RC" : "PAY";
+  const prefix = p.method === "CREDIT_NOTE" ? "CN" : p.method === "TDS" ? "TDS" : purpose === "WALLET" ? "RC" : "PAY";
   const payment = await ctx.tx.payment.create({
     data: {
       number: await nextNumber(ctx, prefix),
@@ -528,6 +534,7 @@ export async function recordPayment(ctx: Ctx, p: PaymentInput) {
       state: p.needsVerification ? "PENDING_VERIFICATION" : "CONFIRMED",
       amount: p.amount,
       reference: p.reference || (p.method === "CHEQUE" ? p.cheque!.number : null),
+      tdsSection: p.method === "TDS" ? (p.tdsSection ?? null) : null,
       proofKey: p.proofKey ?? null,
       note: p.note ?? null,
       orderId: p.orderId ?? null,
@@ -575,8 +582,8 @@ async function postPayment(ctx: Ctx, paymentId: string, p: PaymentInput) {
   });
   await ctx.tx.payment.update({ where: { id: paymentId }, data: { entryId: entry.id } });
   if (purpose === "DUES") await allocateRetailer(ctx, p.retailerId);
-  // Receipt to the retailer (skips wallet settlements and credit notes).
-  if (!p.fromHold) {
+  // Receipt to the retailer (skips wallet settlements and TDS they kept back).
+  if (!p.fromHold && p.method !== "TDS") {
     await paymentReceivedNotify(ctx.tx, ctx.tenantId, paymentId);
     await paymentWebhook(ctx.tx, ctx.tenantId, paymentId);
   }

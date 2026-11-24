@@ -104,6 +104,8 @@ export const KIND_LABEL: Record<EntryKind, string> = {
   JOURNAL: "Journal voucher",
   STOCK_COUNT: "Stock count",
   GST_PAYMENT: "GST paid",
+  TDS_DEDUCTION: "TDS kept back",
+  TDS_PAYMENT: "TDS paid",
 };
 
 export const BANK_KINDS: Record<BankKind, string> = { CURRENT: "Current account", SAVINGS: "Savings account", OD: "Overdraft (OD)", CC: "Cash credit (CC)" };
@@ -704,6 +706,22 @@ export async function checkBooks(ctx: Ctx): Promise<{ ok: boolean; results: Chec
           WHERE st."entryId" IS NOT NULL AND (coalesce(o.amt, 0) <> liab OR coalesce(i.amt, 0) <> cash - liab))
       + (SELECT count(*) FROM st LEFT JOIN "JournalEntry" r ON r."reversesId" = st."entryId" WHERE st."entryId" IS NOT NULL AND (st."cancelledAt" IS NULL) <> (r.id IS NULL))
       + (SELECT count(*) FROM "JournalEntry" j WHERE j."tenantId" = ${t} AND j.kind = 'GST_PAYMENT' AND NOT EXISTS (SELECT 1 FROM "GstSettlement" s WHERE s."entryId" = j.id)) c`;
+  const tds = await q`WITH tl AS (SELECT l."entryId", a.type, sum(l.amount) amt FROM "LedgerLine" l JOIN "LedgerAccount" a ON a.id = l."accountId"
+      WHERE l."tenantId" = ${t} AND a.type IN ('TDS_PAYABLE', 'TDS_RECEIVABLE') GROUP BY 1, 2)
+    SELECT (SELECT count(*) FROM "SupplierPayment" p LEFT JOIN tl ON tl."entryId" = p."entryId" AND tl.type = 'TDS_PAYABLE'
+          WHERE p."tenantId" = ${t} AND p."entryId" IS NOT NULL AND coalesce(tl.amt, 0) <> -p.tds)
+      + (SELECT count(*) FROM "SupplierCredit" c LEFT JOIN tl ON tl."entryId" = c."entryId" AND tl.type = 'TDS_PAYABLE'
+          WHERE c."tenantId" = ${t} AND c.kind = 'TDS' AND (c."entryId" IS NULL OR coalesce(tl.amt, 0) <> -c.amount
+            OR EXISTS (SELECT 1 FROM "JournalEntry" r WHERE r."reversesId" = c."entryId")))
+      + (SELECT count(*) FROM "TdsChallan" c LEFT JOIN tl ON tl."entryId" = c."entryId" AND tl.type = 'TDS_PAYABLE'
+          WHERE c."tenantId" = ${t} AND (c."entryId" IS NULL OR coalesce(tl.amt, 0) <> c.tax))
+      + (SELECT count(*) FROM "TdsChallan" c LEFT JOIN "JournalEntry" r ON r."reversesId" = c."entryId"
+          WHERE c."tenantId" = ${t} AND c."entryId" IS NOT NULL AND (c."cancelledAt" IS NULL) <> (r.id IS NULL))
+      + (SELECT count(*) FROM "Payment" p LEFT JOIN tl ON tl."entryId" = p."entryId" AND tl.type = 'TDS_RECEIVABLE'
+          WHERE p."tenantId" = ${t} AND p.method = 'TDS' AND p.state = 'CONFIRMED' AND (p."entryId" IS NULL OR coalesce(tl.amt, 0) <> p.amount))
+      + (SELECT count(*) FROM "JournalEntry" j WHERE j."tenantId" = ${t} AND j.kind = 'TDS_PAYMENT' AND NOT EXISTS (SELECT 1 FROM "TdsChallan" c WHERE c."entryId" = j.id))
+      + (SELECT count(*) FROM "JournalEntry" j WHERE j."tenantId" = ${t} AND j.kind = 'TDS_DEDUCTION' AND j."reversesId" IS NULL
+          AND NOT EXISTS (SELECT 1 FROM "SupplierCredit" c WHERE c."entryId" = j.id) AND NOT EXISTS (SELECT 1 FROM "JournalEntry" r WHERE r."reversesId" = j.id)) c`;
   const lock = await booksLock(ctx);
   const afterLock = lock
     ? await q`SELECT count(*) c FROM "JournalEntry" WHERE "tenantId" = ${t} AND "occurredAt" < ${dayEnd(lock)} AND "createdAt" > (SELECT coalesce(max("createdAt"), now()) FROM "AuditLog" WHERE "tenantId" = ${t} AND action = 'books.lock')`
@@ -729,6 +747,7 @@ export async function checkBooks(ctx: Ctx): Promise<{ ok: boolean; results: Chec
     { key: "cash", title: "No cash below zero", ok: !cashBelow, found: cashBelow, detail: cashBelow ? `${cashBelow} cash accounts show less than nothing` : "Office cash, petty cash and staff cash are all ₹0 or more", fix: "Open the cash book: a payment from cash was entered before the cash came in, or a receipt or handover is missing." },
     { key: "stock-counts", title: "Stock counts agree with the ledger", ok: !stockCounts, found: stockCounts, detail: stockCounts ? `${stockCounts} stock counts differ from their stock shortage entries` : "Every accepted count's shortage and excess at cost is in stock shortage", fix: "Open Books, Stock, Counts, then tell support." },
     { key: "gst", title: "GST input credit agrees with the bills", ok: !gst, found: gst, detail: gst ? `${gst} purchase bills, notes or GST settlements differ from their GST input / output entries` : "Every bill's and note's input credit, and every month's GST set-off, is in the ledger as worked out", fix: "Open Books, GST, then tell support." },
+    { key: "tds", title: "TDS agrees with the documents", ok: !tds, found: tds, detail: tds ? `${tds} payments, TDS on bills, challans or shops' TDS differ from their TDS entries` : "Every TDS kept back, challan paid and shop's TDS is in the ledger as entered", fix: "Open Books, TDS, then tell support." },
     { key: "lock", title: "Nothing new in closed days", ok: !afterLock, found: afterLock, detail: lock ? (afterLock ? `${afterLock} entries were added on or before ${showDay(lock)} after the books were closed` : `Closed up to ${showDay(lock)}; nothing was added there since`) : "The books are not closed for any days yet", fix: "Ask the owner to look at the day book for those days." },
   ];
   return { ok: results.every((r) => r.ok), results, counts: { entries, lines } };

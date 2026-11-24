@@ -47,6 +47,10 @@ export type VoucherInput = {
   gst?: number;
   tds?: number;
   tdsSection?: string | null;
+  /** Why the TDS differs from what the app worked out. */
+  tdsNote?: string | null;
+  /** The party's PAN (for the TDS return). */
+  partyPan?: string | null;
   reference?: string | null;
   narration?: string | null;
   photos?: string[];
@@ -149,6 +153,7 @@ export async function createVoucher(ctx: Ctx, input: VoucherInput, extra: { hand
   let tds = 0;
   let tdsSection: string | null = null;
   let partyGstin: string | null = null;
+  let partyPan: string | null = null;
   let cheque: { number: string; date: string } | null = null;
 
   if (type === "PAYMENT" || type === "RECEIPT") {
@@ -174,6 +179,8 @@ export async function createVoucher(ctx: Ctx, input: VoucherInput, extra: { hand
     partyGstin = text(input.partyGstin, 15).toUpperCase() || null;
     if (partyGstin && !validGstin(partyGstin)) throw new MoneyError("That GSTIN doesn't look right");
     if (gst && !partyGstin) throw new MoneyError("GST input credit needs the seller's GSTIN");
+    partyPan = text(input.partyPan, 10).toUpperCase() || (partyGstin ? partyGstin.slice(2, 12) : null);
+    if (partyPan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(partyPan)) throw new MoneyError("That PAN doesn't look right (like ABCDE1234F)");
     tds = input.tds ?? 0;
     if (!isPaise(tds, 0)) throw new MoneyError("TDS must be ₹0 or more");
     tdsSection = tds ? text(input.tdsSection, 12).toUpperCase() || null : null;
@@ -285,6 +292,8 @@ export async function createVoucher(ctx: Ctx, input: VoucherInput, extra: { hand
       gst,
       tds,
       tdsSection,
+      tdsNote: tds ? text(input.tdsNote, 200) || null : null,
+      partyPan: partyPan,
       reference,
       narration,
       photos,

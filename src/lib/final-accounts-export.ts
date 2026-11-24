@@ -18,6 +18,8 @@ import { zip, type ZipFile } from "@/lib/zip";
 import { gstMonth, itcRegister } from "@/lib/gst-returns";
 import { itcCsv, monthsCsv } from "@/lib/gst-returns-export";
 import { periodOf, shiftPeriod } from "@/lib/gst-math";
+import { tdsReceived, tdsRegister } from "@/lib/tds";
+import { receivedCsv, registerCsv } from "@/lib/tds-export";
 import type { AccountGroup } from "@/generated/prisma/client";
 import type { Ctx } from "@/lib/ledger";
 
@@ -332,7 +334,19 @@ export async function caPackData(ctx: Ctx, from: string, to: string) {
     docs,
     gst,
     itc: await itcRegister(ctx, from, to),
+    tds: registerCsv(await tdsRegister(ctx, from, to)),
+    tdsChallans: await challansCsv(ctx, from, to),
+    tdsReceived: receivedCsv(await tdsReceived(ctx, from, to)),
   };
+}
+
+/** TDS challans paid in the period (cancelled ones marked). */
+async function challansCsv(ctx: Ctx, from: string, to: string): Promise<Cell[][]> {
+  const list = await ctx.tx.tdsChallan.findMany({ where: { paidOn: { gte: new Date(`${from}T00:00:00Z`), lte: new Date(`${to}T00:00:00Z`) } }, include: { bankAccount: { select: { name: true } } }, orderBy: [{ paidOn: "asc" }, { number: "asc" }] });
+  return [
+    ["Number", "Paid on", "Section", "For month", "BSR code", "Challan serial", "Tax", "Interest", "Late fee", "Bank", "Status"],
+    ...list.map((c) => [c.number, c.paidOn.toISOString().slice(0, 10), c.section, c.period, c.bsrCode, c.serial, rupees(c.tax), rupees(c.interest), rupees(c.lateFee), c.bankAccount?.name ?? "", c.cancelledAt ? `Cancelled: ${c.cancelReason ?? ""}` : "Paid"]),
+  ];
 }
 
 /**
@@ -370,6 +384,9 @@ export async function buildCaPack(d: Awaited<ReturnType<typeof caPackData>>) {
   ]);
   addSheet(wb, "GSTR-3B by month", monthsCsv(d.gst));
   addSheet(wb, "Input credit", itcCsv(d.itc));
+  addSheet(wb, "TDS kept back", d.tds);
+  addSheet(wb, "TDS challans", d.tdsChallans);
+  addSheet(wb, "TDS kept back from us", d.tdsReceived);
   files.push({ name: `05 Books ${from} to ${to}.xlsx`, data: Buffer.from(await wb.xlsx.writeBuffer()) });
   files.push({ name: `06 Sales register ${from} to ${to}.xlsx`, data: await salesRegisterWorkbook(d.docs) });
   files.push({
@@ -381,11 +398,11 @@ export async function buildCaPack(d: Awaited<ReturnType<typeof caPackData>>) {
       "01-04  Trial balance, profit and loss (and by month), balance sheet (PDF).",
       "05     Workbook: the same reports, day book, every ledger, cash and bank books, purchase register,",
       "       debtors, creditors, pending claims, stock value, stock counts, the GSTR-3B working by month",
-      "       (with the set-off and payment of each settled month) and the input credit register.",
+      "       (with the set-off and payment of each settled month), the input credit register, and TDS:",
+      "       what we kept back, the challans paid, and what customers kept back from us.",
       "06     Sales register: invoices and notes, items, and totals by GST rate.",
       "",
       "Amounts are in rupees. Stock is at cost; closing stock is the accepted count on the day, else the app's stock at cost.",
-      "Not in this pack yet: the TDS register.",
       ...(tb.difference || bs.difference ? ["", "WARNING: the books do not balance. See the trial balance and balance sheet notes."] : []),
       ...pl.warnings.map((w) => `Note: ${w}`),
     ].join(String.fromCharCode(13, 10)),

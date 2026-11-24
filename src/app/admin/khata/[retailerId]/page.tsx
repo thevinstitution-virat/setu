@@ -32,7 +32,7 @@ type Payment = {
   id: string;
   number: string;
   purpose: "DUES" | "WALLET";
-  method: "CASH" | "UPI" | "CHEQUE" | "BANK" | "ONLINE" | "WALLET" | "CREDIT_NOTE";
+  method: "CASH" | "UPI" | "CHEQUE" | "BANK" | "ONLINE" | "WALLET" | "CREDIT_NOTE" | "TDS";
   state: "PENDING_VERIFICATION" | "CONFIRMED" | "REJECTED" | "REVERSED";
   amount: number;
   reference: string | null;
@@ -79,6 +79,7 @@ const METHOD: Record<Payment["method"], string> = {
   ONLINE: "Online",
   WALLET: "Wallet",
   CREDIT_NOTE: "Credit note",
+  TDS: "TDS kept back",
 };
 
 const STATE: Record<Payment["state"], { label: string; cls: string }> = {
@@ -108,6 +109,7 @@ const ENTRY_KIND: Record<string, string> = {
   PENALTY: "Penalty",
   DEBIT_NOTE: "Debit note",
   CREDIT_NOTE: "Credit note",
+  TDS: "TDS kept back",
   HANDOVER: "Cash handover",
   SHORTAGE_WRITEOFF: "Shortage write-off",
   REVERSAL: "Reversal",

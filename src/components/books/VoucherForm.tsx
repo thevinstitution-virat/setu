@@ -6,6 +6,7 @@ import { useState } from "react";
 import Icon from "@/components/Icon";
 import { errText, Field, readRupees, send, Thumb, uploadImage } from "@/components/admin/AdminKit";
 import { formatINR } from "@/lib/money";
+import { TdsHint, useProposal } from "@/components/books/TdsForms";
 import { VOUCHER_METHOD_LABEL, VOUCHER_TYPE_HINT, VOUCHER_TYPE_LABEL, VOUCHER_TYPES, type VoucherMethod, type VoucherType } from "@/lib/voucher-labels";
 
 export type VoucherOptions = {
@@ -80,6 +81,8 @@ export default function VoucherForm({ options: o, initialType }: { options: Vouc
   const [gst, setGst] = useState("");
   const [tds, setTds] = useState("");
   const [section, setSection] = useState("");
+  const [partyPan, setPartyPan] = useState("");
+  const [tdsNote, setTdsNote] = useState("");
   const [fromCode, setFromCode] = useState("OFFICE_CASH");
   const [toCode, setToCode] = useState(o.banks[0]?.code ?? "");
   const [amount, setAmount] = useState("");
@@ -97,6 +100,10 @@ export default function VoucherForm({ options: o, initialType }: { options: Vouc
   const gstP = pay && gstOn ? paise(gst) : 0;
   const tdsP = paise(tds);
   const moved = money ? headSum + gstP - tdsP : type === "CONTRA" ? paise(amount) : 0;
+  const tdsOn = pay && (tdsP > 0 || !!section.trim());
+  const panFromGstin = gstOn && /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]/.test(gstin) ? gstin.slice(2, 12) : "";
+  const proposal = useProposal({ section: tdsOn ? section.trim() : "", base: headSum || null, date, basis: "PAYMENT", pan: partyPan.trim() || panFromGstin || null, party: party.trim() || null });
+  const tdsDiffers = !!proposal && proposal.known && proposal.tds !== tdsP;
   const jDebit = jlines.reduce((a, l) => a + paise(l.amount), 0);
   const jCredit = jlines.reduce((a, l) => a + paise(l.credit), 0);
   const staff = o.staff.find((s) => s.id === staffId) ?? null;
@@ -155,6 +162,7 @@ export default function VoucherForm({ options: o, initialType }: { options: Vouc
     const g = readRupees(gst);
     const t = readRupees(tds);
     if ((gstOn && g === "bad") || t === "bad") throw new Error("Write GST and TDS in rupees");
+    if (pay && tdsDiffers && !tdsNote.trim()) throw new Error("Say why the TDS is different from what the app works out");
     return {
       ...base,
       method,
@@ -168,6 +176,8 @@ export default function VoucherForm({ options: o, initialType }: { options: Vouc
       gst: pay && gstOn ? (g ?? 0) : 0,
       tds: t ?? 0,
       tdsSection: t ? section : null,
+      partyPan: pay && tdsOn && partyPan.trim() ? partyPan.trim() : null,
+      tdsNote: pay && tdsDiffers ? tdsNote.trim() : null,
     };
   }
 
@@ -382,7 +392,7 @@ export default function VoucherForm({ options: o, initialType }: { options: Vouc
             <Field label={pay ? "TDS kept back (₹)" : "TDS deducted by them (₹)"} hint="Optional">
               <input className="input" inputMode="decimal" value={tds} onChange={(e) => setTds(e.target.value)} />
             </Field>
-            {tdsP > 0 && (
+            {(tdsP > 0 || pay) && (
               <Field label="TDS section">
                 <input className="input uppercase" list="voucher-tds" value={section} maxLength={12} onChange={(e) => setSection(e.target.value.toUpperCase())} />
                 <datalist id="voucher-tds">
@@ -393,6 +403,21 @@ export default function VoucherForm({ options: o, initialType }: { options: Vouc
                   ))}
                 </datalist>
               </Field>
+            )}
+            {tdsOn && (
+              <Field label="Their PAN" hint={panFromGstin ? `From the GSTIN: ${panFromGstin}` : "Needed for the TDS return; without it TDS is at the higher rate"}>
+                <input className="input uppercase" value={partyPan} maxLength={10} placeholder={panFromGstin} onChange={(e) => setPartyPan(e.target.value.toUpperCase())} />
+              </Field>
+            )}
+            {pay && (
+              <div className="sm:col-span-3 space-y-3">
+                <TdsHint p={proposal} current={tdsP} onUse={(v) => setTds(v ? String(v / 100) : "")} />
+                {tdsDiffers && (
+                  <Field label="Why is the TDS different?" hint="Kept with the voucher, for the CA">
+                    <input className="input" value={tdsNote} maxLength={300} onChange={(e) => setTdsNote(e.target.value)} />
+                  </Field>
+                )}
+              </div>
             )}
           </div>
         </section>

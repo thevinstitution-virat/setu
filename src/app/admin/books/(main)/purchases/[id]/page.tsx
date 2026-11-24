@@ -8,13 +8,20 @@ import { formatINR } from "@/lib/money";
 import { ErrorCard } from "@/components/reports/Kit";
 import { showDay } from "@/components/books/fmt";
 import CancelPurchase from "@/components/books/CancelPurchase";
+import { BillTdsCard } from "@/components/books/TdsForms";
+import { billTds, tdsSections } from "@/lib/tds";
 
 /** One purchase bill or note: its lines, tax, what it is against and how much is settled. */
 export default async function PurchaseDocPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const r = await booksPage((ctx) => purchaseDetail(ctx, id));
+  const r = await booksPage(async (ctx) => {
+    const d = await purchaseDetail(ctx, id);
+    if (d.type !== "BILL") return { d, tds: null };
+    const [t, sections, sup] = await Promise.all([billTds(ctx, d.id), tdsSections(ctx), ctx.tx.supplier.findUnique({ where: { id: d.supplier.id }, select: { tdsSection: true } })]);
+    return { d, tds: { ...t, sections: sections.map((s) => ({ code: s.code, name: s.name })), defaultSection: sup?.tdsSection ?? null } };
+  });
   if (!r.ok) return <ErrorCard message={r.error} />;
-  const d = r.data;
+  const { d, tds: t } = r.data;
   const tax = d.cgst + d.sgst + d.igst;
   const left = d.total - d.settledAmount;
   const live = !d.cancelledAt;
@@ -102,6 +109,21 @@ export default async function PurchaseDocPage({ params }: { params: Promise<{ id
           {live && r.me.canPurchase && <CancelPurchase id={d.id} label={d.label.toLowerCase()} />}
         </div>
       </section>
+
+      {live && t && (t.tds || t.open > 0) && (
+        <BillTdsCard
+          billId={d.id}
+          supplierId={d.supplier.id}
+          date={d.date}
+          taxable={d.taxable}
+          total={d.total}
+          open={t.open}
+          defaultSection={t.defaultSection}
+          existing={t.tds}
+          sections={t.sections}
+          canPost={r.me.canPost}
+        />
+      )}
 
       <section className="card p-0 overflow-x-auto">
         <table className="w-full text-sm" style={{ minWidth: 760 }}>

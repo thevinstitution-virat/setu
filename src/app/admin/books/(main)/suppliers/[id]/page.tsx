@@ -11,7 +11,7 @@ import SupplierEditor from "@/components/books/SupplierEditor";
 import OpeningSupplierBills from "@/components/books/OpeningSupplierBills";
 import { PAY_METHOD_LABEL } from "@/lib/pay-labels";
 
-const CREDIT_LABEL: Record<string, string> = { DEBIT_NOTE: "Our debit note", CREDIT_NOTE: "Their credit note", OPENING_ADVANCE: "Advance (old books)", PAYMENT: "Payment" };
+const CREDIT_LABEL: Record<string, string> = { DEBIT_NOTE: "Our debit note", CREDIT_NOTE: "Their credit note", OPENING_ADVANCE: "Advance (old books)", PAYMENT: "Payment", TDS: "TDS kept back" };
 
 /** One supplier: what we owe, open bills, unused notes and advances, documents and the statement. */
 export default async function SupplierPage({ params }: { params: Promise<{ id: string }> }) {

@@ -426,7 +426,7 @@ async function companies(tx: Tx, d: Awaited<ReturnType<typeof dueBills>>, compan
 
 export const COLLECTION_METHODS = ["CASH", "CHEQUE", "UPI", "BANK", "ONLINE"] as const;
 export type CollectionMethod = (typeof COLLECTION_METHODS)[number];
-export const METHOD_LABEL: Record<string, string> = { CASH: "Cash", CHEQUE: "Cheque", UPI: "UPI", BANK: "Bank", ONLINE: "Online", CREDIT_NOTE: "Credit note", WALLET: "Wallet" };
+export const METHOD_LABEL: Record<string, string> = { CASH: "Cash", CHEQUE: "Cheque", UPI: "UPI", BANK: "Bank", ONLINE: "Online", CREDIT_NOTE: "Credit note", WALLET: "Wallet", TDS: "TDS kept back by the shop" };
 
 export type CollectionRow = { shop: Shop; count: number; total: number; byMethod: Record<CollectionMethod, number>; collectors: string[] };
 

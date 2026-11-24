@@ -32,6 +32,8 @@ export type PayInput = {
   /** TDS kept back (paise); the bills are settled by amount + TDS. */
   tds?: number;
   tdsSection?: string | null;
+  /** Why the TDS differs from what the app worked out. */
+  tdsNote?: string | null;
   /** UTR / transaction reference. */
   reference?: string | null;
   cheque?: { number: string; date?: string | null } | null;
@@ -141,6 +143,7 @@ export async function paySupplier(ctx: Ctx, input: PayInput) {
       amount: input.amount,
       tds,
       tdsSection,
+      tdsNote: tds ? text(input.tdsNote, 200) || null : null,
       reference,
       note: text(input.note, 300) || null,
       creditId: credit.id,

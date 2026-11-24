@@ -8,6 +8,7 @@ import { errText, ErrorBox, Field, readRupees, SearchPick, send, useFetch } from
 import { PAY_METHOD_LABEL, TDS_SECTIONS, type PayMethod } from "@/lib/pay-labels";
 import { formatINR } from "@/lib/money";
 import { showDay } from "@/components/books/fmt";
+import { TdsHint, useProposal } from "@/components/books/TdsForms";
 
 type Options = {
   banks: { id: string; name: string; isDefault: boolean }[];
@@ -54,6 +55,7 @@ export default function PayForm({ options: o, initialSupplier }: { options: Opti
   const [typed, setTyped] = useState(false);
   const [tds, setTds] = useState("");
   const [section, setSection] = useState(() => o.suppliers.find((x) => x.id === initialSupplier)?.tdsSection ?? "");
+  const [tdsNote, setTdsNote] = useState("");
   const [reference, setReference] = useState("");
   const [chequeNo, setChequeNo] = useState("");
   const [chequeDate, setChequeDate] = useState("");
@@ -77,6 +79,8 @@ export default function PayForm({ options: o, initialSupplier }: { options: Opti
 
   const paid = typeof amountP === "number" ? amountP : 0;
   const settles = paid + tdsN;
+  const proposal = useProposal({ section: section.trim(), base: settles || null, date, basis: "PAYMENT", supplierId });
+  const tdsDiffers = !!proposal && proposal.known && proposal.tds !== tdsN;
   const openTotal = bills.reduce((a, b) => a + b.left, 0);
   const advance = Math.max(0, settles - openTotal);
   const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
@@ -87,6 +91,7 @@ export default function PayForm({ options: o, initialSupplier }: { options: Opti
     if (amountP === "bad" || !amountP) return setErr("Enter the amount paid in rupees");
     if (tdsP === "bad") return setErr("Write the TDS in rupees");
     if (tdsN && !section.trim()) return setErr("Pick the TDS section");
+    if (tdsDiffers && !tdsNote.trim()) return setErr("Say why the TDS is different from what the app works out");
     if (method === "CHEQUE" && !chequeNo.trim()) return setErr("Enter the cheque number");
     if (method !== "CASH" && !bankId) return setErr("Add a bank account first (Books → Bank accounts)");
     setBusy(true);
@@ -99,6 +104,7 @@ export default function PayForm({ options: o, initialSupplier }: { options: Opti
         amount: amountP,
         tds: tdsN,
         tdsSection: tdsN ? section : null,
+        tdsNote: tdsDiffers ? tdsNote.trim() : null,
         reference: method === "BANK" ? reference : null,
         cheque: method === "CHEQUE" ? { number: chequeNo, date: chequeDate || date } : null,
         billIds: picked,
@@ -262,19 +268,23 @@ export default function PayForm({ options: o, initialSupplier }: { options: Opti
           <Field label="TDS kept back (₹)" hint="Optional. The bills are settled by the amount plus TDS.">
             <input className="input" inputMode="decimal" value={tds} onChange={(e) => setTds(e.target.value)} />
           </Field>
-          {tdsN > 0 && (
-            <Field label="TDS section">
-              <input className="input uppercase" list="tds-sections" value={section} maxLength={12} onChange={(e) => setSection(e.target.value.toUpperCase())} />
-              <datalist id="tds-sections">
-                {TDS_SECTIONS.map((t) => (
-                  <option key={t.code} value={t.code}>
-                    {t.label}
-                  </option>
-                ))}
-              </datalist>
-            </Field>
-          )}
+          <Field label="TDS section" hint={tdsN ? undefined : "If TDS applies"}>
+            <input className="input uppercase" list="tds-sections" value={section} maxLength={12} onChange={(e) => setSection(e.target.value.toUpperCase())} />
+            <datalist id="tds-sections">
+              {TDS_SECTIONS.map((t) => (
+                <option key={t.code} value={t.code}>
+                  {t.label}
+                </option>
+              ))}
+            </datalist>
+          </Field>
         </div>
+        <TdsHint p={proposal} current={tdsN} onUse={(v) => setTds(v ? String(v / 100) : "")} />
+        {tdsDiffers && (
+          <Field label="Why is the TDS different?" hint="Kept with the payment, for the CA. For example: lower-deduction certificate, or already deducted on the bill.">
+            <input className="input" value={tdsNote} maxLength={300} onChange={(e) => setTdsNote(e.target.value)} />
+          </Field>
+        )}
         <Field label="Note (optional)">
           <input className="input" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} />
         </Field>
