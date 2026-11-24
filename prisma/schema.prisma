@@ -112,6 +112,7 @@ model Tenant {
   journalEntries     JournalEntry[]
   ledgerLines        LedgerLine[]
   bills              Bill[]
+  billShares         BillShare[]
   payments           Payment[]
   allocations        PaymentAllocation[]
   cheques            Cheque[]
@@ -1151,6 +1152,8 @@ model Bill {
   createdAt  DateTime        @default(now())
 
   allocations PaymentAllocation[]
+  /// Company split, for bills that have no invoice lines (imported from the old book).
+  shares      BillShare[]
 
   @@unique([tenantId, number])
   @@index([tenantId, retailerId, settled, date])
@@ -1216,6 +1219,26 @@ model PaymentAllocation {
 
   @@index([tenantId, billId])
   @@index([tenantId, paymentId])
+}
+
+/// A bill's value by company (principal supplier), for the company-wise
+/// outstanding. Only for bills without invoice lines (opening bills from the
+/// old book); bills raised here are split from their invoice lines.
+model BillShare {
+  id         String    @id @default(cuid())
+  tenantId   String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  billId     String
+  bill       Bill      @relation(fields: [billId], references: [id], onDelete: Cascade)
+  /// null = no company (e.g. charges that belong to no principal).
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  /// Paise of the bill's value that is this company's.
+  amount     Int
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId, billId])
+  @@index([tenantId, supplierId])
 }
 
 model Cheque {
@@ -1870,6 +1893,7 @@ model Supplier {
   products       Product[]
   purchaseOrders PurchaseOrder[]
   purchases      Purchase[]
+  billShares     BillShare[]
 
   @@unique([tenantId, name])
 }

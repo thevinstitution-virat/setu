@@ -7,8 +7,8 @@ import Icon from "@/components/Icon";
 
 type Opt = { id: string; name: string };
 type Props = {
-  view: "bills" | "parties" | "agents" | "collections";
-  options: { areas: Opt[]; salesmen: Opt[]; beats: (Opt & { weekdays: number[] })[] };
+  view: "bills" | "parties" | "agents" | "companies" | "collections";
+  options: { areas: Opt[]; salesmen: Opt[]; beats: (Opt & { weekdays: number[] })[]; companies: Opt[] };
   today: string;
   /** Text that goes with the PDF on WhatsApp. */
   summary: string;
@@ -20,8 +20,9 @@ const VIEWS = [
   { key: "bills", label: "Bill-wise" },
   { key: "parties", label: "Party-wise" },
   { key: "agents", label: "Salesman-wise" },
+  { key: "companies", label: "Company-wise" },
 ] as const;
-const FILTER_KEYS = ["areaId", "salesmanId", "beatId", "weekday"] as const;
+const FILTER_KEYS = ["areaId", "salesmanId", "beatId", "weekday", "companyId"] as const;
 
 const addDay = (day: string, n: number) => new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
@@ -157,6 +158,19 @@ export default function DuesToolbar({ view, options, today, summary, file }: Pro
             ))}
           </select>
         </label>
+        {view === "companies" && (
+          <label className="text-xs text-[var(--muted)]">
+            Company
+            <select className={sel} value={sp.get("companyId") ?? ""} onChange={(e) => set({ companyId: e.target.value || null })}>
+              <option value="">All companies</option>
+              {options.companies.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {options.beats.length > 0 && (
           <>
             <label className="text-xs text-[var(--muted)]">

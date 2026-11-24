@@ -23,7 +23,7 @@ const TYPES = {
   },
   products: {
     label: "Products",
-    hint: "name, sku, category, unit, price (₹ before GST), mrp (₹), gst_rate (%), special_offer, brand, hsn_code, name_hi (Hindi name), case_unit + case_size (e.g. box of 24), moq. New categories and brands are created; a known HSN code sets the GST rate. Existing SKUs are updated.",
+    hint: "name, sku, category, unit, price (₹ before GST), mrp (₹), gst_rate (%), special_offer, brand, hsn_code, name_hi (Hindi name), case_unit + case_size (e.g. box of 24), moq, company (the principal company it comes from, for company-wise outstanding). New categories, brands and companies are created; a known HSN code sets the GST rate. Existing SKUs are updated.",
   },
   balances: {
     label: "Opening balances",
@@ -36,6 +36,10 @@ const TYPES = {
   bills: {
     label: "Open bills",
     hint: "party, area, phone, invoice_no, date, bill_value (₹), received (₹ already paid on it), due_date, salesman. One row per unpaid bill from your old software's outstanding report; each keeps its number, date and due date, so ageing and salesman-wise outstanding carry on. A row with no invoice_no and a negative bill_value is an advance. All of a shop's bills go in together, once. Import retailers first.",
+  },
+  bill_shares: {
+    label: "Company split of open bills",
+    hint: "invoice_no, company, value (₹). From your old software's company-wise outstanding: how much of each open bill is each company's, one row per bill and company. A bill's rows must add up to the bill (up to ₹1 off is fine) and replace any split it had. New companies are added as suppliers. Import open bills first; bills raised in VBiz Pro are split from their invoices.",
   },
 } as const;
 

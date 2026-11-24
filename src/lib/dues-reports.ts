@@ -18,7 +18,7 @@ import { isDay, istDay, istDayRange } from "@/lib/field-math";
 import { MoneyError } from "@/lib/money-error";
 import { makePeriod, type Period } from "@/lib/report-periods";
 
-export const DUES_VIEWS = ["bills", "parties", "agents", "collections"] as const;
+export const DUES_VIEWS = ["bills", "parties", "agents", "companies", "collections"] as const;
 export type DuesView = (typeof DUES_VIEWS)[number];
 export const isDuesView = (v: unknown): v is DuesView => typeof v === "string" && (DUES_VIEWS as readonly string[]).includes(v);
 
@@ -26,6 +26,7 @@ export const DUES_TITLE: Record<DuesView, string> = {
   bills: "Outstanding bills, old to new",
   parties: "Outstanding party-wise, with collections",
   agents: "Outstanding salesman-wise",
+  companies: "Outstanding company-wise",
   collections: "Collection summary, party-wise",
 };
 
@@ -40,6 +41,8 @@ export type DuesFilters = {
   beatId?: string;
   /** 0 = Sunday … 6 = Saturday: shops on a beat that runs that day. */
   weekday?: number;
+  /** Supplier id: company-wise outstanding for one company. */
+  companyId?: string;
 };
 
 /** Reads ?asOn=&areaId=&salesmanId=&beatId=&weekday= (bad values are dropped, a bad date fails). */
@@ -59,6 +62,7 @@ export function parseDuesFilters(sp: URLSearchParams, now = new Date()): DuesFil
     salesmanId: id("salesmanId"),
     beatId: id("beatId"),
     weekday: wd !== null && /^[0-6]$/.test(wd) ? Number(wd) : undefined,
+    companyId: id("companyId"),
   };
 }
 
@@ -84,6 +88,7 @@ export type DueBill = {
   id: string;
   number: string;
   kind: string;
+  orderId: string | null;
   date: Date;
   dueDate: Date;
   amount: number;
@@ -160,6 +165,7 @@ export async function dueBills(tx: Tx, f: DuesFilters) {
       id: true,
       number: true,
       kind: true,
+      orderId: true,
       date: true,
       dueDate: true,
       amount: true,
@@ -194,6 +200,7 @@ export async function dueBills(tx: Tx, f: DuesFilters) {
       id: b.id,
       number: b.number,
       kind: b.kind,
+      orderId: b.orderId,
       date: b.date,
       dueDate: b.dueDate,
       amount: b.amount,
@@ -297,6 +304,124 @@ function agents(d: Awaited<ReturnType<typeof dueBills>>): AgentBlock[] {
     .sort((a, b) => (!a.salesman ? 1 : !b.salesman ? -1 : a.salesman.name.localeCompare(b.salesman.name)));
 }
 
+// ───────────────────────────── company-wise ─────────────────────────────
+
+/** Bills with no data to split them by (no invoice lines, no imported split). */
+export const UNSPLIT = "unsplit";
+/** Products (or charges) that have no company. */
+export const NO_COMPANY = "none";
+
+export type CompanyShare = { key: string; companyId: string | null; company: string; amount: number; received: number; balance: number };
+
+/**
+ * Splits `total` over the weights in proportion, in whole paise that add up
+ * exactly (largest remainder). Weights of 0 get 0.
+ */
+export function apportion(total: number, weights: number[]): number[] {
+  const sumW = weights.reduce((a, w) => a + Math.max(0, w), 0);
+  if (!sumW) return weights.map((_, i) => (i === 0 ? total : 0));
+  const raw = weights.map((w) => (total * Math.max(0, w)) / sumW);
+  const out = raw.map(Math.floor);
+  let left = total - out.reduce((a, x) => a + x, 0);
+  const order = raw.map((r, i) => [r - Math.floor(r), i] as const).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+  for (let k = 0; left > 0; k = (k + 1) % order.length, left--) out[order[k][1]]++;
+  return out;
+}
+
+/**
+ * Each bill's value by company (the product's principal supplier), and what
+ * was received and is left of each share. A bill raised here is split by its
+ * invoice lines (GST included); an imported bill by its imported split.
+ * Payments on a bill are split in proportion to the shares.
+ */
+export async function companyShares(tx: Tx, bills: DueBill[]): Promise<Map<string, CompanyShare[]>> {
+  const ids = bills.map((b) => b.id);
+  const orderIds = bills.map((b) => b.orderId).filter((x): x is string => !!x);
+  const noteNumbers = bills.filter((b) => b.kind === "DEBIT_NOTE").map((b) => b.number);
+  const [stored, invoices] = await Promise.all([
+    ids.length ? tx.billShare.findMany({ where: { billId: { in: ids } }, select: { billId: true, amount: true, supplier: { select: { id: true, name: true } } } }) : [],
+    orderIds.length || noteNumbers.length
+      ? tx.invoice.findMany({
+          where: {
+            OR: [
+              ...(orderIds.length ? [{ orderId: { in: orderIds }, type: { in: ["TAX_INVOICE" as const, "BILL_OF_SUPPLY" as const] } }] : []),
+              ...(noteNumbers.length ? [{ number: { in: noteNumbers }, type: "DEBIT_NOTE" as const }] : []),
+            ],
+          },
+          select: { orderId: true, number: true, type: true, lines: { select: { total: true, productId: true } } },
+        })
+      : [],
+  ]);
+  const productIds = [...new Set(invoices.flatMap((i) => i.lines.map((l) => l.productId)).filter((x): x is string => !!x))];
+  const products = productIds.length ? await tx.product.findMany({ where: { id: { in: productIds } }, select: { id: true, supplier: { select: { id: true, name: true } } } }) : [];
+  const supplierOf = new Map(products.map((p) => [p.id, p.supplier]));
+
+  type W = { key: string; companyId: string | null; company: string; weight: number };
+  const add = (list: W[], c: { id: string; name: string } | null | undefined, weight: number) => {
+    const key = c?.id ?? NO_COMPANY;
+    const hit = list.find((x) => x.key === key);
+    if (hit) hit.weight += weight;
+    else list.push({ key, companyId: c?.id ?? null, company: c?.name ?? "No company", weight });
+  };
+  const listFor = (m: Map<string, W[]>, k: string) => {
+    let l = m.get(k);
+    if (!l) m.set(k, (l = []));
+    return l;
+  };
+  const storedBy = new Map<string, W[]>();
+  for (const r of stored) add(listFor(storedBy, r.billId), r.supplier, r.amount);
+  const linesBy = new Map<string, W[]>();
+  for (const inv of invoices) {
+    const list = listFor(linesBy, inv.type === "DEBIT_NOTE" ? `dn:${inv.number}` : `o:${inv.orderId}`);
+    for (const l of inv.lines) add(list, l.productId ? supplierOf.get(l.productId) : null, l.total);
+  }
+
+  const out = new Map<string, CompanyShare[]>();
+  for (const b of bills) {
+    const w = storedBy.get(b.id) ?? (b.kind === "DEBIT_NOTE" ? linesBy.get(`dn:${b.number}`) : b.orderId ? linesBy.get(`o:${b.orderId}`) : undefined);
+    const parts: W[] = w?.some((x) => x.weight > 0) ? w.filter((x) => x.weight > 0) : [{ key: UNSPLIT, companyId: null, company: "Not split", weight: 1 }];
+    const amounts = apportion(b.amount, parts.map((x) => x.weight));
+    const received = apportion(b.received, amounts);
+    out.set(
+      b.id,
+      parts.map((x, i) => ({ key: x.key, companyId: x.companyId, company: x.company, amount: amounts[i], received: received[i], balance: amounts[i] - received[i] }))
+    );
+  }
+  return out;
+}
+
+export type CompanyRow = { bill: DueBill; share: CompanyShare };
+export type CompanyBlock = {
+  key: string;
+  companyId: string | null;
+  company: string;
+  rows: CompanyRow[];
+  /** amount = the company's share of these bills. */
+  totals: Totals;
+  parties: number;
+};
+
+async function companies(tx: Tx, d: Awaited<ReturnType<typeof dueBills>>, companyId?: string): Promise<CompanyBlock[]> {
+  const shares = await companyShares(tx, d.bills);
+  const by = new Map<string, CompanyBlock>();
+  for (const bill of d.bills) {
+    for (const share of shares.get(bill.id) ?? []) {
+      if (share.balance <= 0) continue;
+      if (companyId && share.companyId !== companyId) continue;
+      const blk = by.get(share.key) ?? { key: share.key, companyId: share.companyId, company: share.company, rows: [], totals: { amount: 0, received: 0, balance: 0 }, parties: 0 };
+      blk.rows.push({ bill, share });
+      blk.totals.amount += share.amount;
+      blk.totals.received += share.received;
+      blk.totals.balance += share.balance;
+      by.set(share.key, blk);
+    }
+  }
+  const last = (k: string) => (k === UNSPLIT ? 2 : k === NO_COMPANY ? 1 : 0);
+  return [...by.values()]
+    .map((b) => ({ ...b, parties: new Set(b.rows.map((r) => r.bill.shop.id)).size }))
+    .sort((a, b) => last(a.key) - last(b.key) || a.company.localeCompare(b.company));
+}
+
 // ───────────────────────────── collections ─────────────────────────────
 
 export const COLLECTION_METHODS = ["CASH", "CHEQUE", "UPI", "BANK", "ONLINE"] as const;
@@ -354,6 +479,7 @@ export type DuesReport =
   | { view: "bills"; asOn: string; bills: DueBill[]; totals: Totals; shops: number }
   | { view: "parties"; asOn: string; parties: PartyBlock[]; totals: Totals; advance: number }
   | { view: "agents"; asOn: string; agents: AgentBlock[]; totals: Totals; advance: number }
+  | { view: "companies"; asOn: string; companies: CompanyBlock[]; totals: Totals }
   | ({ view: "collections"; period: Period } & Awaited<ReturnType<typeof collectionSummary>>);
 
 /** The default collection period: the as-on day (a day's collection sheet). */
@@ -379,6 +505,11 @@ export async function loadDues(tenantId: string, view: DuesView, sp: URLSearchPa
       const ps = parties(d);
       return { view, asOn: d.asOn, parties: ps, totals, advance: ps.reduce((s, p) => s + p.advance, 0) };
     }
+    if (view === "companies") {
+      const cs = await companies(tx, d, f.companyId);
+      const t = cs.reduce((a, c) => ({ amount: a.amount + c.totals.amount, received: a.received + c.totals.received, balance: a.balance + c.totals.balance }), { amount: 0, received: 0, balance: 0 });
+      return { view, asOn: d.asOn, companies: cs, totals: t };
+    }
     const as = agents(d);
     return { view, asOn: d.asOn, agents: as, totals, advance: as.reduce((s, a) => s + a.advance, 0) };
   });
@@ -387,12 +518,13 @@ export async function loadDues(tenantId: string, view: DuesView, sp: URLSearchPa
 /** Names for the filter line: area, salesman, beat, day. */
 export async function filterOptions(tenantId: string) {
   return withTenantTx(tenantId, async (tx) => {
-    const [areas, salesmen, beats] = await Promise.all([
+    const [areas, salesmen, beats, companies] = await Promise.all([
       tx.area.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
       tx.user.findMany({ where: { active: true, role: { in: ["SALES_AGENT", "SUPERVISOR"] } }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
       tx.beat.findMany({ where: { active: true }, select: { id: true, name: true, weekdays: true }, orderBy: { name: "asc" } }),
+      tx.supplier.findMany({ where: { active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     ]);
-    return { areas, salesmen, beats };
+    return { areas, salesmen, beats, companies };
   });
 }
 
@@ -403,6 +535,7 @@ export function filterLine(f: Omit<DuesFilters, "asOn">, o: Awaited<ReturnType<t
   if (f.salesmanId) parts.push(`Salesman: ${o.salesmen.find((a) => a.id === f.salesmanId)?.name ?? "?"}`);
   if (f.beatId) parts.push(`Beat: ${o.beats.find((a) => a.id === f.beatId)?.name ?? "?"}`);
   if (f.weekday !== undefined) parts.push(`Beat day: ${WEEKDAYS[f.weekday]}`);
+  if (f.companyId) parts.push(`Company: ${o.companies.find((a) => a.id === f.companyId)?.name ?? "?"}`);
   return parts.join(" · ");
 }
 

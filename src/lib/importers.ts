@@ -7,8 +7,8 @@ import { toPaise } from "@/lib/money";
  * retailers by phone, products by SKU.
  */
 
-export type ImportType = "retailers" | "products" | "balances" | "prices" | "bills";
-export const IMPORT_TYPES: ImportType[] = ["retailers", "products", "balances", "prices", "bills"];
+export type ImportType = "retailers" | "products" | "balances" | "prices" | "bills" | "bill_shares";
+export const IMPORT_TYPES: ImportType[] = ["retailers", "products", "balances", "prices", "bills", "bill_shares"];
 export type Row = Record<string, string>;
 export type RowError = { row: number; message: string };
 
@@ -22,9 +22,10 @@ export const TEMPLATES: Record<ImportType, { columns: string[]; required: string
     example: ["Agarwal General Store", "9876543210", "G-12", "Shree Complex", "400058", "Mumbai", "Andheri", "Test agent", "Ramesh", "02226345678"],
   },
   products: {
-    columns: ["name", "sku", "category", "unit", "price", "mrp", "gst_rate", "special_offer", "brand", "hsn_code", "name_hi", "case_unit", "case_size", "moq"],
+    // company = the principal company (supplier) the product comes from, for company-wise outstanding.
+    columns: ["name", "sku", "category", "unit", "price", "mrp", "gst_rate", "special_offer", "brand", "hsn_code", "name_hi", "case_unit", "case_size", "moq", "company"],
     required: ["name", "sku", "category", "unit", "price", "mrp"],
-    example: ["Masala Chai 250g", "BEV-001", "Beverages", "pack", "85", "95", "5", "", "Chaiwala", "0902", "मसाला चाय", "box", "24", "1"],
+    example: ["Masala Chai 250g", "BEV-001", "Beverages", "pack", "85", "95", "5", "", "Chaiwala", "0902", "मसाला चाय", "box", "24", "1", "Chaiwala Foods Pvt Ltd"],
   },
   balances: {
     // amount in rupees: positive = retailer owes you, negative = advance you hold
@@ -45,6 +46,13 @@ export const TEMPLATES: Record<ImportType, { columns: string[]; required: string
     columns: ["party", "area", "phone", "invoice_no", "date", "bill_value", "received", "due_date", "salesman"],
     required: ["party", "bill_value"],
     example: ["Shree Ganesh Kirana", "Station Road", "9876543210", "A004231", "21/11/2026", "9520", "0", "21/11/2026", "Ravi Sales"],
+  },
+  bill_shares: {
+    // How much of each open bill is each company's (the old book's company-wise outstanding),
+    // one row per bill and company. Bills imported with "bills" only; the shares must add up to the bill.
+    columns: ["invoice_no", "company", "value"],
+    required: ["invoice_no", "company", "value"],
+    example: ["A004231", "Chaiwala Foods Pvt Ltd", "6240.50"],
   },
 };
 
@@ -208,6 +216,8 @@ export type ProductRow = {
   caseUnit: string | null;
   caseSize: number | null;
   moq: number;
+  /** Principal company (supplier) name; null = leave as it is. */
+  company: string | null;
 };
 
 const GST_RATES = new Set([0, 0.25, 3, 5, 12, 18, 28, 40]);
@@ -292,6 +302,7 @@ export function validateProducts(rows: Row[]): { valid: ProductRow[]; errors: Ro
     valid.push({
       row,
       brand: (r.brand ?? "").trim() || null,
+    company: (r.company ?? "").trim().slice(0, 120) || null,
       hsnCode: hsn || null,
       nameHi: (r.name_hi ?? "").trim() || null,
       caseUnit,
@@ -444,6 +455,34 @@ export function validatePrices(rows: Row[]): { valid: PriceRow[]; errors: RowErr
     if (seen.has(key)) return errors.push({ row, message: `Repeated (first on row ${seen.get(key)})` });
     seen.set(key, row);
     valid.push({ row, priceList: list, phone, sku: r.sku.trim(), price });
+  });
+  return { valid, errors };
+}
+
+export type BillShareRow = { row: number; number: string; company: string; amount: number };
+
+/** A bill's value by company, one row per bill and company (see TEMPLATES.bill_shares). */
+export function validateBillShares(rows: Row[]): { valid: BillShareRow[]; errors: RowError[] } {
+  const valid: BillShareRow[] = [];
+  const errors: RowError[] = [];
+  const seen = new Map<string, number>();
+  rows.forEach((r, i) => {
+    const row = i + 2;
+    const miss = missing(r, TEMPLATES.bill_shares.required);
+    if (miss.length) return errors.push({ row, message: `Missing ${miss.join(", ")}` });
+    const number = r.invoice_no.trim().toUpperCase();
+    const company = r.company.trim().replace(/\s+/g, " ").slice(0, 120);
+    let amount: number;
+    try {
+      amount = toPaise(r.value);
+    } catch {
+      return errors.push({ row, message: "value must be a number in rupees" });
+    }
+    if (amount <= 0) return errors.push({ row, message: "value must be more than 0" });
+    const key = `${number}|${company.toLowerCase()}`;
+    if (seen.has(key)) return errors.push({ row, message: `${company} is on bill ${number} twice (first on row ${seen.get(key)})` });
+    seen.set(key, row);
+    valid.push({ row, number, company, amount });
   });
   return { valid, errors };
 }

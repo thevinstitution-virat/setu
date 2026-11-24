@@ -7,9 +7,9 @@ import { filterLine, filterOptions, isDuesView, loadDues, parseDuesFilters } fro
 import { csvFor, renderSheetPdf, sheetFor, summaryText } from "@/lib/dues-export";
 
 /**
- * GET /api/admin/reports/dues/<bills|parties|agents|collections>
+ * GET /api/admin/reports/dues/<bills|parties|agents|companies|collections>
  *   ?asOn=YYYY-MM-DD (outstanding) or ?from=&to= (collections, default today)
- *   &areaId= &salesmanId= &beatId= &weekday=0-6
+ *   &areaId= &salesmanId= &beatId= &weekday=0-6 &companyId= (companies)
  *   &format=json (default) | csv | pdf
  * JSON also carries a short summary for sharing on WhatsApp.
  */
@@ -25,7 +25,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ view: st
     const f = parseDuesFilters(sp);
     const filters = filterLine(f, options);
     const stamp = report.view === "collections" ? `${report.period.from}-to-${report.period.to}` : report.asOn;
-    const file = `${view === "bills" ? "outstanding-bills" : view === "parties" ? "outstanding-parties" : view === "agents" ? "outstanding-salesman" : "collections"}-${stamp}`;
+    const file = `${view === "bills" ? "outstanding-bills" : view === "parties" ? "outstanding-parties" : view === "agents" ? "outstanding-salesman" : view === "companies" ? "outstanding-company" : "collections"}-${stamp}`;
 
     if (format === "csv" || format === "pdf") {
       await audit(auth.db, { actorId: auth.session.userId, action: "report.export", entity: "Report", entityId: `dues:${view}`, after: { format, stamp, filters }, ip: requestIp(req) });

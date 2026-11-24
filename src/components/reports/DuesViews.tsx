@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatINR } from "@/lib/money";
-import { COLLECTION_METHODS, METHOD_LABEL, count, historyText, shortDate, type AgentBlock, type CollectionRow, type DueBill, type PartyBlock, type Totals } from "@/lib/dues-reports";
+import { COLLECTION_METHODS, METHOD_LABEL, UNSPLIT, count, historyText, shortDate, type AgentBlock, type CollectionRow, type CompanyBlock, type DueBill, type PartyBlock, type Totals } from "@/lib/dues-reports";
 import { Empty } from "@/components/reports/Kit";
 
 /** The outstanding / collection reports on screen (server-safe: no hooks). */
@@ -163,6 +163,99 @@ export function AgentBlocks({ agents }: { agents: AgentBlock[] }) {
           {a.parties.map((p) => (
             <Party key={p.shop.id} p={p} showLate />
           ))}
+        </section>
+      ))}
+    </div>
+  );
+}
+
+export function CompanyBlocks({ companies, totals }: { companies: CompanyBlock[]; totals: Totals }) {
+  if (!companies.length) return <Empty>No open bills for these filters.</Empty>;
+  return (
+    <div className="space-y-4">
+      <section className="card overflow-x-auto">
+        <table className="w-full text-sm min-w-[560px]">
+          <thead>
+            <tr className="text-xs text-[var(--muted)] border-b border-[var(--line)] text-left">
+              <th className={th}>Company</th>
+              <th className={`${th} text-right`}>Bills</th>
+              <th className={`${th} text-right`}>Parties</th>
+              <th className={`${th} text-right`}>Share billed</th>
+              <th className={`${th} text-right`}>Balance</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--line)]">
+            {companies.map((c) => (
+              <tr key={c.key}>
+                <td className={td}>
+                  <a href={`#co-${c.key}`} className="font-medium text-[var(--ink)] hover:text-[var(--kesar-text)]">
+                    {c.company}
+                  </a>
+                </td>
+                <td className={`${td} ${num}`}>{c.rows.length}</td>
+                <td className={`${td} ${num}`}>{c.parties}</td>
+                <td className={`${td} ${num}`}>{plain(c.totals.amount)}</td>
+                <td className={`${td} ${num} font-semibold text-[var(--ink)]`}>{plain(c.totals.balance)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-[var(--ink)] font-semibold text-[var(--ink)]">
+              <td className={td}>{count(companies.filter((c) => c.companyId).length, "company", "companies")}</td>
+              <td className={td} colSpan={2} />
+              <td className={`${td} ${num}`}>{plain(totals.amount)}</td>
+              <td className={`${td} ${num}`}>{plain(totals.balance)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
+      {companies.map((c) => (
+        <section key={c.key} id={`co-${c.key}`} className="card p-4 space-y-3 scroll-mt-20">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-[var(--line)] pb-2">
+            <h2 className="font-heading text-lg font-bold text-[var(--ink)]">{c.company}</h2>
+            <p className="text-sm tabular-nums">
+              {count(c.rows.length, "bill")} · {count(c.parties, "party", "parties")} · <span className="font-bold text-[var(--ink)]">{inr(c.totals.balance)}</span>
+            </p>
+          </div>
+          {c.key === UNSPLIT && <p className="text-xs text-[var(--muted)]">Bills from the old book with no company split yet. Import it under Import → Company split of open bills.</p>}
+          <div className="overflow-x-auto -mx-4">
+            <table className="w-full text-sm min-w-[820px]">
+              <thead>
+                <tr className="text-xs text-[var(--muted)] border-b border-[var(--line)] text-left">
+                  <th className={th}>Bill no.</th>
+                  <th className={th}>Date</th>
+                  <th className={th}>Party</th>
+                  <th className={th}>Area</th>
+                  <th className={`${th} text-right`}>Bill value</th>
+                  <th className={`${th} text-right`}>Company share</th>
+                  <th className={`${th} text-right`}>Received</th>
+                  <th className={`${th} text-right`}>Balance</th>
+                  <th className={`${th} text-right`}>Days over</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--line)]">
+                {c.rows.map(({ bill: b, share: x }) => (
+                  <tr key={b.id}>
+                    <td className={`${td} font-medium text-[var(--ink)] whitespace-nowrap`}>{b.number}</td>
+                    <td className={`${td} whitespace-nowrap`}>{shortDate(b.date)}</td>
+                    <td className={td}>
+                      <Link href={khata(b.shop.id)} className="hover:text-[var(--kesar-text)]">
+                        {b.shop.outletName}
+                      </Link>
+                    </td>
+                    <td className={td}>{b.shop.area}</td>
+                    <td className={`${td} ${num} text-[var(--muted)]`}>{plain(b.amount)}</td>
+                    <td className={`${td} ${num}`}>{plain(x.amount)}</td>
+                    <td className={`${td} ${num}`}>{x.received ? plain(x.received) : "–"}</td>
+                    <td className={`${td} ${num} font-semibold text-[var(--ink)]`}>{plain(x.balance)}</td>
+                    <td className={`${td} ${num}`}>
+                      <Late days={b.overdueDays} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       ))}
     </div>

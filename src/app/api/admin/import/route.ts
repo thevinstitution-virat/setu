@@ -14,7 +14,9 @@ import {
   templateCsv,
   validateBalances,
   validateBills,
+  validateBillShares,
   type BillRow,
+  type BillShareRow,
   validatePrices,
   validateProducts,
   type PriceRow,
@@ -25,6 +27,7 @@ import {
   type RetailerRow,
   type RowError,
 } from "@/lib/importers";
+import { applyBillShares } from "@/lib/bill-shares";
 import { tidyProductRows, type TidyChange, type TidyDuplicate } from "@/lib/catalogue-rules";
 
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -159,6 +162,7 @@ async function importProducts(tx: Tx, rows: ProductRow[]): Promise<Summary> {
   // Categories, brands and HSN rates by name / code; new names are created.
   const cats = new Map((await tx.category.findMany({ select: { id: true, name: true } })).map((c) => [c.name.toLowerCase(), c.id]));
   const brands = new Map((await tx.brand.findMany({ select: { id: true, name: true } })).map((c) => [c.name.toLowerCase(), c.id]));
+  const companies = new Map((await tx.supplier.findMany({ select: { id: true, name: true } })).map((c) => [c.name.toLowerCase(), c.id]));
   const hsn = new Map((await tx.hsnCode.findMany({ select: { code: true, gstRate: true } })).map((h) => [h.code, h.gstRate]));
   const idFor = async (map: Map<string, string>, name: string, create: (name: string) => Promise<{ id: string }>) => {
     let id = map.get(name.toLowerCase());
@@ -173,6 +177,8 @@ async function importProducts(tx: Tx, rows: ProductRow[]): Promise<Summary> {
       name: p.name,
       categoryId: await idFor(cats, p.category, (name) => tx.category.create({ data: { name } })),
       brandId: p.brand ? await idFor(brands, p.brand, (name) => tx.brand.create({ data: { name } })) : null,
+      // A blank company leaves the product's company as it is.
+      ...(p.company ? { supplierId: await idFor(companies, p.company, (name) => tx.supplier.create({ data: { name } })) } : {}),
       hsnCode: p.hsnCode,
       nameHi: p.nameHi,
       caseUnit: p.caseUnit,
@@ -335,12 +341,16 @@ async function importBills(tx: Tx, rows: BillRow[], tenantId: string, actorId: s
   return s;
 }
 
+async function importBillShares(tx: Tx, rows: BillShareRow[]): Promise<Summary> {
+  return { ...(await applyBillShares(tx, rows)), newRegions: 0, newAreas: 0 };
+}
+
 export async function GET(req: Request) {
   const auth = await guard("import.run");
   if (!auth.ok) return auth.res;
   const type = new URL(req.url).searchParams.get("type") as ImportType;
   if (!IMPORT_TYPES.includes(type)) {
-    return NextResponse.json({ error: "type must be retailers, products, balances, prices or bills" }, { status: 400 });
+    return NextResponse.json({ error: "type must be retailers, products, balances, prices, bills or bill_shares" }, { status: 400 });
   }
   return new NextResponse("﻿" + templateCsv(type), {
     headers: {
@@ -364,7 +374,7 @@ export async function POST(req: Request) {
   const mode = String(form?.get("mode") ?? "preview");
   if (!(file instanceof File)) return NextResponse.json({ error: "Attach a CSV or Excel file" }, { status: 400 });
   if (!IMPORT_TYPES.includes(type)) {
-    return NextResponse.json({ error: "Choose retailers, products, balances, prices or bills" }, { status: 400 });
+    return NextResponse.json({ error: "Choose retailers, products, balances, prices, bills or bill_shares" }, { status: 400 });
   }
   if (!/\.(csv|xlsx)$/i.test(file.name)) {
     return NextResponse.json({ error: "Use a .csv or .xlsx file (old .xls: save as .xlsx first)" }, { status: 415 });
@@ -403,7 +413,9 @@ export async function POST(req: Request) {
           ? validatePrices(rows)
           : type === "bills"
             ? validateBills(rows)
-            : validateBalances(rows);
+            : type === "bill_shares"
+              ? validateBillShares(rows)
+              : validateBalances(rows);
 
   // Preview runs the exact same writes inside a transaction and rolls it back,
   // so what it reports is exactly what commit will do.
@@ -421,7 +433,9 @@ export async function POST(req: Request) {
                 ? await importPrices(tx, checked.valid as PriceRow[])
                 : type === "bills"
                   ? await importBills(tx, checked.valid as BillRow[], tenant.id, session.userId)
-                  : await importBalances(tx, checked.valid as BalanceRow[], tenant.id, session.userId);
+                  : type === "bill_shares"
+                    ? await importBillShares(tx, checked.valid as BillShareRow[])
+                    : await importBalances(tx, checked.valid as BalanceRow[], tenant.id, session.userId);
         s.errors = [...checked.errors, ...s.errors].sort((a, b) => a.row - b.row);
         if (mode !== "commit" || s.errors.length) throw new Rollback(s);
         return s;

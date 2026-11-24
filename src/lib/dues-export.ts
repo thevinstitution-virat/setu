@@ -7,7 +7,7 @@ import path from "node:path";
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { formatINR } from "@/lib/money";
-import { COLLECTION_METHODS, DUES_TITLE, METHOD_LABEL, count, historyText, shortDate, type DuesReport, type PartyBlock } from "@/lib/dues-reports";
+import { COLLECTION_METHODS, DUES_TITLE, METHOD_LABEL, UNSPLIT, count, historyText, shortDate, type DuesReport, type PartyBlock } from "@/lib/dues-reports";
 
 const money = (p: number) => formatINR(p, { symbol: false });
 const rupees = (p: number) => (p / 100).toFixed(2);
@@ -116,6 +116,35 @@ export function sheetFor(r: DuesReport, filters: string): Sheet {
       rows,
     };
   }
+  if (r.view === "companies") {
+    const rows: SheetRow[] = [];
+    for (const c of r.companies) {
+      rows.push({ kind: "group", text: `${c.company} — ${count(c.rows.length, "bill")}, ${count(c.parties, "party", "parties")}`, right: money(c.totals.balance) });
+      for (const { bill: b, share: x } of c.rows) {
+        rows.push({ kind: "row", cells: [b.number, shortDate(b.date), b.shop.outletName, b.shop.area, money(b.amount), money(x.amount), money(x.received), money(x.balance), b.overdueDays ? String(b.overdueDays) : ""] });
+      }
+      rows.push({ kind: "sub", cells: [`${c.company} total`, "", "", "", "", money(c.totals.amount), money(c.totals.received), money(c.totals.balance), ""] });
+    }
+    rows.push({ kind: "total", cells: ["Grand total", "", count(r.companies.filter((c) => c.companyId).length, "company", "companies"), "", "", money(r.totals.amount), money(r.totals.received), money(r.totals.balance), ""] });
+    if (r.companies.some((c) => c.key === UNSPLIT)) rows.push({ kind: "note", text: "Not split: bills from the old book with no company split imported yet (Import → Company split of open bills)." });
+    return {
+      title,
+      subtitle,
+      landscape: true,
+      cols: [
+        { label: "Bill no.", width: 70 },
+        { label: "Date", width: 46 },
+        { label: "Party", width: 160 },
+        { label: "Area", width: 90 },
+        { label: "Bill value", width: 70, align: "r" },
+        { label: "Company share", width: 76, align: "r" },
+        { label: "Received", width: 70, align: "r" },
+        { label: "Balance", width: 70, align: "r" },
+        { label: "Days over", width: 46, align: "r" },
+      ],
+      rows,
+    };
+  }
   return {
     title,
     subtitle,
@@ -141,6 +170,14 @@ export function csvFor(r: DuesReport): (string | number | null)[][] {
     return [
       ["Party", "Area", "Phone", "Salesman", "Collected by", "Receipts", ...COLLECTION_METHODS.map((m) => METHOD_LABEL[m]), "Total"],
       ...r.rows.map((x) => [x.shop.outletName, x.shop.area, x.shop.phone, x.shop.agent?.name ?? "", x.collectors.join(", "), x.count, ...COLLECTION_METHODS.map((m) => rupees(x.byMethod[m])), rupees(x.total)]),
+    ];
+  }
+  if (r.view === "companies") {
+    return [
+      ["Company", "Party", "Area", "Phone", "Salesman", "Bill no.", "Bill date", "Due date", "Bill value", "Company share", "Received", "Balance", "Days over"],
+      ...r.companies.flatMap((c) =>
+        c.rows.map(({ bill: b, share: x }) => [c.company, b.shop.outletName, b.shop.area, b.shop.phone, b.salesman?.name ?? "", b.number, shortDate(b.date), shortDate(b.dueDate), rupees(b.amount), rupees(x.amount), rupees(x.received), rupees(x.balance), b.overdueDays])
+      ),
     ];
   }
   const head = ["Salesman", "Party", "Area", "Phone", "Other phone", "Contact", "Bill no.", "Bill date", "Due date", "Bill value", "Received", "Balance", "Days", "Days over", "Collections", "Party advance", "Last receipt", "Last receipt date"];
@@ -175,6 +212,7 @@ export function csvFor(r: DuesReport): (string | number | null)[][] {
 export function summaryText(r: DuesReport, business: string, filters: string) {
   const head = `${business}: ${DUES_TITLE[r.view]} (${asOnLine(r, filters)})`;
   if (r.view === "collections") return `${head}\nCollected ₹${money(r.totals.total)} from ${count(r.rows.length, "party", "parties")} (${COLLECTION_METHODS.filter((m) => r.totals.byMethod[m]).map((m) => `${METHOD_LABEL[m]} ₹${money(r.totals.byMethod[m])}`).join(", ") || "nothing yet"}).`;
+  if (r.view === "companies") return `${head}\nOutstanding ₹${money(r.totals.balance)} across ${count(r.companies.filter((c) => c.companyId).length, "company", "companies")} (${r.companies.slice(0, 4).map((c) => `${c.company} ₹${money(c.totals.balance)}`).join(", ")}${r.companies.length > 4 ? ", …" : ""}).`;
   const n = r.view === "bills" ? r.bills.length : r.view === "parties" ? r.parties.reduce((s, p) => s + p.bills.length, 0) : r.agents.reduce((s, a) => s + a.parties.reduce((t, p) => t + p.bills.length, 0), 0);
   return `${head}\nOutstanding ₹${money(r.totals.balance)} on ${count(n, "bill")}.`;
 }
