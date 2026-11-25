@@ -59,7 +59,7 @@ export type ImportType = keyof typeof TYPES;
 export const BOOKS_SHEETS: ImportType[] = ["suppliers", "supplier_bills", "purchases"];
 
 /** The import screen. `only` limits it to some sheets (the books area shows the suppliers' and purchase sheets). */
-export default function ImportTool({ only, initial, inBooks = false }: { only?: ImportType[]; initial?: string; inBooks?: boolean }) {
+export default function ImportTool({ only, initial, inBooks = false, purchaseCases = false }: { only?: ImportType[]; initial?: string; inBooks?: boolean; purchaseCases?: boolean }) {
   const types = only ?? (Object.keys(TYPES) as ImportType[]);
   const [type, setType] = useState<ImportType>(types.includes(initial as ImportType) ? (initial as ImportType) : types[0]);
   const [file, setFile] = useState<File | null>(null);
@@ -129,7 +129,11 @@ export default function ImportTool({ only, initial, inBooks = false }: { only?: 
         </div>
 
         <p className="text-sm text-[var(--muted)]">
-          Columns: {TYPES[type].hint}{" "}
+          Columns: {TYPES[type].hint}
+          {type === "purchases" &&
+            (purchaseCases
+              ? " By the case: fill cases, loose and case_rate (₹ per case) and leave qty and rate blank; case_size blank = the product's case size. The amount is worked out as the company's bill does it."
+              : " To import by the case (cases + rate per case), the owner turns on “Purchase bill sheets by the case” in Settings → Stock.")}{" "}
           <a className="font-bold text-[var(--kesar-text)] underline" href={`/api/admin/import?type=${type}`}>
             Download template
           </a>

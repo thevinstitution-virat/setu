@@ -111,7 +111,7 @@ export async function importSupplierBills(ctx: Ctx, rows: SupplierBillImportRow[
 export async function importPurchases(ctx: Ctx, bills: PurchaseImportBill[]): Promise<BooksImportSummary> {
   const s: BooksImportSummary = { created: 0, updated: 0, errors: [] };
   const known = await suppliersByName(ctx);
-  const products = new Map((await ctx.tx.product.findMany({ select: { id: true, sku: true, name: true, gstRate: true } })).map((p) => [norm(p.sku), p]));
+  const products = new Map((await ctx.tx.product.findMany({ select: { id: true, sku: true, name: true, gstRate: true, caseSize: true } })).map((p) => [norm(p.sku), p]));
   const heads = new Map((await ctx.tx.ledgerHead.findMany({ select: { id: true, name: true, active: true } })).map((h) => [norm(h.name), h]));
   for (const b of bills) {
     const fail = (m: string) => b.rows.forEach((row) => s.errors.push({ row, message: m }));
@@ -128,6 +128,19 @@ export async function importPurchases(ctx: Ctx, bills: PurchaseImportBill[]): Pr
         if (!p) {
           bad = `Row ${l.row}: no product with SKU ${l.sku}`;
           break;
+        }
+        if (l.byCase) {
+          const size = l.byCase.caseSize ?? p.caseSize;
+          if (!size || size < 1) {
+            bad = `Row ${l.row}: ${p.name} has no case size: fill case_size, or set it on the product`;
+            break;
+          }
+          if (l.quantity && l.quantity !== l.byCase.cases * size + l.byCase.loose) {
+            bad = `Row ${l.row}: qty ${l.quantity} isn't ${l.byCase.cases} × ${size} + ${l.byCase.loose}`;
+            break;
+          }
+          lines.push({ target: "GOODS", productId: p.id, description: l.item, quantity: 0, rate: 0, cases: l.byCase.cases, loose: l.byCase.loose, caseSize: size, caseRate: l.byCase.caseRate, freeQty: l.freeQty, discountPct: l.discountPct, gstRate: l.gstRate ?? p.gstRate });
+          continue;
         }
         lines.push({ target: "GOODS", productId: p.id, description: l.item, quantity: l.quantity, freeQty: l.freeQty, rate: l.rate, discountPct: l.discountPct, gstRate: l.gstRate ?? p.gstRate });
       } else {

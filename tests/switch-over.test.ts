@@ -14,7 +14,7 @@ import { withMoney, type Ctx } from "@/lib/ledger";
 import { createHead, todayIst } from "@/lib/books";
 import { openingView } from "@/lib/final-accounts";
 import { payablesBySupplier } from "@/lib/supplier-payments";
-import { validatePurchases, validateSupplierBills, validateSuppliers, type Row } from "@/lib/importers";
+import { templateCsv, validatePurchases, validateSupplierBills, validateSuppliers, type Row } from "@/lib/importers";
 import { importPurchases, importSupplierBills, importSuppliers } from "@/lib/books-import";
 import { applyOldTb, checkOldTb, debtorsOn, parallelRun, readOldTb, switchOver } from "@/lib/switch-over";
 
@@ -91,6 +91,45 @@ describe("sheet checks", () => {
   });
 });
 
+describe("purchase bills by the case", () => {
+  const head = ["supplier", "bill_no", "date", "sku", "head", "qty", "rate", "cases", "loose", "case_size", "case_rate"];
+  const day = new Date("2026-11-25T06:00:00Z");
+
+  it("are refused while the setting is off, and the template has no case columns", () => {
+    const r = validatePurchases(rows(head, ["Acme", "C-1", "21/11/2026", "SKU1", "", "", "", "10", "", "144", "2391.55"]), day);
+    expect(r.valid).toHaveLength(0);
+    expect(r.errors[0].message).toMatch(/Purchase bill sheets by the case/);
+    expect(templateCsv("purchases").split("\r\n")[0]).not.toContain("case_rate");
+  });
+
+  it("read cases, loose and the rate per case when it is on", () => {
+    const r = validatePurchases(
+      rows(
+        head,
+        ["Acme", "C-1", "21/11/2026", "SKU1", "", "", "", "10", "", "144", "2391.55"],
+        ["Acme", "C-1", "21/11/2026", "SKU2", "", "48", "70.50", "", "", "", ""],
+        ["Acme", "C-2", "21/11/2026", "", "Freight", "", "", "1", "", "", "100"],
+        ["Acme", "C-3", "21/11/2026", "SKU1", "", "1440", "", "10", "1", "144", "2391.55"],
+        ["Acme", "C-4", "21/11/2026", "SKU1", "", "", "", "2", "", "", ""],
+      ),
+      day,
+      { purchaseCases: true },
+    );
+    expect(r.valid.map((b) => b.number)).toEqual(["C-1"]);
+    expect(r.valid[0].lines[0]).toMatchObject({ sku: "SKU1", quantity: 0, byCase: { cases: 10, loose: 0, caseSize: 144, caseRate: 2391_55 } });
+    expect(r.valid[0].lines[1]).toMatchObject({ quantity: 48, rate: 70_50 });
+    expect(r.valid[0].lines[1].byCase).toBeUndefined();
+    expect(r.errors.map((e) => e.message)).toEqual([
+      expect.stringMatching(/Only a product/),
+      expect.stringMatching(/qty 1440 isn't 10 × 144 \+ 1/),
+      expect.stringMatching(/case_rate/),
+    ]);
+    const tpl = templateCsv("purchases", { purchaseCases: true }).split("\r\n");
+    expect(tpl[0]).toContain("rate,cases,loose,case_size,case_rate,discount_pct");
+    expect(tpl[2]).toContain("1680.50");
+  });
+});
+
 describe("books imports (rolled back)", () => {
   it("adds and updates suppliers, brings in their open bills once, and enters purchase bills", async () => {
     await inRollback(async (ctx) => {
@@ -133,6 +172,17 @@ describe("books imports (rolled back)", () => {
       const again = await importPurchases(ctx, validatePurchases(pr.slice(0, 2)).valid);
       expect(again.created).toBe(0);
       expect(again.errors[0].message).toMatch(/already entered/);
+
+      // By the case: the case size comes from the product; the amount is the bill's to the paisa.
+      const cased = await ctx.tx.product.update({ where: { id: (await ctx.tx.product.findFirstOrThrow({ where: { sku: product.sku }, select: { id: true } })).id }, data: { caseSize: 144, caseUnit: "case" }, select: { id: true, sku: true } });
+      const cr = rows(["supplier", "bill_no", "date", "sku", "cases", "loose", "case_rate", "gst_rate"], [name, "PB-C", "17/06/2002", cased.sku, "10", "0", "2391.55", "18"], [name, "PB-D", "17/06/2002", cased.sku, "1", "", "10", "18"]);
+      const nocase = await ctx.tx.product.findFirst({ where: { active: true, caseSize: null }, select: { sku: true } });
+      if (nocase) cr.push(...rows(["supplier", "bill_no", "date", "sku", "cases", "case_rate"], [name, "PB-E", "17/06/2002", nocase.sku, "1", "10"]));
+      const c1 = await importPurchases(ctx, validatePurchases(cr, new Date(), { purchaseCases: true }).valid);
+      expect(c1.created).toBe(2);
+      const pears = await ctx.tx.purchaseBill.findFirstOrThrow({ where: { supplierId: sup.id, supplierRef: "PB-C" }, include: { lines: true } });
+      expect(pears.lines[0]).toMatchObject({ quantity: 1440, cases: 10, caseSize: 144, caseRate: 2391_55, taxable: 23915_50 });
+      if (nocase) expect(c1.errors[0].message).toMatch(/has no case size/);
     });
   }, 30_000);
 });

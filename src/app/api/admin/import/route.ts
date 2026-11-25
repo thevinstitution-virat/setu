@@ -9,6 +9,7 @@ import { can } from "@/lib/permissions";
 import type { Role } from "@/generated/prisma/client";
 import { importPurchases, importSupplierBills, importSuppliers } from "@/lib/books-import";
 import { invoiceSettings } from "@/lib/invoice-settings";
+import { inventorySettings } from "@/lib/inventory-settings";
 import {
   BOOKS_IMPORTS,
   IMPORT_TYPES,
@@ -377,7 +378,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: `type must be one of ${IMPORT_TYPES.join(", ")}` }, { status: 400 });
   }
   if (!mayImport(auth.session.role, type)) return NextResponse.json({ error: "You don't have access to this" }, { status: 403 });
-  return new NextResponse("﻿" + templateCsv(type), {
+  return new NextResponse("﻿" + templateCsv(type, { purchaseCases: inventorySettings(auth.tenant.settings).purchaseCases }), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="setu-${type}-template.csv"`,
@@ -448,7 +449,7 @@ export async function POST(req: Request) {
                 : type === "supplier_bills"
                   ? validateSupplierBills(rows)
                   : type === "purchases"
-                    ? validatePurchases(rows)
+                    ? validatePurchases(rows, new Date(), { purchaseCases: inventorySettings(tenant.settings).purchaseCases })
                     : validateBalances(rows);
 
   // Preview runs the exact same writes inside a transaction and rolls it back,

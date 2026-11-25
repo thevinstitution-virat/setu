@@ -80,8 +80,19 @@ export const TEMPLATES: Record<ImportType, { columns: string[]; required: string
   },
 };
 
-export function templateCsv(type: ImportType) {
+/** Extra purchase bill columns when the business imports by the case (Settings → Stock). */
+export const PURCHASE_CASE_COLUMNS = ["cases", "loose", "case_size", "case_rate"];
+
+export function templateCsv(type: ImportType, opts: { purchaseCases?: boolean } = {}) {
   const t = TEMPLATES[type];
+  if (type === "purchases" && opts.purchaseCases) {
+    // Same as the plain sheet, with the case columns after rate, and a second line billed by the case.
+    const at = t.columns.indexOf("rate") + 1;
+    const cols = [...t.columns.slice(0, at), ...PURCHASE_CASE_COLUMNS, ...t.columns.slice(at)];
+    const plain = [...t.example.slice(0, at), "", "", "", "", ...t.example.slice(at)];
+    const byCase = ["Chaiwala Foods Pvt Ltd", "CF/2627/0457", "21/11/2026", "", "BEV-002", "", "", "", "", "", "10", "6", "24", "1680.50", "10", "5", "no", "no", "3388"];
+    return [cols.join(","), plain.map(csvCell).join(","), byCase.map(csvCell).join(",")].join("\r\n") + "\r\n";
+  }
   return [t.columns.join(","), t.example.map(csvCell).join(",")].join("\r\n") + "\r\n";
 }
 
@@ -609,7 +620,19 @@ export function validateSupplierBills(rows: Row[], today = new Date()): { valid:
   return { valid, errors };
 }
 
-export type PurchaseImportLine = { row: number; sku: string | null; head: string | null; item: string | null; quantity: number; freeQty: number; rate: number; discountPct: number; gstRate: number | null };
+export type PurchaseImportLine = {
+  row: number;
+  sku: string | null;
+  head: string | null;
+  item: string | null;
+  quantity: number;
+  freeQty: number;
+  rate: number;
+  discountPct: number;
+  gstRate: number | null;
+  /** By the case: whole cases + loose units at caseRate (paise); caseSize null = the product's. quantity 0 = work it out. */
+  byCase?: { cases: number; loose: number; caseSize: number | null; caseRate: number };
+};
 export type PurchaseImportBill = {
   rows: number[];
   supplier: string;
@@ -628,13 +651,18 @@ const num = (v: string | undefined) => {
 };
 
 /** Purchase bills, one row per line, grouped by supplier + bill_no (see TEMPLATES.purchases). */
-export function validatePurchases(rows: Row[], today = new Date()): { valid: PurchaseImportBill[]; errors: RowError[] } {
+export function validatePurchases(rows: Row[], today = new Date(), opts: { purchaseCases?: boolean } = {}): { valid: PurchaseImportBill[]; errors: RowError[] } {
   const errors: RowError[] = [];
   const bills = new Map<string, PurchaseImportBill>();
   const now = istToday(today);
   rows.forEach((r, i) => {
     const row = i + 2;
-    const miss = missing(r, TEMPLATES.purchases.required);
+    const caseCells = PURCHASE_CASE_COLUMNS.filter((c) => (r[c] ?? "").trim());
+    if (caseCells.length && !opts.purchaseCases) {
+      return errors.push({ row, message: `This sheet fills ${caseCells.join(", ")}: the owner can turn on "Purchase bill sheets by the case" in Settings → Stock, or enter qty and rate instead` });
+    }
+    const caseLine = caseCells.length > 0;
+    const miss = missing(r, caseLine ? TEMPLATES.purchases.required.filter((c) => c !== "qty" && c !== "rate") : TEMPLATES.purchases.required);
     if (miss.length) return errors.push({ row, message: `Missing ${miss.join(", ")}` });
     const supplier = r.supplier.trim().replace(/\s+/g, " ");
     const number = r.bill_no.trim();
@@ -652,17 +680,38 @@ export function validatePurchases(rows: Row[], today = new Date()): { valid: Pur
     const discountPct = num(r.discount_pct);
     const gstText = (r.gst_rate ?? "").trim().replace(/%$/, "");
     const gstRate = gstText ? Number(gstText) : null;
-    let rate: number;
-    try {
-      rate = toPaise(r.rate);
-    } catch {
-      return errors.push({ row, message: "rate must be a number in rupees" });
+    let byCase: PurchaseImportLine["byCase"];
+    if (caseLine) {
+      if (!sku) return errors.push({ row, message: "Only a product (sku) can be billed by the case" });
+      const cases = num(r.cases);
+      const loose = num(r.loose);
+      const size = (r.case_size ?? "").trim() ? num(r.case_size) : null;
+      let caseRate: number;
+      try {
+        caseRate = toPaise(r.case_rate);
+      } catch {
+        return errors.push({ row, message: "case_rate (the rate per case) must be a number in rupees" });
+      }
+      if (!(r.case_rate ?? "").trim() || caseRate <= 0) return errors.push({ row, message: "Give case_rate, the rate per case in rupees" });
+      if (!Number.isInteger(cases) || cases < 0 || !Number.isInteger(loose) || loose < 0) return errors.push({ row, message: "cases and loose must be whole numbers" });
+      if (size !== null && (!Number.isInteger(size) || size < 1 || size > 100_000)) return errors.push({ row, message: "case_size must be a whole number, 1 or more" });
+      if (cases + loose === 0) return errors.push({ row, message: "Give the cases (or loose units)" });
+      if (size !== null && quantity && quantity !== cases * size + loose) return errors.push({ row, message: `qty ${quantity} isn't ${cases} × ${size} + ${loose}: leave qty blank or fix it` });
+      byCase = { cases, loose, caseSize: size, caseRate };
     }
-    if (!Number.isInteger(quantity) || quantity <= 0) return errors.push({ row, message: "qty must be a whole number more than 0" });
+    let rate = 0;
+    if (!caseLine) {
+      try {
+        rate = toPaise(r.rate);
+      } catch {
+        return errors.push({ row, message: "rate must be a number in rupees" });
+      }
+      if (!Number.isInteger(quantity) || quantity <= 0) return errors.push({ row, message: "qty must be a whole number more than 0" });
+    } else if (!Number.isInteger(quantity) || quantity < 0) return errors.push({ row, message: "qty must be a whole number" });
     if (!Number.isInteger(freeQty) || freeQty < 0) return errors.push({ row, message: "free_qty must be a whole number" });
     if (!Number.isFinite(discountPct) || discountPct < 0 || discountPct >= 100) return errors.push({ row, message: "discount_pct must be 0 to 99.99" });
     if (gstRate !== null && !Number.isFinite(gstRate)) return errors.push({ row, message: "gst_rate must be a number, like 5 or 18" });
-    if (rate <= 0) return errors.push({ row, message: "rate must be more than 0" });
+    if (!caseLine && rate <= 0) return errors.push({ row, message: "rate must be more than 0" });
     let billTotal: number | null = null;
     if ((r.bill_total ?? "").trim()) {
       try {
@@ -681,7 +730,7 @@ export function validatePurchases(rows: Row[], today = new Date()): { valid: Pur
     if (b.billTotal === null && billTotal !== null) b.billTotal = billTotal;
     if (!b.dueDate && dueDate) b.dueDate = dueDate;
     b.rows.push(row);
-    b.lines.push({ row, sku, head, item: (r.item ?? "").trim() || null, quantity, freeQty, rate, discountPct: Math.round(discountPct * 100) / 100, gstRate });
+    b.lines.push({ row, sku, head, item: (r.item ?? "").trim() || null, quantity, freeQty, rate, discountPct: Math.round(discountPct * 100) / 100, gstRate, ...(byCase ? { byCase } : {}) });
   });
   // A bill with a bad row is left out whole, so it isn't entered half.
   const bad = new Set(errors.map((e) => e.row));
