@@ -4,24 +4,27 @@ import { formatINR } from "@/lib/money";
 import { pageSession } from "@/lib/guard";
 import { getTenant } from "@/lib/tenant";
 import { withTenantTx } from "@/lib/db";
-import { STATUS_COLOR } from "@/lib/orders";
 import { getServerLang, tr } from "@/lib/i18n/server";
 import { addDay, istDay, istDayRange } from "@/lib/field-math";
 import { collections, outstanding } from "@/lib/analytics";
 import type { OrderStatus } from "@/generated/prisma/client";
 import Icon, { type IconName } from "@/components/Icon";
 import StockAlertStrip from "@/components/stock/overview/StockAlertStrip";
+import StatCard from "@/components/ui/StatCard";
+import StatusPill from "@/components/ui/StatusPill";
+import LowStockStat from "@/components/ui/LowStockStat";
+import EmptyState from "@/components/ui/EmptyState";
 
 const OPEN: OrderStatus[] = ["PLACED", "CONFIRMED", "PACKED", "OUT_FOR_DELIVERY"];
 
 /** Bar colour per stage — the same family as the status chips. */
 const STAGE_BAR: Record<OrderStatus, string> = {
-  PLACED: "#e0a21e",
-  CONFIRMED: "#2f7f78",
-  PACKED: "#0f2a2a",
-  OUT_FOR_DELIVERY: "#db5c17",
-  DELIVERED: "#2ba884",
-  CANCELLED: "#a8281e",
+  PLACED: "var(--scheme)",
+  CONFIRMED: "var(--mor)",
+  PACKED: "var(--ink)",
+  OUT_FOR_DELIVERY: "var(--accent)",
+  DELIVERED: "var(--success)",
+  CANCELLED: "var(--risk)",
 };
 
 const STALE_HOURS = 2;
@@ -63,6 +66,7 @@ export default async function AdminDashboard() {
       onDutyNow,
       salesAgents,
       deliveryAgents,
+      liveSchemes,
     ] = await Promise.all([
       tx.order.aggregate({ where: { createdAt: { gte: todayR.from, lt: todayR.to }, status: { not: "CANCELLED" } }, _count: true, _sum: { totalAmount: true } }),
       tx.order.aggregate({ where: { createdAt: { gte: lastWeekR.from, lt: lastWeekR.to }, status: { not: "CANCELLED" } }, _count: true, _sum: { totalAmount: true } }),
@@ -100,10 +104,11 @@ export default async function AdminDashboard() {
         select: { checkInAt: true, checkOutAt: true, user: { select: { name: true, role: true } } },
       }),
       tx.attendance.count({ where: { date: today, checkInAt: { not: null }, checkOutAt: null } }),
+      tx.scheme.count({ where: { active: true, OR: [{ endsAt: null }, { endsAt: { gt: now } }], AND: [{ OR: [{ startsAt: null }, { startsAt: { lte: now } }] }] } }),
       tx.salesAgentProfile.count(),
       tx.deliveryAgentProfile.count(),
     ]);
-    return { todayOrders, lastWeekOrders, openByStatus, doneToday, money, owed, stale, held, openTickets, recent, byDay, onDuty, onDutyNow, salesAgents, deliveryAgents };
+    return { todayOrders, lastWeekOrders, openByStatus, doneToday, money, owed, stale, held, openTickets, recent, byDay, onDuty, onDutyNow, salesAgents, deliveryAgents, liveSchemes };
     // Read-only; a dozen small queries on one connection can pass the 5 s default on a busy day.
   }, { timeout: 20_000 });
 
@@ -202,41 +207,32 @@ export default async function AdminDashboard() {
       </div>
 
       <section aria-label="Today at a glance" className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
-        <Kpi
-          icon="box"
-          tone="kesar"
-          label="Orders today"
-          value={String(ordersToday)}
-          delta={ordersChange}
-          note={`vs last ${weekday}`}
+        <StatCard
+          tone="accent"
           href="/admin/orders"
+          label="Sales today"
+          value={formatINR(valueToday, { compact: true })}
+          delta={
+            <>
+              {valueChange != null && <span className="font-extrabold">{valueChange >= 0 ? "▲" : "▼"} {Math.abs(valueChange)}% </span>}
+              {ordersToday} {ordersToday === 1 ? "order" : "orders"} · vs last {weekday}
+            </>
+          }
+          spark={days.map((x) => x.total)}
         />
-        <Kpi
-          icon="rupee"
-          tone="mor"
-          label="Order value today"
-          value={formatINR(valueToday, { whole: true })}
-          delta={valueChange}
-          note={`vs last ${weekday}`}
-          href="/admin/orders"
-        />
-        <Kpi
-          icon="card"
-          tone="mint"
-          label="Collected today"
-          value={formatINR(d.money.received, { whole: true })}
-          note={d.money.pending.count ? `${d.money.pending.count} to verify` : "All verified"}
-          href="/admin/payments"
-        />
-        <Kpi
-          icon="book"
-          tone="genda"
-          label="Dues outstanding"
-          value={formatINR(d.owed.total, { whole: true })}
-          note={d.owed.shops ? `${d.owed.shops} ${d.owed.shops === 1 ? "shop" : "shops"} · ${formatINR(d.owed.overdue, { whole: true })} overdue` : "Nothing owed"}
-          noteTone={d.owed.overdue ? "red" : undefined}
+        <StatCard
+          tone="money"
           href="/admin/khata"
+          label="Outstanding"
+          value={formatINR(d.owed.total, { compact: true })}
+          delta={
+            d.owed.overdue
+              ? `${formatINR(d.owed.overdue, { compact: true })} overdue · ${d.owed.shops} ${d.owed.shops === 1 ? "shop" : "shops"}`
+              : "Nothing overdue"
+          }
         />
+        <StatCard tone="scheme" href="/admin/schemes" label="Live schemes" value={String(d.liveSchemes)} delta={d.liveSchemes ? "Running now" : "None running"} />
+        <LowStockStat />
       </section>
 
       <section aria-labelledby="pipe" className="card p-4 sm:p-5 space-y-4">
@@ -245,7 +241,7 @@ export default async function AdminDashboard() {
           <span className="text-sm text-[var(--muted)]">
             {openCount} open{cancelledToday ? ` · ${cancelledToday} cancelled today` : ""}
           </span>
-          <Link href="/admin/dispatch" className="text-sm font-semibold text-[var(--kesar-text)]">
+          <Link href="/admin/dispatch" className="text-sm font-semibold text-[var(--accent-text)]">
             Dispatch board →
           </Link>
         </div>
@@ -263,7 +259,7 @@ export default async function AdminDashboard() {
             <Link
               key={s.status}
               href={`/admin/orders?status=${s.status}`}
-              className="rounded-xl border border-[var(--app-line)] px-3.5 py-3 hover:border-[#c9d3d0] hover:bg-[#f8faf9] transition"
+              className="rounded-xl border border-[var(--app-line)] px-3.5 py-3 hover:border-[var(--faint)] hover:bg-[var(--surface-2)] transition"
             >
               <span className="flex items-center gap-2 text-[13px] font-semibold text-[var(--ink-2)]">
                 <span className="h-2 w-2 rounded-full shrink-0" style={{ background: STAGE_BAR[s.status] }} />
@@ -284,7 +280,7 @@ export default async function AdminDashboard() {
           <section aria-labelledby="recent" className="card overflow-hidden">
             <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5 border-b border-[var(--app-line)]">
               <h2 id="recent" className="font-bold text-base flex-1">Recent orders</h2>
-              <Link href="/admin/orders" className="text-sm font-semibold text-[var(--kesar-text)]">
+              <Link href="/admin/orders" className="text-sm font-semibold text-[var(--accent-text)]">
                 View all →
               </Link>
             </div>
@@ -316,7 +312,7 @@ export default async function AdminDashboard() {
                       <td className="text-[var(--ink-2)]">{o.delivery?.deliveryAgent.user.name ?? "—"}</td>
                       <td className="text-right font-semibold num whitespace-nowrap">{formatINR(o.totalAmount, { whole: true })}</td>
                       <td>
-                        <span className={`text-xs px-2.5 py-1 rounded-full ${STATUS_COLOR[o.status]}`}>{tr(`status.${o.status}`, lang)}</span>
+                        <StatusPill status={o.status}>{tr(`status.${o.status}`, lang)}</StatusPill>
                       </td>
                       <td className="text-right text-[var(--muted)] num whitespace-nowrap">{placedAt(o.createdAt, today)}</td>
                     </tr>
@@ -324,7 +320,7 @@ export default async function AdminDashboard() {
                 </tbody>
               </table>
             </div>
-            <ul className="sm:hidden divide-y divide-[#eef2f1]">
+            <ul className="sm:hidden divide-y divide-[var(--line)]">
               {d.recent.map((o) => (
                 <li key={o.id}>
                   <Link href={`/admin/orders?q=${encodeURIComponent(o.orderNumber)}`} className="flex items-center gap-3 px-4 py-3">
@@ -334,12 +330,12 @@ export default async function AdminDashboard() {
                         {o.orderNumber} · {formatINR(o.totalAmount, { whole: true })} · {placedAt(o.createdAt, today)}
                       </span>
                     </span>
-                    <span className={`shrink-0 text-[11px] px-2 py-0.5 rounded-full ${STATUS_COLOR[o.status]}`}>{tr(`status.${o.status}`, lang)}</span>
+                    <StatusPill status={o.status} className="shrink-0">{tr(`status.${o.status}`, lang)}</StatusPill>
                   </Link>
                 </li>
               ))}
             </ul>
-            {d.recent.length === 0 && <p className="px-5 py-6 text-sm text-[var(--muted)]">No orders yet.</p>}
+            {d.recent.length === 0 && <EmptyState icon="empty-orders" title="No orders yet" text="Orders placed by your shops will show up here." />}
           </section>
 
           <section aria-labelledby="week" className="card p-4 sm:p-5 space-y-4">
@@ -350,10 +346,10 @@ export default async function AdminDashboard() {
             <div className="flex items-end gap-2 sm:gap-3.5 h-40 border-b border-[var(--app-line)]" role="img" aria-label={`Order value per day for the last 7 days, ${formatINR(weekTotal, { whole: true })} in all`}>
               {days.map((x, i) => (
                 <div key={x.day} className="flex-1 h-full flex flex-col items-center justify-end gap-1.5 min-w-0">
-                  <span className="text-[10.5px] sm:text-[11px] text-[var(--muted)] num truncate max-w-full">{short(x.total)}</span>
+                  <span className="text-[10.5px] sm:text-[11px] text-[var(--muted)] num truncate max-w-full">{formatINR(x.total, { compact: true })}</span>
                   <div
                     className="w-full max-w-11 rounded-t-md"
-                    style={{ height: `${Math.max(2, Math.round((x.total / peak) * 100))}%`, maxHeight: "calc(100% - 20px)", background: i === 6 ? "var(--kesar)" : "#b9d3ce" }}
+                    style={{ height: `${Math.max(2, Math.round((x.total / peak) * 100))}%`, maxHeight: "calc(100% - 20px)", background: i === 6 ? "var(--accent)" : "var(--mor-tint)" }}
                   />
                 </div>
               ))}
@@ -375,14 +371,14 @@ export default async function AdminDashboard() {
               {attention.length > 0 && <span className="chip chip-kesar !py-0.5">{attention.length}</span>}
             </div>
             {attention.length === 0 ? (
-              <p className="flex items-center gap-2 px-5 py-5 text-sm text-[var(--mint-text)] font-semibold">
+              <p className="flex items-center gap-2 px-5 py-5 text-sm text-[var(--success-text)] font-semibold">
                 <Icon name="check" className="h-5 w-5" /> All clear for now.
               </p>
             ) : (
-              <ul className="divide-y divide-[#eef2f1]">
+              <ul className="divide-y divide-[var(--line)]">
                 {attention.map((a) => (
                   <li key={a.title}>
-                    <Link href={a.href} className="flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-[#f8faf9] min-h-[60px]">
+                    <Link href={a.href} className="flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-[var(--surface-2)] min-h-[60px]">
                       <span className={`icon-tile !h-9 !w-9 !rounded-[10px] ${TONES[a.tone]}`}>
                         <Icon name={a.icon} className="!h-[18px] !w-[18px]" />
                       </span>
@@ -390,7 +386,7 @@ export default async function AdminDashboard() {
                         <span className="block text-sm font-semibold">{a.title}</span>
                         <span className="block text-xs text-[var(--muted)]">{a.sub}</span>
                       </span>
-                      <span className="text-sm font-semibold text-[var(--kesar-text)] whitespace-nowrap">{a.cta}</span>
+                      <span className="text-sm font-semibold text-[var(--accent-text)] whitespace-nowrap">{a.cta}</span>
                     </Link>
                   </li>
                 ))}
@@ -408,10 +404,10 @@ export default async function AdminDashboard() {
             {d.onDuty.length === 0 ? (
               <p className="px-5 py-5 text-sm text-[var(--muted)]">Nobody has checked in yet today.</p>
             ) : (
-              <ul className="divide-y divide-[#eef2f1]">
+              <ul className="divide-y divide-[var(--line)]">
                 {d.onDuty.map((a, i) => (
                   <li key={i} className="flex items-center gap-3 px-4 sm:px-5 py-3">
-                    <span className="grid place-items-center h-9 w-9 shrink-0 rounded-full bg-[#e1eeec] text-[var(--mor)] text-xs font-bold" aria-hidden="true">
+                    <span className="grid place-items-center h-9 w-9 shrink-0 rounded-full bg-[var(--mor-tint)] text-[var(--mor)] text-xs font-bold" aria-hidden="true">
                       {a.user.name
                         .split(/\s+/)
                         .slice(0, 2)
@@ -427,19 +423,19 @@ export default async function AdminDashboard() {
                     </span>
                     {a.checkOutAt ? (
                       <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--ink-2)]">
-                        <span className="h-2 w-2 rounded-full bg-[#9aaeaa]" /> Off duty
+                        <span className="h-2 w-2 rounded-full bg-[var(--faint)]" /> Off duty
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--mint-text)]">
-                        <span className="h-2 w-2 rounded-full bg-[#2ba884]" /> On duty
+                      <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--success-text)]">
+                        <span className="h-2 w-2 rounded-full bg-[var(--success)]" /> On duty
                       </span>
                     )}
                   </li>
                 ))}
               </ul>
             )}
-            <div className="px-4 sm:px-5 py-3 border-t border-[#eef2f1]">
-              <Link href="/team" className="text-sm font-semibold text-[var(--kesar-text)]">
+            <div className="px-4 sm:px-5 py-3 border-t border-[var(--line)]">
+              <Link href="/team" className="text-sm font-semibold text-[var(--accent-text)]">
                 See the team on the map →
               </Link>
             </div>
@@ -458,12 +454,12 @@ const ROLE_LABEL: Partial<Record<string, string>> = {
 };
 
 const TONES = {
-  kesar: "bg-[var(--kesar-tint)] text-[var(--kesar-text)]",
-  mor: "bg-[#e1eeec] text-[var(--mor)]",
-  genda: "bg-[var(--genda-tint)] text-[var(--genda-text)]",
-  mint: "bg-[var(--mint-tint)] text-[var(--mint-text)]",
-  red: "bg-[#fde4e1] text-[#a8281e]",
-  blue: "bg-[#e3eef8] text-[#1f4e79]",
+  kesar: "bg-[var(--accent-tint)] text-[var(--accent-text)]",
+  mor: "bg-[var(--mor-tint)] text-[var(--mor)]",
+  genda: "bg-[var(--scheme-tint)] text-[var(--scheme-text)]",
+  mint: "bg-[var(--success-tint)] text-[var(--success-text)]",
+  red: "bg-[var(--risk-tint)] text-[var(--risk-text)]",
+  blue: "bg-[var(--money-tint)] text-[var(--money)]",
 };
 
 const clock = (d: Date) => d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" });
@@ -471,54 +467,4 @@ const clock = (d: Date) => d.toLocaleTimeString("en-IN", { hour: "numeric", minu
 /** Time for today's orders, day and month for older ones. */
 function placedAt(d: Date, today: string) {
   return istDay(d) === today ? clock(d) : d.toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
-}
-
-/** ₹3.4L / ₹42K / ₹950 — short labels over the bars. */
-function short(paise: number) {
-  const r = paise / 100;
-  if (r >= 1_00_00_000) return `₹${(r / 1_00_00_000).toFixed(1)}Cr`;
-  if (r >= 1_00_000) return `₹${(r / 1_00_000).toFixed(1)}L`;
-  if (r >= 1_000) return `₹${Math.round(r / 1_000)}K`;
-  return `₹${Math.round(r)}`;
-}
-
-function Kpi({
-  icon,
-  tone,
-  label,
-  value,
-  delta,
-  note,
-  noteTone,
-  href,
-}: {
-  icon: IconName;
-  tone: keyof typeof TONES;
-  label: string;
-  value: string;
-  delta?: number | null;
-  note: string;
-  noteTone?: "red";
-  href: string;
-}) {
-  return (
-    <Link href={href} className="card p-4 sm:p-[18px] flex flex-col gap-1.5 hover:border-[#c9d3d0] transition min-w-0">
-      <span className="flex items-center justify-between gap-2">
-        <span className="text-[13px] font-semibold text-[var(--muted)]">{label}</span>
-        <span className={`hidden sm:grid place-items-center h-8 w-8 rounded-lg ${TONES[tone]}`}>
-          <Icon name={icon} className="h-[17px] w-[17px]" />
-        </span>
-      </span>
-      <span className="text-[22px] sm:text-[28px] font-bold leading-tight num tracking-[-0.02em] truncate">{value}</span>
-      <span className={`text-xs sm:text-[13px] ${noteTone === "red" ? "text-[#a8281e]" : "text-[var(--muted)]"}`}>
-        {delta != null && (
-          <span className={`font-bold ${delta >= 0 ? "text-[var(--mint-text)]" : "text-[#a8281e]"}`}>
-            {delta >= 0 ? "+" : ""}
-            {delta}%{" "}
-          </span>
-        )}
-        {note}
-      </span>
-    </Link>
-  );
 }
