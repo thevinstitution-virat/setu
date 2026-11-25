@@ -17,7 +17,7 @@ export default function StockAlertStrip() {
   const items = [
     { n: a.reorder, text: a.reorder === 1 ? "product to reorder" : "products to reorder", href: "/admin/stock?filter=low", tone: "chip-genda" },
     { n: a.expiringSoon, text: a.expiringSoon === 1 ? "batch expiring soon" : "batches expiring soon", href: "/admin/stock?filter=expiring", tone: "chip-genda" },
-    { n: a.expired, text: a.expired === 1 ? "expired batch" : "expired batches", href: "/admin/stock?filter=expired", tone: "!bg-[#fde4e1] !text-[#a8281e] !border-transparent" },
+    { n: a.expired, text: a.expired === 1 ? "expired batch" : "expired batches", href: "/admin/stock?filter=expired", tone: "!bg-[var(--risk-tint)] !text-[var(--risk-text)] !border-transparent" },
   ].filter((i) => i.n > 0);
   return (
     <div className="card p-3 flex flex-wrap items-center gap-2" role="status">

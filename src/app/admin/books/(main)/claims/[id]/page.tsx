@@ -36,7 +36,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
               {c.number} <span className="chip !text-xs align-middle">{cancelled ? "Cancelled" : CLAIM_STATUS_LABEL[c.status]}</span>
             </h2>
             <p className="text-sm text-[var(--ink-2)] mt-1">
-              <Link href={`/admin/books/suppliers/${c.supplier.id}`} className="font-semibold text-[var(--kesar-text)]">
+              <Link href={`/admin/books/suppliers/${c.supplier.id}`} className="font-semibold text-[var(--accent-text)]">
                 {c.supplier.name}
               </Link>{" "}
               · raised {showDay(ymd(c.date)!)}
@@ -45,7 +45,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
           </div>
           <div className="text-right">
             <p className="font-heading text-2xl font-bold tabular-nums">{formatINR(c.amount)}</p>
-            {!cancelled && c.open > 0 && c.open < c.amount && <p className="text-sm text-[var(--kesar-text)] tabular-nums">{formatINR(c.open)} still open</p>}
+            {!cancelled && c.open > 0 && c.open < c.amount && <p className="text-sm text-[var(--accent-text)] tabular-nums">{formatINR(c.open)} still open</p>}
           </div>
         </div>
         <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
@@ -64,7 +64,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
         </dl>
         {c.closeReason && <p className="text-sm text-[var(--muted)]">Written off: {c.closeReason}</p>}
         {c.note && <p className="text-sm text-[var(--muted)]">Note: {c.note}</p>}
-        {cancelled && <p className="text-sm text-[#a8281e]">Cancelled: {c.cancelReason}</p>}
+        {cancelled && <p className="text-sm text-[var(--risk-text)]">Cancelled: {c.cancelReason}</p>}
         <SharePdf url={`/api/admin/books/claims/${c.id}`} file={`claim-${c.number}`} summary={letterText} />
         {!cancelled && r.me.canClaim && (
           <div className="flex flex-wrap gap-2 pt-1 border-t border-[var(--line)]">

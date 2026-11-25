@@ -44,7 +44,7 @@ export function ColourField({
           onChange={(e) => onChange(e.target.value)}
         />
         <input
-          className={`input font-mono uppercase ${error || bad ? "!border-[#a8281e]" : ""}`}
+          className={`input font-mono uppercase ${error || bad ? "!border-[var(--risk-text)]" : ""}`}
           aria-label={`${label}: colour code`}
           value={value}
           placeholder={fallback.toUpperCase()}
@@ -55,9 +55,9 @@ export function ColourField({
         />
       </div>
       {bad ? (
-        <span className="block text-xs text-[#a8281e] mt-1">Colour must look like #1A5C55</span>
+        <span className="block text-xs text-[var(--risk-text)] mt-1">Colour must look like #1A5C55</span>
       ) : error ? (
-        <span className="block text-xs text-[#a8281e] mt-1">{error}</span>
+        <span className="block text-xs text-[var(--risk-text)] mt-1">{error}</span>
       ) : hint ? (
         <span className="block text-xs text-[var(--muted)] mt-1">{hint}</span>
       ) : null}

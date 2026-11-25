@@ -149,7 +149,7 @@ export default function PayForm({ options: o, initialSupplier }: { options: Opti
         {supplier && d && (
           <p className="text-sm">
             We owe them <span className="font-bold tabular-nums">{formatINR(Math.max(0, d.summary.owed))}</span>
-            {d.summary.overdue > 0 && <span className="text-[#a8281e]"> · {formatINR(d.summary.overdue)} past due</span>}
+            {d.summary.overdue > 0 && <span className="text-[var(--risk-text)]"> · {formatINR(d.summary.overdue)} past due</span>}
             {d.summary.owed < 0 && <span className="text-[var(--muted)]"> · paid ahead {formatINR(-d.summary.owed)}</span>}
           </p>
         )}
@@ -178,7 +178,7 @@ export default function PayForm({ options: o, initialSupplier }: { options: Opti
                   ))}
                 </select>
               ) : (
-                <p className="text-sm text-[#a8281e]">
+                <p className="text-sm text-[var(--risk-text)]">
                   No bank account yet.{" "}
                   <Link href="/admin/books/banks" className="underline">
                     Add one
@@ -230,12 +230,12 @@ export default function PayForm({ options: o, initialSupplier }: { options: Opti
                 const on = picked.includes(b.id);
                 return (
                   <li key={b.id}>
-                    <label className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer ${on ? "bg-[var(--kesar-tint)]" : ""}`}>
+                    <label className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer ${on ? "bg-[var(--accent-tint)]" : ""}`}>
                       <input type="checkbox" className="h-4 w-4 shrink-0" checked={on} onChange={() => toggle(b.id)} />
                       <span className="min-w-0 flex-1">
                         <span className="font-semibold">{b.number}</span>
                         {b.kind === "OPENING" && <span className="chip !text-[10px] ml-1">Old books</span>}
-                        <span className={`block text-xs ${b.overdue ? "text-[#a8281e]" : "text-[var(--muted)]"}`}>
+                        <span className={`block text-xs ${b.overdue ? "text-[var(--risk-text)]" : "text-[var(--muted)]"}`}>
                           {showDay(b.date)} · due {showDay(b.dueDate)}
                           {on ? ` · ${picked.indexOf(b.id) + 1}` : ""}
                         </span>
@@ -308,7 +308,7 @@ export default function PayForm({ options: o, initialSupplier }: { options: Opti
             )}
           </dl>
         )}
-        {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+        {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
       </section>
 
       <div className="sticky bottom-[5.5rem] md:bottom-3 z-10">

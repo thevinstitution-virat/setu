@@ -23,7 +23,7 @@ const VIEWS = [
 type View = (typeof VIEWS)[number]["key"];
 const amt = (p: number) => (p ? formatINR(p) : "–");
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
-const STATUS_CHIP: Record<keyof typeof STATUS_LABEL, string> = { PAID: "chip chip-mint", PAID_LATE: "chip", DUE: "chip", LATE: "chip bg-[#fde4e1] text-[#a8281e]", OVER: "chip" };
+const STATUS_CHIP: Record<keyof typeof STATUS_LABEL, string> = { PAID: "chip chip-mint", PAID_LATE: "chip", DUE: "chip", LATE: "chip bg-[var(--risk-tint)] text-[var(--risk-text)]", OVER: "chip" };
 
 /** TDS: what we kept back and paid (challans), the register, the quarterly return working, TDS kept back from us, and the sections. */
 export default async function TdsPage({ searchParams }: { searchParams: Promise<SP> }) {
@@ -362,7 +362,7 @@ function Quarter({ q }: { q: Q }) {
         head={["Deductee", "Paid", "TDS"]}
         rows={q.rows.map((r) => [
           <Link key="d" href={r.href} className="hover:underline">
-            {r.party} · {r.pan ?? <span className="text-[#a8281e]">no PAN</span>}
+            {r.party} · {r.pan ?? <span className="text-[var(--risk-text)]">no PAN</span>}
             <span className="block text-xs text-[var(--muted)]">
               {showDay(r.date)} · {r.section} at {rateLabel(r.rate)} · {r.challan ? `challan ${r.challan.bsrCode}/${r.challan.serial} of ${showDay(r.challan.paidOn)}` : "not paid yet"}
             </span>

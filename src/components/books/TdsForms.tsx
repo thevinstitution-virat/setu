@@ -8,7 +8,7 @@ import { formatINR } from "@/lib/money";
 import { rateLabel } from "@/lib/tds-math";
 
 const todayIst = () => new Date(Date.now() + 5.5 * 3_600_000).toISOString().slice(0, 10);
-const Err = ({ err }: { err: string | null }) => (err ? <p className="text-sm text-[#a8281e]">{err}</p> : null);
+const Err = ({ err }: { err: string | null }) => (err ? <p className="text-sm text-[var(--risk-text)]">{err}</p> : null);
 type Bank = { id: string; name: string; isDefault: boolean };
 type Section = { code: string; name: string };
 
@@ -351,7 +351,7 @@ export function CancelWithReason({ url, id, label, what }: { url: string; id: st
       <button type="button" className="btn btn-quiet btn-xs" onClick={() => setAsk(false)}>
         No
       </button>
-      {err && <span className="text-xs text-[#a8281e]">{err}</span>}
+      {err && <span className="text-xs text-[var(--risk-text)]">{err}</span>}
     </span>
   );
 }

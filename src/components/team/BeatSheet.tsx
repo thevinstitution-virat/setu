@@ -170,7 +170,7 @@ export default function BeatSheet({
               aria-pressed={days.includes(d)}
               onClick={() => toggleDay(d)}
               className={`min-h-[44px] min-w-[44px] rounded-xl px-2.5 text-sm font-bold transition ${
-                days.includes(d) ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-ink/5 text-[var(--ink-2)]"
+                days.includes(d) ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "bg-ink/5 text-[var(--ink-2)]"
               }`}
             >
               {w}
@@ -251,7 +251,7 @@ export default function BeatSheet({
                       className="flex w-full items-center gap-2 px-3 py-2 min-h-[44px] text-left hover:bg-black/[0.04]"
                       onClick={() => setShops((list) => [...list, { id: h.id, outletName: h.outletName, sub: [h.area, `PIN ${h.pinCode}`].filter(Boolean).join(" · ") }])}
                     >
-                      <Icon name="plus" className="h-4 w-4 shrink-0 text-[var(--kesar-text)]" />
+                      <Icon name="plus" className="h-4 w-4 shrink-0 text-[var(--accent-text)]" />
                       <span className="min-w-0">
                         <span className="block text-sm font-medium truncate">{h.outletName}</span>
                         <span className="block text-xs text-[var(--muted)] truncate">

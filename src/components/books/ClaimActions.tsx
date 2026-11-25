@@ -59,7 +59,7 @@ export function ClaimActions({ id, open, raisedOn, banks, canCancel }: { id: str
           </>
         )}
         {canCancel && (
-          <button type="button" className="btn btn-quiet btn-xs text-[#a8281e]" onClick={() => setMode("cancel")}>
+          <button type="button" className="btn btn-quiet btn-xs text-[var(--risk-text)]" onClick={() => setMode("cancel")}>
             Cancel claim
           </button>
         )}
@@ -114,7 +114,7 @@ export function ClaimActions({ id, open, raisedOn, banks, canCancel }: { id: str
         </div>
       )}
       {mode !== "receive" && <input className="input" placeholder="Why?" aria-label="Why" value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} />}
-      {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+      {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
       <div className="flex justify-end gap-2">
         <button type="button" className="btn btn-quiet btn-xs" onClick={close}>
           Back
@@ -157,7 +157,7 @@ export function UndoSettlement({ claimId, settlementId }: { claimId: string; set
       <button type="button" className="btn btn-quiet btn-xs" onClick={() => setOpen(false)}>
         Back
       </button>
-      {err && <p className="w-full text-xs text-[#a8281e]">{err}</p>}
+      {err && <p className="w-full text-xs text-[var(--risk-text)]">{err}</p>}
     </div>
   );
 }

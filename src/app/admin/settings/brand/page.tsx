@@ -200,7 +200,7 @@ export default function BrandPage() {
   return (
     <form onSubmit={save} className="space-y-5 pb-28">
       <div>
-        <Link href="/admin/settings" className="text-xs font-bold text-[var(--kesar-text)] inline-flex items-center gap-1">
+        <Link href="/admin/settings" className="text-xs font-bold text-[var(--accent-text)] inline-flex items-center gap-1">
           <Icon name="chevronLeft" className="h-3.5 w-3.5" /> Settings
         </Link>
         <h1 className="page-title">Brand</h1>
@@ -356,7 +356,7 @@ export default function BrandPage() {
             {saveError ? (
               <ErrorLine text={saveError} />
             ) : savedAt ? (
-              <p className="text-sm text-[var(--mint-text)] flex items-center gap-1.5">
+              <p className="text-sm text-[var(--success-text)] flex items-center gap-1.5">
                 <Icon name="check" className="h-4 w-4" /> Saved. Everyone sees it on their next page.
               </p>
             ) : !dirty ? (

@@ -111,7 +111,7 @@ export default function TeamTargetsPage({ searchParams }: { searchParams: Promis
                 <li key={r.userId} className="flex items-center gap-3 p-3 min-w-0">
                   <span
                     className={`grid place-items-center h-9 w-9 rounded-full shrink-0 font-heading font-bold text-sm ${
-                      r.rank <= 3 && r.achieved > 0 ? "bg-[var(--genda-tint)] text-[var(--genda-text)]" : "bg-ink/5 text-[var(--ink-2)]"
+                      r.rank <= 3 && r.achieved > 0 ? "bg-[var(--scheme-tint)] text-[var(--scheme-text)]" : "bg-ink/5 text-[var(--ink-2)]"
                     }`}
                   >
                     {r.rank}
@@ -184,7 +184,7 @@ function TargetRow({ t, canManage, onEdit, onDeleted }: { t: TargetJson; canMana
             {amount(t.metric, t.achieved)} of {amount(t.metric, t.goal)}
           </p>
         </div>
-        <p className={`font-heading font-bold shrink-0 ${t.pct >= 100 ? "text-[var(--mint-text)]" : ""}`}>{t.pct}%</p>
+        <p className={`font-heading font-bold shrink-0 ${t.pct >= 100 ? "text-[var(--success-text)]" : ""}`}>{t.pct}%</p>
       </div>
       <Bar pct={t.pct} label={`${METRIC_LABEL[t.metric]} ${t.pct}%`} />
       <p className="text-xs text-[var(--ink-2)]">

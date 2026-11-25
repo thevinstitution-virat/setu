@@ -161,7 +161,7 @@ export default function PayLinkCard({
           <Icon name="card" className="h-4 w-4" /> Send payment link
         </button>
       )}
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
     </div>
   );
 }

@@ -40,7 +40,7 @@ export default async function SalesOrders() {
               </div>
               <OrderMeta order={o} />
               <details className="group">
-                <summary className="cursor-pointer text-xs font-bold text-[var(--kesar-text)] list-none">
+                <summary className="cursor-pointer text-xs font-bold text-[var(--accent-text)] list-none">
                   <span className="group-open:hidden">Show items</span>
                   <span className="hidden group-open:inline">Hide items</span>
                 </summary>

@@ -141,7 +141,7 @@ export default function PaymentLinkCard({
       </div>
       <div className="p-4 space-y-3">
         {loadError && (
-          <p className="text-xs text-[#a8281e]">
+          <p className="text-xs text-[var(--risk-text)]">
             {loadError}{" "}
             <button type="button" className="font-bold underline" onClick={load}>
               Try again
@@ -153,7 +153,7 @@ export default function PaymentLinkCard({
         {data && !data.on && (
           <p className="text-sm text-[var(--ink-2)]">
             Online payments are off —{" "}
-            <Link href="/admin/settings" className="font-bold text-[var(--kesar-text)]">
+            <Link href="/admin/settings" className="font-bold text-[var(--accent-text)]">
               set them up in Settings
             </Link>
             .
@@ -178,7 +178,7 @@ export default function PaymentLinkCard({
               <input className="input mt-1" maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} />
             </label>
             {receivable <= 0 && !amount.trim() && <p className="text-[11px] text-[var(--muted)]">Nothing is due now, so enter an amount.</p>}
-            {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+            {error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
             <button className="btn btn-kesar btn-sm w-full" disabled={busy} onClick={create}>
               <Icon name="share" className="h-4 w-4" />
               {busy ? "Making link…" : "Make payment link"}
@@ -198,7 +198,7 @@ export default function PaymentLinkCard({
                     <div className="min-w-0">
                       <p className="text-sm font-bold">
                         {formatINR(r.amount)}
-                        {r.purpose === "WALLET" && <span className="ml-1.5 text-xs font-semibold text-[var(--mint-text)]">Wallet</span>}
+                        {r.purpose === "WALLET" && <span className="ml-1.5 text-xs font-semibold text-[var(--success-text)]">Wallet</span>}
                       </p>
                       <p className="text-xs text-[var(--muted)]">
                         {r.kind === "QR" ? "QR" : "Link"} · {fmtDateTime(r.createdAt)}
@@ -208,12 +208,12 @@ export default function PaymentLinkCard({
                     <span className={`chip !py-0.5 !px-2 !text-[11.5px] shrink-0 ${STATUS[r.status].cls}`}>{STATUS[r.status].label}</span>
                   </div>
                   {r.paidAmount > 0 && (
-                    <p className="text-xs text-[var(--mint-text)]">
+                    <p className="text-xs text-[var(--success-text)]">
                       {formatINR(r.paidAmount)} paid of {formatINR(r.amount)}
                     </p>
                   )}
                   {r.note && <p className="text-xs text-[var(--ink-2)] break-words">{r.note}</p>}
-                  {r.error && <p className="text-xs text-[#a8281e] break-words">{r.error}</p>}
+                  {r.error && <p className="text-xs text-[var(--risk-text)] break-words">{r.error}</p>}
                   {isOpen(r) && (
                     <div className="flex flex-wrap gap-1.5">
                       {r.shortUrl && <CopyButton text={r.shortUrl} small />}
@@ -227,7 +227,7 @@ export default function PaymentLinkCard({
                       )}
                     </div>
                   )}
-                  {rowMsg?.id === r.id && <p className={`text-xs ${rowMsg.bad ? "text-[#a8281e]" : "text-[var(--muted)]"}`}>{rowMsg.text}</p>}
+                  {rowMsg?.id === r.id && <p className={`text-xs ${rowMsg.bad ? "text-[var(--risk-text)]" : "text-[var(--muted)]"}`}>{rowMsg.text}</p>}
                 </div>
               ))}
             </div>
@@ -241,14 +241,14 @@ export default function PaymentLinkCard({
 function LinkBox({ r, outletName }: { r: PayRequest; outletName: string }) {
   if (!r.shortUrl) {
     return (
-      <p className="rounded-xl bg-[#fde4e1]/60 p-3 text-xs text-[#a8281e]">
+      <p className="rounded-xl bg-[var(--risk-tint)]/60 p-3 text-xs text-[var(--risk-text)]">
         {r.error ?? "The link could not be made. Try again in a minute."}
       </p>
     );
   }
   return (
-    <div className="rounded-xl bg-[var(--mint-tint)] p-3 space-y-2">
-      <p className="text-xs font-semibold text-[var(--mint-text)]">Link ready for {formatINR(r.amount - r.paidAmount)}</p>
+    <div className="rounded-xl bg-[var(--success-tint)] p-3 space-y-2">
+      <p className="text-xs font-semibold text-[var(--success-text)]">Link ready for {formatINR(r.amount - r.paidAmount)}</p>
       <p className="text-xs font-mono break-all select-all bg-white rounded-lg px-2 py-1.5">{r.shortUrl}</p>
       <div className="flex flex-wrap gap-2">
         <CopyButton text={r.shortUrl} />

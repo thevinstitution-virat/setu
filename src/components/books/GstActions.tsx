@@ -34,7 +34,7 @@ export function CancelGst({ id, label }: { id: string; label: string }) {
     <div className="rounded-xl bg-ink/5 p-3 space-y-2 max-w-lg">
       <p className="text-sm text-[var(--ink-2)]">The entry for {label} is reversed today and the month can be settled again. Only the latest settled month can be cancelled.</p>
       <input className="input" placeholder="Why" value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} />
-      {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+      {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
       <div className="flex gap-2">
         <button type="button" className="btn btn-mor btn-sm" disabled={busy || !reason.trim()} onClick={go}>
           {busy ? "Cancelling…" : "Yes, cancel it"}
@@ -106,7 +106,7 @@ export function Upload2b({ period, label, has }: { period: string; label: string
           </button>
         )}
       </div>
-      {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+      {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
       {done && <p className="text-sm text-[#2e7d4f]">{done}</p>}
     </div>
   );

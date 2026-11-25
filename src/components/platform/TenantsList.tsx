@@ -127,8 +127,8 @@ export default function TenantsList() {
                         {t.name}
                       </Link>
                       <span className="block text-xs text-[var(--muted)]">{t.slug}</span>
-                      {t.suspendReason && <span className="block text-xs text-[#a8281e]">{t.suspendReason}</span>}
-                      {t.deleteAfter && <span className="block text-xs text-[#a8281e]">Deletes {when(t.deleteAfter)}</span>}
+                      {t.suspendReason && <span className="block text-xs text-[var(--risk-text)]">{t.suspendReason}</span>}
+                      {t.deleteAfter && <span className="block text-xs text-[var(--risk-text)]">Deletes {when(t.deleteAfter)}</span>}
                     </td>
                     <td>
                       <StatusChip value={t.status} />
@@ -150,7 +150,7 @@ export default function TenantsList() {
                     <td className="whitespace-nowrap" title={when(t.lastOrderAt, true)}>
                       {ago(t.lastOrderAt)}
                     </td>
-                    <td className={`!text-right tabular-nums ${t.overduePaise ? "text-[#a8281e] font-semibold" : "text-[var(--muted)]"}`}>
+                    <td className={`!text-right tabular-nums ${t.overduePaise ? "text-[var(--risk-text)] font-semibold" : "text-[var(--muted)]"}`}>
                       {t.overduePaise ? inr(t.overduePaise) : "—"}
                     </td>
                   </tr>

@@ -277,7 +277,7 @@ export default function VoucherForm({ options: o, initialType }: { options: Vouc
                     </select>
                   </Field>
                 ) : (
-                  <p className="text-sm text-[#a8281e]">
+                  <p className="text-sm text-[var(--risk-text)]">
                     Add a bank account first:{" "}
                     <Link href="/admin/books/banks" className="underline">
                       Bank accounts
@@ -463,7 +463,7 @@ export default function VoucherForm({ options: o, initialType }: { options: Vouc
             </div>
             <div>
               <dt className="text-xs text-[var(--muted)]">Difference</dt>
-              <dd className={`font-semibold ${jDebit === jCredit ? "text-[var(--mint-text)]" : "text-[#a8281e]"}`}>{formatINR(Math.abs(jDebit - jCredit))}</dd>
+              <dd className={`font-semibold ${jDebit === jCredit ? "text-[var(--success-text)]" : "text-[var(--risk-text)]"}`}>{formatINR(Math.abs(jDebit - jCredit))}</dd>
             </div>
           </dl>
           <p className="text-xs text-[var(--muted)]">Shops, suppliers, claims, sales, purchases and GST output are kept by their own bills and payments, so they are not offered here.</p>
@@ -521,7 +521,7 @@ export default function VoucherForm({ options: o, initialType }: { options: Vouc
             )}
           </dl>
         )}
-        {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+        {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
       </section>
 
       <div className="sticky bottom-[5.5rem] md:bottom-3 z-10">

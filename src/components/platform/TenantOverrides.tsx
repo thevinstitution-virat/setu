@@ -84,7 +84,7 @@ export default function TenantOverrides({ data, onChanged }: { data: TenantData;
                     aria-checked={features[m.code] === o.v}
                     onClick={() => setFeatures({ ...features, [m.code]: o.v })}
                     className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
-                      features[m.code] === o.v ? (o.v === "on" ? "bg-[var(--mint-tint)] text-[var(--mint-text)]" : o.v === "off" ? "bg-[#fde4e1] text-[#a8281e]" : "bg-white text-ink shadow-sm") : "text-[var(--muted)]"
+                      features[m.code] === o.v ? (o.v === "on" ? "bg-[var(--success-tint)] text-[var(--success-text)]" : o.v === "off" ? "bg-[var(--risk-tint)] text-[var(--risk-text)]" : "bg-white text-ink shadow-sm") : "text-[var(--muted)]"
                     }`}
                   >
                     {o.label}
@@ -92,7 +92,7 @@ export default function TenantOverrides({ data, onChanged }: { data: TenantData;
                 ))}
               </div>
             ) : (
-              m.override !== null && <span className="text-xs font-semibold text-[var(--kesar-text)]">override: {m.override ? "on" : "off"}</span>
+              m.override !== null && <span className="text-xs font-semibold text-[var(--accent-text)]">override: {m.override ? "on" : "off"}</span>
             )}
           </li>
         ))}

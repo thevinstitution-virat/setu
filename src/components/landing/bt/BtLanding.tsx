@@ -9,8 +9,10 @@ import { btContent } from "@/lib/i18n/landing-bt-content";
 import LanguageToggle from "@/components/LanguageToggle";
 import { Logo } from "@/components/BrandMark";
 import { APP_NAME } from "@/lib/brand";
-import { Arrow, Icon } from "../pro/Icon";
-import { ProFooter } from "../pro/ProSections";
+import Icon, { type IconName } from "@/components/Icon";
+import { Icon3D } from "@/components/icons3d/Icon3D";
+import type { Icon3DName } from "@/lib/ui/icons3d";
+import { BtFooter } from "./BtFooter";
 import "./bt.css";
 
 /**
@@ -29,6 +31,24 @@ const MIC = (
     <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
   </svg>
 );
+
+/** The older content keys (landing-pro-content) mapped onto the shared line icons and the 3D set. */
+const LINE: Record<IconKey, IconName> = {
+  bill: "receipt", box: "box", truck: "truck", pin: "pin", tag: "tag", wallet: "wallet", bank: "cash", chart: "chart", chat: "chat",
+  camera: "camera", brand: "sparkle", cart: "cart", mic: "mic", bell: "bell", star: "star", route: "route", clock: "clock", shield: "lock",
+  lang: "chat", phone: "phone",
+};
+const TILE: Record<IconKey, Icon3DName> = {
+  bill: "invoice", box: "warehouse", truck: "truck", pin: "beat-map", tag: "percent-tag", wallet: "wallet", bank: "cash-stack", chart: "target",
+  chat: "chat-order", camera: "camera", brand: "sparkle", cart: "kirana-shop", mic: "mic", bell: "bell", star: "trophy", route: "beat-map",
+  clock: "calendar-slot", shield: "success-tick", lang: "chat-order", phone: "upi-phone",
+};
+function LineIcon({ name }: { name: IconKey }) {
+  return <Icon name={LINE[name]} className="h-full w-full" />;
+}
+function Arrow() {
+  return <Icon name="arrow" className="h-[18px] w-[18px]" weight="bold" />;
+}
 
 function Svg({ d, w = 2.2 }: { d: string; w?: number }) {
   return (
@@ -269,7 +289,7 @@ export default function BtLanding() {
               return (
                 <li key={tab.tab}>
                   <span className="bt-ring" aria-hidden="true" style={{ "--bt-a": r.a, "--bt-b": r.b, "--bt-arc": r.arc, "--bt-sp": r.sp } as CSSProperties}>
-                    <span><span style={{ background: r.bg, color: r.fg }}><Icon name={r.icon} /></span></span>
+                    <span><span style={{ background: r.bg, color: r.fg }}><Icon3D name={TILE[r.icon]} size={46} /></span></span>
                   </span>
                   <div>
                     <h3>{tab.title}</h3>
@@ -318,7 +338,7 @@ export default function BtLanding() {
               <ul className="bt-feats">
                 {p.retail.items.map((it) => (
                   <li key={it.t}>
-                    <span aria-hidden="true"><Icon name={it.icon} /></span>
+                    <span aria-hidden="true"><Icon3D name={TILE[it.icon]} size={40} /></span>
                     <span><b>{it.t}</b><small>{it.d}</small></span>
                   </li>
                 ))}
@@ -412,7 +432,7 @@ export default function BtLanding() {
                     { bg: "#ddf6ec", fg: "#0e6b52", icon: "shield" as IconKey },
                   ][i % 3];
                   return (
-                    <li key={pt}><span aria-hidden="true" style={{ background: look.bg, color: look.fg }}><Icon name={look.icon} /></span>{pt}</li>
+                    <li key={pt}><span aria-hidden="true" style={{ background: look.bg, color: look.fg }}><LineIcon name={look.icon} /></span>{pt}</li>
                   );
                 })}
               </ul>
@@ -455,7 +475,7 @@ export default function BtLanding() {
           <ul className="bt-grid">
             {p.grid.items.map((it, i) => (
               <li className="bt-gcard" key={it.t}>
-                <span className={`bt-gic ${(i + Math.floor(i / 4)) % 2 ? "bt-gic-m" : "bt-gic-k"}`} aria-hidden="true"><Icon name={it.icon} /></span>
+                <span className={`bt-gic ${(i + Math.floor(i / 4)) % 2 ? "bt-gic-m" : "bt-gic-k"}`} aria-hidden="true"><Icon3D name={TILE[it.icon]} size={36} /></span>
                 <h3>{it.t}</h3>
                 <p>{it.d}</p>
               </li>
@@ -525,7 +545,7 @@ export default function BtLanding() {
       </main>
 
       <div className="vp">
-        <ProFooter />
+        <BtFooter />
       </div>
     </div>
   );

@@ -159,7 +159,7 @@ export default function PurchaseOrdersPage({ searchParams }: { searchParams: Pro
           <p className="text-sm font-semibold">{tab === "open" ? "No open purchase orders" : "No purchase orders yet"}</p>
           <p className="text-sm text-[var(--muted)]">
             Make one here, or draft them in one go from the{" "}
-            <Link href="/admin/stock/reorder" className="font-semibold text-[var(--kesar-text)]">
+            <Link href="/admin/stock/reorder" className="font-semibold text-[var(--accent-text)]">
               reorder list
             </Link>
             .
@@ -253,7 +253,7 @@ function EditLoader({ id, onClose, onSaved }: { id: string; onClose: () => void;
   if (!data) {
     return (
       <Sheet title="Edit purchase order" onClose={onClose}>
-        {error ? <p className="text-sm text-[#a8281e]">{error}</p> : <p className="text-sm text-[var(--muted)]">Loading…</p>}
+        {error ? <p className="text-sm text-[var(--risk-text)]">{error}</p> : <p className="text-sm text-[var(--muted)]">Loading…</p>}
       </Sheet>
     );
   }
@@ -386,7 +386,7 @@ function PoSheet({ initial, onClose, onSaved }: { initial: Initial; onClose: () 
             </span>
             <span className="font-heading font-bold text-lg">{formatINR(total)}</span>
           </div>
-          {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+          {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
           <div className="flex gap-2 justify-end">
             <button type="button" className="btn btn-quiet" onClick={onClose} disabled={busy}>
               Cancel
@@ -398,7 +398,7 @@ function PoSheet({ initial, onClose, onSaved }: { initial: Initial; onClose: () 
         </div>
       }
     >
-      {loadError && <p className="text-sm text-[#a8281e]">{loadError}</p>}
+      {loadError && <p className="text-sm text-[var(--risk-text)]">{loadError}</p>}
       {loading && !loadError && <p className="text-sm text-[var(--muted)]">Loading…</p>}
       {!loading && (
         <>
@@ -408,7 +408,7 @@ function PoSheet({ initial, onClose, onSaved }: { initial: Initial; onClose: () 
               <p className="text-sm font-bold">{supplierName ?? "Supplier"}</p>
             </div>
           ) : activeSuppliers.length === 0 ? (
-            <div className="rounded-2xl bg-[var(--genda-tint)] p-3 text-sm text-[var(--genda-text)]">
+            <div className="rounded-2xl bg-[var(--scheme-tint)] p-3 text-sm text-[var(--scheme-text)]">
               Add a supplier first.{" "}
               <Link href="/admin/stock/suppliers" className="font-bold underline">
                 Suppliers

@@ -43,8 +43,8 @@ export default function NotDeliveredSheet({ orderId, open, onCloseAction }: { or
       onCloseAction={onCloseAction}
       footer={
         <div className="space-y-2">
-          {error && <p className="text-sm text-[#a8281e]">{error}</p>}
-          <button type="button" className="btn btn-danger w-full !min-h-[52px]" onClick={save} disabled={busy}>
+          {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
+          <button type="button" className="btn btn-danger w-full !min-h-[56px]" onClick={save} disabled={busy}>
             {busy ? "Saving…" : "Mark not delivered"}
           </button>
         </div>

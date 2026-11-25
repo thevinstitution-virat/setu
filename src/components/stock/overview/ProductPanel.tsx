@@ -91,11 +91,11 @@ export default function ProductPanel({
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--muted)]">Available to sell</p>
-            <p className={`stat-num mt-1 ${product.available <= 0 ? "text-[#a8281e]" : ""}`}>{qtyText(product.available, product.unit)}</p>
+            <p className={`stat-num mt-1 ${product.available <= 0 ? "text-[var(--risk-text)]" : ""}`}>{qtyText(product.available, product.unit)}</p>
             {cases && <p className="text-xs text-[var(--muted)] mt-1">= {cases}</p>}
           </div>
           <div className="flex flex-wrap gap-1.5 justify-end">
-            {product.out && <span className={`chip ${SMALL_CHIP} !bg-[#fde4e1] !text-[#a8281e] !border-transparent`}>Out</span>}
+            {product.out && <span className={`chip ${SMALL_CHIP} !bg-[var(--risk-tint)] !text-[var(--risk-text)] !border-transparent`}>Out</span>}
             {product.low && !product.out && <span className={`chip chip-genda ${SMALL_CHIP}`}>Reorder</span>}
           </div>
         </div>
@@ -103,8 +103,8 @@ export default function ProductPanel({
           <Num n={product.warehouse} label="Warehouse" />
           <Num n={product.van} label="In vans" />
           <Num n={product.reserved} label="On open orders" />
-          <Num n={product.damaged} label="Damaged" tone={product.damaged ? "text-[var(--kesar-text)]" : ""} />
-          <Num n={product.expired} label="Expired" tone={product.expired ? "text-[#a8281e]" : ""} />
+          <Num n={product.damaged} label="Damaged" tone={product.damaged ? "text-[var(--accent-text)]" : ""} />
+          <Num n={product.expired} label="Expired" tone={product.expired ? "text-[var(--risk-text)]" : ""} />
           <div className="rounded-xl bg-ink/5 py-2 px-1 min-w-0">
             <p className="font-heading font-bold text-sm leading-tight break-words">{formatINR(product.value)}</p>
             <p className="text-[10.5px] text-[var(--muted)] mt-1 leading-tight">Stock value</p>
@@ -136,7 +136,7 @@ export default function ProductPanel({
                     <p className="text-xs text-[var(--muted)] break-words">{l.batch ? `Batch ${l.batch}` : "No batch no."}</p>
                     {ex ? <p className={`text-xs font-semibold ${ex.tone}`}>{ex.text}</p> : <p className="text-xs text-[var(--muted)]">No expiry date</p>}
                   </div>
-                  <p className={`shrink-0 font-heading font-bold ${l.expired ? "text-[#a8281e]" : ""}`}>{qtyText(l.qty, product.unit)}</p>
+                  <p className={`shrink-0 font-heading font-bold ${l.expired ? "text-[var(--risk-text)]" : ""}`}>{qtyText(l.qty, product.unit)}</p>
                 </li>
               );
             })}
@@ -147,7 +147,7 @@ export default function ProductPanel({
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <h3 className="font-heading font-bold">Recent history</h3>
-          <Link href={`/admin/stock/history?productId=${product.id}`} className="text-sm font-bold text-[var(--kesar-text)]">
+          <Link href={`/admin/stock/history?productId=${product.id}`} className="text-sm font-bold text-[var(--accent-text)]">
             All history →
           </Link>
         </div>

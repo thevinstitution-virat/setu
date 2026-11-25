@@ -24,7 +24,7 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Pr
         <div className="flex flex-wrap gap-2">
           {r.me.canPurchase && <SupplierEditor initial={blankSupplier} buttonLabel="Add a supplier" buttonClass="btn btn-mor btn-sm" />}
         </div>
-        <Link href={all ? "/admin/books/suppliers" : "/admin/books/suppliers?all=1"} className="text-sm font-semibold text-[var(--kesar-text)]">
+        <Link href={all ? "/admin/books/suppliers" : "/admin/books/suppliers?all=1"} className="text-sm font-semibold text-[var(--accent-text)]">
           {all ? "Hide suppliers not in use" : "Show suppliers not in use too"}
         </Link>
       </div>
@@ -50,14 +50,14 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Pr
               {rows.map((x) => (
                 <tr key={x.id} className={`hover:bg-black/[0.02] ${x.active ? "" : "opacity-60"}`}>
                   <td className="px-4 py-2">
-                    <Link href={`/admin/books/suppliers/${x.id}`} className="font-semibold text-[var(--ink)] hover:text-[var(--kesar-text)]">
+                    <Link href={`/admin/books/suppliers/${x.id}`} className="font-semibold text-[var(--ink)] hover:text-[var(--accent-text)]">
                       {x.name}
                     </Link>
                     <span className="block text-xs text-[var(--muted)]">{[x.gstin, `${x.creditDays} days' credit`].filter(Boolean).join(" · ")}</span>
                   </td>
                   <td className="px-4 py-2 text-[var(--ink-2)]">{SUPPLIER_KINDS[x.kind].split(" (")[0]}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{x.openBills || ""}</td>
-                  <td className={`px-4 py-2 text-right tabular-nums ${x.overdue ? "text-[#a8281e] font-semibold" : ""}`}>{x.overdue ? formatINR(x.overdue) : ""}</td>
+                  <td className={`px-4 py-2 text-right tabular-nums ${x.overdue ? "text-[var(--risk-text)] font-semibold" : ""}`}>{x.overdue ? formatINR(x.overdue) : ""}</td>
                   <td className="px-4 py-2 text-right tabular-nums font-semibold">{x.owed ? (x.owed > 0 ? formatINR(x.owed) : `${formatINR(-x.owed)} ahead`) : ""}</td>
                 </tr>
               ))}

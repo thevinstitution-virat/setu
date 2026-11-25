@@ -140,7 +140,7 @@ export default async function CashBookPage({ searchParams }: { searchParams: Pro
                             </span>
                           </span>
                           <span className="text-right shrink-0 tabular-nums">
-                            {row.debit > 0 && <span className="block font-semibold text-[var(--mint-text)]">+{formatINR(row.debit)}</span>}
+                            {row.debit > 0 && <span className="block font-semibold text-[var(--success-text)]">+{formatINR(row.debit)}</span>}
                             {row.credit > 0 && <span className="block font-semibold">−{formatINR(row.credit)}</span>}
                             <span className="block text-[11px] text-[var(--muted)]">{drcr(row.balance)}</span>
                           </span>

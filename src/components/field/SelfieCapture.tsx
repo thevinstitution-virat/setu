@@ -63,7 +63,7 @@ export default function SelfieCapture({
             <Icon name="image" className="h-4 w-4" />
             {busy ? "Uploading…" : value ? "Take again" : label}
           </button>
-          {value && !busy && <p className="text-xs text-[var(--mint-text)]">Selfie ready</p>}
+          {value && !busy && <p className="text-xs text-[var(--success-text)]">Selfie ready</p>}
         </div>
         <input
           ref={input}
@@ -74,7 +74,7 @@ export default function SelfieCapture({
           onChange={(e) => pick(e.target.files?.[0])}
         />
       </div>
-      {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+      {error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
     </div>
   );
 }

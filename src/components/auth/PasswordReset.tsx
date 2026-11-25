@@ -78,7 +78,7 @@ export function ForgotPassword({
     <Shell appName={appName} logoUrl={logoUrl} kick={t("login.forgot")} title={t("reset.title")} sub={sent ? undefined : t("reset.sub")}>
       {sent ? (
         <div className="space-y-4">
-          <p role="status" className="text-sm rounded-lg bg-[var(--genda-tint)] text-[var(--genda-text)] px-3 py-2">
+          <p role="status" className="text-sm rounded-lg bg-[var(--scheme-tint)] text-[var(--scheme-text)] px-3 py-2">
             {t("reset.sent")}
           </p>
           {field === "login" && <p className="text-xs text-[var(--muted)]">{t("reset.noEmail")}</p>}
@@ -101,7 +101,7 @@ export function ForgotPassword({
               onChange={(e) => setValue(e.target.value)}
             />
           </label>
-          {error && <p role="alert" className="text-sm text-[#a8281e]">{error}</p>}
+          {error && <p role="alert" className="text-sm text-[var(--risk-text)]">{error}</p>}
           <button type="submit" className="btn btn-kesar w-full" disabled={busy || !value.trim()}>
             {busy ? t("login.wait") : t("reset.send")}
           </button>
@@ -176,7 +176,7 @@ export function NewPassword({
         <p className="text-sm text-[var(--muted)]">{t("login.wait")}</p>
       ) : state === "bad" ? (
         <div className="space-y-4">
-          <p role="alert" className="text-sm rounded-lg bg-[#a8281e]/10 text-[#a8281e] px-3 py-2">
+          <p role="alert" className="text-sm rounded-lg bg-[var(--risk-text)]/10 text-[var(--risk-text)] px-3 py-2">
             {t("reset.bad")}
           </p>
           <Link href={forgotHref} className="btn btn-kesar w-full">
@@ -193,7 +193,7 @@ export function NewPassword({
             <span className="block text-sm font-medium text-foreground/70 mb-1">{t("reset.again")}</span>
             <input className="input" type="password" autoComplete="new-password" required minLength={min} value={again} onChange={(e) => setAgain(e.target.value)} />
           </label>
-          {error && <p role="alert" className="text-sm text-[#a8281e]">{error}</p>}
+          {error && <p role="alert" className="text-sm text-[var(--risk-text)]">{error}</p>}
           <button type="submit" className="btn btn-kesar w-full" disabled={busy || password.length < min || !again}>
             {busy ? t("login.wait") : t("reset.save")}
           </button>

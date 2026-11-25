@@ -1,0 +1,1192 @@
+{
+ "version": 1,
+ "generated": "2026-11-26",
+ "source": "Gemini, 1024px transparent PNG, trimmed and re-centred at 84% fill",
+ "files": {
+  "x1": "{name}.webp (512px)",
+  "x2": "{name}-2x.webp (1024px)"
+ },
+ "icons": [
+  {
+   "code": "C01",
+   "name": "shampoo",
+   "group": "category",
+   "label": {
+    "en": "Shampoo",
+    "hi": "शैम्पू"
+   },
+   "hue": "#bf5177",
+   "kb": {
+    "x1": 14,
+    "x2": 38
+   },
+   "keywords": [
+    "shampoo",
+    "शैम्पू",
+    "hair wash"
+   ]
+  },
+  {
+   "code": "C02",
+   "name": "conditioner",
+   "group": "category",
+   "label": {
+    "en": "Conditioner",
+    "hi": "कंडीशनर"
+   },
+   "hue": "#98759f",
+   "kb": {
+    "x1": 10,
+    "x2": 27
+   },
+   "keywords": [
+    "conditioner",
+    "कंडीशनर"
+   ]
+  },
+  {
+   "code": "C03",
+   "name": "hair-oil",
+   "group": "category",
+   "label": {
+    "en": "Hair oil",
+    "hi": "बालों का तेल"
+   },
+   "hue": "#ac8a3a",
+   "kb": {
+    "x1": 15,
+    "x2": 38
+   },
+   "keywords": [
+    "hair oil",
+    "coconut oil",
+    "तेल",
+    "केश"
+   ]
+  },
+  {
+   "code": "C04",
+   "name": "soap",
+   "group": "category",
+   "label": {
+    "en": "Soap",
+    "hi": "साबुन"
+   },
+   "hue": "#cd7e8a",
+   "kb": {
+    "x1": 14,
+    "x2": 40
+   },
+   "keywords": [
+    "soap",
+    "साबुन",
+    "bath bar",
+    "beauty bar"
+   ]
+  },
+  {
+   "code": "C05",
+   "name": "body-wash",
+   "group": "category",
+   "label": {
+    "en": "Body wash",
+    "hi": "बॉडी वॉश"
+   },
+   "hue": "#836bc3",
+   "kb": {
+    "x1": 14,
+    "x2": 37
+   },
+   "keywords": [
+    "body wash",
+    "shower gel",
+    "बॉडी वॉश"
+   ]
+  },
+  {
+   "code": "C06",
+   "name": "face-wash",
+   "group": "category",
+   "label": {
+    "en": "Face wash",
+    "hi": "फेस वॉश"
+   },
+   "hue": "#7cc7af",
+   "kb": {
+    "x1": 12,
+    "x2": 30
+   },
+   "keywords": [
+    "face wash",
+    "facewash",
+    "फेस वॉश"
+   ]
+  },
+  {
+   "code": "C07",
+   "name": "skin-cream",
+   "group": "category",
+   "label": {
+    "en": "Skin care",
+    "hi": "त्वचा देखभाल"
+   },
+   "hue": "#78a5cb",
+   "kb": {
+    "x1": 15,
+    "x2": 38
+   },
+   "keywords": [
+    "cream",
+    "lotion",
+    "skin",
+    "moisturi",
+    "talc",
+    "क्रीम",
+    "त्वचा"
+   ]
+  },
+  {
+   "code": "C08",
+   "name": "deo",
+   "group": "category",
+   "label": {
+    "en": "Deodorant",
+    "hi": "डियो"
+   },
+   "hue": "#203178",
+   "kb": {
+    "x1": 14,
+    "x2": 36
+   },
+   "keywords": [
+    "deo",
+    "deodorant",
+    "perfume",
+    "body spray",
+    "डियो"
+   ]
+  },
+  {
+   "code": "C09",
+   "name": "toothpaste",
+   "group": "category",
+   "label": {
+    "en": "Oral care",
+    "hi": "दंत देखभाल"
+   },
+   "hue": "#b04652",
+   "kb": {
+    "x1": 21,
+    "x2": 40
+   },
+   "keywords": [
+    "toothpaste",
+    "oral",
+    "toothbrush",
+    "tooth",
+    "टूथपेस्ट",
+    "दंत",
+    "मंजन"
+   ]
+  },
+  {
+   "code": "C10",
+   "name": "detergent",
+   "group": "category",
+   "label": {
+    "en": "Detergent powder",
+    "hi": "डिटर्जेंट पाउडर"
+   },
+   "hue": "#5b7ba4",
+   "kb": {
+    "x1": 20,
+    "x2": 39
+   },
+   "keywords": [
+    "detergent powder",
+    "washing powder",
+    "detergent bar",
+    "डिटर्जेंट",
+    "सर्फ"
+   ]
+  },
+  {
+   "code": "C11",
+   "name": "detergent-liquid",
+   "group": "category",
+   "label": {
+    "en": "Liquid detergent",
+    "hi": "लिक्विड डिटर्जेंट"
+   },
+   "hue": "#3792cf",
+   "kb": {
+    "x1": 17,
+    "x2": 38
+   },
+   "keywords": [
+    "liquid detergent",
+    "fabric",
+    "laundry",
+    "लिक्विड"
+   ]
+  },
+  {
+   "code": "C12",
+   "name": "dishwash",
+   "group": "category",
+   "label": {
+    "en": "Dishwash",
+    "hi": "बर्तन साफ़"
+   },
+   "hue": "#a3bf3f",
+   "kb": {
+    "x1": 18,
+    "x2": 37
+   },
+   "keywords": [
+    "dishwash",
+    "dish wash",
+    "utensil",
+    "बर्तन"
+   ]
+  },
+  {
+   "code": "C13",
+   "name": "floor-cleaner",
+   "group": "category",
+   "label": {
+    "en": "Home cleaning",
+    "hi": "घर की सफ़ाई"
+   },
+   "hue": "#68a341",
+   "kb": {
+    "x1": 14,
+    "x2": 37
+   },
+   "keywords": [
+    "floor",
+    "toilet",
+    "surface",
+    "household",
+    "cleaner",
+    "फ़र्श",
+    "फर्श",
+    "सफ़ाई",
+    "सफाई"
+   ]
+  },
+  {
+   "code": "C14",
+   "name": "handwash",
+   "group": "category",
+   "label": {
+    "en": "Handwash",
+    "hi": "हैंडवॉश"
+   },
+   "hue": "#236a5d",
+   "kb": {
+    "x1": 16,
+    "x2": 36
+   },
+   "keywords": [
+    "handwash",
+    "hand wash",
+    "sanitiser",
+    "sanitizer",
+    "हैंडवॉश"
+   ]
+  },
+  {
+   "code": "C15",
+   "name": "biscuits",
+   "group": "category",
+   "label": {
+    "en": "Biscuits",
+    "hi": "बिस्कुट"
+   },
+   "hue": "#cc944b",
+   "kb": {
+    "x1": 14,
+    "x2": 38
+   },
+   "keywords": [
+    "biscuit",
+    "cookie",
+    "rusk",
+    "बिस्कुट"
+   ]
+  },
+  {
+   "code": "C16",
+   "name": "cream-biscuits",
+   "group": "category",
+   "label": {
+    "en": "Cream biscuits",
+    "hi": "क्रीम बिस्कुट"
+   },
+   "hue": "#a26b3e",
+   "kb": {
+    "x1": 17,
+    "x2": 37
+   },
+   "keywords": [
+    "cream biscuit",
+    "sandwich biscuit",
+    "क्रीम बिस्कुट"
+   ]
+  },
+  {
+   "code": "C17",
+   "name": "chocolate",
+   "group": "category",
+   "label": {
+    "en": "Chocolates",
+    "hi": "चॉकलेट"
+   },
+   "hue": "#996e53",
+   "kb": {
+    "x1": 19,
+    "x2": 39
+   },
+   "keywords": [
+    "chocolate",
+    "confection",
+    "candy",
+    "toffee",
+    "चॉकलेट",
+    "टॉफ़ी"
+   ]
+  },
+  {
+   "code": "C18",
+   "name": "atta",
+   "group": "category",
+   "label": {
+    "en": "Atta & staples",
+    "hi": "आटा और राशन"
+   },
+   "hue": "#bda67b",
+   "kb": {
+    "x1": 19,
+    "x2": 40
+   },
+   "keywords": [
+    "atta",
+    "flour",
+    "rice",
+    "dal",
+    "pulse",
+    "staple",
+    "grocery",
+    "आटा",
+    "चावल",
+    "दाल"
+   ]
+  },
+  {
+   "code": "C19",
+   "name": "spices",
+   "group": "category",
+   "label": {
+    "en": "Spices",
+    "hi": "मसाले"
+   },
+   "hue": "#c47048",
+   "kb": {
+    "x1": 22,
+    "x2": 39
+   },
+   "keywords": [
+    "spice",
+    "masala",
+    "chilli",
+    "salt",
+    "मसाला",
+    "मसाले",
+    "नमक"
+   ]
+  },
+  {
+   "code": "C20",
+   "name": "tea",
+   "group": "category",
+   "label": {
+    "en": "Tea",
+    "hi": "चाय"
+   },
+   "hue": "#9e5848",
+   "kb": {
+    "x1": 19,
+    "x2": 37
+   },
+   "keywords": [
+    "tea",
+    "chai",
+    "चाय"
+   ]
+  },
+  {
+   "code": "C21",
+   "name": "coffee",
+   "group": "category",
+   "label": {
+    "en": "Coffee",
+    "hi": "कॉफ़ी"
+   },
+   "hue": "#917458",
+   "kb": {
+    "x1": 15,
+    "x2": 37
+   },
+   "keywords": [
+    "coffee",
+    "कॉफ़ी",
+    "कॉफी"
+   ]
+  },
+  {
+   "code": "C22",
+   "name": "noodles",
+   "group": "category",
+   "label": {
+    "en": "Noodles & pasta",
+    "hi": "नूडल्स"
+   },
+   "hue": "#d49455",
+   "kb": {
+    "x1": 22,
+    "x2": 40
+   },
+   "keywords": [
+    "noodle",
+    "pasta",
+    "vermicelli",
+    "नूडल"
+   ]
+  },
+  {
+   "code": "C23",
+   "name": "chips",
+   "group": "category",
+   "label": {
+    "en": "Snacks",
+    "hi": "नमकीन"
+   },
+   "hue": "#d8a353",
+   "kb": {
+    "x1": 21,
+    "x2": 39
+   },
+   "keywords": [
+    "chips",
+    "snack",
+    "namkeen",
+    "wafer",
+    "नमकीन",
+    "चिप्स"
+   ]
+  },
+  {
+   "code": "C24",
+   "name": "ketchup",
+   "group": "category",
+   "label": {
+    "en": "Sauces",
+    "hi": "सॉस"
+   },
+   "hue": "#bb3d31",
+   "kb": {
+    "x1": 17,
+    "x2": 36
+   },
+   "keywords": [
+    "ketchup",
+    "sauce",
+    "mayonnaise",
+    "dip",
+    "सॉस",
+    "केचप"
+   ]
+  },
+  {
+   "code": "C25",
+   "name": "jam",
+   "group": "category",
+   "label": {
+    "en": "Jams & spreads",
+    "hi": "जैम"
+   },
+   "hue": "#ad6962",
+   "kb": {
+    "x1": 27,
+    "x2": 42
+   },
+   "keywords": [
+    "jam",
+    "spread",
+    "honey",
+    "peanut butter",
+    "जैम",
+    "शहद"
+   ]
+  },
+  {
+   "code": "C26",
+   "name": "ice-cream",
+   "group": "category",
+   "label": {
+    "en": "Ice cream",
+    "hi": "आइसक्रीम"
+   },
+   "hue": "#b07a69",
+   "kb": {
+    "x1": 19,
+    "x2": 39
+   },
+   "keywords": [
+    "ice cream",
+    "icecream",
+    "frozen dessert",
+    "kulfi",
+    "आइसक्रीम"
+   ]
+  },
+  {
+   "code": "C27",
+   "name": "health-drink",
+   "group": "category",
+   "label": {
+    "en": "Health drinks",
+    "hi": "हेल्थ ड्रिंक"
+   },
+   "hue": "#313e82",
+   "kb": {
+    "x1": 14,
+    "x2": 36
+   },
+   "keywords": [
+    "health drink",
+    "malt",
+    "nutrition",
+    "हेल्थ"
+   ]
+  },
+  {
+   "code": "C28",
+   "name": "juice",
+   "group": "category",
+   "label": {
+    "en": "Juices & drinks",
+    "hi": "जूस और पेय"
+   },
+   "hue": "#d98639",
+   "kb": {
+    "x1": 14,
+    "x2": 34
+   },
+   "keywords": [
+    "juice",
+    "beverage",
+    "drink",
+    "soft drink",
+    "cold drink",
+    "जूस",
+    "पेय"
+   ]
+  },
+  {
+   "code": "C29",
+   "name": "frozen-snacks",
+   "group": "category",
+   "label": {
+    "en": "Frozen food",
+    "hi": "फ्रोज़न"
+   },
+   "hue": "#9ea69c",
+   "kb": {
+    "x1": 19,
+    "x2": 40
+   },
+   "keywords": [
+    "frozen",
+    "ready to cook",
+    "ready-to-cook",
+    "फ्रोज़न"
+   ]
+  },
+  {
+   "code": "C30",
+   "name": "agarbatti",
+   "group": "category",
+   "label": {
+    "en": "Pooja needs",
+    "hi": "पूजा सामग्री"
+   },
+   "hue": "#954a39",
+   "kb": {
+    "x1": 16,
+    "x2": 38
+   },
+   "keywords": [
+    "agarbatti",
+    "incense",
+    "pooja",
+    "puja",
+    "dhoop",
+    "अगरबत्ती",
+    "पूजा"
+   ]
+  },
+  {
+   "code": "C31",
+   "name": "matches",
+   "group": "category",
+   "label": {
+    "en": "Matches",
+    "hi": "माचिस"
+   },
+   "hue": "#ca9150",
+   "kb": {
+    "x1": 18,
+    "x2": 38
+   },
+   "keywords": [
+    "match",
+    "माचिस"
+   ]
+  },
+  {
+   "code": "C32",
+   "name": "notebooks",
+   "group": "category",
+   "label": {
+    "en": "Stationery",
+    "hi": "स्टेशनरी"
+   },
+   "hue": "#6c9d98",
+   "kb": {
+    "x1": 22,
+    "x2": 40
+   },
+   "keywords": [
+    "notebook",
+    "stationery",
+    "pen",
+    "school",
+    "कॉपी",
+    "स्टेशनरी"
+   ]
+  },
+  {
+   "code": "C33",
+   "name": "baby-care",
+   "group": "category",
+   "label": {
+    "en": "Baby care",
+    "hi": "बेबी केयर"
+   },
+   "hue": "#d9a5b3",
+   "kb": {
+    "x1": 15,
+    "x2": 38
+   },
+   "keywords": [
+    "baby",
+    "diaper",
+    "infant",
+    "बेबी",
+    "शिशु"
+   ]
+  },
+  {
+   "code": "B01",
+   "name": "gift-box",
+   "group": "feature",
+   "label": {
+    "en": "Schemes",
+    "hi": "स्कीम"
+   },
+   "hue": "#a49c3e",
+   "kb": {
+    "x1": 21,
+    "x2": 38
+   }
+  },
+  {
+   "code": "B02",
+   "name": "ledger",
+   "group": "feature",
+   "label": {
+    "en": "Khata",
+    "hi": "खाता"
+   },
+   "hue": "#6d7998",
+   "kb": {
+    "x1": 20,
+    "x2": 39
+   }
+  },
+  {
+   "code": "B03",
+   "name": "truck",
+   "group": "feature",
+   "label": {
+    "en": "Delivery",
+    "hi": "डिलीवरी"
+   },
+   "hue": "#4c6251",
+   "kb": {
+    "x1": 16,
+    "x2": 38
+   }
+  },
+  {
+   "code": "B04",
+   "name": "box-sealed",
+   "group": "feature",
+   "label": {
+    "en": "Order placed",
+    "hi": "ऑर्डर हो गया"
+   },
+   "hue": "#a39464",
+   "kb": {
+    "x1": 15,
+    "x2": 39
+   }
+  },
+  {
+   "code": "B05",
+   "name": "kirana-shop",
+   "group": "feature",
+   "label": {
+    "en": "Shops",
+    "hi": "दुकानें"
+   },
+   "hue": "#ba9d70",
+   "kb": {
+    "x1": 26,
+    "x2": 38
+   }
+  },
+  {
+   "code": "B06",
+   "name": "wallet",
+   "group": "feature",
+   "label": {
+    "en": "Wallet",
+    "hi": "वॉलेट"
+   },
+   "hue": "#466397",
+   "kb": {
+    "x1": 15,
+    "x2": 37
+   }
+  },
+  {
+   "code": "B07",
+   "name": "upi-phone",
+   "group": "feature",
+   "label": {
+    "en": "UPI pay",
+    "hi": "UPI भुगतान"
+   },
+   "hue": "#3f827a",
+   "kb": {
+    "x1": 20,
+    "x2": 38
+   }
+  },
+  {
+   "code": "B08",
+   "name": "invoice",
+   "group": "feature",
+   "label": {
+    "en": "Invoices",
+    "hi": "बिल"
+   },
+   "hue": "#63c4a5",
+   "kb": {
+    "x1": 15,
+    "x2": 40
+   }
+  },
+  {
+   "code": "B09",
+   "name": "cash-stack",
+   "group": "feature",
+   "label": {
+    "en": "Cash handover",
+    "hi": "नकद जमा"
+   },
+   "hue": "#96a179",
+   "kb": {
+    "x1": 18,
+    "x2": 37
+   }
+  },
+  {
+   "code": "B10",
+   "name": "credit-gauge",
+   "group": "feature",
+   "label": {
+    "en": "Credit limit",
+    "hi": "क्रेडिट सीमा"
+   },
+   "hue": "#99864f",
+   "kb": {
+    "x1": 13,
+    "x2": 32
+   }
+  },
+  {
+   "code": "B11",
+   "name": "beat-map",
+   "group": "feature",
+   "label": {
+    "en": "Beat",
+    "hi": "बीट"
+   },
+   "hue": "#a5b29c",
+   "kb": {
+    "x1": 17,
+    "x2": 37
+   }
+  },
+  {
+   "code": "B12",
+   "name": "calendar-slot",
+   "group": "feature",
+   "label": {
+    "en": "Delivery slot",
+    "hi": "डिलीवरी समय"
+   },
+   "hue": "#66b47b",
+   "kb": {
+    "x1": 17,
+    "x2": 36
+   }
+  },
+  {
+   "code": "B13",
+   "name": "megaphone",
+   "group": "feature",
+   "label": {
+    "en": "Announcements",
+    "hi": "घोषणाएँ"
+   },
+   "hue": "#69674f",
+   "kb": {
+    "x1": 20,
+    "x2": 39
+   }
+  },
+  {
+   "code": "B14",
+   "name": "bell",
+   "group": "feature",
+   "label": {
+    "en": "Notifications",
+    "hi": "सूचनाएँ"
+   },
+   "hue": "#d2a157",
+   "kb": {
+    "x1": 18,
+    "x2": 39
+   }
+  },
+  {
+   "code": "B15",
+   "name": "target",
+   "group": "feature",
+   "label": {
+    "en": "Targets",
+    "hi": "लक्ष्य"
+   },
+   "hue": "#b26236",
+   "kb": {
+    "x1": 19,
+    "x2": 39
+   }
+  },
+  {
+   "code": "B16",
+   "name": "trophy",
+   "group": "feature",
+   "label": {
+    "en": "Leaderboard",
+    "hi": "लीडरबोर्ड"
+   },
+   "hue": "#a48e4a",
+   "kb": {
+    "x1": 20,
+    "x2": 39
+   }
+  },
+  {
+   "code": "B17",
+   "name": "camera",
+   "group": "feature",
+   "label": {
+    "en": "Shelf audit",
+    "hi": "शेल्फ़ ऑडिट"
+   },
+   "hue": "#205b59",
+   "kb": {
+    "x1": 14,
+    "x2": 35
+   }
+  },
+  {
+   "code": "B18",
+   "name": "mic",
+   "group": "feature",
+   "label": {
+    "en": "Voice order",
+    "hi": "बोलकर ऑर्डर"
+   },
+   "hue": "#64b97c",
+   "kb": {
+    "x1": 20,
+    "x2": 41
+   }
+  },
+  {
+   "code": "B19",
+   "name": "chat-order",
+   "group": "feature",
+   "label": {
+    "en": "Order by message",
+    "hi": "मैसेज से ऑर्डर"
+   },
+   "hue": "#48a850",
+   "kb": {
+    "x1": 16,
+    "x2": 39
+   }
+  },
+  {
+   "code": "B20",
+   "name": "crate",
+   "group": "feature",
+   "label": {
+    "en": "Returnables",
+    "hi": "वापसी क्रेट"
+   },
+   "hue": "#449946",
+   "kb": {
+    "x1": 19,
+    "x2": 39
+   }
+  },
+  {
+   "code": "B21",
+   "name": "warehouse",
+   "group": "feature",
+   "label": {
+    "en": "Stock",
+    "hi": "स्टॉक"
+   },
+   "hue": "#a48057",
+   "kb": {
+    "x1": 23,
+    "x2": 41
+   }
+  },
+  {
+   "code": "B22",
+   "name": "clipboard",
+   "group": "feature",
+   "label": {
+    "en": "Purchase orders",
+    "hi": "खरीद ऑर्डर"
+   },
+   "hue": "#58968a",
+   "kb": {
+    "x1": 13,
+    "x2": 32
+   }
+  },
+  {
+   "code": "B23",
+   "name": "van",
+   "group": "feature",
+   "label": {
+    "en": "Van sales",
+    "hi": "वैन बिक्री"
+   },
+   "hue": "#a06739",
+   "kb": {
+    "x1": 16,
+    "x2": 40
+   }
+  },
+  {
+   "code": "B24",
+   "name": "attendance",
+   "group": "feature",
+   "label": {
+    "en": "Attendance",
+    "hi": "हाज़िरी"
+   },
+   "hue": "#4f9989",
+   "kb": {
+    "x1": 14,
+    "x2": 37
+   }
+  },
+  {
+   "code": "B25",
+   "name": "percent-tag",
+   "group": "feature",
+   "label": {
+    "en": "Margin & discount",
+    "hi": "मार्जिन और छूट"
+   },
+   "hue": "#d8a649",
+   "kb": {
+    "x1": 20,
+    "x2": 39
+   }
+  },
+  {
+   "code": "B26",
+   "name": "sparkle",
+   "group": "feature",
+   "label": {
+    "en": "Ask your business",
+    "hi": "अपने बिज़नेस से पूछें"
+   },
+   "hue": "#d18036",
+   "kb": {
+    "x1": 18,
+    "x2": 39
+   }
+  },
+  {
+   "code": "B27",
+   "name": "referral",
+   "group": "feature",
+   "label": {
+    "en": "Refer a shop",
+    "hi": "दुकान जोड़ें"
+   },
+   "hue": "#b8a36c",
+   "kb": {
+    "x1": 20,
+    "x2": 40
+   }
+  },
+  {
+   "code": "E01",
+   "name": "empty-cart",
+   "group": "state",
+   "label": {
+    "en": "Cart is empty",
+    "hi": "कार्ट खाली है"
+   },
+   "hue": "#5cb591",
+   "kb": {
+    "x1": 20,
+    "x2": 38
+   }
+  },
+  {
+   "code": "E02",
+   "name": "empty-orders",
+   "group": "state",
+   "label": {
+    "en": "No orders yet",
+    "hi": "अभी कोई ऑर्डर नहीं"
+   },
+   "hue": "#af8a63",
+   "kb": {
+    "x1": 15,
+    "x2": 39
+   }
+  },
+  {
+   "code": "E03",
+   "name": "no-results",
+   "group": "state",
+   "label": {
+    "en": "No results",
+    "hi": "कुछ नहीं मिला"
+   },
+   "hue": "#4aac88",
+   "kb": {
+    "x1": 20,
+    "x2": 40
+   }
+  },
+  {
+   "code": "E04",
+   "name": "offline",
+   "group": "state",
+   "label": {
+    "en": "You are offline",
+    "hi": "आप ऑफ़लाइन हैं"
+   },
+   "hue": "#a95224",
+   "kb": {
+    "x1": 17,
+    "x2": 39
+   }
+  },
+  {
+   "code": "E05",
+   "name": "success-tick",
+   "group": "state",
+   "label": {
+    "en": "Done",
+    "hi": "हो गया"
+   },
+   "hue": "#5eb05a",
+   "kb": {
+    "x1": 22,
+    "x2": 42
+   }
+  },
+  {
+   "code": "E06",
+   "name": "all-paid",
+   "group": "state",
+   "label": {
+    "en": "All paid",
+    "hi": "सब चुका दिया"
+   },
+   "hue": "#5a7ba5",
+   "kb": {
+    "x1": 20,
+    "x2": 39
+   }
+  },
+  {
+   "code": "E07",
+   "name": "no-notifications",
+   "group": "state",
+   "label": {
+    "en": "No notifications",
+    "hi": "कोई सूचना नहीं"
+   },
+   "hue": "#bf9156",
+   "kb": {
+    "x1": 15,
+    "x2": 39
+   }
+  },
+  {
+   "code": "E08",
+   "name": "no-schemes",
+   "group": "state",
+   "label": {
+    "en": "No schemes right now",
+    "hi": "अभी कोई स्कीम नहीं"
+   },
+   "hue": "#c59732",
+   "kb": {
+    "x1": 15,
+    "x2": 35
+   }
+  }
+ ]
+}

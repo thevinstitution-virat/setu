@@ -93,7 +93,7 @@ export default async function DayBookPage({ searchParams }: { searchParams: Prom
                   {e.memo && (
                     <p className="text-xs text-[var(--muted)] mt-0.5">
                       {e.href ? (
-                        <Link href={e.href} className="hover:text-[var(--kesar-text)]">
+                        <Link href={e.href} className="hover:text-[var(--accent-text)]">
                           {e.memo}
                         </Link>
                       ) : (

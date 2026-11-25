@@ -315,7 +315,7 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
 
       <section className="card p-4 space-y-4">
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Supplier" hint={supplier ? `${supplier.gstin ? `GSTIN ${supplier.gstin} · ` : ""}${supplier.creditDays} days' credit` : <Link href="/admin/books/suppliers" className="text-[var(--kesar-text)]">Add a supplier</Link>}>
+          <Field label="Supplier" hint={supplier ? `${supplier.gstin ? `GSTIN ${supplier.gstin} · ` : ""}${supplier.creditDays} days' credit` : <Link href="/admin/books/suppliers" className="text-[var(--accent-text)]">Add a supplier</Link>}>
             <SearchPick
               options={o.suppliers.map((s) => ({ id: s.id, label: s.name, sub: [s.kind === "GOODS" ? "Company" : s.kind === "SERVICES" ? "Services" : "Other", s.gstin].filter(Boolean).join(" · ") }))}
               value={supplierId}
@@ -479,7 +479,7 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
                     </Field>
                   )
                 ) : l.target === "HEAD" ? (
-                  <Field label="Charge to" hint={<Link href="/admin/books" className="text-[var(--kesar-text)]">Add a head</Link>}>
+                  <Field label="Charge to" hint={<Link href="/admin/books" className="text-[var(--accent-text)]">Add a head</Link>}>
                     <select className="input" value={l.headId} onChange={(e) => setLine(l.key, { headId: e.target.value })}>
                       <option value="">Pick an account head</option>
                       {Object.keys(GROUP_LABEL).map((g) => (
@@ -637,8 +637,8 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
           </div>
           {figures.itc > 0 && <p className="text-xs text-[var(--muted)] text-right">Input tax we can claim: {formatINR(figures.itc)}</p>}
         </dl>
-        {figures.printedOff && <p className="text-sm text-[#a8281e]">The lines add up to {formatINR(figures.before)}, more than ₹1 away from the printed total. Check the lines.</p>}
-        {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+        {figures.printedOff && <p className="text-sm text-[var(--risk-text)]">The lines add up to {formatINR(figures.before)}, more than ₹1 away from the printed total. Check the lines.</p>}
+        {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
       </section>
 
       <div className="sticky bottom-[5.5rem] md:bottom-3 z-10">

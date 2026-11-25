@@ -29,7 +29,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ id: st
               {p.number} {cancelled && <span className="chip !text-xs align-middle">{p.cheque?.status === "BOUNCED" ? "Cheque bounced" : "Cancelled"}</span>}
             </h2>
             <p className="text-sm text-[var(--ink-2)] mt-1">
-              <Link href={`/admin/books/suppliers/${p.supplier.id}`} className="font-semibold text-[var(--kesar-text)]">
+              <Link href={`/admin/books/suppliers/${p.supplier.id}`} className="font-semibold text-[var(--accent-text)]">
                 {p.supplier.name}
               </Link>{" "}
               · {showDay(p.date)}
@@ -105,7 +105,7 @@ export default async function PaymentPage({ params }: { params: Promise<{ id: st
                 <li key={a.id} className="flex justify-between gap-3 py-2">
                   <span>
                     {a.bill.purchaseBillId ? (
-                      <Link href={`/admin/books/purchases/${a.bill.purchaseBillId}`} className="font-semibold text-[var(--kesar-text)]">
+                      <Link href={`/admin/books/purchases/${a.bill.purchaseBillId}`} className="font-semibold text-[var(--accent-text)]">
                         {a.bill.number}
                       </Link>
                     ) : (

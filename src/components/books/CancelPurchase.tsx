@@ -28,7 +28,7 @@ export default function CancelPurchase({ id, label }: { id: string; label: strin
 
   return (
     <>
-      <button type="button" className="btn btn-quiet btn-xs text-[#a8281e]" onClick={() => { setErr(null); setOpen(true); }}>
+      <button type="button" className="btn btn-quiet btn-xs text-[var(--risk-text)]" onClick={() => { setErr(null); setOpen(true); }}>
         Cancel this {label}
       </button>
       {open && (
@@ -40,7 +40,7 @@ export default function CancelPurchase({ id, label }: { id: string; label: strin
               <button type="button" className="btn btn-quiet btn-sm" onClick={() => setOpen(false)}>
                 Keep it
               </button>
-              <button type="button" className="btn btn-sm bg-[#a8281e] text-white" disabled={busy || reason.trim().length < 3} onClick={cancel}>
+              <button type="button" className="btn btn-sm bg-[var(--risk-text)] text-white" disabled={busy || reason.trim().length < 3} onClick={cancel}>
                 {busy ? "Cancelling…" : "Cancel it"}
               </button>
             </div>
@@ -51,7 +51,7 @@ export default function CancelPurchase({ id, label }: { id: string; label: strin
             <Field label="Why">
               <input className="input" value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} autoFocus />
             </Field>
-            {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+            {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
           </div>
         </Sheet>
       )}

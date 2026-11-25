@@ -243,7 +243,7 @@ export default function AdminTeamPage() {
             </Field>
           )}
         </div>
-        {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+        {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
         <Flash text={flash} />
         <button onClick={createUser} disabled={loading} className="btn btn-kesar btn-sm">
           <Icon name="plus" className="h-4 w-4" />
@@ -261,7 +261,7 @@ export default function AdminTeamPage() {
           value={tab}
           onChange={setTab}
         />
-        {loadError && <p className="text-sm text-[#a8281e]">{loadError}</p>}
+        {loadError && <p className="text-sm text-[var(--risk-text)]">{loadError}</p>}
         <Flash text={listFlash} />
         {shown.length === 0 ? (
           <div className="card p-4 text-sm text-[var(--muted)]">{users.length ? "No one with this role yet." : "No staff yet. Add your first person above."}</div>
@@ -326,13 +326,13 @@ export default function AdminTeamPage() {
                       disabled={busyId === u.id}
                       aria-pressed={u.active}
                       className={`min-h-[44px] text-xs font-medium rounded-lg px-3 ${
-                        u.active ? "bg-[var(--mint-tint)] text-[var(--mint-text)] font-bold" : "bg-black/5 text-foreground/50"
+                        u.active ? "bg-[var(--success-tint)] text-[var(--success-text)] font-bold" : "bg-black/5 text-foreground/50"
                       }`}
                     >
                       {busyId === u.id ? "…" : u.active ? "Active" : "Inactive"}
                     </button>
                     ) : (
-                      <span className={`min-h-[44px] inline-flex items-center text-xs rounded-lg px-3 ${u.active ? "bg-[var(--mint-tint)] text-[var(--mint-text)] font-bold" : "bg-black/5 text-foreground/50"}`}>{u.active ? "Active" : "Inactive"}</span>
+                      <span className={`min-h-[44px] inline-flex items-center text-xs rounded-lg px-3 ${u.active ? "bg-[var(--success-tint)] text-[var(--success-text)] font-bold" : "bg-black/5 text-foreground/50"}`}>{u.active ? "Active" : "Inactive"}</span>
                     )}
                     {u.active && can.password && (
                       <button
@@ -372,7 +372,7 @@ export default function AdminTeamPage() {
                     )}
                   </div>
                 </div>
-                {rowError?.id === u.id && <p className="text-xs text-[#a8281e]">{rowError.text}</p>}
+                {rowError?.id === u.id && <p className="text-xs text-[var(--risk-text)]">{rowError.text}</p>}
               </div>
               );
             })}
@@ -408,7 +408,7 @@ export default function AdminTeamPage() {
                     ))}
                   </select>
                 </div>
-                {rowError?.id === r.id && <p className="text-xs text-[#a8281e]">{rowError.text}</p>}
+                {rowError?.id === r.id && <p className="text-xs text-[var(--risk-text)]">{rowError.text}</p>}
               </div>
             ))}
           </div>
@@ -512,7 +512,7 @@ function EditStaff({
       onClose={onClose}
       footer={
         <div className="space-y-2">
-          {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+          {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
           <div className="flex gap-2 justify-end">
             <button type="button" className="btn btn-quiet btn-sm" onClick={onClose} disabled={busy}>
               Cancel
@@ -587,7 +587,7 @@ function SetPassword({ user, onClose, onSaved }: { user: TeamUser; onClose: () =
       onClose={onClose}
       footer={
         <div className="space-y-2">
-          {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+          {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
           <div className="flex gap-2 justify-end">
             <button type="button" className="btn btn-quiet btn-sm" onClick={onClose} disabled={busy}>
               Cancel

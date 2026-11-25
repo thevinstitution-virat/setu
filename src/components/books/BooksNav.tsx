@@ -42,7 +42,7 @@ export default function BooksNav() {
           key={t.href}
           href={t.href}
           aria-current={t === tab ? "page" : undefined}
-          className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold ${t === tab ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-black/5 text-foreground/70 hover:bg-black/10"}`}
+          className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold ${t === tab ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "bg-black/5 text-foreground/70 hover:bg-black/10"}`}
         >
           {t.label}
         </Link>

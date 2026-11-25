@@ -47,7 +47,7 @@ export default function WorkspaceSwitcher() {
       <ul className="space-y-2">
         {data.workspaces.map((w) => (
           <li key={w.slug} className="flex items-center gap-3">
-            <span className="icon-tile bg-[var(--kesar-tint)] text-[var(--kesar-text)]">
+            <span className="icon-tile bg-[var(--accent-tint)] text-[var(--accent-text)]">
               <Icon name="share" />
             </span>
             <div className="flex-1 min-w-0">
@@ -68,7 +68,7 @@ export default function WorkspaceSwitcher() {
       {!data.canHop && (
         <p className="text-xs text-[var(--muted)]">You will sign in there with your mobile number.</p>
       )}
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
     </div>
   );
 }

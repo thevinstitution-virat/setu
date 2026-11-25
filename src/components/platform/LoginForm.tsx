@@ -36,12 +36,12 @@ export default function LoginForm() {
       <Field label="Password">
         <input className="input" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
       </Field>
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       <button type="submit" className="btn btn-primary w-full" disabled={busy || !email || !password}>
         {busy ? "Signing in…" : "Sign in"}
       </button>
       <p className="text-center">
-        <a href="/platform/login/forgot" className="text-sm font-semibold text-[var(--kesar-text)] hover:underline">
+        <a href="/platform/login/forgot" className="text-sm font-semibold text-[var(--accent-text)] hover:underline">
           Forgot password?
         </a>
       </p>

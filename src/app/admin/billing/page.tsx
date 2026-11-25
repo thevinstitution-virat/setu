@@ -129,7 +129,7 @@ export default function BillingPage() {
     // Same rule as the server: a smaller monthly bill at today's staff and shops starts next month.
     const monthly = (x: PlanCard) => x.basePaise + x.seatPaise * (data?.limits.staff.used ?? 0) + x.retailerPaise * (data?.limits.retailers.used ?? 0);
     const cheaperNow = !!paidPlan && !inTrial && monthly(p) < monthly(paidPlan);
-    if (current) return <p className="text-sm font-semibold text-[var(--mint-text)] flex items-center gap-1.5"><Icon name="check" className="h-4 w-4" /> Your plan</p>;
+    if (current) return <p className="text-sm font-semibold text-[var(--success-text)] flex items-center gap-1.5"><Icon name="check" className="h-4 w-4" /> Your plan</p>;
     if (picking === p.code) {
       return (
         <div className="space-y-2">
@@ -184,7 +184,7 @@ export default function BillingPage() {
       {paused && (
         <section className="card p-5 space-y-3 !border-[#e8b27a]">
           <div className="flex items-center gap-2">
-            <Icon name="lock" className="h-5 w-5 text-[var(--kesar-text)]" />
+            <Icon name="lock" className="h-5 w-5 text-[var(--accent-text)]" />
             <p className="font-heading font-bold">Why the app is paused</p>
           </div>
           <p className="text-sm text-[var(--ink-2)]">{pausedWhy(data.pausedReason)}</p>
@@ -236,14 +236,14 @@ export default function BillingPage() {
         </div>
 
         <details className="group">
-          <summary className="cursor-pointer text-xs font-bold text-[var(--kesar-text)] list-none">
+          <summary className="cursor-pointer text-xs font-bold text-[var(--accent-text)] list-none">
             <span className="group-open:hidden">What your plan includes</span>
             <span className="hidden group-open:inline">Hide</span>
           </summary>
           <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-1 text-sm mt-2">
             {data.modules.map((m) => (
               <li key={m.code} className={`flex items-start gap-2 ${m.on ? "" : "text-[var(--muted)]"}`}>
-                <Icon name={m.on ? "check" : "lock"} className={`h-4 w-4 shrink-0 mt-0.5 ${m.on ? "text-[var(--mint-text)]" : ""}`} />
+                <Icon name={m.on ? "check" : "lock"} className={`h-4 w-4 shrink-0 mt-0.5 ${m.on ? "text-[var(--success-text)]" : ""}`} />
                 {m.label}
               </li>
             ))}
@@ -313,7 +313,7 @@ export default function BillingPage() {
         <div>
           <p className="font-heading text-lg font-bold">{inTrial ? "Pick a plan for after the trial" : "Plans"}</p>
           {flash && (
-            <p className="text-sm text-[var(--mint-text)] flex items-center gap-1.5 mt-1">
+            <p className="text-sm text-[var(--success-text)] flex items-center gap-1.5 mt-1">
               <Icon name="check" className="h-4 w-4" /> {flash}
             </p>
           )}

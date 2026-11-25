@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
+import { Icon3D } from "@/components/icons3d/Icon3D";
 import { formatINR, toPaise } from "@/lib/money";
 import { upiLink } from "@/lib/money-settings";
 import { compressImage, uploadFile } from "@/lib/upload-client";
@@ -46,6 +47,7 @@ type Khata = {
   balances: { receivable: number; walletAvailable: number; walletReserved: number };
   creditAvailable: number | null;
   overdue: number;
+  ageing?: Record<"d0_7" | "d8_15" | "d16_30" | "d30p", number>;
   advance: number;
   pendingVerification: { amount: number; count: number };
   postDated?: { amount: number; count: number };
@@ -95,10 +97,10 @@ const ENTRY: Record<string, string> = {
 };
 
 function PaymentChip({ p }: { p: Payment }) {
-  if (p.cheque?.status === "BOUNCED") return <span className="chip bg-[#fde4e1] text-[#a8281e] border-transparent">Cheque bounced</span>;
+  if (p.cheque?.status === "BOUNCED") return <span className="chip bg-[var(--risk-tint)] text-[var(--risk-text)] border-transparent">Cheque bounced</span>;
   if (p.state === "PENDING_VERIFICATION") return <span className="chip chip-genda">Waiting</span>;
-  if (p.state === "POST_DATED") return <span className="chip chip-genda">Post-dated cheque</span>;
-  if (p.state === "REJECTED") return <span className="chip bg-[#fde4e1] text-[#a8281e] border-transparent">Rejected</span>;
+  if (p.state === "POST_DATED") return <span className="chip chip-scheme">Post-dated cheque</span>;
+  if (p.state === "REJECTED") return <span className="chip bg-[var(--risk-tint)] text-[var(--risk-text)] border-transparent">Rejected</span>;
   if (p.state === "REVERSED") return <span className="chip">Reversed</span>;
   if (p.cheque && p.cheque.status !== "CLEARED") return <span className="chip chip-kesar">Cheque in bank</span>;
   return <span className="chip chip-mint">Confirmed</span>;
@@ -179,7 +181,7 @@ export default function KhataPage({
   if (!data) {
     return loadError ? (
       <div className="card p-5 space-y-3">
-        <p className="text-sm text-[#a8281e]">{loadError}</p>
+        <p className="text-sm text-[var(--risk-text)]">{loadError}</p>
         <button className="btn btn-quiet btn-sm" onClick={load}>
           Try again
         </button>
@@ -210,18 +212,34 @@ export default function KhataPage({
       </div>
 
       {/* ── Balance ── */}
-      <div className="panel-dark p-5 space-y-4 print:hidden">
+      <div className="rounded-[var(--r-xl)] bg-[var(--money)] text-white shadow-[var(--e-2)] p-5 space-y-4 print:hidden">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-genda">
             {owes > 0 ? "You owe" : owes < 0 ? "Advance with us" : "Your dues"}
           </p>
-          <p className="stat-num !text-4xl mt-2">{owes === 0 ? "All paid" : formatINR(Math.abs(owes))}</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="stat-num !text-4xl mt-2">{owes === 0 ? "All paid" : formatINR(Math.abs(owes))}</p>
+            <Icon3D name={owes === 0 ? "all-paid" : "ledger"} size={owes === 0 ? 88 : 64} animate={owes === 0 ? "pop" : "none"} className="shrink-0 bg-white/90 rounded-2xl" />
+          </div>
           {data.overdue > 0 && (
-            <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#fde4e1] text-[#a8281e] px-3 py-1 text-sm font-bold">
+            <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--risk-tint)] text-[var(--risk-text)] px-3 py-1 text-sm font-bold">
               <Icon name="alert" className="h-4 w-4" /> {formatINR(data.overdue)} overdue
             </p>
           )}
         </div>
+
+        {!prepaid && data.ageing && Object.values(data.ageing).some((v) => v > 0) && (
+          <div className="space-y-1.5" aria-label="Bills by age">
+            <div className="flex h-2.5 rounded-full overflow-hidden gap-0.5">
+              {([["d0_7", "var(--success)"], ["d8_15", "var(--scheme)"], ["d16_30", "var(--accent)"], ["d30p", "var(--risk)"]] as const)
+                .filter(([k]) => data.ageing![k] > 0)
+                .map(([k, c]) => (
+                  <div key={k} style={{ flex: data.ageing![k], background: c }} />
+                ))}
+            </div>
+            <p className="text-[11.5px] text-white/75">0 to 7 · 8 to 15 · 16 to 30 · 30+ days old</p>
+          </div>
+        )}
 
         {prepaid ? (
           <div className="grid grid-cols-2 gap-3 border-t border-white/10 pt-4">
@@ -244,7 +262,7 @@ export default function KhataPage({
             </div>
             <div className="h-2 rounded-full bg-white/15 overflow-hidden">
               <div
-                className={`h-full rounded-full ${usedPct >= 90 ? "bg-[#f26b5b]" : "bg-[var(--kesar)]"}`}
+                className={`h-full rounded-full ${usedPct >= 100 ? "bg-[var(--risk)]" : usedPct >= 80 ? "bg-[var(--scheme)]" : "bg-white"}`}
                 style={{ width: `${usedPct}%` }}
               />
             </div>
@@ -270,7 +288,7 @@ export default function KhataPage({
 
         {!paying && !payingOnline && (
           <div className="space-y-2">
-            <button className="btn btn-kesar w-full !min-h-[52px] text-base" onClick={() => { setPaying(true); setThanks(null); }}>
+            <button className="btn btn-scheme w-full !min-h-[52px] text-base" onClick={() => { setPaying(true); setThanks(null); }}>
               <Icon name="wallet" /> Pay now
             </button>
             {canPayOnline && (
@@ -286,12 +304,12 @@ export default function KhataPage({
       </div>
 
       {notFinished ? (
-        <p className="rounded-xl bg-[var(--genda-tint)] text-[var(--genda-text)] p-3 text-sm font-semibold print:hidden" role="status">
+        <p className="rounded-xl bg-[var(--scheme-tint)] text-[var(--scheme-text)] p-3 text-sm font-semibold print:hidden" role="status">
           The online payment was not finished. You can try again.
         </p>
       ) : backFromGateway && (
         <div className="card p-4 flex items-start gap-3 print:hidden" role="status">
-          <span className="icon-tile bg-[var(--mint-tint)] text-[var(--mint-text)]">
+          <span className="icon-tile bg-[var(--success-tint)] text-[var(--success-text)]">
             <Icon name="check" />
           </span>
           <p className="text-sm text-[var(--ink-2)] pt-2">
@@ -302,7 +320,7 @@ export default function KhataPage({
 
       {thanks && (
         <div className="card p-4 flex items-start gap-3 print:hidden">
-          <span className="icon-tile bg-[var(--mint-tint)] text-[var(--mint-text)]">
+          <span className="icon-tile bg-[var(--success-tint)] text-[var(--success-text)]">
             <Icon name="check" />
           </span>
           <p className="text-sm text-[var(--ink-2)] pt-2">{thanks}</p>
@@ -347,7 +365,7 @@ export default function KhataPage({
                   {b.invoiceId ? (
                     <Link
                       href={`/retailer/invoices/${b.invoiceId}`}
-                      className="font-bold text-sm truncate inline-flex items-center gap-1 text-[var(--kesar-text)] underline-offset-2 hover:underline max-w-full"
+                      className="font-bold text-sm truncate inline-flex items-center gap-1 text-[var(--accent-text)] underline-offset-2 hover:underline max-w-full"
                     >
                       <Icon name="file" className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">{b.number}</span>
@@ -365,9 +383,9 @@ export default function KhataPage({
                   )}
                 </div>
                 <div className="text-right shrink-0">
-                  <p className={`font-bold ${b.overdue ? "text-[#a8281e]" : ""}`}>{formatINR(b.due)}</p>
+                  <p className={`font-bold ${b.overdue ? "text-[var(--risk-text)]" : ""}`}>{formatINR(b.due)}</p>
                   {b.overdue ? (
-                    <span className="chip bg-[#fde4e1] text-[#a8281e] border-transparent mt-1">
+                    <span className="chip bg-[var(--risk-tint)] text-[var(--risk-text)] border-transparent mt-1">
                       Overdue {daysSince(b.dueDate)}d
                     </span>
                   ) : (
@@ -406,10 +424,10 @@ export default function KhataPage({
                   <PaymentChip p={p} />
                 </div>
                 {p.state === "REJECTED" && p.rejectReason && (
-                  <p className="text-xs text-[#a8281e]">Reason: {p.rejectReason}</p>
+                  <p className="text-xs text-[var(--risk-text)]">Reason: {p.rejectReason}</p>
                 )}
                 {p.cheque?.status === "BOUNCED" && p.cheque.bounceReason && (
-                  <p className="text-xs text-[#a8281e]">Reason: {p.cheque.bounceReason}</p>
+                  <p className="text-xs text-[var(--risk-text)]">Reason: {p.cheque.bounceReason}</p>
                 )}
               </div>
             ))}
@@ -435,7 +453,7 @@ export default function KhataPage({
             <input className="input mt-1" type="date" value={to} min={from} onChange={(e) => e.target.value && setTo(e.target.value)} />
           </label>
         </div>
-        {loadError && <p className="text-sm text-[#a8281e] print:hidden">{loadError}</p>}
+        {loadError && <p className="text-sm text-[var(--risk-text)] print:hidden">{loadError}</p>}
 
         <div className="hidden print:block">
           <p className="font-bold text-lg">{data.retailer.outletName}: statement</p>
@@ -458,7 +476,7 @@ export default function KhataPage({
                 </div>
                 <div className="text-right shrink-0">
                   {r.debit > 0 && <p className="font-semibold">+ {formatINR(r.debit)}</p>}
-                  {r.credit > 0 && <p className="font-semibold text-[var(--mint-text)]">− {formatINR(r.credit)}</p>}
+                  {r.credit > 0 && <p className="font-semibold text-[var(--success-text)]">− {formatINR(r.credit)}</p>}
                   <p className="text-xs text-[var(--muted)]">Bal. {bal(r.balance)}</p>
                 </div>
               </div>
@@ -556,7 +574,7 @@ function PayPanel({
   }
 
   const tab = (on: boolean) =>
-    `flex-1 rounded-xl py-3 text-sm font-semibold ${on ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-black/5 text-foreground/70"}`;
+    `flex-1 rounded-xl py-3 text-sm font-semibold ${on ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "bg-black/5 text-foreground/70"}`;
 
   return (
     <div className="card p-4 space-y-4 print:hidden">
@@ -649,7 +667,7 @@ function PayPanel({
             )}
           </div>
         ) : (
-          <p className="rounded-2xl bg-[var(--genda-tint)] text-[var(--genda-text)] p-3 text-sm">
+          <p className="rounded-2xl bg-[var(--scheme-tint)] text-[var(--scheme-text)] p-3 text-sm">
             UPI payment is not set up yet by the business. You can still pay by bank transfer and tell us here.
           </p>
         ))}
@@ -672,7 +690,7 @@ function PayPanel({
           <span className="text-xs font-semibold text-[var(--ink-2)]">Screenshot of payment (optional)</span>
           <input type="file" accept="image/*" className="block text-sm mt-1" onChange={(e) => setProof(e.target.files?.[0] ?? null)} />
         </label>
-        {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+        {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
         <button className="btn btn-kesar w-full !min-h-[52px] text-base" onClick={submit} disabled={saving}>
           {saving ? "Sending…" : `I have paid${paise > 0 ? ` ${formatINR(paise)}` : ""}`}
         </button>

@@ -120,7 +120,7 @@ export function ClearDamagedSheet({
       {ret && (
         <Field label="Supplier">
           {suppliers.error ? (
-            <p className="text-sm text-[#a8281e]">{suppliers.error}</p>
+            <p className="text-sm text-[var(--risk-text)]">{suppliers.error}</p>
           ) : !suppliers.data ? (
             <p className="text-sm text-[var(--muted)]">Loading…</p>
           ) : list.length === 0 ? (
@@ -218,7 +218,7 @@ export function TransferSheet({ warehouses, onClose, onDone }: { warehouses: Pla
         </Field>
       </div>
 
-      {lots.error && <p className="text-sm text-[#a8281e]">{lots.error}</p>}
+      {lots.error && <p className="text-sm text-[var(--risk-text)]">{lots.error}</p>}
       {!lots.data && !lots.error && <p className="text-sm text-[var(--muted)]">Loading stock…</p>}
       {lots.data && products.length === 0 && <p className="text-sm text-[var(--muted)]">Nothing in stock at this warehouse.</p>}
 

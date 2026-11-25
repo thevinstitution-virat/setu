@@ -183,7 +183,7 @@ export default function AnnouncementsPage() {
               <div key={a.id} className={`card p-4 space-y-2 ${st.live ? "" : "opacity-75"}`}>
                 <div className="flex flex-wrap items-start gap-2">
                   <p className="font-semibold flex-1 min-w-0 break-words flex items-center gap-2">
-                    {a.level === "warning" && <Icon name="alert" className="h-4 w-4 shrink-0 text-[var(--genda-text)]" />}
+                    {a.level === "warning" && <Icon name="alert" className="h-4 w-4 shrink-0 text-[var(--scheme-text)]" />}
                     {a.title}
                   </p>
                   <StatusChip value={a.level} />

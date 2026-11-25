@@ -106,7 +106,7 @@ export default function AuditPage() {
           {rows.map((r) => (
             <li key={r.id} className="py-2.5 text-sm space-y-0.5">
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <span className={`font-semibold ${r.action.endsWith("failed") ? "text-[#a8281e]" : ""}`} title={r.action}>
+                <span className={`font-semibold ${r.action.endsWith("failed") ? "text-[var(--risk-text)]" : ""}`} title={r.action}>
                   {readable(r.action).text}
                 </span>
                 {readable(r.action).group && <span className="chip !py-0.5 !px-2 !text-[11px]">{readable(r.action).group}</span>}
@@ -162,7 +162,7 @@ function Detail({ value }: { value: unknown }) {
   if (text.length <= 140) return <p className="text-xs text-[var(--ink-2)] break-all">{text}</p>;
   return (
     <details>
-      <summary className="cursor-pointer text-xs font-bold text-[var(--kesar-text)]">Details</summary>
+      <summary className="cursor-pointer text-xs font-bold text-[var(--accent-text)]">Details</summary>
       <pre className="mt-1 rounded-xl bg-ink/5 p-2 text-[11.5px] font-mono overflow-x-auto max-h-72">{JSON.stringify(value, null, 2)}</pre>
     </details>
   );

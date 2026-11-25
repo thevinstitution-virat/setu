@@ -163,7 +163,7 @@ function ProfitAndLoss({ p, apiQ }: { p: PL; apiQ: string }) {
                     <td className="px-3 py-2 text-right whitespace-nowrap">{formatINR(m.sales, { whole: true })}</td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">{signed(m.grossProfit)}</td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">{signed(m.running)}</td>
-                    <td className={`px-4 py-2 text-right whitespace-nowrap font-semibold ${m.netProfit < 0 ? "text-[#a8281e]" : ""}`}>{signed(m.netProfit)}</td>
+                    <td className={`px-4 py-2 text-right whitespace-nowrap font-semibold ${m.netProfit < 0 ? "text-[var(--risk-text)]" : ""}`}>{signed(m.netProfit)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -16,7 +16,7 @@ export default function VehiclesPage() {
   return (
     <div className="space-y-5 max-w-2xl">
       <Link href="/admin/dispatch" className="inline-flex items-center gap-1 text-sm font-bold text-[var(--ink-2)]">
-        <Icon name="arrow" className="h-4 w-4 rotate-180" /> Dispatch
+        <Icon name="back" className="h-4 w-4" /> Dispatch
       </Link>
       <div>
         <p className="page-kick">Delivery</p>
@@ -75,7 +75,7 @@ function VehicleRow({ v, onEdit, onChanged }: { v: Vehicle; onEdit: () => void; 
   return (
     <div className="space-y-1.5">
       <div className="flex flex-wrap items-center gap-3">
-        <span className={`icon-tile ${v.active ? "bg-[var(--kesar-tint)] text-[var(--kesar-text)]" : "bg-ink/5 text-[var(--muted)]"}`}>
+        <span className={`icon-tile ${v.active ? "bg-[var(--accent-tint)] text-[var(--accent-text)]" : "bg-ink/5 text-[var(--muted)]"}`}>
           <Icon name="truck" />
         </span>
         <div className="min-w-0 flex-1">
@@ -92,7 +92,7 @@ function VehicleRow({ v, onEdit, onChanged }: { v: Vehicle; onEdit: () => void; 
           </button>
         </div>
       </div>
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
     </div>
   );
 }
@@ -162,7 +162,7 @@ function VehicleForm({
           <input className="input" inputMode="numeric" placeholder="Optional" value={cap} onChange={(e) => setCap(e.target.value.replace(/\D/g, ""))} />
         </Field>
       </div>
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       <div className="flex gap-2 justify-end">
         {onCancel && (
           <button type="button" className="btn btn-quiet btn-sm" onClick={onCancel} disabled={busy}>

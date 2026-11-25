@@ -133,7 +133,7 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
                 <tr key={b.id}>
                   <td className="px-4 py-2">
                     {b.purchaseBillId ? (
-                      <Link href={`/admin/books/purchases/${b.purchaseBillId}`} className="font-semibold text-[var(--kesar-text)]">
+                      <Link href={`/admin/books/purchases/${b.purchaseBillId}`} className="font-semibold text-[var(--accent-text)]">
                         {b.number}
                       </Link>
                     ) : (
@@ -142,7 +142,7 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
                     {b.kind === "OPENING" && <span className="chip !text-[10px] ml-1">Old books</span>}
                   </td>
                   <td className="px-4 py-2 whitespace-nowrap">{showDay(b.date)}</td>
-                  <td className={`px-4 py-2 whitespace-nowrap ${b.overdue ? "text-[#a8281e] font-semibold" : ""}`}>{showDay(b.dueDate)}</td>
+                  <td className={`px-4 py-2 whitespace-nowrap ${b.overdue ? "text-[var(--risk-text)] font-semibold" : ""}`}>{showDay(b.dueDate)}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{formatINR(b.amount)}</td>
                   <td className="px-4 py-2 text-right tabular-nums">{b.paid ? formatINR(b.paid) : ""}</td>
                   <td className="px-4 py-2 text-right tabular-nums font-semibold">{formatINR(b.left)}</td>
@@ -165,7 +165,7 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
               <li key={c.id} className="flex justify-between gap-3 py-2">
                 <span>
                   {c.purchaseBillId ? (
-                    <Link href={`/admin/books/purchases/${c.purchaseBillId}`} className="font-semibold text-[var(--kesar-text)]">
+                    <Link href={`/admin/books/purchases/${c.purchaseBillId}`} className="font-semibold text-[var(--accent-text)]">
                       {c.number}
                     </Link>
                   ) : (
@@ -189,7 +189,7 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
             {docs.map((d) => (
               <li key={d.id} className={`flex justify-between gap-3 py-2 ${d.cancelled ? "opacity-50" : ""}`}>
                 <span className="min-w-0">
-                  <Link href={`/admin/books/purchases/${d.id}`} className="font-semibold text-[var(--kesar-text)]">
+                  <Link href={`/admin/books/purchases/${d.id}`} className="font-semibold text-[var(--accent-text)]">
                     {d.number}
                   </Link>{" "}
                   <span className="text-[var(--muted)]">
@@ -213,7 +213,7 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
             {payments.map((p) => (
               <li key={p.id} className={`flex justify-between gap-3 py-2 ${p.cancelledAt ? "opacity-50" : ""}`}>
                 <span className="min-w-0">
-                  <Link href={`/admin/books/payments/${p.id}`} className="font-semibold text-[var(--kesar-text)]">
+                  <Link href={`/admin/books/payments/${p.id}`} className="font-semibold text-[var(--accent-text)]">
                     {p.number}
                   </Link>{" "}
                   <span className="text-[var(--muted)]">

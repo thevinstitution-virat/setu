@@ -74,7 +74,7 @@ export default function ComplaintSheet({
       onClose={onClose}
       footer={
         <div className="space-y-2">
-          {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+          {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
           <div className="flex gap-2">
             <button type="button" className="btn btn-quiet flex-1" onClick={onClose} disabled={saving}>
               Cancel

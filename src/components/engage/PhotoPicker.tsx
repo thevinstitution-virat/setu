@@ -79,7 +79,7 @@ export default function PhotoPicker({
         className="hidden"
         onChange={(e) => pick(e.target.files)}
       />
-      {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+      {error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
     </div>
   );
 }

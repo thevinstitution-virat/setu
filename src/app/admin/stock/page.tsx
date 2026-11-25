@@ -76,7 +76,7 @@ export default function StockPage({ searchParams }: { searchParams: Promise<{ fi
 
       {data && !data.settings.enabled && (
         <div className="card p-6 text-center space-y-3 max-w-lg mx-auto">
-          <span className="icon-tile mx-auto bg-[var(--genda-tint)] text-[var(--genda-text)]">
+          <span className="icon-tile mx-auto bg-[var(--scheme-tint)] text-[var(--scheme-text)]">
             <Icon name="stock" />
           </span>
           <p className="font-heading font-bold text-lg">Stock tracking is off</p>
@@ -124,7 +124,7 @@ export default function StockPage({ searchParams }: { searchParams: Promise<{ fi
               <p className="text-sm font-semibold">No active products</p>
               <p className="text-sm text-[var(--muted)]">
                 Add products in{" "}
-                <Link href="/admin/products" className="font-bold text-[var(--kesar-text)]">
+                <Link href="/admin/products" className="font-bold text-[var(--accent-text)]">
                   Products
                 </Link>{" "}
                 first.
@@ -172,17 +172,17 @@ function Tiles({ data, onPick }: { data: StockData; onPick: (f: Filter) => void 
         <p className="stat-lbl">Stock value at cost</p>
       </div>
       <Link href="/admin/stock/reorder" className={tile}>
-        <p className={`stat-num !text-2xl ${t.low ? "text-[var(--genda-text)]" : ""}`}>{t.low}</p>
+        <p className={`stat-num !text-2xl ${t.low ? "text-[var(--scheme-text)]" : ""}`}>{t.low}</p>
         <p className="stat-lbl flex items-center gap-1">
           To reorder <Icon name="arrow" className="h-3.5 w-3.5" />
         </p>
       </Link>
       <button type="button" className={tile} onClick={() => onPick("expiring")}>
-        <p className={`stat-num !text-2xl ${t.expiringSoon ? "text-[var(--genda-text)]" : ""}`}>{t.expiringSoon}</p>
+        <p className={`stat-num !text-2xl ${t.expiringSoon ? "text-[var(--scheme-text)]" : ""}`}>{t.expiringSoon}</p>
         <p className="stat-lbl">Expiring in {plural(data.settings.expiryAlertDays, "day")}</p>
       </button>
       <button type="button" className={tile} onClick={() => onPick("expired")}>
-        <p className={`stat-num !text-2xl ${t.expired ? "text-[#a8281e]" : ""}`}>{t.expired}</p>
+        <p className={`stat-num !text-2xl ${t.expired ? "text-[var(--risk-text)]" : ""}`}>{t.expired}</p>
         <p className="stat-lbl">{t.expired === 1 ? "Product with expired stock" : "Products with expired stock"}</p>
       </button>
     </div>
@@ -213,9 +213,9 @@ function ExpiredBar({ count, onDone }: { count: number; onDone: () => void }) {
   }
 
   return (
-    <div className="card p-4 space-y-2 !bg-[#fde4e1]/70">
+    <div className="card p-4 space-y-2 !bg-[var(--risk-tint)]/70">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-[#a8281e] flex items-center gap-2 min-w-0">
+        <p className="text-sm font-semibold text-[var(--risk-text)] flex items-center gap-2 min-w-0">
           <Icon name="alert" className="h-4 w-4 shrink-0" />
           {plural(count, "product")} {count === 1 ? "has" : "have"} expired stock.
         </p>
@@ -238,8 +238,8 @@ function ExpiredBar({ count, onDone }: { count: number; onDone: () => void }) {
           </div>
         </div>
       )}
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
-      {flash && <p className="text-sm text-[var(--mint-text)]">{flash}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
+      {flash && <p className="text-sm text-[var(--success-text)]">{flash}</p>}
     </div>
   );
 }
@@ -254,7 +254,7 @@ function ProductRow({ r, alertDays, onOpen }: { r: StockRow; alertDays: number; 
       <span className="min-w-0 flex-1 space-y-0.5">
         <span className="flex flex-wrap items-center gap-1.5">
           <span className="text-sm font-bold break-words">{r.name}</span>
-          {r.out && <span className={`chip ${SMALL_CHIP} !bg-[#fde4e1] !text-[#a8281e] !border-transparent`}>Out</span>}
+          {r.out && <span className={`chip ${SMALL_CHIP} !bg-[var(--risk-tint)] !text-[var(--risk-text)] !border-transparent`}>Out</span>}
           {r.low && !r.out && <span className={`chip chip-genda ${SMALL_CHIP}`}>Reorder</span>}
           {r.expired > 0 && <span className={`chip chip-kesar ${SMALL_CHIP}`}>{r.expired} expired</span>}
         </span>
@@ -277,7 +277,7 @@ function ProductRow({ r, alertDays, onOpen }: { r: StockRow; alertDays: number; 
         <span>{r.reserved.toLocaleString("en-IN")}</span>
       </span>
       <span className="shrink-0 text-right md:w-32">
-        <span className={`block font-heading font-bold text-2xl leading-none ${r.available <= 0 ? "text-[#a8281e]" : ""}`}>{r.available.toLocaleString("en-IN")}</span>
+        <span className={`block font-heading font-bold text-2xl leading-none ${r.available <= 0 ? "text-[var(--risk-text)]" : ""}`}>{r.available.toLocaleString("en-IN")}</span>
         <span className="block text-[11px] text-[var(--muted)] mt-1">{r.unit} available</span>
         {cases && <span className="block text-[11px] text-[var(--muted)]">{cases}</span>}
       </span>

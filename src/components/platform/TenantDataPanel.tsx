@@ -70,9 +70,9 @@ export default function TenantDataPanel({ data, onChanged }: { data: TenantData;
       )}
 
       {t.deleteAfter ? (
-        <div className="rounded-2xl bg-[#fde4e1]/60 p-3 space-y-2">
+        <div className="rounded-2xl bg-[var(--risk-tint)]/60 p-3 space-y-2">
           <p className="text-sm">
-            <span className="font-semibold text-[#a8281e]">Deletion scheduled</span> for {when(t.deleteAfter, true)}
+            <span className="font-semibold text-[var(--risk-text)]">Deletion scheduled</span> for {when(t.deleteAfter, true)}
             {t.deleteRequestedAt && <span className="text-[var(--ink-2)]"> (asked {when(t.deleteRequestedAt)})</span>}
           </p>
           {!closed && (
@@ -84,8 +84,8 @@ export default function TenantDataPanel({ data, onChanged }: { data: TenantData;
       ) : (
         owner &&
         !closed && (
-          <div className="space-y-2 rounded-2xl border border-[#a8281e]/20 p-3">
-            <p className="text-sm font-semibold text-[#a8281e]">Delete this business</p>
+          <div className="space-y-2 rounded-2xl border border-[var(--risk-text)]/20 p-3">
+            <p className="text-sm font-semibold text-[var(--risk-text)]">Delete this business</p>
             <p className="text-xs text-[var(--muted)]">Only on the business&apos;s written request. A copy is made first; all data is removed 7 days later unless cancelled.</p>
             <Field label="Request">
               <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Owner's email of 18 Nov asking to close the account" />

@@ -129,13 +129,13 @@ export default function CashPage() {
         </button>
       </div>
 
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       {!data && !error && <p className="text-sm text-[var(--muted)]">Loading…</p>}
 
       {data && (
         <div className="grid grid-cols-2 gap-3 max-w-xl">
           <div className="card p-4 flex items-center gap-3">
-            <span className="icon-tile bg-[var(--kesar-tint)] text-[var(--kesar-text)]">
+            <span className="icon-tile bg-[var(--accent-tint)] text-[var(--accent-text)]">
               <Icon name="users" />
             </span>
             <div className="min-w-0">
@@ -144,7 +144,7 @@ export default function CashPage() {
             </div>
           </div>
           <div className="card p-4 flex items-center gap-3">
-            <span className="icon-tile bg-[var(--mint-tint)] text-[var(--mint-text)]">
+            <span className="icon-tile bg-[var(--success-tint)] text-[var(--success-text)]">
               <Icon name="cash" />
             </span>
             <div className="min-w-0">
@@ -156,7 +156,7 @@ export default function CashPage() {
       )}
 
       {done && (
-        <p className="text-sm text-[var(--mint-text)] flex items-center gap-1.5">
+        <p className="text-sm text-[var(--success-text)] flex items-center gap-1.5">
           <Icon name="check" className="h-4 w-4" /> {done}
         </p>
       )}
@@ -389,7 +389,7 @@ function HandoverForm({ row, onCancel, onDone }: { row: Row; onCancel: () => voi
             </>
           )}
         </div>
-        {expected < 0 && <p className="text-xs text-[#a8281e]">The expenses are more than the {formatINR(row.cashInHand)} they hold.</p>}
+        {expected < 0 && <p className="text-xs text-[var(--risk-text)]">The expenses are more than the {formatINR(row.cashInHand)} they hold.</p>}
       </div>
       <div className="flex items-baseline justify-between gap-2">
         <p className="text-sm text-[var(--ink-2)]">Should have{spent > 0 ? ` (after ${formatINR(spent)} expenses)` : ""}</p>
@@ -407,7 +407,7 @@ function HandoverForm({ row, onCancel, onDone }: { row: Row; onCancel: () => voi
         />
       </label>
       <div className="flex flex-wrap items-center gap-2 text-sm min-h-7">
-        {counted.trim() && !valid && <span className="text-[#a8281e]">Enter an amount in rupees</span>}
+        {counted.trim() && !valid && <span className="text-[var(--risk-text)]">Enter an amount in rupees</span>}
         {valid && variance === 0 && <span className="chip chip-mint">Matches</span>}
         {valid && variance > 0 && (
           <>
@@ -418,7 +418,7 @@ function HandoverForm({ row, onCancel, onDone }: { row: Row; onCancel: () => voi
         {over && (
           <>
             <span className="chip chip-genda">Over {formatINR(-variance)}</span>
-            <span className="text-xs text-[#a8281e]">That is more than they hold. Count again, or check for a payment they have not entered.</span>
+            <span className="text-xs text-[var(--risk-text)]">That is more than they hold. Count again, or check for a payment they have not entered.</span>
           </>
         )}
       </div>
@@ -426,7 +426,7 @@ function HandoverForm({ row, onCancel, onDone }: { row: Row; onCancel: () => voi
         <span className="block text-xs font-bold text-[var(--ink-2)] mb-1">Note (optional)</span>
         <input className="input" maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} />
       </label>
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       <div className="flex gap-2">
         <button type="submit" className="btn btn-kesar btn-sm" disabled={!valid || over || busy || uploading}>
           {busy ? "Saving…" : valid ? `Receive ${formatINR(c)}` : "Receive"}
@@ -485,7 +485,7 @@ function WriteOffForm({
       <label className="block">
         <span className="block text-xs font-bold text-[var(--ink-2)] mb-1">Amount (₹)</span>
         <input className="input" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
-        {tooMuch && <span className="block text-xs text-[#a8281e] mt-1">They only hold {formatINR(row.cashInHand)}.</span>}
+        {tooMuch && <span className="block text-xs text-[var(--risk-text)] mt-1">They only hold {formatINR(row.cashInHand)}.</span>}
       </label>
       <label className="block">
         <span className="block text-xs font-bold text-[var(--ink-2)] mb-1">Reason</span>
@@ -497,7 +497,7 @@ function WriteOffForm({
           onChange={(e) => setNote(e.target.value)}
         />
       </label>
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       <div className="flex gap-2">
         <button type="submit" className="btn btn-danger btn-sm" disabled={!ok || busy}>
           {busy ? "Saving…" : "Write off"}

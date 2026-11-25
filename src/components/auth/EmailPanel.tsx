@@ -69,7 +69,7 @@ export default function EmailPanel({ email }: { email: string | null }) {
         <h2 id="sec-email" className="font-heading font-bold">
           {t("sec.email")}
         </h2>
-        {email && <span className="text-xs font-bold rounded-full px-2.5 py-1 bg-[var(--genda-tint)] text-[var(--genda-text)]">{t("sec.emailVerified")}</span>}
+        {email && <span className="text-xs font-bold rounded-full px-2.5 py-1 bg-[var(--scheme-tint)] text-[var(--scheme-text)]">{t("sec.emailVerified")}</span>}
       </div>
       <p className="text-sm text-[var(--muted)]">{t("sec.emailWhy")}</p>
       {step === "idle" && <p className="text-sm font-semibold break-all">{email ?? t("sec.emailNone")}</p>}
@@ -80,7 +80,7 @@ export default function EmailPanel({ email }: { email: string | null }) {
             {email ? t("sec.emailChange") : t("sec.emailAdd")}
           </button>
           {email && (
-            <button type="button" className="btn btn-quiet btn-sm text-[#a8281e]" disabled={busy} onClick={remove}>
+            <button type="button" className="btn btn-quiet btn-sm text-[var(--risk-text)]" disabled={busy} onClick={remove}>
               {t("sec.emailRemove")}
             </button>
           )}
@@ -103,7 +103,7 @@ export default function EmailPanel({ email }: { email: string | null }) {
       ) : (
         <form onSubmit={confirm} className="space-y-3">
           {devCode && (
-            <p className="text-xs rounded-lg bg-[var(--genda-tint)] text-[var(--genda-text)] px-3 py-2">
+            <p className="text-xs rounded-lg bg-[var(--scheme-tint)] text-[var(--scheme-text)] px-3 py-2">
               {t("login.demoEmail")} <span className="font-semibold">{devCode}</span>.
             </p>
           )}
@@ -131,7 +131,7 @@ export default function EmailPanel({ email }: { email: string | null }) {
           </div>
         </form>
       )}
-      {error && <p role="alert" className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p role="alert" className="text-sm text-[var(--risk-text)]">{error}</p>}
     </section>
   );
 }

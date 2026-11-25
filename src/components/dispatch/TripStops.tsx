@@ -89,7 +89,7 @@ export default function TripStops({ data, onDone }: { data: TripDetail; onDone: 
             {located} of {open.length} open stops have a map pin. Stops without one go last, grouped by area.
           </p>
         )}
-        {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+        {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       </div>
 
       {stops.length === 0 ? (
@@ -121,7 +121,7 @@ function StateChip({ s }: { s: StopJson }) {
   if (s.state === "DELIVERED") return <span className="chip chip-mint !py-0.5 !px-2 !text-[11.5px]">Delivered</span>;
   if (s.state === "FAILED")
     return (
-      <span className="chip !py-0.5 !px-2 !text-[11.5px] !bg-[#fde4e1] !text-[#a8281e] !border-transparent max-w-full">
+      <span className="chip !py-0.5 !px-2 !text-[11.5px] !bg-[var(--risk-tint)] !text-[var(--risk-text)] !border-transparent max-w-full">
         <span className="truncate">Not delivered: {failLabel(s.failReason)}</span>
       </span>
     );
@@ -158,7 +158,7 @@ function StopRow({
       <div className="flex items-start gap-3">
         <span
           className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold ${
-            s.state === "DELIVERED" ? "bg-[var(--mint-tint)] text-[var(--mint-text)]" : s.state === "FAILED" ? "bg-[#fde4e1] text-[#a8281e]" : "bg-ink text-genda"
+            s.state === "DELIVERED" ? "bg-[var(--success-tint)] text-[var(--success-text)]" : s.state === "FAILED" ? "bg-[var(--risk-tint)] text-[var(--risk-text)]" : "bg-ink text-genda"
           }`}
           aria-label={`Stop ${s.seq ?? ""}`}
         >
@@ -176,7 +176,7 @@ function StopRow({
             <OrderLink orderNumber={s.order.orderNumber} />
             <span>{plural(s.order.lines, "line")}</span>
             {s.retailer.phone && (
-              <a href={`tel:${s.retailer.phone}`} className="font-semibold text-[var(--kesar-text)]">
+              <a href={`tel:${s.retailer.phone}`} className="font-semibold text-[var(--accent-text)]">
                 {s.retailer.phone}
               </a>
             )}
@@ -274,7 +274,7 @@ function NotDelivered({ s, onCancel, run }: { s: StopJson; onCancel: () => void;
             aria-checked={reason === k}
             onClick={() => setReason(k)}
             className={`min-h-[44px] rounded-xl border px-3 text-left text-sm transition ${
-              reason === k ? "border-mor bg-[var(--mint-tint)] font-semibold" : "border-[var(--line)]"
+              reason === k ? "border-mor bg-[var(--success-tint)] font-semibold" : "border-[var(--line)]"
             }`}
           >
             {label}
@@ -285,7 +285,7 @@ function NotDelivered({ s, onCancel, run }: { s: StopJson; onCancel: () => void;
         <span className="block text-xs font-medium text-[var(--ink-2)] mb-1">Note{reason === "other" ? "" : " (optional)"}</span>
         <input className="input" maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} />
       </label>
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       <div className="flex flex-wrap gap-2 justify-end">
         <button type="button" className="btn btn-quiet btn-sm !min-h-[44px]" onClick={onCancel} disabled={busy}>
           Cancel

@@ -49,7 +49,7 @@ export default function TenantAndroid({ tenantId, slug }: { tenantId: string; sl
       {data && (
         <div className="space-y-3">
           {!data.allowed && (
-            <p className="text-sm rounded-xl bg-[var(--genda-tint)] text-[var(--genda-text)] px-3 py-2">
+            <p className="text-sm rounded-xl bg-[var(--scheme-tint)] text-[var(--scheme-text)] px-3 py-2">
               The android module is not on for this business. Turn it on (plan or override) before you build.
             </p>
           )}

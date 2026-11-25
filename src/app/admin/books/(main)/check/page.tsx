@@ -18,7 +18,7 @@ export default async function CheckPage() {
     <div className="space-y-4">
       <section className={`card p-4 flex flex-wrap items-center justify-between gap-3 ${c.ok ? "border-[var(--mint)]" : "border-[#e8a39b]"}`}>
         <div className="flex items-center gap-3">
-          <span className={`grid h-10 w-10 place-items-center rounded-full ${c.ok ? "bg-[var(--mint-tint)] text-[var(--mint-text)]" : "bg-[#fbe9e7] text-[#a8281e]"}`}>
+          <span className={`grid h-10 w-10 place-items-center rounded-full ${c.ok ? "bg-[var(--success-tint)] text-[var(--success-text)]" : "bg-[#fbe9e7] text-[var(--risk-text)]"}`}>
             <Icon name={c.ok ? "check" : "alert"} className="h-5 w-5" />
           </span>
           <div>
@@ -35,7 +35,7 @@ export default async function CheckPage() {
       <ul className="card divide-y divide-[var(--line)] p-0">
         {c.results.map((x) => (
           <li key={x.key} className="flex items-start gap-3 px-4 py-3">
-            <Icon name={x.ok ? "check" : "alert"} className={`mt-0.5 h-4 w-4 shrink-0 ${x.ok ? "text-[var(--mint-text)]" : "text-[#a8281e]"}`} />
+            <Icon name={x.ok ? "check" : "alert"} className={`mt-0.5 h-4 w-4 shrink-0 ${x.ok ? "text-[var(--success-text)]" : "text-[var(--risk-text)]"}`} />
             <div className="min-w-0">
               <p className="text-sm font-semibold text-[var(--ink)]">{x.title}</p>
               <p className="text-xs text-[var(--muted)]">{x.detail}</p>

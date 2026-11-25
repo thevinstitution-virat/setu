@@ -96,7 +96,7 @@ export default function StockHistoryPage({ searchParams }: { searchParams: Promi
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Product" className="sm:col-span-2 lg:col-span-1">
             {stock.error ? (
-              <p className="text-sm text-[#a8281e]">{stock.error}</p>
+              <p className="text-sm text-[var(--risk-text)]">{stock.error}</p>
             ) : (
               <SearchPick options={productOpts} value={productId} onChange={setProductId} placeholder={stock.data ? "All products" : "Loading…"} />
             )}
@@ -150,7 +150,7 @@ export default function StockHistoryPage({ searchParams }: { searchParams: Promi
             </button>
           )}
         </div>
-        {rangeError && <p className="text-sm text-[#a8281e]">{rangeError}</p>}
+        {rangeError && <p className="text-sm text-[var(--risk-text)]">{rangeError}</p>}
       </section>
 
       {first.error && <ErrorBox message={first.error} onRetry={first.reload} />}
@@ -181,7 +181,7 @@ export default function StockHistoryPage({ searchParams }: { searchParams: Promi
           <button type="button" className="btn btn-outline" disabled={moreBusy} onClick={loadMore}>
             {moreBusy ? "Loading…" : "Load more"}
           </button>
-          {moreError && <p className="text-sm text-[#a8281e]">{moreError}</p>}
+          {moreError && <p className="text-sm text-[var(--risk-text)]">{moreError}</p>}
         </div>
       )}
     </div>

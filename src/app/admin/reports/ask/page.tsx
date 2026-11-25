@@ -98,7 +98,7 @@ export default function AskPage() {
                 onClick={listen}
                 aria-pressed={listening}
                 aria-label={listening ? "Stop listening" : "Speak the question"}
-                className={`absolute right-1.5 top-1/2 -translate-y-1/2 grid place-items-center h-8 w-8 rounded-full ${listening ? "bg-[#a8281e] text-white animate-pulse" : "bg-[var(--kesar-tint)] text-[var(--kesar-text)]"}`}
+                className={`absolute right-1.5 top-1/2 -translate-y-1/2 grid place-items-center h-8 w-8 rounded-full ${listening ? "bg-[var(--risk-text)] text-white animate-pulse" : "bg-[var(--accent-tint)] text-[var(--accent-text)]"}`}
               >
                 <Icon name="mic" className="h-4 w-4" />
               </button>
@@ -115,7 +115,7 @@ export default function AskPage() {
             </button>
           ))}
         </div>
-        {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+        {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       </section>
 
       {asked.map(({ question, answer: a }, i) => (

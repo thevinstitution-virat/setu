@@ -19,7 +19,7 @@ export default function AdminInvoicePage({ params }: { params: Promise<{ id: str
   return (
     <div className="space-y-4 max-w-3xl">
       <Link href="/admin/invoices" className="inline-flex items-center gap-1 text-sm font-bold text-[var(--ink-2)]">
-        <Icon name="arrow" className="h-4 w-4 rotate-180" /> All invoices
+        <Icon name="back" className="h-4 w-4" /> All invoices
       </Link>
       <InvoicePanel
         key={id}
@@ -41,8 +41,8 @@ function Actions({ r, reload }: { r: InvoiceResponse; reload: () => void }) {
   return (
     <div className="space-y-4">
       {r.can.eway && inv.ewayNeeded && (
-        <div className="card p-4 flex items-start gap-3 !bg-[var(--genda-tint)]">
-          <span className="icon-tile bg-white/70 text-[var(--genda-text)]">
+        <div className="card p-4 flex items-start gap-3 !bg-[var(--scheme-tint)]">
+          <span className="icon-tile bg-white/70 text-[var(--scheme-text)]">
             <Icon name="truck" />
           </span>
           <div className="min-w-0">
@@ -249,7 +249,7 @@ function NoteSheet({ type, inv, onClose }: { type: "CREDIT_NOTE" | "DEBIT_NOTE";
           </div>
         }
       >
-        <div className="rounded-2xl bg-[var(--mint-tint)] p-3 text-sm text-[var(--mint-text)] flex items-start gap-2" role="status">
+        <div className="rounded-2xl bg-[var(--success-tint)] p-3 text-sm text-[var(--success-text)] flex items-start gap-2" role="status">
           <Icon name="check" className="h-4 w-4 shrink-0 mt-0.5" />
           <span>{restocked.text}</span>
         </div>
@@ -271,7 +271,7 @@ function NoteSheet({ type, inv, onClose }: { type: "CREDIT_NOTE" | "DEBIT_NOTE";
               {formatINR(taxable)} + {formatINR(tax)} GST
             </p>
           )}
-          {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+          {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
           <div className="flex gap-2 justify-end">
             <button type="button" className="btn btn-quiet btn-sm" onClick={onClose} disabled={busy}>
               Cancel
@@ -296,7 +296,7 @@ function NoteSheet({ type, inv, onClose }: { type: "CREDIT_NOTE" | "DEBIT_NOTE";
                 setError(null);
               }}
               className={`w-full text-left rounded-2xl border px-3 py-2.5 transition ${
-                kind === k.key ? "border-mor bg-[var(--mint-tint)]" : "border-[var(--line)] bg-white"
+                kind === k.key ? "border-mor bg-[var(--success-tint)]" : "border-[var(--line)] bg-white"
               }`}
             >
               <span className="block text-sm font-bold">{k.label}</span>
@@ -360,7 +360,7 @@ function NoteSheet({ type, inv, onClose }: { type: "CREDIT_NOTE" | "DEBIT_NOTE";
               </li>
             ))}
           </ul>
-          {problem && <p className="text-xs text-[#a8281e]">{problem}</p>}
+          {problem && <p className="text-xs text-[var(--risk-text)]">{problem}</p>}
         </div>
       )}
 
@@ -376,7 +376,7 @@ function NoteSheet({ type, inv, onClose }: { type: "CREDIT_NOTE" | "DEBIT_NOTE";
                 aria-checked={restock === o.key}
                 onClick={() => setRestock(o.key)}
                 className={`min-h-[44px] rounded-2xl border px-3 py-2 text-left text-sm font-semibold transition ${
-                  restock === o.key ? "border-mor bg-[var(--mint-tint)]" : "border-[var(--line)] bg-white"
+                  restock === o.key ? "border-mor bg-[var(--success-tint)]" : "border-[var(--line)] bg-white"
                 }`}
               >
                 {o.label}
@@ -455,9 +455,9 @@ function EInvoiceCard({ r, reload }: { r: InvoiceResponse; reload: () => void })
         <p className="font-heading font-bold">e-Invoice</p>
         {inv.einvStatus !== "NOT_REQUIRED" && <span className="chip">{EINV_LABEL[inv.einvStatus]}</span>}
       </div>
-      {inv.einvStatus === "FAILED" && inv.einvError && <p className="text-sm text-[var(--kesar-text)]">Last try: {inv.einvError}</p>}
+      {inv.einvStatus === "FAILED" && inv.einvError && <p className="text-sm text-[var(--accent-text)]">Last try: {inv.einvError}</p>}
       {r.einvoiceProblems.length > 0 && (
-        <div className="rounded-2xl bg-[var(--genda-tint)] p-3 text-sm space-y-1">
+        <div className="rounded-2xl bg-[var(--scheme-tint)] p-3 text-sm space-y-1">
           <p className="font-semibold">Fix these first</p>
           <ul className="list-disc pl-5 space-y-0.5">
             {r.einvoiceProblems.map((p) => (
@@ -514,7 +514,7 @@ function EInvoiceCard({ r, reload }: { r: InvoiceResponse; reload: () => void })
             Cancel e-invoice
           </button>
         ))}
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
     </section>
   );
 }
@@ -570,7 +570,7 @@ function EwayCard({ inv, reload }: { inv: InvoiceJson; reload: () => void }) {
           <input className="input" inputMode="numeric" placeholder="12" value={km} onChange={(e) => setKm(e.target.value.replace(/\D/g, ""))} />
         </Field>
       </div>
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       <button type="button" className={`btn btn-sm ${inv.ewayNeeded ? "btn-kesar" : "btn-outline"}`} disabled={busy} onClick={submit}>
         {busy ? "Making…" : "Make e-way bill"}
       </button>

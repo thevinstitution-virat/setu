@@ -28,7 +28,7 @@ export default async function PlatformLoginPage({ searchParams }: { searchParams
   return (
     <ConsoleAuthFrame kick="Platform" title="Sign in to the console" sub="For the VBiz Pro team: businesses, plans, invoices and health." below="After the link, the console asks for the code from your authenticator app.">
       {notice && (
-        <p role="status" className="text-sm rounded-lg bg-[var(--genda-tint)] text-[var(--genda-text)] px-3 py-2 mb-4 break-words">
+        <p role="status" className="text-sm rounded-lg bg-[var(--scheme-tint)] text-[var(--scheme-text)] px-3 py-2 mb-4 break-words">
           {notice}
         </p>
       )}

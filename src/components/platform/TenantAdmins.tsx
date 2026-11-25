@@ -79,9 +79,9 @@ export function AdminFields({ value, onChange }: { value: NewAdminForm; onChange
 /** The set-password link to hand over (shown once). */
 export function LinkCard({ who, url, emailed, onDone }: { who: string; url: string; emailed: boolean; onDone: () => void }) {
   return (
-    <div className="card p-4 space-y-2 !bg-[var(--genda-tint)]">
+    <div className="card p-4 space-y-2 !bg-[var(--scheme-tint)]">
       <p className="text-sm font-semibold flex items-center gap-2">
-        <Icon name="alert" className="h-4 w-4 text-[var(--genda-text)]" /> Set-password link for {who}
+        <Icon name="alert" className="h-4 w-4 text-[var(--scheme-text)]" /> Set-password link for {who}
       </p>
       <p className="text-sm text-[var(--ink-2)]">
         Works once, for 3 days. {emailed ? "We emailed it too." : "Send it to them yourself (WhatsApp is fine)."} It isn&apos;t shown again: make a new one if it&apos;s lost.
@@ -291,7 +291,7 @@ export default function TenantAdmins({ tenantId, closed }: { tenantId: string; c
           ))}
         </ul>
       )}
-      {note && <p className="text-sm text-[var(--mint-text)]">{note}</p>}
+      {note && <p className="text-sm text-[var(--success-text)]">{note}</p>}
       <ErrLine text={error} />
     </Section>
   );

@@ -98,7 +98,7 @@ export default function DuesToolbar({ view, options, today, summary, file }: Pro
                 key={v.key}
                 href={`${path}${q.toString() ? `?${q}` : ""}`}
                 aria-current={active ? "page" : undefined}
-                className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold border ${active ? "border-[var(--kesar)] bg-[var(--kesar-tint)] text-[var(--kesar-text)]" : "border-[var(--line)] bg-white/60 text-foreground/70 hover:bg-white"}`}
+                className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold border ${active ? "border-[var(--kesar)] bg-[var(--accent-tint)] text-[var(--accent-text)]" : "border-[var(--line)] bg-white/60 text-foreground/70 hover:bg-white"}`}
               >
                 {v.label}
               </Link>

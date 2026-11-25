@@ -57,7 +57,7 @@ export default async function PurchaseDocPage({ params }: { params: Promise<{ id
         </div>
         <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
           <Item label="Supplier">
-            <Link href={`/admin/books/suppliers/${d.supplier.id}`} className="font-semibold text-[var(--kesar-text)]">
+            <Link href={`/admin/books/suppliers/${d.supplier.id}`} className="font-semibold text-[var(--accent-text)]">
               {d.supplier.name}
             </Link>
             {d.supplier.gstin && <p className="text-xs text-[var(--muted)] break-all">GSTIN {d.supplier.gstin}</p>}
@@ -68,7 +68,7 @@ export default async function PurchaseDocPage({ params }: { params: Promise<{ id
           </Item>
           <Item label="Goods">
             {d.purchase ? (
-              <Link href={`/admin/stock/purchases/${d.purchase.id}`} className="font-semibold text-[var(--kesar-text)]">
+              <Link href={`/admin/stock/purchases/${d.purchase.id}`} className="font-semibold text-[var(--accent-text)]">
                 {d.movedStock ? "Received with this bill" : "For"} {d.purchase.number}
               </Link>
             ) : (
@@ -79,7 +79,7 @@ export default async function PurchaseDocPage({ params }: { params: Promise<{ id
             {d.type === "BILL" ? (
               d.notes.length ? (
                 d.notes.map((n) => (
-                  <Link key={n.id} href={`/admin/books/purchases/${n.id}`} className={`block font-semibold text-[var(--kesar-text)] ${n.cancelledAt ? "line-through opacity-60" : ""}`}>
+                  <Link key={n.id} href={`/admin/books/purchases/${n.id}`} className={`block font-semibold text-[var(--accent-text)] ${n.cancelledAt ? "line-through opacity-60" : ""}`}>
                     {n.number} · {formatINR(n.total)}
                   </Link>
                 ))
@@ -87,7 +87,7 @@ export default async function PurchaseDocPage({ params }: { params: Promise<{ id
                 <p className="text-[var(--muted)]">None</p>
               )
             ) : d.against ? (
-              <Link href={`/admin/books/purchases/${d.against.id}`} className="font-semibold text-[var(--kesar-text)]">
+              <Link href={`/admin/books/purchases/${d.against.id}`} className="font-semibold text-[var(--accent-text)]">
                 {d.against.supplierRef} ({d.against.number})
               </Link>
             ) : (
@@ -120,7 +120,7 @@ export default async function PurchaseDocPage({ params }: { params: Promise<{ id
           </dl>
         )}
         {(d.reason || d.note) && <p className="rounded-xl bg-black/[0.04] px-3 py-2 text-sm text-[var(--ink-2)]">{[d.reason, d.note].filter(Boolean).join(" · ")}</p>}
-        {d.cancelledAt && <p className="rounded-xl bg-[#fdecea] px-3 py-2 text-sm text-[#a8281e]">Cancelled: {d.cancelReason}</p>}
+        {d.cancelledAt && <p className="rounded-xl bg-[#fdecea] px-3 py-2 text-sm text-[var(--risk-text)]">Cancelled: {d.cancelReason}</p>}
         <div className="flex flex-wrap gap-2">
           {d.entryId && (
             <Link className="btn btn-outline btn-xs" href={`${ledgerHref(`PAYABLE:${d.supplier.id}`)}&from=${d.date}`}>
@@ -179,7 +179,7 @@ export default async function PurchaseDocPage({ params }: { params: Promise<{ id
                 <td className="px-4 py-2">
                   <span className="font-medium text-[var(--ink)]">{l.description}</span>
                   {l.claimId && (
-                    <Link href={`/admin/books/claims/${l.claimId}`} className="block text-xs font-semibold text-[var(--kesar-text)]">
+                    <Link href={`/admin/books/claims/${l.claimId}`} className="block text-xs font-semibold text-[var(--accent-text)]">
                       Settles our claim
                     </Link>
                   )}

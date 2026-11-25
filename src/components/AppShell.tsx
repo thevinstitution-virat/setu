@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
@@ -11,6 +11,8 @@ import { BrandLockup, BrandMark, Logo } from "@/components/BrandMark";
 import Icon, { type IconName } from "@/components/Icon";
 import { NOTIFY_EVENT } from "@/components/engage/kit";
 import ShellNotices from "@/components/ShellNotices";
+import { ToastHost } from "@/components/ui/Toast";
+import TableKeys from "@/components/ui/TableKeys";
 import type { Chrome } from "@/lib/chrome";
 
 export type NavGroup = "overview" | "sell" | "deliver" | "money" | "setup" | "businesses" | "operate" | "safety";
@@ -75,6 +77,22 @@ function tabsOf(nav: NavItem[]) {
   return nav.length <= 5 ? nav : nav.slice(0, 4);
 }
 
+/** Browser online / offline, without an effect. */
+function useOnline() {
+  return useSyncExternalStore(
+    (cb) => {
+      window.addEventListener("online", cb);
+      window.addEventListener("offline", cb);
+      return () => {
+        window.removeEventListener("online", cb);
+        window.removeEventListener("offline", cb);
+      };
+    },
+    () => navigator.onLine,
+    () => true,
+  );
+}
+
 const initials = (name: string) =>
   name
     .split(/\s+/)
@@ -91,6 +109,7 @@ export default function AppShell({
   roleLabel,
   account = BUSINESS_ACCOUNT,
   chrome,
+  surface,
 }: {
   children: React.ReactNode;
   nav: NavItem[];
@@ -101,6 +120,8 @@ export default function AppShell({
   account?: ShellAccount;
   /** Brand, banners and plan locks for this business (Phase 9). */
   chrome?: Chrome | null;
+  /** "retailer" = the green, white-chrome surface. Everyone else uses the staff default (teal + saffron). */
+  surface?: "retailer";
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -111,6 +132,7 @@ export default function AppShell({
   const tabs = useMemo(() => tabsOf(nav), [nav]);
   const hasMore = tabs.length < nav.length;
   const [sheetOpen, setSheetOpen] = useState(false);
+  const online = useOnline();
   const [query, setQuery] = useState("");
 
   const currentItem = nav.find((i) => i.href === current);
@@ -132,14 +154,14 @@ export default function AppShell({
     : sections;
 
   return (
-    <div className="app-shell min-h-screen md:flex">
+    <div className="app-shell min-h-screen md:flex" data-surface={surface}>
       {/* Tablet: icon rail. PC: full sidebar with sections. */}
       <aside
         className="app-side hidden md:flex sticky top-0 h-screen shrink-0 flex-col w-[76px] lg:w-[256px] text-white"
         aria-label={t("nav.menu")}
       >
         <Link href={home} className="flex items-center gap-2.5 h-16 px-[18px] lg:px-5 shrink-0" aria-label={chrome?.brand.appName ?? APP_NAME}>
-          <SideBrand name={chrome?.brand.appName} logoUrl={chrome?.brand.logoUrl} />
+          <SideBrand name={chrome?.brand.appName} logoUrl={chrome?.brand.logoUrl} onLight={surface === "retailer"} />
         </Link>
 
         {nav.length > 8 && (
@@ -244,7 +266,7 @@ export default function AppShell({
             <button
               type="button"
               onClick={() => setSheetOpen(true)}
-              className="md:hidden grid place-items-center h-10 w-10 shrink-0 rounded-full bg-[var(--mint-tint)] text-[var(--mint-text)] text-[13px] font-bold"
+              className="md:hidden grid place-items-center h-10 w-10 shrink-0 rounded-full bg-[var(--accent-tint)] text-[var(--accent-text)] text-[13px] font-bold"
               aria-label={`${userName} · ${t("nav.menu")}`}
               aria-haspopup="dialog"
             >
@@ -253,7 +275,12 @@ export default function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 w-full max-w-[1360px] mx-auto px-4 md:px-6 lg:px-8 py-5 md:py-7">
+        {!online && (
+          <p role="status" className="flex items-center justify-center gap-2 bg-[var(--ink)] text-white text-[13px] font-semibold px-4 py-2 text-center">
+            <Icon name="alert" className="h-4 w-4 shrink-0" /> {t("shell.offline")}
+          </p>
+        )}
+        <main key={pathname} className="page-in flex-1 w-full max-w-[1360px] mx-auto px-4 md:px-6 lg:px-8 py-5 md:py-7">
           {chrome ? (
             <ShellNotices chrome={chrome} isOffice={roleKey === "role.admin"}>
               {children}
@@ -277,12 +304,15 @@ export default function AppShell({
             className={`tab-link ${current && !tabs.some((x) => x.href === current) ? "is-on" : ""}`}
           >
             <span className="tab-ic">
-              <Icon name="menu" className="h-[22px] w-[22px]" strokeWidth={1.8} />
+              <Icon name="menu" className="h-[22px] w-[22px]" weight="duotone" />
             </span>
             {t("nav.more")}
           </button>
         )}
       </nav>
+
+      <ToastHost />
+      {surface !== "retailer" && <TableKeys />}
 
       {sheetOpen && (
         <MenuSheet
@@ -301,7 +331,7 @@ export default function AppShell({
 }
 
 /** Our logo for the dark sidebar, or the business's own (white label). */
-function SideBrand({ name, logoUrl }: { name?: string; logoUrl?: string | null }) {
+function SideBrand({ name, logoUrl, onLight }: { name?: string; logoUrl?: string | null; onLight?: boolean }) {
   const own = !name || name === APP_NAME;
   if (own && !logoUrl) {
     return (
@@ -310,7 +340,7 @@ function SideBrand({ name, logoUrl }: { name?: string; logoUrl?: string | null }
           <BrandMark size={40} />
         </span>
         <span className="hidden lg:block">
-          <Logo kind="onDark" height={30} priority />
+          <Logo kind={onLight ? "wide" : "onDark"} height={30} priority />
         </span>
       </>
     );
@@ -323,7 +353,7 @@ function SideBrand({ name, logoUrl }: { name?: string; logoUrl?: string | null }
       ) : (
         <BrandMark size={40} />
       )}
-      <span className="hidden lg:block font-heading font-bold text-[17px] leading-tight truncate">{own ? APP_NAME : name}</span>
+      <span className={`hidden lg:block font-heading font-bold text-[17px] leading-tight truncate ${onLight ? "text-ink" : ""}`}>{own ? APP_NAME : name}</span>
     </>
   );
 }
@@ -339,7 +369,7 @@ function SideLink({ item, active, locked }: { item: NavItem; active: boolean; lo
       title={`${label}${locked ? ` (${t("shell.notInPlan")})` : ""}`}
       className={`side-link ${active ? "is-on" : ""}`}
     >
-      <Icon name={item.icon} className="side-ic" strokeWidth={1.8} />
+      <Icon name={item.icon} className="side-ic" weight={active ? "fill" : "duotone"} />
       <span className="hidden lg:inline flex-1 truncate">{label}</span>
       {locked && <Icon name="lock" className="hidden lg:block h-3.5 w-3.5 opacity-60" />}
     </Link>
@@ -351,7 +381,7 @@ function TabLink({ item, active, locked }: { item: NavItem; active: boolean; loc
   return (
     <Link href={item.href} aria-current={active ? "page" : undefined} className={`tab-link ${active ? "is-on" : ""}`}>
       <span className="tab-ic">
-        <Icon name={locked ? "lock" : item.icon} className="h-[22px] w-[22px]" strokeWidth={1.8} />
+        <Icon name={locked ? "lock" : item.icon} className="h-[22px] w-[22px]" weight={active ? "fill" : "duotone"} />
       </span>
       <span className="max-w-full truncate px-0.5">{itemLabel(t, item)}</span>
     </Link>
@@ -394,8 +424,8 @@ function MenuSheet({
   return (
     <div className="md:hidden fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label={t("nav.menu")}>
       <button type="button" className="absolute inset-0 bg-[rgba(8,38,37,.45)]" aria-label={t("nav.close")} onClick={onClose} />
-      <div className="menu-sheet absolute inset-x-0 bottom-0 max-h-[88vh] flex flex-col rounded-t-[22px] bg-[var(--app-ground)]">
-        <div className="flex items-center gap-3 px-4 pt-4 pb-3 bg-white rounded-t-[22px] border-b border-[var(--app-line)]">
+      <div className="menu-sheet absolute inset-x-0 bottom-0 max-h-[88vh] flex flex-col rounded-t-[22px] bg-[var(--canvas)]">
+        <div className="flex items-center gap-3 px-4 pt-4 pb-3 bg-white rounded-t-[22px] border-b border-[var(--line)]">
           <span className="grid place-items-center h-11 w-11 shrink-0 rounded-full bg-[var(--mint-tint)] text-[var(--mint-text)] text-sm font-bold" aria-hidden="true">
             {initials(userName)}
           </span>
@@ -410,7 +440,7 @@ function MenuSheet({
 
         <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-3">
           {sections.map((s, idx) => (
-            <section key={s.group ?? `s${idx}`} className="rounded-2xl bg-white border border-[var(--app-line)] px-2 pt-2.5 pb-1.5">
+            <section key={s.group ?? `s${idx}`} className="rounded-2xl bg-white border border-[var(--line)] px-2 pt-2.5 pb-1.5">
               {s.group && (
                 <h2 className="px-2 mb-1 text-[11px] font-bold uppercase tracking-[.08em] text-[var(--muted)]">{groupLabel(t, s.group)}</h2>
               )}
@@ -425,11 +455,11 @@ function MenuSheet({
                         onClick={onClose}
                         aria-current={on ? "page" : undefined}
                         className={`flex flex-col items-center justify-center gap-1.5 min-h-[76px] px-1 py-2 rounded-xl text-center text-[12px] font-semibold leading-tight ${
-                          on ? "bg-[var(--kesar-tint)] text-[var(--kesar-text)]" : "text-ink active:bg-ink/5"
+                          on ? "bg-[var(--accent-tint)] text-[var(--accent-text)]" : "text-ink active:bg-ink/5"
                         }`}
                       >
-                        <span className={`grid place-items-center h-10 w-10 rounded-[11px] ${on ? "bg-white" : "bg-[#eef2f1] text-[var(--mor)]"}`}>
-                          <Icon name={isLocked ? "lock" : item.icon} className="h-5 w-5" strokeWidth={1.8} />
+                        <span className={`grid place-items-center h-10 w-10 rounded-[11px] ${on ? "bg-white" : "bg-[var(--surface-2)] text-[var(--mor)]"}`}>
+                          <Icon name={isLocked ? "lock" : item.icon} className="h-5 w-5" weight="duotone" />
                         </span>
                         {itemLabel(t, item)}
                       </Link>
@@ -442,7 +472,7 @@ function MenuSheet({
 
           <Link
             href={securityHref}
-            className="w-full flex items-center justify-center gap-2 min-h-[48px] rounded-2xl bg-white border border-[var(--app-line)] font-semibold mb-2"
+            className="w-full flex items-center justify-center gap-2 min-h-[48px] rounded-2xl bg-white border border-[var(--line)] font-semibold mb-2"
           >
             <Icon name="lock" className="h-5 w-5" />
             {t("sec.title")}
@@ -450,7 +480,7 @@ function MenuSheet({
           <button
             type="button"
             onClick={onLogout}
-            className="w-full flex items-center justify-center gap-2 min-h-[48px] rounded-2xl bg-white border border-[var(--app-line)] font-semibold text-[#a8281e]"
+            className="w-full flex items-center justify-center gap-2 min-h-[48px] rounded-2xl bg-white border border-[var(--line)] font-semibold text-[var(--risk-text)]"
           >
             <Icon name="logout" className="h-5 w-5" />
             {t("common.logout")}
@@ -500,12 +530,12 @@ function Bell({ href, active }: { href: string; active: boolean }) {
       title={label}
       aria-current={active ? "page" : undefined}
       className={`relative grid place-items-center h-10 w-10 shrink-0 rounded-xl transition ${
-        active ? "bg-[var(--kesar-tint)] text-[var(--kesar-text)]" : "text-[var(--ink-2)] hover:bg-ink/5"
+        active ? "bg-[var(--accent-tint)] text-[var(--accent-text)]" : "text-[var(--ink-2)] hover:bg-ink/5"
       }`}
     >
       <Icon name="bell" className="h-5 w-5" />
       {count > 0 && (
-        <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#a8281e] text-white text-[10.5px] font-bold leading-[18px] text-center">
+        <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[var(--risk)] text-white text-[10.5px] font-bold leading-[18px] text-center">
           {count > 99 ? "99+" : count}
         </span>
       )}

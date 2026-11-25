@@ -99,7 +99,7 @@ export default async function VouchersPage({ searchParams }: { searchParams: Pro
                     <Link href={`/admin/books/vouchers/${v.id}`} className="flex items-start justify-between gap-3 px-4 py-2.5 hover:bg-black/[0.02]">
                       <span className="min-w-0">
                         <span className="text-sm">
-                          <span className="font-semibold text-[var(--kesar-text)]">{v.number}</span>
+                          <span className="font-semibold text-[var(--accent-text)]">{v.number}</span>
                           <span className="chip !text-[10px] ml-1.5">{SHORT[v.type]}</span>
                           {v.cancelled && <span className="chip !text-[10px] ml-1">Cancelled</span>}
                         </span>

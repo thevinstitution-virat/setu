@@ -43,7 +43,7 @@ export default function PurchasePage({ params }: { params: Promise<{ id: string 
 
   const back = (
     <Link href="/admin/stock/purchases" className="inline-flex items-center gap-1 text-sm font-bold text-[var(--ink-2)]">
-      <Icon name="arrow" className="h-4 w-4 rotate-180" /> Goods received
+      <Icon name="back" className="h-4 w-4" /> Goods received
     </Link>
   );
 
@@ -88,18 +88,18 @@ export default function PurchasePage({ params }: { params: Promise<{ id: string 
           </Item>
           <Item label="Purchase bill (books)">
             {p.bill ? (
-              <Link href={`/admin/books/purchases/${p.bill.id}`} className="font-semibold text-[var(--kesar-text)]">
+              <Link href={`/admin/books/purchases/${p.bill.id}`} className="font-semibold text-[var(--accent-text)]">
                 {p.bill.number}
               </Link>
             ) : (
-              <Link href={`/admin/books/purchases/new?grn=${p.id}`} className="font-semibold text-[var(--kesar-text)]">
+              <Link href={`/admin/books/purchases/new?grn=${p.id}`} className="font-semibold text-[var(--accent-text)]">
                 Make the purchase bill
               </Link>
             )}
           </Item>
           <Item label="Purchase order">
             {p.po ? (
-              <Link href={`/admin/stock/purchase-orders/${p.po.id}`} className="font-semibold text-[var(--kesar-text)]">
+              <Link href={`/admin/stock/purchase-orders/${p.po.id}`} className="font-semibold text-[var(--accent-text)]">
                 {p.po.number}
               </Link>
             ) : (

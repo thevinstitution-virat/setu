@@ -9,7 +9,7 @@ export default async function RoutesReport({ searchParams }: { searchParams: Pro
   if (!ctx.ok) return <ErrorCard message={ctx.error} />;
   const [r, session] = await Promise.all([loadReport(ctx.tenantId, "routes", ctx.period), pageSession()]);
   const t = r.totals;
-  const neg = (v: number) => (v < 0 ? <span className="text-[#a8281e]">{rs(v)}</span> : rs(v));
+  const neg = (v: number) => (v < 0 ? <span className="text-[var(--risk-text)]">{rs(v)}</span> : rs(v));
 
   return (
     <div className="space-y-5">

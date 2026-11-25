@@ -5,7 +5,7 @@ export default function InvalidShareLink() {
   return (
     <main className="w-full max-w-md mx-auto px-4 py-16">
       <div className="card p-6 text-center space-y-3">
-        <span className="icon-tile mx-auto bg-[var(--kesar-tint)] text-[var(--kesar-text)]">
+        <span className="icon-tile mx-auto bg-[var(--accent-tint)] text-[var(--accent-text)]">
           <Icon name="alert" />
         </span>
         <h1 className="page-title !text-xl">This link is not valid</h1>

@@ -16,7 +16,7 @@ export default function DeliveredView({ order, invoices }: { order: OrderDetail;
         <h1 className="page-title">{order.retailer.outletName}</h1>
         <p className="text-sm text-foreground/50">{order.orderNumber}</p>
       </div>
-      <p className="flex items-center gap-2 rounded-xl bg-[var(--mint-tint)] text-[var(--mint-text)] p-3 text-sm font-bold">
+      <p className="flex items-center gap-2 rounded-xl bg-[var(--success-tint)] text-[var(--success-text)] p-3 text-sm font-bold">
         <Icon name="check" className="h-4 w-4" /> Delivered
       </p>
 
@@ -44,7 +44,7 @@ export default function DeliveredView({ order, invoices }: { order: OrderDetail;
       ) : (
         <p className="text-sm text-[var(--muted)]">The invoice will show here once it is ready.</p>
       )}
-      <Link href="/delivery" className="btn btn-kesar w-full !min-h-[52px]">
+      <Link href="/delivery" className="btn btn-kesar w-full !min-h-[56px]">
         Back to my stops <Icon name="arrow" className="h-4 w-4" />
       </Link>
     </div>

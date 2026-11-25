@@ -83,7 +83,7 @@ function LoadSheet() {
           <p className="text-sm text-[var(--muted)]">
             {data.label}: {data.orders} order{data.orders === 1 ? "" : "s"} going out
             {data.topUp ? `; extra brings each product up to the usual for a ${data.label.split(",")[0]} (spot sales, late orders)` : ""}.
-            {data.totals.short > 0 && <span className="font-semibold text-[#a8281e]"> {data.totals.short} short in the warehouse.</span>}
+            {data.totals.short > 0 && <span className="font-semibold text-[var(--risk-text)]"> {data.totals.short} short in the warehouse.</span>}
           </p>
           {data.rows.length === 0 ? (
             <p className="card p-4 text-sm text-[var(--muted)]">Nothing to load for this day yet.</p>
@@ -112,7 +112,7 @@ function LoadSheet() {
                       <td className="px-3 py-2 text-right tabular-nums">{r.extra ? `+${num(r.extra)}` : "–"}</td>
                       <td className="px-3 py-2 text-right font-bold tabular-nums">{num(r.suggested)}</td>
                       {data.stockTracked && (
-                        <td className={`px-3 py-2 text-right tabular-nums ${r.short ? "font-semibold text-[#a8281e]" : ""}`}>
+                        <td className={`px-3 py-2 text-right tabular-nums ${r.short ? "font-semibold text-[var(--risk-text)]" : ""}`}>
                           {num(r.warehouse ?? 0)}
                           {r.short > 0 && <span className="block text-[11px]">short {num(r.short)}</span>}
                         </td>
@@ -179,7 +179,7 @@ function ForecastTable() {
                         {r.available === null ? "–" : num(r.available)}
                         {r.onOrder > 0 && <span className="block text-[11px] text-[var(--muted)]">+{num(r.onOrder)} on order</span>}
                       </td>
-                      <td className={`px-3 py-2 text-right tabular-nums ${r.runsOutFirst ? "font-semibold text-[#a8281e]" : ""}`}>
+                      <td className={`px-3 py-2 text-right tabular-nums ${r.runsOutFirst ? "font-semibold text-[var(--risk-text)]" : ""}`}>
                         {r.daysLeft === null ? "–" : r.daysLeft}
                         {r.runsOut && <span className="block text-[11px] text-[var(--muted)]">{shortDate(`${r.runsOut}T00:00:00+05:30`)}</span>}
                       </td>

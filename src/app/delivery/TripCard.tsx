@@ -49,7 +49,7 @@ function Progress({ stops }: { stops: TripStop[] }) {
         <span className="font-semibold">
           {done} of {stops.length} delivered
         </span>
-        {failed > 0 && <span className="text-[#a8281e] font-semibold">{failed} not delivered</span>}
+        {failed > 0 && <span className="text-[var(--risk-text)] font-semibold">{failed} not delivered</span>}
       </div>
       <div className="h-2 rounded-full bg-black/[0.07] overflow-hidden">
         <div className="h-full rounded-full bg-[var(--mint)]" style={{ width: `${pct}%` }} />
@@ -122,7 +122,7 @@ function RunningTrip({ trip, stock }: { trip: DriverTrip; stock: boolean }) {
           </div>
         )}
         {open.length === 0 && (
-          <p className="flex items-center gap-2 rounded-xl bg-[var(--mint-tint)] text-[var(--mint-text)] p-3 text-sm font-bold">
+          <p className="flex items-center gap-2 rounded-xl bg-[var(--success-tint)] text-[var(--success-text)] p-3 text-sm font-bold">
             <Icon name="check" className="h-4 w-4" /> All stops done.
             {trip.cash > 0 ? ` Hand over ${formatINR(trip.cash)} cash at the office.` : ""}
           </p>

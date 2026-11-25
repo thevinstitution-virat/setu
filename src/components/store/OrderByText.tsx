@@ -47,6 +47,7 @@ export default function OrderByText({
   byId,
   inCartAction,
   draftId,
+  defaultOpen = false,
   onAddAction,
 }: {
   retailerId?: string;
@@ -54,9 +55,11 @@ export default function OrderByText({
   byId: Map<string, StoreProduct>;
   inCartAction: (productId: string) => boolean;
   draftId?: string | null;
+  /** Start expanded (the search bar mic opens it). */
+  defaultOpen?: boolean;
   onAddAction: (adds: TextAdd[], draftId: string | null) => void;
 }) {
-  const [open, setOpen] = useState(!!draftId);
+  const [open, setOpen] = useState(!!draftId || defaultOpen);
   const [text, setText] = useState("");
   const [rows, setRows] = useState<Row[] | null>(null);
   const [reading, setReading] = useState(false);
@@ -175,7 +178,7 @@ export default function OrderByText({
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className="card w-full p-3.5 flex items-center gap-3 text-left hover:brightness-[0.99]">
-        <span className="grid place-items-center h-10 w-10 shrink-0 rounded-xl bg-[var(--kesar-tint)] text-[var(--kesar-text)]">
+        <span className="grid place-items-center h-10 w-10 shrink-0 rounded-xl bg-[var(--accent-tint)] text-[var(--accent-text)]">
           <Icon name="mic" className="h-5 w-5" />
         </span>
         <span className="min-w-0">
@@ -224,7 +227,7 @@ export default function OrderByText({
                 onClick={listen}
                 aria-pressed={listening}
                 aria-label={listening ? "Stop listening" : "Speak the order"}
-                className={`absolute right-2 top-2 grid place-items-center h-9 w-9 rounded-full ${listening ? "bg-[#a8281e] text-white animate-pulse" : "bg-[var(--kesar-tint)] text-[var(--kesar-text)]"}`}
+                className={`absolute right-2 top-2 grid place-items-center h-9 w-9 rounded-full ${listening ? "bg-[var(--risk-text)] text-white animate-pulse" : "bg-[var(--accent-tint)] text-[var(--accent-text)]"}`}
               >
                 <Icon name="mic" className="h-4.5 w-4.5" />
               </button>
@@ -242,7 +245,7 @@ export default function OrderByText({
 
       {rows && (
         <div className="space-y-2">
-          {unsure > 0 && <p className="text-xs text-[var(--kesar-text)] font-semibold">{unsure === 1 ? "1 line needs a look" : `${unsure} lines need a look`} (marked below).</p>}
+          {unsure > 0 && <p className="text-xs text-[var(--accent-text)] font-semibold">{unsure === 1 ? "1 line needs a look" : `${unsure} lines need a look`} (marked below).</p>}
           <ul className="divide-y divide-[var(--line)]">
             {rows.map((r) => (
               <RowEditor
@@ -267,7 +270,7 @@ export default function OrderByText({
         </div>
       )}
 
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       {info && <p className="text-xs text-[var(--muted)]">{info}</p>}
     </section>
   );
@@ -315,7 +318,7 @@ function RowEditor({
           &ldquo;{r.said}&rdquo;
           {conf && <span className={`chip ml-1.5 !py-0 !text-[10.5px] ${conf.cls}`}>{conf.label}</span>}
         </p>
-        <button type="button" className="text-xs font-semibold text-[var(--muted)] hover:text-[#a8281e] shrink-0" onClick={onRemoveAction} aria-label={`Remove ${r.said}`}>
+        <button type="button" className="text-xs font-semibold text-[var(--muted)] hover:text-[var(--risk-text)] shrink-0" onClick={onRemoveAction} aria-label={`Remove ${r.said}`}>
           Remove
         </button>
       </div>

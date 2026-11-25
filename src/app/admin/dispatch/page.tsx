@@ -58,11 +58,11 @@ export default function DispatchPage({ searchParams }: { searchParams: Promise<{
       {!board && !error && <p className="text-sm text-[var(--muted)]">Loading…</p>}
 
       {flash && (
-        <p className="card p-3 text-sm font-semibold text-[var(--mint-text)] bg-[var(--mint-tint)] flex flex-wrap items-center gap-2" role="status">
+        <p className="card p-3 text-sm font-semibold text-[var(--success-text)] bg-[var(--success-tint)] flex flex-wrap items-center gap-2" role="status">
           <Icon name="check" className="h-4 w-4 shrink-0" />
           <span className="min-w-0">{flash.text}</span>
           {flash.href && (
-            <Link href={flash.href} className="font-bold text-[var(--kesar-text)]">
+            <Link href={flash.href} className="font-bold text-[var(--accent-text)]">
               {flash.link ?? "Open trip →"}
             </Link>
           )}
@@ -156,7 +156,7 @@ function PlanTrips({ board, onPlanned }: { board: Board; onPlanned: (text: strin
         <Icon name="route" className="h-4 w-4" /> Plan trips
       </button>
       {err && (
-        <span className="w-full text-sm text-[#a8281e]" role="alert">
+        <span className="w-full text-sm text-[var(--risk-text)]" role="alert">
           {err}
         </span>
       )}
@@ -262,8 +262,8 @@ function TripCard({ t }: { t: BoardTrip }) {
       </div>
       <div className="mt-3 grid grid-cols-4 gap-2 text-center">
         <Stat n={t.stops} label="Stops" />
-        <Stat n={t.delivered} label="Delivered" tone="text-[var(--mint-text)]" />
-        <Stat n={t.failed} label="Not delivered" tone={t.failed ? "text-[#a8281e]" : ""} />
+        <Stat n={t.delivered} label="Delivered" tone="text-[var(--success-text)]" />
+        <Stat n={t.failed} label="Not delivered" tone={t.failed ? "text-[var(--risk-text)]" : ""} />
         <Stat n={open} label="Open" />
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -368,14 +368,14 @@ function AddBar({
         )}
         {target?.status === "STARTED" && <p className="text-xs text-[var(--muted)]">This trip has left: the orders go out for delivery at once.</p>}
         {short && (
-          <div className="space-y-2 rounded-2xl bg-[var(--genda-tint)] p-3">
+          <div className="space-y-2 rounded-2xl bg-[var(--scheme-tint)] p-3">
             <ShortList rows={short} />
             <button type="button" className="btn btn-kesar btn-sm !min-h-[44px] w-full" disabled={busy} onClick={() => add(true)}>
               Add anyway (the goods are there)
             </button>
           </div>
         )}
-        {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+        {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       </div>
     </div>
   );

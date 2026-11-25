@@ -143,7 +143,7 @@ export default function ReorderPage() {
                 <Icon name="clipboard" className="h-4 w-4" /> {busy ? "Drafting…" : "Draft purchase orders"}
               </button>
             </div>
-            {failed && <p className="text-sm text-[#a8281e]">{failed}</p>}
+            {failed && <p className="text-sm text-[var(--risk-text)]">{failed}</p>}
           </div>
         </div>
       )}
@@ -174,13 +174,13 @@ function ReorderRow({ r, on, onToggle }: { r: Row; on: boolean; onToggle: (on: b
             <div className="text-right shrink-0">
               {can ? (
                 <>
-                  <p className="text-sm font-bold text-[var(--kesar-text)]">
+                  <p className="text-sm font-bold text-[var(--accent-text)]">
                     Order {r.suggested} {r.unit}
                   </p>
                   {cases !== null && <p className="text-[11px] text-[var(--muted)]">{plural(cases, "case")}</p>}
                 </>
               ) : (
-                <p className="text-xs font-semibold text-[var(--mint-text)]">Enough on order</p>
+                <p className="text-xs font-semibold text-[var(--success-text)]">Enough on order</p>
               )}
             </div>
           </div>
@@ -203,7 +203,7 @@ function DraftResult({ done, onClose }: { done: Drafted; onClose: () => void }) 
     <section className="card p-4 space-y-3" role="status">
       <div className="flex items-start justify-between gap-2">
         <p className="font-heading font-bold flex items-center gap-2">
-          <Icon name="check" className="h-5 w-5 text-[var(--mint-text)]" />
+          <Icon name="check" className="h-5 w-5 text-[var(--success-text)]" />
           {done.orders.length ? `${plural(done.orders.length, "draft purchase order")} made` : "No purchase orders made"}
         </p>
         <button type="button" className="btn btn-quiet btn-xs !px-2 !min-h-[40px] !min-w-[40px]" aria-label="Close" onClick={onClose}>
@@ -226,8 +226,8 @@ function DraftResult({ done, onClose }: { done: Drafted; onClose: () => void }) 
       )}
       {done.orders.length > 0 && <p className="text-xs text-[var(--muted)]">Check each draft, then mark it sent and share it with the supplier.</p>}
       {done.skipped.length > 0 && (
-        <div className="rounded-2xl bg-[var(--genda-tint)] p-3 text-sm space-y-1">
-          <p className="font-semibold text-[var(--genda-text)]">Skipped: no usual supplier</p>
+        <div className="rounded-2xl bg-[var(--scheme-tint)] p-3 text-sm space-y-1">
+          <p className="font-semibold text-[var(--scheme-text)]">Skipped: no usual supplier</p>
           <p className="text-[var(--ink-2)]">{done.skipped.join(", ")}</p>
           <p className="text-xs text-[var(--ink-2)]">
             Set a usual supplier on the product in{" "}

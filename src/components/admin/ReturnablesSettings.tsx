@@ -101,7 +101,7 @@ function ReturnableRow({ r, onEdit, onChanged }: { r: Returnable; onEdit: () => 
           {r.active ? "Turn off" : "Turn on"}
         </button>
       </div>
-      {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+      {error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
     </div>
   );
 }
@@ -143,7 +143,7 @@ function ReturnableForm({ item, onCancel, onSaved }: { item?: Returnable; onCanc
           <input className="input" inputMode="decimal" placeholder="0" value={charge} onChange={(e) => setCharge(e.target.value)} />
         </Field>
       </div>
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       <div className="flex gap-2 justify-end">
         <button type="button" className="btn btn-quiet btn-sm !min-h-[44px]" onClick={onCancel} disabled={busy}>
           Cancel

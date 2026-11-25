@@ -16,7 +16,7 @@ export default async function SalesInvoice({ params }: { params: Promise<{ id: s
 
   return (
     <div className="space-y-4">
-      <Link href={back ? `/sales/retailers/${back.id}` : "/sales"} className="inline-block text-sm font-semibold text-[var(--kesar-text)]">
+      <Link href={back ? `/sales/retailers/${back.id}` : "/sales"} className="inline-block text-sm font-semibold text-[var(--accent-text)]">
         ← {back ? back.outletName : "Back"}
       </Link>
       <InvoicePanel id={id} />

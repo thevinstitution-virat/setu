@@ -129,7 +129,7 @@ export default function CountSheet({ count, products, canPost }: { count: Count;
         <span className="block text-[10px] uppercase tracking-wide text-[var(--muted)]">{label}</span>
         <input
           data-count
-          className={`input !py-1.5 !px-2 text-right tabular-nums ${st === "bad" ? "!border-[#a8281e]" : st === "saved" ? "!border-[#2e7d4f]" : ""}`}
+          className={`input !py-1.5 !px-2 text-right tabular-nums ${st === "bad" ? "!border-[var(--risk-text)]" : st === "saved" ? "!border-[#2e7d4f]" : ""}`}
           inputMode={f === "countedQty" ? "numeric" : "decimal"}
           enterKeyHint="next"
           aria-label={`${label}: ${l.name}${l.batch ? ` batch ${l.batch}` : ""}`}
@@ -202,7 +202,7 @@ export default function CountSheet({ count, products, canPost }: { count: Count;
         )}
       </div>
 
-      {err && <p className="text-sm rounded-lg bg-[#fdecea] text-[#a8281e] px-3 py-2">{err}</p>}
+      {err && <p className="text-sm rounded-lg bg-[#fdecea] text-[var(--risk-text)] px-3 py-2">{err}</p>}
 
       <section className="card p-0 overflow-hidden">
         {shown.length ? (
@@ -227,7 +227,7 @@ export default function CountSheet({ count, products, canPost }: { count: Count;
                       .join(" · ")}
                   </p>
                   {l.diffQty !== null && l.diffQty !== 0 && (book || count.status !== "DRAFT") && (
-                    <p className={`text-xs font-semibold ${l.diffQty < 0 ? "text-[#a8281e]" : "text-[#2e7d4f]"}`}>
+                    <p className={`text-xs font-semibold ${l.diffQty < 0 ? "text-[var(--risk-text)]" : "text-[#2e7d4f]"}`}>
                       {l.diffQty < 0 ? `Short ${-l.diffQty}` : `Over ${l.diffQty}`}
                       {l.diffValue ? ` · ${formatINR(Math.abs(l.diffValue))}` : ""}
                     </p>
@@ -260,7 +260,7 @@ export default function CountSheet({ count, products, canPost }: { count: Count;
           <p className="px-4 py-6 text-sm text-[var(--muted)]">{lines.length ? "Nothing matches." : "The sheet is empty: the app had no stock here on that day. Add what you find."}</p>
         )}
         {shown.length > limit && (
-          <button type="button" className="w-full border-t border-[var(--line)] px-4 py-2.5 text-sm font-semibold text-[var(--kesar-text)]" onClick={() => setLimit((n) => n + PAGE)}>
+          <button type="button" className="w-full border-t border-[var(--line)] px-4 py-2.5 text-sm font-semibold text-[var(--accent-text)]" onClick={() => setLimit((n) => n + PAGE)}>
             Show more ({shown.length - limit} left)
           </button>
         )}
@@ -446,7 +446,7 @@ function AddFound({ countId, tracked, products, onClose, onAdded }: { countId: s
           <input className="input text-right" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} />
         </Field>
       </div>
-      {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+      {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
     </Sheet>
   );
 }

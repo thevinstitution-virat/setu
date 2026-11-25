@@ -60,7 +60,7 @@ const BUCKETS = [
   { key: "d0_7", label: "0–7 days", color: "var(--mint)" },
   { key: "d8_15", label: "8–15 days", color: "var(--genda)" },
   { key: "d16_30", label: "16–30 days", color: "var(--kesar)" },
-  { key: "d30p", label: "30+ days", color: "#a8281e" },
+  { key: "d30p", label: "30+ days", color: "var(--risk-text)" },
 ] as const;
 
 const PAGE = 200;
@@ -210,11 +210,11 @@ export default function KhataListPage() {
           <p className="page-sub">Who owes what, how old it is, and who has paid ahead.</p>
         </div>
         <button className="btn btn-outline btn-sm" onClick={downloadCsv} disabled={!shown.length}>
-          <Icon name="upload" className="h-4 w-4 rotate-180" /> Download CSV
+          <Icon name="download" className="h-4 w-4" /> Download CSV
         </button>
       </div>
 
-      {error && <p className="card p-4 text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="card p-4 text-sm text-[var(--risk-text)]">{error}</p>}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Tile icon="book" tint="kesar" label="Total receivable" value={totals ? formatINR(totals.receivable, { whole: true }) : "…"} />
@@ -264,7 +264,7 @@ export default function KhataListPage() {
               key={f.key}
               onClick={() => pickFilter(f.key)}
               className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${
-                filter === f.key ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-black/5 text-foreground/60"
+                filter === f.key ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "bg-black/5 text-foreground/60"
               }`}
             >
               {f.label}
@@ -404,15 +404,15 @@ function ModeChip({ mode }: { mode: "PREPAID" | "POSTPAID" }) {
 function Balance({ r }: { r: Row }) {
   if (r.receivable < 0) {
     return (
-      <span className="font-bold text-[var(--mint-text)]">
+      <span className="font-bold text-[var(--success-text)]">
         {formatINR(-r.receivable)} <span className="text-xs font-semibold">advance</span>
       </span>
     );
   }
   return (
-    <span className={`font-bold ${r.overdue > 0 ? "text-[#a8281e]" : ""}`}>
+    <span className={`font-bold ${r.overdue > 0 ? "text-[var(--risk-text)]" : ""}`}>
       {formatINR(r.receivable)}
-      {r.wallet > 0 && <span className="block text-xs font-semibold text-[var(--mint-text)]">Wallet {formatINR(r.wallet)}</span>}
+      {r.wallet > 0 && <span className="block text-xs font-semibold text-[var(--success-text)]">Wallet {formatINR(r.wallet)}</span>}
     </span>
   );
 }
@@ -421,7 +421,7 @@ function Overdue({ r, compact }: { r: Row; compact?: boolean }) {
   if (r.overdue <= 0) return compact ? null : <span className="text-[var(--muted)]">—</span>;
   const days = r.oldestDueDays ?? 0;
   return (
-    <span className="text-[#a8281e] font-semibold">
+    <span className="text-[var(--risk-text)] font-semibold">
       {formatINR(r.overdue, { whole: true })}
       <span className={`${compact ? "ml-1" : "block"} text-xs font-medium`}>
         {days} day{days === 1 ? "" : "s"}
@@ -431,10 +431,10 @@ function Overdue({ r, compact }: { r: Row; compact?: boolean }) {
 }
 
 const TINTS = {
-  kesar: "bg-[var(--kesar-tint)] text-[var(--kesar-text)]",
-  mor: "bg-[#e1eeec] text-mor",
-  mint: "bg-[var(--mint-tint)] text-[var(--mint-text)]",
-  red: "bg-[#fde4e1] text-[#a8281e]",
+  kesar: "bg-[var(--accent-tint)] text-[var(--accent-text)]",
+  mor: "bg-[var(--mor-tint)] text-mor",
+  mint: "bg-[var(--success-tint)] text-[var(--success-text)]",
+  red: "bg-[var(--risk-tint)] text-[var(--risk-text)]",
 };
 
 function Tile({ label, value, icon, tint }: { label: string; value: string; icon: IconName; tint: keyof typeof TINTS }) {

@@ -25,7 +25,7 @@ export default function SoldView({ sale, onNewAction }: { sale: SoldSale; onNewA
         <h1 className="page-title">{sale.shopName}</h1>
         <p className="text-sm text-[var(--muted)] break-all">{sale.orderNumber}</p>
       </div>
-      <p className="flex items-center gap-2 rounded-xl bg-[var(--mint-tint)] text-[var(--mint-text)] p-3 text-sm font-bold">
+      <p className="flex items-center gap-2 rounded-xl bg-[var(--success-tint)] text-[var(--success-text)] p-3 text-sm font-bold">
         <Icon name="check" className="h-4 w-4" /> Sold and delivered
       </p>
 
@@ -48,7 +48,7 @@ export default function SoldView({ sale, onNewAction }: { sale: SoldSale; onNewA
       )}
 
       <div className="space-y-3">
-        <button type="button" className="btn btn-kesar w-full !min-h-[52px]" onClick={onNewAction}>
+        <button type="button" className="btn btn-kesar w-full !min-h-[56px]" onClick={onNewAction}>
           <Icon name="plus" className="h-4 w-4" /> New spot sale
         </button>
         <Link href="/delivery" className="btn btn-outline w-full">

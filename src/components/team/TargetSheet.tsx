@@ -169,7 +169,7 @@ export default function TargetSheet({
                     setMetric(m);
                   }}
                   className={`min-h-[44px] rounded-xl px-3 text-sm font-bold transition ${
-                    metric === m ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-ink/5 text-[var(--ink-2)]"
+                    metric === m ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "bg-ink/5 text-[var(--ink-2)]"
                   }`}
                 >
                   {METRIC_LABEL[m]}
@@ -196,7 +196,7 @@ export default function TargetSheet({
                     aria-checked={scope === k}
                     onClick={() => setScope(k)}
                     className={`min-h-[44px] rounded-xl px-3 text-sm font-bold transition ${
-                      scope === k ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-ink/5 text-[var(--ink-2)]"
+                      scope === k ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "bg-ink/5 text-[var(--ink-2)]"
                     }`}
                   >
                     {label}

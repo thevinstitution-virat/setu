@@ -39,7 +39,7 @@ export function CancelPayment({ id, cheque }: { id: string; cheque: boolean }) {
             Cheque bounced or stopped
           </button>
         )}
-        <button type="button" className="btn btn-quiet btn-xs text-[#a8281e]" onClick={() => setMode("cancel")}>
+        <button type="button" className="btn btn-quiet btn-xs text-[var(--risk-text)]" onClick={() => setMode("cancel")}>
           Cancel payment
         </button>
       </div>
@@ -50,7 +50,7 @@ export function CancelPayment({ id, cheque }: { id: string; cheque: boolean }) {
       <p className="text-sm font-semibold">{mode === "bounce" ? "Our cheque bounced or was stopped" : "Cancel this payment"}</p>
       <p className="text-xs text-[var(--muted)]">The entry is reversed and the bills it paid are open again.</p>
       <input className="input" placeholder="Why?" value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} />
-      {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+      {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
       <div className="flex justify-end gap-2">
         <button type="button" className="btn btn-quiet btn-xs" onClick={() => setMode(null)}>
           Back
@@ -104,7 +104,7 @@ export function ClearCheque({ id }: { id: string }) {
       <button type="button" className="btn btn-quiet btn-xs" onClick={() => setOpen(false)}>
         Back
       </button>
-      {err && <p className="w-full text-xs text-[#a8281e]">{err}</p>}
+      {err && <p className="w-full text-xs text-[var(--risk-text)]">{err}</p>}
     </div>
   );
 }

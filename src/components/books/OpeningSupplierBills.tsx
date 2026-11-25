@@ -109,7 +109,7 @@ export default function OpeningSupplierBills({ supplierId, name }: { supplierId:
       <p className="text-sm">
         Still to pay on these bills: <span className="font-bold tabular-nums">{formatINR(Math.max(0, dues))}</span>
       </p>
-      {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+      {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
       <div className="flex justify-end gap-2">
         <button type="button" className="btn btn-quiet btn-sm" onClick={() => setOpen(false)}>
           Cancel

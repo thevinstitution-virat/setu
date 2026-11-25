@@ -75,7 +75,7 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
                 key={x.key}
                 href={`/admin/books/payables${href.toString() ? `?${href}` : ""}`}
                 aria-current={on ? "page" : undefined}
-                className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold border ${on ? "border-[var(--kesar)] bg-[var(--kesar-tint)] text-[var(--kesar-text)]" : "border-[var(--line)] bg-white/60 text-foreground/70 hover:bg-white"}`}
+                className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold border ${on ? "border-[var(--kesar)] bg-[var(--accent-tint)] text-[var(--accent-text)]" : "border-[var(--line)] bg-white/60 text-foreground/70 hover:bg-white"}`}
               >
                 {x.label}
               </Link>
@@ -143,13 +143,13 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
                   {d.bySupplier.rows.map((s) => (
                     <tr key={s.id} className="hover:bg-black/[0.02]">
                       <td className="px-4 py-2">
-                        <Link href={`/admin/books/suppliers/${s.id}`} className="font-semibold hover:text-[var(--kesar-text)]">
+                        <Link href={`/admin/books/suppliers/${s.id}`} className="font-semibold hover:text-[var(--accent-text)]">
                           {s.name}
                         </Link>
                         <span className="block text-xs text-[var(--muted)]">{s.bills ? `${s.bills} open bill${s.bills === 1 ? "" : "s"}` : "No open bills"}</span>
                       </td>
                       {(["notDue", "d30", "d60", "d90", "older"] as const).map((k) => (
-                        <td key={k} className={`px-3 py-2 text-right tabular-nums ${k !== "notDue" && s[k] ? "text-[#a8281e]" : ""}`}>
+                        <td key={k} className={`px-3 py-2 text-right tabular-nums ${k !== "notDue" && s[k] ? "text-[var(--risk-text)]" : ""}`}>
                           {s[k] ? formatINR(s[k]) : ""}
                         </td>
                       ))}
@@ -226,7 +226,7 @@ export default async function PayablesPage({ searchParams }: { searchParams: Pro
                     <tr key={p.id} className={p.cancelled ? "opacity-50" : ""}>
                       <td className="px-4 py-2 whitespace-nowrap">{showDay(p.date)}</td>
                       <td className="px-4 py-2 whitespace-nowrap">
-                        <Link href={`/admin/books/payments/${p.id}`} className="font-semibold text-[var(--kesar-text)]">
+                        <Link href={`/admin/books/payments/${p.id}`} className="font-semibold text-[var(--accent-text)]">
                           {p.number}
                         </Link>
                         {p.cancelled && <span className="chip !text-[10px] ml-1">Cancelled</span>}
@@ -270,13 +270,13 @@ function BillTable({ bills, pay = false }: { bills: Bill[]; pay?: boolean }) {
           {bills.map((b) => (
             <tr key={b.id} className="hover:bg-black/[0.02]">
               <td className="px-4 py-2">
-                <Link href={`/admin/books/suppliers/${b.supplierId}`} className="hover:text-[var(--kesar-text)]">
+                <Link href={`/admin/books/suppliers/${b.supplierId}`} className="hover:text-[var(--accent-text)]">
                   {b.supplier}
                 </Link>
               </td>
               <td className="px-4 py-2">
                 {b.purchaseBillId ? (
-                  <Link href={`/admin/books/purchases/${b.purchaseBillId}`} className="font-semibold text-[var(--kesar-text)]">
+                  <Link href={`/admin/books/purchases/${b.purchaseBillId}`} className="font-semibold text-[var(--accent-text)]">
                     {b.number}
                   </Link>
                 ) : (
@@ -285,7 +285,7 @@ function BillTable({ bills, pay = false }: { bills: Bill[]; pay?: boolean }) {
                 {b.kind === "OPENING" && <span className="chip !text-[10px] ml-1">Old books</span>}
               </td>
               <td className="px-4 py-2 whitespace-nowrap">{showDay(b.date)}</td>
-              <td className={`px-4 py-2 whitespace-nowrap ${b.late ? "text-[#a8281e] font-semibold" : ""}`}>{showDay(b.dueDate)}</td>
+              <td className={`px-4 py-2 whitespace-nowrap ${b.late ? "text-[var(--risk-text)] font-semibold" : ""}`}>{showDay(b.dueDate)}</td>
               <td className="px-4 py-2 text-right tabular-nums font-semibold">{formatINR(b.left)}</td>
               <td className="px-4 py-2 text-right tabular-nums">{b.late || ""}</td>
               {pay && (

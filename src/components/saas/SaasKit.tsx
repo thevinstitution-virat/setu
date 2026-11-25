@@ -48,8 +48,8 @@ export function fileSize(bytes: number | null | undefined) {
 /** "This is not in your plan" with a link to Billing. */
 export function UpgradeNote({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-[var(--line)] bg-[var(--genda-tint)] p-4 flex items-start gap-3">
-      <Icon name="lock" className="h-5 w-5 shrink-0 mt-0.5 text-[var(--genda-text)]" />
+    <div className="rounded-2xl border border-[var(--line)] bg-[var(--scheme-tint)] p-4 flex items-start gap-3">
+      <Icon name="lock" className="h-5 w-5 shrink-0 mt-0.5 text-[var(--scheme-text)]" />
       <div className="min-w-0 text-sm">
         <p className="font-semibold text-ink">{title}</p>
         {children && <div className="text-[var(--ink-2)] mt-0.5">{children}</div>}
@@ -65,7 +65,7 @@ export function UpgradeNote({ title, children }: { title: string; children?: Rea
 export function ErrorLine({ text }: { text: string | null | undefined }) {
   if (!text) return null;
   return (
-    <p role="alert" className="text-sm text-[#a8281e] flex items-start gap-1.5">
+    <p role="alert" className="text-sm text-[var(--risk-text)] flex items-start gap-1.5">
       <Icon name="alert" className="h-4 w-4 shrink-0 mt-0.5" /> <span className="min-w-0">{text}</span>
     </p>
   );

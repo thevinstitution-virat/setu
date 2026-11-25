@@ -24,7 +24,7 @@ export default function CratesCard() {
   return (
     <section className="card p-4 space-y-2 print:hidden">
       <div className="flex items-center gap-2">
-        <Icon name="box" className="h-4 w-4 text-[var(--kesar-text)]" />
+        <Icon name="box" className="h-4 w-4 text-[var(--accent-text)]" />
         <h2 className="font-bold text-base">Crates &amp; jars with you</h2>
       </div>
       <ul className="divide-y divide-black/5">

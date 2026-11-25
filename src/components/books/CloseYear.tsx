@@ -40,7 +40,7 @@ export default function CloseYear({ to, fy, ready }: { to: string; fy: string; r
         Nothing can be entered or cancelled on or before {showDay(to)} after this; only the owner can open those days again.
         {ready ? "" : " Some steps above are not done yet."}
       </p>
-      {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+      {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
       <div className="flex gap-2">
         <button type="button" className="btn btn-mor btn-sm" disabled={busy} onClick={go}>
           {busy ? "Closing…" : `Yes, close up to ${showDay(to)}`}

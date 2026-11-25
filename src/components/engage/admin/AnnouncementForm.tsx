@@ -191,7 +191,7 @@ export default function AnnouncementForm({
               Send <b>“{f.title.trim()}”</b> to <b>{plural(confirm, "person", "people")}</b> now
               {chosenChannels.length ? ` in the app and on ${chosenChannels.join(", ")}` : " in the app only"}? It goes out once and can&apos;t be called back.
             </p>
-            {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+            {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" className="btn btn-quiet btn-sm" disabled={!!busy} onClick={() => setConfirm(null)}>
                 Not yet
@@ -203,15 +203,15 @@ export default function AnnouncementForm({
           </div>
         ) : (
           <div className="space-y-2">
-            {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+            {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
             <div className="flex flex-wrap items-center gap-2">
               {current && !locked && (
-                <button type="button" className="btn btn-quiet btn-sm text-[#a8281e]" disabled={!!busy} onClick={remove}>
+                <button type="button" className="btn btn-quiet btn-sm text-[var(--risk-text)]" disabled={!!busy} onClick={remove}>
                   <Icon name="trash" className="h-4 w-4" /> {busy === "delete" ? "Deleting…" : "Delete draft"}
                 </button>
               )}
               {locked && state !== "ended" && (
-                <button type="button" className="btn btn-quiet btn-sm text-[#a8281e]" disabled={!!busy} onClick={end}>
+                <button type="button" className="btn btn-quiet btn-sm text-[var(--risk-text)]" disabled={!!busy} onClick={end}>
                   {busy === "end" ? "Ending…" : "End now"}
                 </button>
               )}
@@ -231,7 +231,7 @@ export default function AnnouncementForm({
       }
     >
       {locked && current && (
-        <div className="rounded-2xl bg-[var(--mint-tint)] p-4 text-sm text-[var(--mint-text)] space-y-1">
+        <div className="rounded-2xl bg-[var(--success-tint)] p-4 text-sm text-[var(--success-text)] space-y-1">
           <p className="font-bold">
             <Icon name="check" className="inline h-4 w-4 mr-1 -mt-0.5" />
             Sent {shortDate(current.publishedAt, true)} to {plural(current.sentCount, "person", "people")}
@@ -284,7 +284,7 @@ export default function AnnouncementForm({
                     aria-checked={on}
                     onClick={() => set("audience", a.key)}
                     className={`rounded-xl p-2.5 sm:p-3 text-left transition border min-w-0 ${
-                      on ? "bg-gradient-to-br from-mor to-[#0c3634] text-white border-transparent" : "bg-white/70 border-[var(--line)]"
+                      on ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white border-transparent" : "bg-white/70 border-[var(--line)]"
                     }`}
                   >
                     <span className="block text-sm font-bold">{a.label}</span>
@@ -369,7 +369,7 @@ export default function AnnouncementForm({
           })}
         </div>
         {f.audience !== "RETAILERS" && (
-          <p className={`text-xs ${staffNote ? "font-semibold text-[var(--genda-text)]" : "text-[var(--muted)]"}`}>Staff get push only, never WhatsApp or SMS.</p>
+          <p className={`text-xs ${staffNote ? "font-semibold text-[var(--scheme-text)]" : "text-[var(--muted)]"}`}>Staff get push only, never WhatsApp or SMS.</p>
         )}
         {f.channels.includes("sms") && f.audience !== "STAFF" && <p className="text-xs text-[var(--muted)]">SMS costs money per message and shops who muted offers get it in the app only.</p>}
       </section>

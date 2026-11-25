@@ -88,7 +88,7 @@ export default function BanksManager({ banks, kinds, canSetup }: { banks: BankVi
               </div>
               <Link href={b.ledgerHref} className="shrink-0 text-right">
                 <span className="block text-sm font-bold tabular-nums text-[var(--ink)]">{drcr(b.balance)}</span>
-                <span className="text-[11px] text-[var(--kesar-text)]">Ledger</span>
+                <span className="text-[11px] text-[var(--accent-text)]">Ledger</span>
               </Link>
             </div>
             {canSetup && (
@@ -113,7 +113,7 @@ export default function BanksManager({ banks, kinds, canSetup }: { banks: BankVi
                 )}
               </div>
             )}
-            {rowErr?.id === b.id && <p className="text-xs text-[#a8281e]">{rowErr.text}</p>}
+            {rowErr?.id === b.id && <p className="text-xs text-[var(--risk-text)]">{rowErr.text}</p>}
           </li>
         ))}
       </ul>
@@ -170,7 +170,7 @@ export default function BanksManager({ banks, kinds, canSetup }: { banks: BankVi
                 <input type="checkbox" checked={form.makeDefault} onChange={(e) => setForm({ ...form, makeDefault: e.target.checked })} /> Make this the default bank
               </label>
             )}
-            {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+            {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
           </div>
         </Sheet>
       )}

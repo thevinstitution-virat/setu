@@ -164,7 +164,7 @@ export function setQuery(path: string) {
   }
 }
 
-export const errorText = "text-sm text-[#a8281e]";
+export const errorText = "text-sm text-[var(--risk-text)]";
 
 // ───────────────────────────── pickers ─────────────────────────────
 

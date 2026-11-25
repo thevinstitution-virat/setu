@@ -25,7 +25,7 @@ const DOT: Record<Exclude<Mark, null>, string> = {
   late: "bg-[var(--kesar)]",
   leave: "bg-[var(--genda)]",
   "leave-pending": "border-2 border-[var(--genda)]",
-  absent: "bg-[#a8281e]",
+  absent: "bg-[var(--risk-text)]",
 };
 
 const LEGEND: [Exclude<Mark, null>, string][] = [
@@ -130,7 +130,7 @@ function MonthBody({ month, userId }: { month: string; userId?: string }) {
                   type="button"
                   onClick={() => setPicked(active ? null : day)}
                   className={`flex flex-col items-center justify-center gap-1 rounded-xl min-h-[44px] text-sm transition ${
-                    active ? "bg-ink text-white" : isToday ? "bg-[var(--mint-tint)] font-bold" : "hover:bg-black/[0.04]"
+                    active ? "bg-ink text-white" : isToday ? "bg-[var(--success-tint)] font-bold" : "hover:bg-black/[0.04]"
                   } ${day > today ? "opacity-50" : ""}`}
                   aria-label={`${dayText(day, true)}${m ? `: ${LEGEND.find((x) => x[0] === m)?.[1]}` : ""}`}
                   aria-pressed={active}

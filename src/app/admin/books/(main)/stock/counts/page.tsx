@@ -33,7 +33,7 @@ export default async function CountsPage() {
                 <Link href={`/admin/books/stock/counts/${c.id}`} className="flex items-start justify-between gap-3 px-4 py-2.5 hover:bg-black/[0.02]">
                   <span className="min-w-0">
                     <span className="text-sm">
-                      <span className="font-semibold text-[var(--kesar-text)]">{c.number}</span>
+                      <span className="font-semibold text-[var(--accent-text)]">{c.number}</span>
                       <span className={`chip !text-[10px] ml-1.5 ${c.status === "ACCEPTED" ? "chip-mint" : ""}`}>{c.statusLabel}</span>
                     </span>
                     <span className="block text-sm text-[var(--ink)] truncate">{c.what}</span>

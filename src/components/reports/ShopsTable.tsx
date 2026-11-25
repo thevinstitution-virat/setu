@@ -7,9 +7,9 @@ import type { ChurnRisk, RetailerRow } from "@/lib/analytics";
 
 const RISK: Record<ChurnRisk, { label: string; cls: string; icon: string }> = {
   high: { label: "At risk", cls: "bg-[#fde2df] text-[#8f1f15]", icon: "▼" },
-  medium: { label: "Slipping", cls: "bg-[var(--genda-tint)] text-[var(--genda-text)]", icon: "◆" },
-  low: { label: "Regular", cls: "bg-[var(--mint-tint)] text-[var(--mint-text)]", icon: "●" },
-  new: { label: "New", cls: "bg-[#e1eeec] text-mor", icon: "★" },
+  medium: { label: "Slipping", cls: "bg-[var(--scheme-tint)] text-[var(--scheme-text)]", icon: "◆" },
+  low: { label: "Regular", cls: "bg-[var(--success-tint)] text-[var(--success-text)]", icon: "●" },
+  new: { label: "New", cls: "bg-[var(--mor-tint)] text-mor", icon: "★" },
   none: { label: "No orders yet", cls: "bg-black/5 text-foreground/60", icon: "○" },
 };
 const FILTERS: ("all" | ChurnRisk)[] = ["all", "high", "medium", "low", "new", "none"];
@@ -54,7 +54,7 @@ export default function ShopsTable({ rows, counts, query }: { rows: RetailerRow[
         </div>
         <div className="flex gap-1.5 overflow-x-auto pb-1">
           {FILTERS.map((f) => (
-            <button key={f} onClick={() => setFilter(f)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${filter === f ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-black/5 text-foreground/60"}`}>
+            <button key={f} onClick={() => setFilter(f)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${filter === f ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "bg-black/5 text-foreground/60"}`}>
               {f === "all" ? "All" : RISK[f].label}
               <span className="ml-1 opacity-70">{f === "all" ? rows.length : counts[f]}</span>
             </button>
@@ -90,7 +90,7 @@ export default function ShopsTable({ rows, counts, query }: { rows: RetailerRow[
             {shown.map((r) => (
               <tr key={r.retailerId} className="hover:bg-black/[0.02]">
                 <td className="px-4 py-2.5">
-                  <Link href={`/admin/reports/shops/${r.retailerId}${query}`} className="font-medium text-[var(--ink)] hover:text-[var(--kesar-text)]">
+                  <Link href={`/admin/reports/shops/${r.retailerId}${query}`} className="font-medium text-[var(--ink)] hover:text-[var(--accent-text)]">
                     {r.outletName}
                   </Link>
                   <span className="block text-xs text-[var(--muted)]">
@@ -101,7 +101,7 @@ export default function ShopsTable({ rows, counts, query }: { rows: RetailerRow[
                 <td className="px-2 py-2.5 text-right tabular-nums">{r.orders}</td>
                 <td className="px-2 py-2.5 text-right tabular-nums">{rs(r.value)}</td>
                 <td className="px-2 py-2.5 text-right tabular-nums">{r.orders ? rs(r.avgOrder) : "–"}</td>
-                <td className={`px-2 py-2.5 text-right tabular-nums ${r.change === null ? "text-[var(--muted)]" : r.change < 0 ? "text-[#a8281e]" : "text-[var(--mint-text)]"}`}>{r.change === null ? "–" : `${r.change > 0 ? "+" : ""}${r.change}%`}</td>
+                <td className={`px-2 py-2.5 text-right tabular-nums ${r.change === null ? "text-[var(--muted)]" : r.change < 0 ? "text-[var(--risk-text)]" : "text-[var(--success-text)]"}`}>{r.change === null ? "–" : `${r.change > 0 ? "+" : ""}${r.change}%`}</td>
                 <td className="px-2 py-2.5 text-right tabular-nums">{r.usualGap === null ? "–" : `${r.usualGap} d`}</td>
                 <td className="px-2 py-2.5 text-right tabular-nums">{r.daysSince === null ? "–" : r.daysSince === 0 ? "Today" : `${r.daysSince} d ago`}</td>
                 <td className="px-2 py-2.5">

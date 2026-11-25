@@ -166,7 +166,7 @@ export default function MessagesPage() {
             ))}
           </ul>
         ))}
-      {moreError && <p className="text-sm text-[#a8281e]">{moreError}</p>}
+      {moreError && <p className="text-sm text-[var(--risk-text)]">{moreError}</p>}
       {data && more && (
         <button type="button" className="btn btn-quiet btn-sm" disabled={loadingMore} onClick={loadMore}>
           {loadingMore ? "Loading…" : "Show older"}
@@ -197,12 +197,12 @@ function ChannelCards({ data }: { data: Data }) {
                 <span>
                   <b>{n("SENT")}</b> sent
                 </span>
-                <span className={n("FAILED") ? "text-[#a8281e]" : ""}>
+                <span className={n("FAILED") ? "text-[var(--risk-text)]" : ""}>
                   <b>{n("FAILED")}</b> failed
                 </span>
                 <span className="text-[var(--muted)]">{n("LOGGED")} only logged</span>
                 <span className="text-[var(--muted)]">{n("SKIPPED")} skipped</span>
-                {n("QUEUED") > 0 && <span className="text-[var(--genda-text)]">{n("QUEUED")} waiting</span>}
+                {n("QUEUED") > 0 && <span className="text-[var(--scheme-text)]">{n("QUEUED")} waiting</span>}
               </div>
             </div>
           );
@@ -250,7 +250,7 @@ function MessageRow({ m, onRetried }: { m: Message; onRetried: () => void }) {
       {m.title && <p className="text-sm font-semibold break-words">{m.title}</p>}
       <p className="text-sm text-[var(--ink-2)] break-words line-clamp-3">{m.body}</p>
       {(m.error || m.status === "FAILED") && (
-        <p className={`text-xs break-words ${m.status === "FAILED" ? "text-[#a8281e]" : "text-[var(--muted)]"}`}>
+        <p className={`text-xs break-words ${m.status === "FAILED" ? "text-[var(--risk-text)]" : "text-[var(--muted)]"}`}>
           {m.error ?? s?.hint}
           {m.attempts > 0 && ` · ${plural(m.attempts, "try", "tries")}`}
         </p>
@@ -260,7 +260,7 @@ function MessageRow({ m, onRetried }: { m: Message; onRetried: () => void }) {
           <button type="button" className="btn btn-outline btn-xs" disabled={busy} onClick={retry}>
             {busy ? "Sending…" : "Send again"}
           </button>
-          {error && <span className="text-xs text-[#a8281e]">{error}</span>}
+          {error && <span className="text-xs text-[var(--risk-text)]">{error}</span>}
         </div>
       )}
     </div>
@@ -293,7 +293,7 @@ function TestPush({ onDone }: { onDone: (msg: string) => void }) {
       <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={go}>
         <Icon name="bell" className="h-4 w-4" /> {busy ? "Sending…" : "Send me a test push"}
       </button>
-      {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+      {error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
     </div>
   );
 }

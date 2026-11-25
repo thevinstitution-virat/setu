@@ -45,11 +45,11 @@ export default function SalesToday() {
           href={`/sales/retailers/${open.retailerId}`}
           className="card p-4 flex items-center gap-3 min-h-[64px] border-2 !border-[var(--kesar)] hover:-translate-y-0.5 transition"
         >
-          <span className="icon-tile bg-[var(--kesar-tint)] text-[var(--kesar-text)]">
+          <span className="icon-tile bg-[var(--accent-tint)] text-[var(--accent-text)]">
             <Icon name="pin" />
           </span>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--kesar-text)]">In a shop now</p>
+            <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--accent-text)]">In a shop now</p>
             <p className="font-bold text-sm truncate">{open.retailer.outletName}</p>
             <p className="text-xs text-[var(--muted)]">Since {clock(open.checkInAt)}. Check out before the next shop.</p>
           </div>
@@ -95,13 +95,13 @@ export default function SalesToday() {
 
       <div className="grid grid-cols-2 gap-3">
         <Link href="/sales/stores" className="card p-4 flex items-center gap-3 min-h-[64px]">
-          <span className="icon-tile bg-[var(--mint-tint)] text-[var(--mint-text)]">
+          <span className="icon-tile bg-[var(--success-tint)] text-[var(--success-text)]">
             <Icon name="plus" />
           </span>
           <span className="font-bold text-sm">New shop</span>
         </Link>
         <Link href="/sales/targets" className="card p-4 flex items-center gap-3 min-h-[64px]">
-          <span className="icon-tile bg-[var(--genda-tint)] text-[var(--genda-text)]">
+          <span className="icon-tile bg-[var(--scheme-tint)] text-[var(--scheme-text)]">
             <Icon name="chart" />
           </span>
           <span className="font-bold text-sm">Targets</span>

@@ -121,7 +121,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
                     <tr key={d.id} className={`hover:bg-black/[0.02] ${d.cancelled ? "opacity-50" : ""}`}>
                       <td className="px-4 py-2 whitespace-nowrap">{showDay(d.date)}</td>
                       <td className="px-4 py-2 whitespace-nowrap">
-                        <Link href={`/admin/books/purchases/${d.id}`} className="font-semibold text-[var(--kesar-text)]">
+                        <Link href={`/admin/books/purchases/${d.id}`} className="font-semibold text-[var(--accent-text)]">
                           {d.number}
                         </Link>
                         {d.cancelled && <span className="chip !text-[10px] ml-1">Cancelled</span>}
@@ -131,7 +131,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Pr
                         {d.reverseCharge && <span className="chip !text-[10px] ml-1">RCM</span>}
                       </td>
                       <td className="px-4 py-2">
-                        <Link href={`/admin/books/suppliers/${d.supplierId}`} className="hover:text-[var(--kesar-text)]">
+                        <Link href={`/admin/books/suppliers/${d.supplierId}`} className="hover:text-[var(--accent-text)]">
                           {d.supplier}
                         </Link>
                       </td>

@@ -25,7 +25,7 @@ function NumberSetting({ label, hint, value, min, max, unit, disabled, onSave }:
       </span>
       <span className="flex shrink-0 items-center gap-1.5">
         <input
-          className={`input !w-24 !py-1.5 text-right tabular-nums ${bad ? "!border-[#a8281e]" : ""}`}
+          className={`input !w-24 !py-1.5 text-right tabular-nums ${bad ? "!border-[var(--risk-text)]" : ""}`}
           inputMode="numeric"
           value={text}
           disabled={disabled}
@@ -52,7 +52,7 @@ function CapSetting({ value, disabled, onSave }: { value: number | null; disable
         <span className="block text-xs text-[var(--muted)]">Credits; empty = no cap. At the cap, features use their rules.</span>
       </span>
       <input
-        className={`input !w-24 !py-1.5 text-right tabular-nums ${bad ? "!border-[#a8281e]" : ""}`}
+        className={`input !w-24 !py-1.5 text-right tabular-nums ${bad ? "!border-[var(--risk-text)]" : ""}`}
         inputMode="numeric"
         value={text}
         disabled={disabled}
@@ -127,13 +127,13 @@ export default function AutomationSettingsPage() {
     <div className="space-y-5">
       <div className="page-head">
         <div className="min-w-0">
-          <Link href="/admin/settings" className="text-xs font-bold text-[var(--kesar-text)]">
+          <Link href="/admin/settings" className="text-xs font-bold text-[var(--accent-text)]">
             ← Settings
           </Link>
           <h1 className="page-title">Automation</h1>
           <p className="page-sub">
             Plain maths on your own records, every morning at 6 (credit review on Mondays). Each one writes{" "}
-            <Link href="/admin/suggestions" className="font-bold text-[var(--kesar-text)]">
+            <Link href="/admin/suggestions" className="font-bold text-[var(--accent-text)]">
               suggestions
             </Link>{" "}
             that someone accepts or rejects. Nothing that touches money or prices happens by itself.
@@ -144,7 +144,7 @@ export default function AutomationSettingsPage() {
             Run now
           </button>
           {openTotal > 0 && (
-            <Link href="/admin/suggestions" className="text-xs font-bold text-[var(--kesar-text)]">
+            <Link href="/admin/suggestions" className="text-xs font-bold text-[var(--accent-text)]">
               {openTotal} to decide →
             </Link>
           )}
@@ -210,7 +210,7 @@ export default function AutomationSettingsPage() {
             <h2 className="font-heading font-bold">Trip planning</h2>
             <p className="text-xs text-[var(--muted)]">
               On{" "}
-              <Link href="/admin/dispatch" className="font-bold text-[var(--kesar-text)]">
+              <Link href="/admin/dispatch" className="font-bold text-[var(--accent-text)]">
                 Dispatch
               </Link>
               , &ldquo;Plan trips&rdquo; splits the day&apos;s ready orders across the free drivers, one side of town each, in route order.
@@ -223,7 +223,7 @@ export default function AutomationSettingsPage() {
             <h2 className="font-heading font-bold">Demand forecast</h2>
             <p className="text-xs text-[var(--muted)]">
               From 8 weeks of orders:{" "}
-              <Link href="/admin/stock/forecast" className="font-bold text-[var(--kesar-text)]">
+              <Link href="/admin/stock/forecast" className="font-bold text-[var(--accent-text)]">
                 the load sheet
               </Link>{" "}
               for tomorrow, and each morning one reorder suggestion per supplier (a draft purchase order once accepted). Needs stock tracking for reorders.
@@ -259,7 +259,7 @@ export default function AutomationSettingsPage() {
             <h2 className="font-heading font-bold">Ask your business</h2>
             <p className="text-xs text-[var(--muted)]">
               On{" "}
-              <Link href="/admin/reports/ask" className="font-bold text-[var(--kesar-text)]">
+              <Link href="/admin/reports/ask" className="font-bold text-[var(--accent-text)]">
                 Reports → Ask
               </Link>
               , ask in Hindi or English: &ldquo;who owes more than 20,000 for over 30 days?&rdquo;. Answers come from your reports, never made up.
@@ -293,7 +293,7 @@ export default function AutomationSettingsPage() {
             <h2 className="font-heading font-bold">Shelf audits</h2>
             <p className="text-xs text-[var(--muted)]">
               At a visit, sales agents photograph the shop&apos;s shelf and save our facings, other brands&apos; and empty slots. With AI the counts are filled from the photo for the agent to check. See{" "}
-              <Link href="/admin/reports/shelf" className="font-bold text-[var(--kesar-text)]">
+              <Link href="/admin/reports/shelf" className="font-bold text-[var(--accent-text)]">
                 Reports → Shelf
               </Link>
               .
@@ -327,7 +327,7 @@ export default function AutomationSettingsPage() {
                           {r.trigger === "manual" && <span className="text-xs text-[var(--muted)]"> · by hand</span>}
                         </td>
                         <td className="px-4 py-2 text-right tabular-nums">{r.made}</td>
-                        <td className={`px-4 py-2 text-xs ${r.error ? "text-[#a8281e]" : "text-[var(--muted)]"}`}>{r.error ?? (r.finishedAt ? "Done" : "Running")}</td>
+                        <td className={`px-4 py-2 text-xs ${r.error ? "text-[var(--risk-text)]" : "text-[var(--muted)]"}`}>{r.error ?? (r.finishedAt ? "Done" : "Running")}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -344,12 +344,12 @@ export default function AutomationSettingsPage() {
             </p>
             <p className="text-xs text-[var(--muted)]">
               Provider cost {formatINR(data.ai.costPaise)}. Used by{" "}
-              <Link href="/admin/products/assist" className="font-bold text-[var(--kesar-text)]">
+              <Link href="/admin/products/assist" className="font-bold text-[var(--accent-text)]">
                 catalogue assist
               </Link>
               ; the automations above are plain maths and use none.
             </p>
-            <p className={`rounded-xl px-3 py-2 text-xs ${data.ai.available ? "bg-[var(--mint-tint)]" : "bg-ink/5"}`} role="status">
+            <p className={`rounded-xl px-3 py-2 text-xs ${data.ai.available ? "bg-[var(--success-tint)]" : "bg-ink/5"}`} role="status">
               {data.ai.available ? `On${data.ai.model ? ` (${data.ai.model})` : ""}.` : data.ai.message}
             </p>
             <Toggle checked={data.ai.settings.on} disabled={busy} onChange={(v) => saveAi({ on: v })} label="Use AI where the plan allows" hint="Off: catalogue assist uses its built-in rules only." />

@@ -116,7 +116,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
                     </td>
                     <td className="px-4 py-2 text-[var(--ink-2)]">
                       {x.href ? (
-                        <Link href={x.href} className="hover:text-[var(--kesar-text)]">
+                        <Link href={x.href} className="hover:text-[var(--accent-text)]">
                           {x.against}
                         </Link>
                       ) : (

@@ -118,7 +118,7 @@ export default function StockSettings({ inventory }: { inventory: InventorySetti
                   aria-checked={f.orderCheck === v}
                   onClick={() => set("orderCheck", v)}
                   className={`flex-1 min-h-[44px] rounded-xl py-2 px-2 text-sm font-bold transition ${
-                    f.orderCheck === v ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "text-[var(--ink-2)]"
+                    f.orderCheck === v ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "text-[var(--ink-2)]"
                   }`}
                 >
                   {label}
@@ -164,11 +164,11 @@ export default function StockSettings({ inventory }: { inventory: InventorySetti
         <div className="card p-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm min-w-0">
             {error ? (
-              <span className="text-[#a8281e]">{error}</span>
+              <span className="text-[var(--risk-text)]">{error}</span>
             ) : dirty ? (
               <span className="text-[var(--ink-2)]">Unsaved stock changes.</span>
             ) : savedAt ? (
-              <span className="text-[var(--mint-text)] inline-flex items-center gap-1.5">
+              <span className="text-[var(--success-text)] inline-flex items-center gap-1.5">
                 <Icon name="check" className="h-4 w-4" />
                 Saved at {savedAt.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
               </span>

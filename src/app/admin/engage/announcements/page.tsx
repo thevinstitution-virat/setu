@@ -99,7 +99,7 @@ export default function AnnouncementsPage() {
                     {shortDate(a.startsAt, true)} → {a.endsAt ? shortDate(a.endsAt, true) : "no end"}
                   </span>
                   {a.publishedAt ? (
-                    <span className="text-[var(--mint-text)] font-semibold">Sent to {plural(a.sentCount, "person", "people")}</span>
+                    <span className="text-[var(--success-text)] font-semibold">Sent to {plural(a.sentCount, "person", "people")}</span>
                   ) : (
                     <span>Not sent yet{a.createdBy ? ` · by ${a.createdBy.name}` : ""}</span>
                   )}

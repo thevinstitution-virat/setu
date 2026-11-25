@@ -20,8 +20,24 @@ export function fromPaise(p: Paise): number {
 const inr = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const inrWhole = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
 
-/** 123456 → "₹1,234.56"; whole: true → "₹1,235". */
-export function formatINR(p: Paise, opts?: { whole?: boolean; symbol?: boolean }): string {
+/**
+ * 123456 → "₹1,234.56"; whole: true → "₹1,235".
+ * compact: true → "₹4.82L" / "₹1.2Cr" / "₹12.4k" for cards and tiles (Indian units);
+ * amounts under ₹1,000 stay whole, and detail views and tables should not use it.
+ */
+export function formatINR(p: Paise, opts?: { whole?: boolean; symbol?: boolean; compact?: boolean }): string {
+  if (opts?.compact) {
+    const r = p / 100;
+    const abs = Math.abs(r);
+    const sign = r < 0 ? "-" : "";
+    const trim = (n: number, d: number) => n.toFixed(d).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+    let body: string;
+    if (abs >= 1e7) body = `${trim(abs / 1e7, 2)}Cr`;
+    else if (abs >= 1e5) body = `${trim(abs / 1e5, 2)}L`;
+    else if (abs >= 1e4) body = `${trim(abs / 1e3, 1)}k`;
+    else body = inrWhole.format(abs);
+    return opts.symbol === false ? `${sign}${body}` : `${sign}₹${body}`;
+  }
   const s = (opts?.whole ? inrWhole : inr).format(p / 100);
   return opts?.symbol === false ? s : `₹${s}`;
 }

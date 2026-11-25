@@ -124,7 +124,7 @@ export default function ImportTool({ only, initial, inBooks = false, purchaseCas
               aria-selected={type === t}
               onClick={() => pickType(t)}
               className={`flex-1 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-bold transition ${
-                type === t ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "text-[var(--ink-2)]"
+                type === t ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "text-[var(--ink-2)]"
               }`}
             >
               {TYPES[t].label}
@@ -138,7 +138,7 @@ export default function ImportTool({ only, initial, inBooks = false, purchaseCas
             (purchaseCases
               ? " By the case: fill cases, loose and case_rate (₹ per case) and leave qty and rate blank; case_size blank = the product's case size. The amount is worked out as the company's bill does it."
               : " To import by the case (cases + rate per case), the owner turns on “Purchase bill sheets by the case” in Settings → Stock.")}{" "}
-          <a className="font-bold text-[var(--kesar-text)] underline" href={`/api/admin/import?type=${type}`}>
+          <a className="font-bold text-[var(--accent-text)] underline" href={`/api/admin/import?type=${type}`}>
             Download template
           </a>
         </p>
@@ -183,7 +183,7 @@ export default function ImportTool({ only, initial, inBooks = false, purchaseCas
             {busy === "commit" ? "Importing…" : "Import now"}
           </button>
         </div>
-        {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+        {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       </div>
 
       {result && (
@@ -218,7 +218,7 @@ export default function ImportTool({ only, initial, inBooks = false, purchaseCas
                 </details>
               )}
               {result.tidy.duplicates.length > 0 && (
-                <div className="rounded-xl bg-[var(--kesar-tint)] p-3 text-sm">
+                <div className="rounded-xl bg-[var(--accent-tint)] p-3 text-sm">
                   <p className="font-bold">Possible duplicates (imported as they are; check them):</p>
                   <ul className="mt-1 space-y-1">
                     {result.tidy.duplicates.map((d, i) => (

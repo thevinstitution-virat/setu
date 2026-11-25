@@ -14,7 +14,7 @@ const td = "px-3 py-2";
 
 function Late({ days }: { days: number }) {
   if (!days) return <span className="text-[var(--muted)]">–</span>;
-  return <span className={days > 30 ? "font-semibold text-[#a8281e]" : days > 15 ? "text-[var(--kesar-text)]" : ""}>{days}</span>;
+  return <span className={days > 30 ? "font-semibold text-[var(--risk-text)]" : days > 15 ? "text-[var(--accent-text)]" : ""}>{days}</span>;
 }
 
 export function BillsTable({ bills, totals }: { bills: DueBill[]; totals: Totals }) {
@@ -42,7 +42,7 @@ export function BillsTable({ bills, totals }: { bills: DueBill[]; totals: Totals
               <td className={`${td} font-medium text-[var(--ink)] whitespace-nowrap`}>{b.number}</td>
               <td className={`${td} whitespace-nowrap`}>{shortDate(b.date)}</td>
               <td className={td}>
-                <Link href={khata(b.shop.id)} className="hover:text-[var(--kesar-text)]">
+                <Link href={khata(b.shop.id)} className="hover:text-[var(--accent-text)]">
                   {b.shop.outletName}
                 </Link>
               </td>
@@ -81,7 +81,7 @@ function Party({ p, showLate }: { p: PartyBlock; showLate?: boolean }) {
     <div className="space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <div>
-          <Link href={khata(s.id)} className="font-heading font-bold text-[var(--ink)] hover:text-[var(--kesar-text)]">
+          <Link href={khata(s.id)} className="font-heading font-bold text-[var(--ink)] hover:text-[var(--accent-text)]">
             {s.outletName}
           </Link>
           <span className="text-sm text-[var(--muted)]"> · {s.area}</span>
@@ -188,7 +188,7 @@ export function CompanyBlocks({ companies, totals }: { companies: CompanyBlock[]
             {companies.map((c) => (
               <tr key={c.key}>
                 <td className={td}>
-                  <a href={`#co-${c.key}`} className="font-medium text-[var(--ink)] hover:text-[var(--kesar-text)]">
+                  <a href={`#co-${c.key}`} className="font-medium text-[var(--ink)] hover:text-[var(--accent-text)]">
                     {c.company}
                   </a>
                 </td>
@@ -239,7 +239,7 @@ export function CompanyBlocks({ companies, totals }: { companies: CompanyBlock[]
                     <td className={`${td} font-medium text-[var(--ink)] whitespace-nowrap`}>{b.number}</td>
                     <td className={`${td} whitespace-nowrap`}>{shortDate(b.date)}</td>
                     <td className={td}>
-                      <Link href={khata(b.shop.id)} className="hover:text-[var(--kesar-text)]">
+                      <Link href={khata(b.shop.id)} className="hover:text-[var(--accent-text)]">
                         {b.shop.outletName}
                       </Link>
                     </td>
@@ -284,7 +284,7 @@ export function CollectionsTable({ rows, totals }: { rows: CollectionRow[]; tota
           {rows.map((r) => (
             <tr key={r.shop.id} className="hover:bg-black/[0.02]">
               <td className={td}>
-                <Link href={khata(r.shop.id)} className="font-medium text-[var(--ink)] hover:text-[var(--kesar-text)]">
+                <Link href={khata(r.shop.id)} className="font-medium text-[var(--ink)] hover:text-[var(--accent-text)]">
                   {r.shop.outletName}
                 </Link>
               </td>

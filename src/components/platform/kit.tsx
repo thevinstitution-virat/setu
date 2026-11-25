@@ -92,7 +92,7 @@ export const paiseToText = (p: number | null | undefined) => (p ? String(p / 100
 // ───────────────────────────── chips ─────────────────────────────
 
 const CHIP = "chip !py-0.5 !px-2 !text-[11.5px]";
-const RED = "!bg-[#fde4e1] !text-[#a8281e] !border-transparent";
+const RED = "!bg-[var(--risk-tint)] !text-[var(--risk-text)] !border-transparent";
 
 const TONES: Record<string, string> = {
   TRIAL: "chip-genda",
@@ -176,8 +176,8 @@ export function ConfirmButton({
     );
   }
   return (
-    <span className="inline-flex flex-wrap items-center gap-2 rounded-xl bg-[#fde4e1]/60 px-2.5 py-1.5">
-      <span className="text-sm font-semibold text-[#a8281e]">{question}</span>
+    <span className="inline-flex flex-wrap items-center gap-2 rounded-xl bg-[var(--risk-tint)]/60 px-2.5 py-1.5">
+      <span className="text-sm font-semibold text-[var(--risk-text)]">{question}</span>
       <button
         type="button"
         className="btn btn-xs btn-danger"
@@ -199,7 +199,7 @@ export function ConfirmButton({
 /** An error line under a form or action. */
 export function ErrLine({ text }: { text: string | null }) {
   if (!text) return null;
-  return <p className="text-sm text-[#a8281e]">{text}</p>;
+  return <p className="text-sm text-[var(--risk-text)]">{text}</p>;
 }
 
 /** Card section with a heading. */
@@ -219,11 +219,11 @@ export function Section({ title, sub, children, right }: { title: string; sub?: 
 }
 
 const KPI_TONES = {
-  kesar: "bg-[var(--kesar-tint)] text-[var(--kesar-text)]",
-  mor: "bg-[#e1eeec] text-[var(--mor)]",
-  genda: "bg-[var(--genda-tint)] text-[var(--genda-text)]",
-  mint: "bg-[var(--mint-tint)] text-[var(--mint-text)]",
-  red: "bg-[#fde4e1] text-[#a8281e]",
+  kesar: "bg-[var(--accent-tint)] text-[var(--accent-text)]",
+  mor: "bg-[var(--mor-tint)] text-[var(--mor)]",
+  genda: "bg-[var(--scheme-tint)] text-[var(--scheme-text)]",
+  mint: "bg-[var(--success-tint)] text-[var(--success-text)]",
+  red: "bg-[var(--risk-tint)] text-[var(--risk-text)]",
   blue: "bg-[#e3eef8] text-[#1f4e79]",
 };
 
@@ -258,7 +258,7 @@ export function Kpi({
         </span>
       </span>
       <span className="text-[22px] sm:text-[28px] font-bold leading-tight num tracking-[-0.02em] truncate">{value}</span>
-      {note != null && <span className={`text-xs sm:text-[13px] ${noteTone === "red" ? "text-[#a8281e]" : "text-[var(--muted)]"}`}>{note}</span>}
+      {note != null && <span className={`text-xs sm:text-[13px] ${noteTone === "red" ? "text-[var(--risk-text)]" : "text-[var(--muted)]"}`}>{note}</span>}
     </>
   );
   const cls = `card p-4 sm:p-[18px] flex flex-col gap-1.5 min-w-0 text-left transition ${href || onClick ? "hover:border-[#c9d3d0]" : ""} ${active ? "!border-[var(--mor)] ring-1 ring-[var(--mor)]" : ""}`;

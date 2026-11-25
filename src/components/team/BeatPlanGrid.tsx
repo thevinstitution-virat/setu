@@ -43,7 +43,7 @@ export default function BeatPlanGrid({
             type="button"
             onClick={() => setEditing(d)}
             className={`rounded-xl border p-2 text-left min-h-[64px] min-w-0 transition hover:shadow ${
-              d.source === "plan" ? "border-[var(--kesar)] bg-[var(--kesar-tint)]" : "border-[var(--line)] bg-white"
+              d.source === "plan" ? "border-[var(--kesar)] bg-[var(--accent-tint)]" : "border-[var(--line)] bg-white"
             }`}
           >
             <p className="text-[11px] font-bold text-[var(--muted)]">{dayLabel(d.date)}</p>
@@ -51,7 +51,7 @@ export default function BeatPlanGrid({
               {d.beat ? d.beat.name : d.source === "plan" ? "No beat" : "Nothing set"}
             </p>
             {d.note && <p className="text-[11px] text-[var(--ink-2)] truncate">{d.note}</p>}
-            {d.source === "plan" && <p className="text-[10.5px] font-bold text-[var(--kesar-text)]">Changed</p>}
+            {d.source === "plan" && <p className="text-[10.5px] font-bold text-[var(--accent-text)]">Changed</p>}
           </button>
         ))}
       </div>
@@ -141,7 +141,7 @@ function DaySheet({
           <label
             key={o.key || "none"}
             className={`flex items-start gap-3 rounded-2xl border p-3 min-h-[44px] cursor-pointer ${
-              choice === o.key ? "border-mor bg-[var(--mint-tint)]" : "border-[var(--line)] bg-white"
+              choice === o.key ? "border-mor bg-[var(--success-tint)]" : "border-[var(--line)] bg-white"
             }`}
           >
             <input

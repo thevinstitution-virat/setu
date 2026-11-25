@@ -38,7 +38,7 @@ export default function CancelVoucher({ id, number }: { id: string; number: stri
       <Field label="Why">
         <input className="input" value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Entered twice" />
       </Field>
-      {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+      {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
       <div className="flex gap-2">
         <button type="button" className="btn btn-danger btn-sm" disabled={busy || reason.trim().length < 3} onClick={go}>
           {busy ? "Cancelling…" : "Cancel voucher"}

@@ -63,11 +63,11 @@ export default async function YearEndPage({ searchParams }: { searchParams: Prom
             <h2 className="font-heading text-xl font-bold text-[var(--ink)]">Close FY {y.fy}</h2>
             <p className="text-sm text-[var(--ink-2)]">
               {y.over ? "Profit for the year" : "Profit so far"}: <span className="font-semibold tabular-nums">{formatINR(y.profit)}</span>{" "}
-              <Link href={`/admin/books/final?${new URLSearchParams({ report: "pl", from: y.from, to: y.over ? y.to : today })}`} className="text-[var(--kesar-text)] underline">
+              <Link href={`/admin/books/final?${new URLSearchParams({ report: "pl", from: y.from, to: y.over ? y.to : today })}`} className="text-[var(--accent-text)] underline">
                 P&amp;L
               </Link>
               {" · "}
-              <Link href={`/admin/books/final?${new URLSearchParams({ report: "bs", to: y.over ? y.to : today })}`} className="text-[var(--kesar-text)] underline">
+              <Link href={`/admin/books/final?${new URLSearchParams({ report: "bs", to: y.over ? y.to : today })}`} className="text-[var(--accent-text)] underline">
                 balance sheet
               </Link>
             </p>
@@ -85,7 +85,7 @@ export default async function YearEndPage({ searchParams }: { searchParams: Prom
                 {s.key === "check" && !s.ok && (
                   <>
                     {" "}
-                    <Link href="/admin/books/check" className="text-[var(--kesar-text)] underline">
+                    <Link href="/admin/books/check" className="text-[var(--accent-text)] underline">
                       Check my books
                     </Link>
                   </>
@@ -93,7 +93,7 @@ export default async function YearEndPage({ searchParams }: { searchParams: Prom
                 {s.key === "count" && !s.ok && y.over && (
                   <>
                     {" "}
-                    <Link href="/admin/books/stock/counts/new" className="text-[var(--kesar-text)] underline">
+                    <Link href="/admin/books/stock/counts/new" className="text-[var(--accent-text)] underline">
                       Start a count
                     </Link>
                   </>

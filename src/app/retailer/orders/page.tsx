@@ -48,7 +48,7 @@ export default async function RetailerOrders() {
                   {o.deliveryDate && <span className="text-[var(--ink-2)]">Delivery {formatDay(o.deliveryDate)}</span>}
                   {o.deliveryDate && o.discountAmount > 0 && " · "}
                   {o.discountAmount > 0 && (
-                    <span className="font-semibold text-[var(--mint-text)]">Saved {formatINR(o.discountAmount)}</span>
+                    <span className="font-semibold text-[var(--success-text)]">Saved {formatINR(o.discountAmount)}</span>
                   )}
                 </p>
               )}

@@ -114,7 +114,7 @@ export default function GstSettleForm({
           <input className="input" value={arn} maxLength={30} onChange={(e) => setArn(e.target.value)} />
         </Field>
       </div>
-      {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+      {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
       <button type="button" className="btn btn-mor btn-sm" disabled={busy || !s} onClick={save}>
         <Icon name="check" className="h-4 w-4" /> {busy ? "Saving…" : cash ? `Settle ${label}: ${formatINR(cash)} paid` : `Settle ${label}`}
       </button>

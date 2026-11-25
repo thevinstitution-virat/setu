@@ -196,7 +196,7 @@ function WordingSheet({ item, onClose, onSaved }: { item: Item; onClose: () => v
       wide
       footer={
         <div className="space-y-2">
-          {(error || (dirty && check)) && <p className="text-sm text-[#a8281e]">{error ?? check}</p>}
+          {(error || (dirty && check)) && <p className="text-sm text-[var(--risk-text)]">{error ?? check}</p>}
           <div className="flex flex-wrap items-center gap-2">
             {own && (
               <button type="button" className="btn btn-quiet btn-sm" disabled={!!busy} onClick={reset}>

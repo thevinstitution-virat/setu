@@ -26,10 +26,10 @@ const SHOW = [
 ] as const;
 
 const STATUS_TONE: Record<ClaimStatus, string> = {
-  RAISED: "bg-[var(--kesar-tint)] text-[var(--kesar-text)]",
-  PART_SETTLED: "bg-[var(--kesar-tint)] text-[var(--kesar-text)]",
+  RAISED: "bg-[var(--accent-tint)] text-[var(--accent-text)]",
+  PART_SETTLED: "bg-[var(--accent-tint)] text-[var(--accent-text)]",
   SETTLED: "bg-emerald-50 text-emerald-800",
-  REJECTED: "bg-red-50 text-[#a8281e]",
+  REJECTED: "bg-red-50 text-[var(--risk-text)]",
   WRITTEN_OFF: "bg-black/5 text-foreground/70",
 };
 
@@ -69,7 +69,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
     return `/admin/books/claims${p.toString() ? `?${p}` : ""}`;
   };
   const pill = (on: boolean) =>
-    `shrink-0 rounded-full px-3 py-1 text-xs font-semibold border ${on ? "border-[var(--kesar)] bg-[var(--kesar-tint)] text-[var(--kesar-text)]" : "border-[var(--line)] bg-white/60 text-foreground/70 hover:bg-white"}`;
+    `shrink-0 rounded-full px-3 py-1 text-xs font-semibold border ${on ? "border-[var(--kesar)] bg-[var(--accent-tint)] text-[var(--accent-text)]" : "border-[var(--line)] bg-white/60 text-foreground/70 hover:bg-white"}`;
 
   return (
     <div className="space-y-4">
@@ -175,7 +175,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
                       </span>
                       <span className="text-right shrink-0">
                         <span className="block tabular-nums font-semibold">{formatINR(c.amount)}</span>
-                        {c.open > 0 && c.open < c.amount && <span className="block text-xs tabular-nums text-[var(--kesar-text)]">{formatINR(c.open)} open</span>}
+                        {c.open > 0 && c.open < c.amount && <span className="block text-xs tabular-nums text-[var(--accent-text)]">{formatINR(c.open)} open</span>}
                         {c.open > 0 && <span className="block text-xs text-[var(--muted)]">{c.age} days</span>}
                       </span>
                     </Link>
@@ -215,7 +215,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
                   {d.pending.companies.map((c) => (
                     <tr key={c.supplierId}>
                       <td className="px-4 py-2">
-                        <Link href={link({ view: null, supplier: c.supplierId })} className="font-semibold hover:text-[var(--kesar-text)]">
+                        <Link href={link({ view: null, supplier: c.supplierId })} className="font-semibold hover:text-[var(--accent-text)]">
                           {c.company}
                         </Link>
                         <span className="block text-xs text-[var(--muted)]">
@@ -223,7 +223,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
                         </span>
                       </td>
                       {(["d30", "d60", "d90", "older"] as const).map((k) => (
-                        <td key={k} className={`px-3 py-2 text-right tabular-nums ${k !== "d30" && c[k] ? "text-[#a8281e]" : ""}`}>
+                        <td key={k} className={`px-3 py-2 text-right tabular-nums ${k !== "d30" && c[k] ? "text-[var(--risk-text)]" : ""}`}>
                           {c[k] ? formatINR(c[k]) : ""}
                         </td>
                       ))}
@@ -253,7 +253,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
                 {d.settled.rows.map((x) => (
                   <li key={x.id} className="flex items-start justify-between gap-3 px-4 py-2.5 text-sm">
                     <span className="min-w-0">
-                      <Link href={`/admin/books/claims/${x.claimId}`} className="font-semibold text-[var(--kesar-text)]">
+                      <Link href={`/admin/books/claims/${x.claimId}`} className="font-semibold text-[var(--accent-text)]">
                         {x.claim}
                       </Link>{" "}
                       <span className="text-[var(--ink-2)]">{x.company}</span>

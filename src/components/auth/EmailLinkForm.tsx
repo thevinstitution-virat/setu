@@ -48,12 +48,12 @@ export default function EmailLinkForm({ text = EMAIL_LINK_EN, hint }: { text?: E
   if (sent) {
     return (
       <div className="space-y-4">
-        <p role="status" className="text-sm rounded-lg bg-[var(--genda-tint)] text-[var(--genda-text)] px-3 py-2">
+        <p role="status" className="text-sm rounded-lg bg-[var(--scheme-tint)] text-[var(--scheme-text)] px-3 py-2">
           {text.sent}
         </p>
         <button
           type="button"
-          className="text-sm text-[var(--kesar-text)] w-full text-center min-h-[44px]"
+          className="text-sm text-[var(--accent-text)] w-full text-center min-h-[44px]"
           onClick={() => {
             setSent(false);
             setEmail("");
@@ -72,7 +72,7 @@ export default function EmailLinkForm({ text = EMAIL_LINK_EN, hint }: { text?: E
         <input className="input" type="email" autoComplete="email" autoCapitalize="none" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
       </label>
       {error && (
-        <p role="alert" className="text-sm text-[#a8281e]">
+        <p role="alert" className="text-sm text-[var(--risk-text)]">
           {error}
         </p>
       )}

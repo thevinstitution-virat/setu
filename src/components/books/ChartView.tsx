@@ -70,7 +70,7 @@ export default function ChartView({ groups, headGroups, canSetup }: { groups: Ch
         </div>
       </div>
       {hiddenCount > 0 && (
-        <button type="button" className="text-xs font-semibold text-[var(--kesar-text)]" onClick={() => setShowHidden((v) => !v)}>
+        <button type="button" className="text-xs font-semibold text-[var(--accent-text)]" onClick={() => setShowHidden((v) => !v)}>
           {showHidden ? "Hide" : "Show"} {hiddenCount} hidden head{hiddenCount === 1 ? "" : "s"} and closed bank{hiddenCount === 1 ? "" : "s"}
         </button>
       )}
@@ -88,7 +88,7 @@ export default function ChartView({ groups, headGroups, canSetup }: { groups: Ch
                   <li key={r.key} className="flex items-center justify-between gap-3 text-sm pl-3">
                     <span className={`min-w-0 truncate ${r.active ? "text-[var(--ink-2)]" : "text-[var(--muted)] line-through"}`}>
                       {r.href ? (
-                        <Link href={r.href} className="hover:text-[var(--kesar-text)]">
+                        <Link href={r.href} className="hover:text-[var(--accent-text)]">
                           {r.name}
                         </Link>
                       ) : (
@@ -152,7 +152,7 @@ export default function ChartView({ groups, headGroups, canSetup }: { groups: Ch
             {edit.id && (
               <Toggle checked={edit.active} onChange={(v) => setEdit({ ...edit, active: v })} label="In use" hint="A hidden head keeps its entries but takes no new ones." />
             )}
-            {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+            {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
           </div>
         </Sheet>
       )}

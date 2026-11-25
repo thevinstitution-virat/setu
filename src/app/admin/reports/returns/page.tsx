@@ -39,7 +39,7 @@ export default async function ReturnsReport({ searchParams }: { searchParams: Pr
             head={["Shop", "Credited", "Sales", "Rate"]}
             align={["l", "r", "r", "r"]}
             rows={r.shops.map((s) => [
-              <Link key={s.retailerId} href={`/admin/reports/shops/${s.retailerId}`} className="hover:text-[var(--kesar-text)]">
+              <Link key={s.retailerId} href={`/admin/reports/shops/${s.retailerId}`} className="hover:text-[var(--accent-text)]">
                 {s.outletName}
               </Link>,
               rs(s.credited),

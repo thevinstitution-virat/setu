@@ -20,7 +20,7 @@ export default function RatePrompt() {
   return (
     <section className="card p-4 space-y-3 border-2 !border-[var(--genda)]">
       <div>
-        <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--genda-text)]">Rate your delivery</p>
+        <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--scheme-text)]">Rate your delivery</p>
         <p className="font-bold text-sm mt-1">
           {o.orderNumber} · {formatINR(o.totalAmount)}
         </p>
@@ -50,7 +50,7 @@ export default function RatePrompt() {
                   {r.orderNumber}
                   <span className="text-xs text-[var(--muted)]"> · {formatINR(r.totalAmount)}</span>
                 </span>
-                <span className="text-xs font-semibold text-[var(--kesar-text)] shrink-0">Rate</span>
+                <span className="text-xs font-semibold text-[var(--accent-text)] shrink-0">Rate</span>
               </Link>
             </li>
           ))}

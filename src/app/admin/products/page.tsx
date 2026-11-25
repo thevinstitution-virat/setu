@@ -167,7 +167,7 @@ function Catalogue() {
           <p className="page-sub">What retailers can order, how it is grouped, its GST, and the banners on their home screen.</p>
         </div>
         <Link href="/admin/products/assist" className="btn btn-quiet btn-sm">
-          <Icon name="star" className="h-4 w-4" /> Catalogue assist
+          <Icon name="sparkle" className="h-4 w-4" /> Catalogue assist
         </Link>
       </div>
       <TabBar tabs={TABS} value={tab} onChange={pick} />
@@ -550,7 +550,7 @@ function ProductForm({
       wide
       footer={
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-[#a8281e] min-w-0">{error}</p>
+          <p className="text-sm text-[var(--risk-text)] min-w-0">{error}</p>
           <div className="flex gap-2 ml-auto">
             <button type="button" className="btn btn-quiet btn-sm" onClick={onClose} disabled={busy}>
               Cancel
@@ -610,7 +610,7 @@ function ProductForm({
           <Field label="MRP ₹">
             <input className="input" inputMode="decimal" value={f.mrp} onChange={(e) => set("mrp", e.target.value)} />
           </Field>
-          <Field label="HSN code" hint={hsnRow ? <span className="text-[var(--mint-text)] font-semibold">GST set by HSN: {hsnRow.gstRate}%</span> : f.hsnCode.trim() ? "Not in your HSN list — pick GST yourself." : undefined}>
+          <Field label="HSN code" hint={hsnRow ? <span className="text-[var(--success-text)] font-semibold">GST set by HSN: {hsnRow.gstRate}%</span> : f.hsnCode.trim() ? "Not in your HSN list — pick GST yourself." : undefined}>
             <input className="input" inputMode="numeric" maxLength={8} value={f.hsnCode} onChange={(e) => set("hsnCode", e.target.value.replace(/\D/g, ""))} />
           </Field>
           <Field label="GST %">
@@ -629,7 +629,7 @@ function ProductForm({
           ) : (
             <span>
               Retailer pays {formatINR(landed!)} with GST and sells at {formatINR(mrp as number)}: margin <MarginText value={hint} />
-              {hint < 0 && <span className="text-[#a8281e]"> — the rate with GST is above MRP.</span>}
+              {hint < 0 && <span className="text-[var(--risk-text)]"> — the rate with GST is above MRP.</span>}
             </span>
           )}
         </div>
@@ -816,7 +816,7 @@ function ProductPhotos({ value, onChange }: { value: string[]; onChange: (v: str
         )}
       </div>
       <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={(e) => add(e.target.files)} />
-      {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+      {error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
     </div>
   );
 }
@@ -978,7 +978,7 @@ function CategoryForm({
 function SaveBar({ error, busy, onCancel, onSave, label }: { error: string | null; busy: boolean; onCancel: () => void; onSave: () => void; label: string }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-sm text-[#a8281e] min-w-0">{error}</p>
+      <p className="text-sm text-[var(--risk-text)] min-w-0">{error}</p>
       <div className="flex gap-2 ml-auto">
         <button type="button" className="btn btn-quiet btn-sm" onClick={onCancel} disabled={busy}>
           Cancel
@@ -1162,7 +1162,7 @@ function HsnTab() {
             <input className="input" maxLength={160} value={description} placeholder="e.g. Biscuits" onChange={(e) => setDescription(e.target.value)} />
           </Field>
         </div>
-        {formError && <p className="text-sm text-[#a8281e]">{formError}</p>}
+        {formError && <p className="text-sm text-[var(--risk-text)]">{formError}</p>}
         <div className="flex gap-2">
           <button type="submit" className="btn btn-kesar btn-sm" disabled={busy}>
             {busy ? "Saving…" : editingCode ? "Save and update products" : "Add code"}
@@ -1331,8 +1331,8 @@ function BannersTab() {
                     )}
                   </div>
                 </div>
-                {confirmDel === b.id && <p className="text-xs text-[#a8281e]">This removes the banner for good. Switch it off instead to keep it for later.</p>}
-                {rowError?.id === b.id && <p className="text-sm text-[#a8281e]">{rowError.message}</p>}
+                {confirmDel === b.id && <p className="text-xs text-[var(--risk-text)]">This removes the banner for good. Switch it off instead to keep it for later.</p>}
+                {rowError?.id === b.id && <p className="text-sm text-[var(--risk-text)]">{rowError.message}</p>}
               </div>
             );
           })}

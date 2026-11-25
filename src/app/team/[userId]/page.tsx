@@ -63,7 +63,7 @@ export default function PersonDayPage({
     <div className="space-y-5">
       <div className="page-head">
         <div className="min-w-0">
-          <Link href={`/team?date=${date}`} className="text-sm font-bold text-[var(--kesar-text)] inline-flex items-center gap-1 min-h-[44px]">
+          <Link href={`/team?date=${date}`} className="text-sm font-bold text-[var(--accent-text)] inline-flex items-center gap-1 min-h-[44px]">
             <Icon name="chevronLeft" className="h-4 w-4" /> Team today
           </Link>
           <p className="page-kick">{track ? roleText(track.user.role) : "Field team"}</p>
@@ -255,7 +255,7 @@ function TimelineRow({ e, last }: { e: Event; last: boolean }) {
         {e.kind === "in" && <p className="text-sm font-semibold">Checked in</p>}
         {e.kind === "out" && <p className="text-sm font-semibold">Checked out</p>}
         {e.kind === "gap" && (
-          <p className="text-sm text-[var(--genda-text)] flex items-center gap-1.5">
+          <p className="text-sm text-[var(--scheme-text)] flex items-center gap-1.5">
             <Icon name="alert" className="h-4 w-4 shrink-0" /> No position for {hoursText(e.minutes)}
           </p>
         )}

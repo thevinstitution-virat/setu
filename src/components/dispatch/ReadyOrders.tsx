@@ -93,7 +93,7 @@ export default function ReadyOrders({
 function OrderRow({ o, date, checked, onToggle }: { o: ReadyOrder; date: string; checked: boolean; onToggle: (on: boolean) => void }) {
   const late = o.deliveryDate && o.deliveryDate < date;
   return (
-    <label className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition ${checked ? "bg-[var(--mint-tint)]" :"hover:bg-black/[0.03]"}`}>
+    <label className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition ${checked ? "bg-[var(--success-tint)]" :"hover:bg-black/[0.03]"}`}>
       <input
         type="checkbox"
         className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--mor)]"
@@ -134,7 +134,7 @@ function OrderRow({ o, date, checked, onToggle }: { o: ReadyOrder; date: string;
 /** Link to the admin orders screen, filtered to one order number. */
 export function OrderLink({ orderNumber, className = "" }: { orderNumber: string; className?: string }) {
   return (
-    <Link href={`/admin/orders?q=${encodeURIComponent(orderNumber)}`} className={`font-semibold text-[var(--kesar-text)] hover:underline ${className}`}>
+    <Link href={`/admin/orders?q=${encodeURIComponent(orderNumber)}`} className={`font-semibold text-[var(--accent-text)] hover:underline ${className}`}>
       {orderNumber}
     </Link>
   );

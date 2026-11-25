@@ -38,7 +38,7 @@ async function upload<T>(fields: Record<string, string | File>): Promise<T> {
 function Errors({ list }: { list: { row: number; message: string }[] }) {
   if (!list.length) return null;
   return (
-    <div className="rounded-lg bg-[#fdecea] px-3 py-2 text-sm text-[#a8281e] space-y-0.5">
+    <div className="rounded-lg bg-[#fdecea] px-3 py-2 text-sm text-[var(--risk-text)] space-y-0.5">
       <p className="font-semibold">Fix these rows in the sheet:</p>
       {list.slice(0, 30).map((e) => (
         <p key={`${e.row}${e.message}`}>
@@ -121,7 +121,7 @@ export function OldTrialBalance({ startOn, canSetup }: { startOn: string | null;
         assets) to add it as a new head. As on the day before the switch.
       </p>
       {busy && <p className="text-sm text-[var(--muted)]">Checking…</p>}
-      {err && <p className="rounded-lg bg-[#fdecea] px-3 py-2 text-sm text-[#a8281e]">{err}</p>}
+      {err && <p className="rounded-lg bg-[#fdecea] px-3 py-2 text-sm text-[var(--risk-text)]">{err}</p>}
       {done && <p className="rounded-lg bg-[#e3f4ec] px-3 py-2 text-sm text-[#1d6b47]">{done}</p>}
       {r && (
         <div className="space-y-3">
@@ -145,7 +145,7 @@ export function OldTrialBalance({ startOn, canSetup }: { startOn: string | null;
                     <tr key={x.row}>
                       <td className="px-3 py-1.5">
                         {x.name}
-                        <span className={`block text-xs ${x.target.kind === "UNMATCHED" ? "text-[#a8281e]" : "text-[var(--muted)]"}`}>
+                        <span className={`block text-xs ${x.target.kind === "UNMATCHED" ? "text-[var(--risk-text)]" : "text-[var(--muted)]"}`}>
                           {x.target.kind === "ACCOUNT"
                             ? `→ ${x.target.name}`
                             : x.target.kind === "NEW"
@@ -245,7 +245,7 @@ export function ParallelRun({ today }: { today: string }) {
         same shop, supplier and product names.
       </p>
       {busy && <p className="text-sm text-[var(--muted)]">Comparing…</p>}
-      {err && <p className="rounded-lg bg-[#fdecea] px-3 py-2 text-sm text-[#a8281e]">{err}</p>}
+      {err && <p className="rounded-lg bg-[#fdecea] px-3 py-2 text-sm text-[var(--risk-text)]">{err}</p>}
       {r && (
         <div className="space-y-3">
           <Errors list={r.errors} />
@@ -287,7 +287,7 @@ export function ParallelRun({ today }: { today: string }) {
                             <td className="px-3 py-1.5">{l.name}</td>
                             <td className="px-2 py-1.5 text-right whitespace-nowrap">{l.here === null ? "Not here" : signed(l.here)}</td>
                             <td className="px-2 py-1.5 text-right whitespace-nowrap">{l.old === null ? "Not in sheet" : signed(l.old)}</td>
-                            <td className={`px-3 py-1.5 text-right whitespace-nowrap ${l.diff ? "text-[#a8281e] font-semibold" : ""}`}>{l.diff ? signed(l.diff) : "–"}</td>
+                            <td className={`px-3 py-1.5 text-right whitespace-nowrap ${l.diff ? "text-[var(--risk-text)] font-semibold" : ""}`}>{l.diff ? signed(l.diff) : "–"}</td>
                           </tr>
                         ))}
                         <tr className="font-semibold">

@@ -5,6 +5,8 @@ import { useState } from "react";
 import type { CatalogueProduct } from "@/lib/pricing";
 import { formatINR } from "@/lib/money";
 import Icon from "@/components/Icon";
+import { Icon3D } from "@/components/icons3d/Icon3D";
+import EmptyState from "@/components/ui/EmptyState";
 import { formatDay, qtyLabel } from "./format";
 import { QtyControl, Sheet, type Cart, type CartEntry, type CartRules, type QuoteJson } from "./shared";
 
@@ -82,7 +84,7 @@ export default function CartReview({
       footer={
         <div className="space-y-2">
           {placeError && (
-            <div className="rounded-xl bg-[#fde4e1] text-[#a8281e] p-3 text-sm font-semibold">
+            <div className="rounded-xl bg-[var(--risk-tint)] text-[var(--risk-text)] p-3 text-sm font-semibold">
               <p>{placeError.message}</p>
               {placeError.status === 402 && forRetailer && (
                 <Link href="/retailer/khata" className="inline-flex items-center gap-1 mt-1 underline">
@@ -95,7 +97,7 @@ export default function CartReview({
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs text-[var(--muted)]">Total with GST</p>
-              <p className={`font-heading font-bold text-xl leading-tight ${fresh ? "" : "opacity-50"}`}>
+              <p className={`font-heading font-bold text-xl leading-tight num ${fresh ? "" : "opacity-50"}`}>
                 {quote ? formatINR(quote.totalAmount) : "…"}
               </p>
             </div>
@@ -104,8 +106,8 @@ export default function CartReview({
                 Check prices again
               </button>
             ) : (
-              <button type="button" className="btn btn-kesar flex-1 max-w-[60%]" disabled={!canPlace} onClick={onPlaceAction}>
-                {placing ? "Placing…" : !fresh ? "Checking prices…" : submitLabel}
+              <button type="button" className="btn btn-kesar btn-lg flex-1 max-w-[62%]" disabled={!canPlace} onClick={onPlaceAction}>
+                {placing ? "Placing…" : !fresh ? "Checking prices…" : `${submitLabel}${quote ? ` · ${formatINR(quote.totalAmount, { whole: true })}` : ""}`}
               </button>
             )}
           </div>
@@ -113,9 +115,43 @@ export default function CartReview({
       }
     >
       {ids.length === 0 ? (
-        <p className="text-sm text-[var(--muted)] text-center py-6">Your cart is empty.</p>
+        <EmptyState icon="empty-cart" title="Your cart is empty" text="Add products from the catalogue to start an order." />
       ) : (
         <div className={`space-y-5 transition-opacity ${fresh ? "" : "opacity-70"}`}>
+          {/* Before anything else: the scheme nudge, minimum-order and credit warnings. */}
+          {/* Nudges */}
+          {quote && (quote.shortBy > 0 || freeDeliveryGap > 0) && (
+            <div className="space-y-1.5">
+              {quote.shortBy > 0 && (
+                <p className="flex items-center gap-2 rounded-[14px] bg-[var(--scheme)] text-[var(--on-scheme)] px-3 py-2.5 text-sm font-bold">
+                  <Icon3D name="gift-box" size={32} />
+                  Add {formatINR(quote.shortBy)} more to order (minimum {formatINR(quote.minOrderValue, { whole: true })} of goods)
+                </p>
+              )}
+              {freeDeliveryGap > 0 && (
+                <p className="rounded-xl bg-[var(--success-tint)] text-[var(--success-text)] px-3 py-2 text-sm font-semibold">
+                  {formatINR(freeDeliveryGap)} more for free delivery
+                </p>
+              )}
+            </div>
+          )}
+
+          {quoteError && <p className="text-sm font-semibold text-[var(--risk-text)]">{quoteError}</p>}
+          {fresh && quote && quote.problems.length > 0 && (
+            <ul className="rounded-xl bg-[var(--risk-tint)] text-[var(--risk-text)] p-3 text-sm space-y-1 list-disc pl-7">
+              {quote.problems.map((m) => (
+                <li key={m}>{m}</li>
+              ))}
+            </ul>
+          )}
+          {fresh && quote && (quote.warnings ?? []).length > 0 && (
+            <ul className="rounded-xl bg-[var(--scheme-tint)] text-[var(--scheme-text)] p-3 text-sm font-semibold space-y-1 list-disc pl-7">
+              {quote.warnings.map((m) => (
+                <li key={m}>{m}</li>
+              ))}
+            </ul>
+          )}
+
           {/* Lines */}
           <div className="divide-y divide-[var(--line)]">
             {ids.map((id) => {
@@ -138,18 +174,18 @@ export default function CartReview({
                         <p className="text-xs text-[var(--muted)] mt-0.5">{formatINR(p.price)} / {p.unit}</p>
                       )}
                       {l && l.discount > 0 && (
-                        <p className="text-xs font-semibold text-[var(--mint-text)] mt-0.5">
+                        <p className="text-xs font-semibold text-[var(--success-text)] mt-0.5">
                           −{formatINR(l.discount)}
                           {l.schemes.length > 0 && ` · ${l.schemes.join(", ")}`}
                         </p>
                       )}
                       {inStock !== undefined && (
-                        <p className="text-xs font-semibold text-[var(--genda-text)] mt-0.5">
+                        <p className="text-xs font-semibold text-[var(--scheme-text)] mt-0.5">
                           {inStock > 0 ? `Only ${inStock} ${p.unit} in stock` : "Out of stock"}
                         </p>
                       )}
                     </div>
-                    <span className="shrink-0 text-sm font-bold">{l ? formatINR(l.total) : "…"}</span>
+                    <span className="shrink-0 text-sm font-bold num">{l ? formatINR(l.total) : "…"}</span>
                   </div>
                   <div className="flex justify-end">
                     <QtyControl product={p} entry={cart[id]} onChangeAction={(e) => onEntryAction(id, e)} />
@@ -161,11 +197,11 @@ export default function CartReview({
 
           {/* Free goods */}
           {quote && quote.free.length > 0 && (
-            <div className="rounded-xl bg-[var(--mint-tint)] p-3 space-y-2">
+            <div className="rounded-xl bg-[var(--success-tint)] p-3 space-y-2">
               {quote.free.map((f) => (
                 <div key={`${f.schemeId}-${f.productId}`} className="flex items-start justify-between gap-3 text-sm">
                   <div className="min-w-0">
-                    <p className="font-semibold text-[var(--mint-text)] break-words">
+                    <p className="font-semibold text-[var(--success-text)] break-words">
                       {f.name} · {f.quantity} {f.unit}
                     </p>
                     <p className="text-xs text-[var(--ink-2)]">
@@ -191,25 +227,9 @@ export default function CartReview({
                       {a.capped && " · limited, the scheme is nearly used up"}
                     </p>
                   </div>
-                  <span className="shrink-0 text-sm font-semibold text-[var(--mint-text)]">Save {formatINR(a.value)}</span>
+                  <span className="shrink-0 text-sm font-semibold text-[var(--success-text)]">Save {formatINR(a.value)}</span>
                 </div>
               ))}
-            </div>
-          )}
-
-          {/* Nudges */}
-          {quote && (quote.shortBy > 0 || freeDeliveryGap > 0) && (
-            <div className="space-y-1.5">
-              {quote.shortBy > 0 && (
-                <p className="rounded-xl bg-[var(--genda-tint)] text-[var(--genda-text)] px-3 py-2 text-sm font-semibold">
-                  Add {formatINR(quote.shortBy)} more to order (minimum {formatINR(quote.minOrderValue, { whole: true })} of goods)
-                </p>
-              )}
-              {freeDeliveryGap > 0 && (
-                <p className="rounded-xl bg-[var(--mint-tint)] text-[var(--mint-text)] px-3 py-2 text-sm font-semibold">
-                  {formatINR(freeDeliveryGap)} more for free delivery
-                </p>
-              )}
             </div>
           )}
 
@@ -221,7 +241,7 @@ export default function CartReview({
                 <div className="min-w-0">
                   <p className="font-bold text-sm">{coupon}</p>
                   {quote?.coupon && quote.coupon.code === coupon && (
-                    <p className={`text-xs font-semibold ${quote.coupon.valid ? "text-[var(--mint-text)]" : "text-[#a8281e]"}`}>
+                    <p className={`text-xs font-semibold ${quote.coupon.valid ? "text-[var(--success-text)]" : "text-[var(--risk-text)]"}`}>
                       {quote.coupon.message}
                     </p>
                   )}
@@ -262,7 +282,9 @@ export default function CartReview({
 
           {/* Delivery day */}
           <div className="space-y-1.5">
-            <p className="page-kick">Delivery</p>
+            <p className="page-kick flex items-center gap-2">
+              <Icon3D name="calendar-slot" size={28} /> Delivery
+            </p>
             {rules.allowDateChoice && dates.length > 1 ? (
               <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
                 {dates.map((d) => (
@@ -314,21 +336,6 @@ export default function CartReview({
             </div>
           )}
 
-          {quoteError && <p className="text-sm font-semibold text-[#a8281e]">{quoteError}</p>}
-          {fresh && quote && quote.problems.length > 0 && (
-            <ul className="rounded-xl bg-[#fde4e1] text-[#a8281e] p-3 text-sm space-y-1 list-disc pl-7">
-              {quote.problems.map((m) => (
-                <li key={m}>{m}</li>
-              ))}
-            </ul>
-          )}
-          {fresh && quote && (quote.warnings ?? []).length > 0 && (
-            <ul className="rounded-xl bg-[var(--genda-tint)] text-[var(--genda-text)] p-3 text-sm font-semibold space-y-1 list-disc pl-7">
-              {quote.warnings.map((m) => (
-                <li key={m}>{m}</li>
-              ))}
-            </ul>
-          )}
         </div>
       )}
     </Sheet>
@@ -337,7 +344,7 @@ export default function CartReview({
 
 function Row({ label, value, mint }: { label: string; value: string; mint?: boolean }) {
   return (
-    <div className={`flex justify-between ${mint ? "text-[var(--mint-text)] font-semibold" : "text-[var(--ink-2)]"}`}>
+    <div className={`flex justify-between ${mint ? "text-[var(--success-text)] font-semibold" : "text-[var(--ink-2)]"}`}>
       <span>{label}</span>
       <span>{value}</span>
     </div>

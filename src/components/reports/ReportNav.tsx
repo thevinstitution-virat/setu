@@ -60,7 +60,7 @@ export default function ReportNav() {
               key={t.href}
               href={`${t.href}${qs}`}
               aria-current={active ? "page" : undefined}
-              className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold ${active ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-black/5 text-foreground/70 hover:bg-black/10"}`}
+              className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold ${active ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "bg-black/5 text-foreground/70 hover:bg-black/10"}`}
             >
               {t.label}
             </Link>
@@ -76,17 +76,17 @@ export default function ReportNav() {
               setOpen(false);
               go(new URLSearchParams(p === "30d" ? [] : [["preset", p]]));
             }}
-            className={`rounded-full px-3 py-1 text-xs font-medium border ${preset === p ? "border-[var(--kesar)] bg-[var(--kesar-tint)] text-[var(--kesar-text)]" : "border-[var(--line)] bg-white/60 text-foreground/70 hover:bg-white"}`}
+            className={`rounded-full px-3 py-1 text-xs font-medium border ${preset === p ? "border-[var(--kesar)] bg-[var(--accent-tint)] text-[var(--accent-text)]" : "border-[var(--line)] bg-white/60 text-foreground/70 hover:bg-white"}`}
           >
             {PRESETS[p]}
           </button>
         ))}
-        <button onClick={() => setOpen((v) => !v)} className={`rounded-full px-3 py-1 text-xs font-medium border ${custom ? "border-[var(--kesar)] bg-[var(--kesar-tint)] text-[var(--kesar-text)]" : "border-[var(--line)] bg-white/60 text-foreground/70 hover:bg-white"}`}>
+        <button onClick={() => setOpen((v) => !v)} className={`rounded-full px-3 py-1 text-xs font-medium border ${custom ? "border-[var(--kesar)] bg-[var(--accent-tint)] text-[var(--accent-text)]" : "border-[var(--line)] bg-white/60 text-foreground/70 hover:bg-white"}`}>
           Pick dates
         </button>
         {!onShop && (
           <a href={csv} className="btn btn-outline btn-xs ml-auto" download>
-            <Icon name="upload" className="h-3.5 w-3.5 rotate-180" /> CSV
+            <Icon name="download" className="h-3.5 w-3.5" /> CSV
           </a>
         )}
       </div>

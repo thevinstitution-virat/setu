@@ -7,6 +7,8 @@ import LanguageToggle from "@/components/LanguageToggle";
 import Link from "next/link";
 import { APP_NAME } from "@/lib/brand";
 import { BrandLockup } from "@/components/BrandMark";
+import { Icon3D } from "@/components/icons3d/Icon3D";
+import OtpInput from "@/components/ui/OtpInput";
 import Icon from "@/components/Icon";
 import GoogleButton from "@/components/auth/GoogleButton";
 import EmailLinkForm from "@/components/auth/EmailLinkForm";
@@ -94,19 +96,20 @@ export default function LoginCard({
           <LanguageToggle />
         </div>
 
-        <div className="card card-deco p-6 sm:p-7">
+        <div className={`card ${brand.business ? "" : "card-deco"} p-6 sm:p-7`}>
+          <Icon3D name="kirana-shop" size={88} animate="pop" priority className="mb-2" />
           {!EMAIL_AND_GOOGLE_ONLY && <p className="page-kick">{mode === "retailer" ? t("login.retailerTab") : t("login.teamTab")}</p>}
           <h1 className="page-title">{t("login.title")}</h1>
           <p className="page-sub mb-6">{brand.tagline || t("brand.tagline")}</p>
 
           {notice && (
-            <p role="status" className="text-sm rounded-lg bg-[var(--genda-tint)] text-[var(--genda-text)] px-3 py-2 mb-4 break-words">
+            <p role="status" className="text-sm rounded-lg bg-[var(--scheme-tint)] text-[var(--scheme-text)] px-3 py-2 mb-4 break-words">
               {notice}
             </p>
           )}
 
           {linkError && (
-            <p role="alert" className="text-sm rounded-lg bg-[#a8281e]/10 text-[#a8281e] px-3 py-2 mb-4 break-words">
+            <p role="alert" className="text-sm rounded-lg bg-[var(--risk-text)]/10 text-[var(--risk-text)] px-3 py-2 mb-4 break-words">
               {t("login.switchFailed")} {linkError}
             </p>
           )}
@@ -138,7 +141,7 @@ export default function LoginCard({
                 aria-selected={mode === m}
                 className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition ${
                   mode === m
-                    ? "bg-gradient-to-br from-mor to-[#0c3634] text-white shadow-[0_10px_20px_-12px_rgba(8,38,37,.9)]"
+                    ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white shadow-[0_10px_20px_-12px_rgba(8,38,37,.9)]"
                     : "text-[var(--ink-2)]"
                 }`}
                 onClick={() => setMode(m)}
@@ -156,7 +159,7 @@ export default function LoginCard({
         {!brand.business && (
           <p className="text-sm text-center text-[var(--ink-2)] mt-5">
             {t("login.newHere")}{" "}
-            <Link href="/start" className="font-bold text-[var(--kesar-text)] whitespace-nowrap">
+            <Link href="/start" className="font-bold text-[var(--accent-text)] whitespace-nowrap">
               {t("login.startTrial")}
             </Link>
           </p>
@@ -208,9 +211,9 @@ function SimpleSignIn({ business }: { business: boolean }) {
 function FailureNote({ failure }: { failure: LoginFailure | null }) {
   const { t } = useLanguage();
   if (!failure) return null;
-  if (!failure.paused) return <p role="alert" className="text-sm text-[#a8281e]">{failure.text}</p>;
+  if (!failure.paused) return <p role="alert" className="text-sm text-[var(--risk-text)]">{failure.text}</p>;
   return (
-    <div role="alert" className="flex gap-2.5 rounded-xl bg-[#a8281e]/10 text-[#a8281e] px-3 py-2.5">
+    <div role="alert" className="flex gap-2.5 rounded-xl bg-[var(--risk-text)]/10 text-[var(--risk-text)] px-3 py-2.5">
       <Icon name="lock" className="h-5 w-5 shrink-0 mt-0.5" />
       <div className="text-sm">
         <p className="font-bold">{t("login.pausedTitle")}</p>
@@ -227,7 +230,7 @@ function RetailerLogin({ initialRef = "" }: { initialRef?: string }) {
   return (
     <div className="space-y-4">
       {viaEmail ? <EmailCodeLogin /> : <RetailerPhoneLogin initialRef={initialRef} />}
-      <button type="button" className="text-sm text-[var(--kesar-text)] w-full text-center min-h-[44px]" onClick={() => setViaEmail(!viaEmail)}>
+      <button type="button" className="text-sm text-[var(--accent-text)] w-full text-center min-h-[44px]" onClick={() => setViaEmail(!viaEmail)}>
         {viaEmail ? t("login.usePhone") : t("login.useEmail")}
       </button>
     </div>
@@ -362,7 +365,7 @@ function RetailerPhoneLogin({ initialRef = "" }: { initialRef?: string }) {
             {t("login.verify")}
           </Button>
           <button
-            className="text-sm text-[var(--kesar-text)] w-full text-center"
+            className="text-sm text-[var(--accent-text)] w-full text-center"
             onClick={() => {
               setStep("phone");
               setError(null);
@@ -453,10 +456,10 @@ function RetailerPhoneLogin({ initialRef = "" }: { initialRef?: string }) {
                 <span className="block text-xs text-[var(--muted)] mt-1">Checking…</span>
               )}
               {referralCode && referral.state === "ok" && (
-                <span className="block text-xs font-semibold text-[var(--mint-text)] mt-1">Code from {referral.shop}</span>
+                <span className="block text-xs font-semibold text-[var(--success-text)] mt-1">Code from {referral.shop}</span>
               )}
               {referralCode && (referral.state === "error" || referral.state === "off") && (
-                <span className={`block text-xs mt-1 ${referralCode.length < 5 && referral.state === "error" ? "text-[var(--muted)]" : "text-[#a8281e]"}`}>
+                <span className={`block text-xs mt-1 ${referralCode.length < 5 && referral.state === "error" ? "text-[var(--muted)]" : "text-[var(--risk-text)]"}`}>
                   {referral.message}
                   {referral.state === "off" ? ". You can still sign up." : ""}
                 </span>
@@ -594,7 +597,7 @@ function PasswordLogin() {
       </Button>
       <FailureNote failure={error} />
       <p className="text-center">
-        <Link href="/login/forgot" className="text-sm font-semibold text-[var(--kesar-text)] hover:underline inline-block min-h-[44px] leading-[44px]">
+        <Link href="/login/forgot" className="text-sm font-semibold text-[var(--accent-text)] hover:underline inline-block min-h-[44px] leading-[44px]">
           {t("login.forgot")}
         </Link>
       </p>
@@ -671,7 +674,7 @@ function EmailCodeLogin() {
       ) : (
         <>
           {devCode ? (
-            <p className="text-xs rounded-lg bg-[var(--genda-tint)] text-[var(--genda-text)] px-3 py-2">
+            <p className="text-xs rounded-lg bg-[var(--scheme-tint)] text-[var(--scheme-text)] px-3 py-2">
               {t("login.demoEmail")} <span className="font-semibold">{devCode}</span>.
             </p>
           ) : (
@@ -698,7 +701,7 @@ function EmailCodeLogin() {
           </Button>
           <button
             type="button"
-            className="text-sm text-[var(--kesar-text)] w-full text-center min-h-[44px]"
+            className="text-sm text-[var(--accent-text)] w-full text-center min-h-[44px]"
             onClick={() => {
               setStep("email");
               setError(null);
@@ -788,7 +791,7 @@ function StaffOtpLogin({ initialPhone }: { initialPhone: string }) {
           </Button>
           <button
             type="button"
-            className="text-sm text-[var(--kesar-text)] w-full text-center min-h-[44px]"
+            className="text-sm text-[var(--accent-text)] w-full text-center min-h-[44px]"
             onClick={() => {
               setStep("phone");
               setError(null);
@@ -819,21 +822,14 @@ function OtpCodeField({
   return (
     <>
       {devCode && (
-        <p className="text-xs rounded-lg bg-[var(--genda-tint)] text-[var(--genda-text)] px-3 py-2">
+        <p className="text-xs rounded-lg bg-[var(--scheme-tint)] text-[var(--scheme-text)] px-3 py-2">
           {t("login.demoOtp")} <span className="font-semibold">{devCode}</span>.
         </p>
       )}
-      <Field label={`${t("login.otpLabel")} ${phone}`}>
-        <input
-          className="input tracking-[0.3em] text-center"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          maxLength={6}
-          placeholder="••••••"
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-        />
-      </Field>
+      <div>
+        <p className="block text-sm font-medium text-foreground/70 mb-2">{`${t("login.otpLabel")} ${phone}`}</p>
+        <OtpInput value={code} onChangeAction={setCode} autoFocus label={t("login.otpLabel")} />
+      </div>
     </>
   );
 }

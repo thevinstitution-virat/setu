@@ -112,7 +112,7 @@ export default function OpeningForm({ view, canSetup }: { view: View; canSetup: 
                   The app&apos;s stock then: {formatINR(view.stockSuggestion.value)}
                   {view.stockSuggestion.source === "count" ? " (counted)" : ""}.{" "}
                   {canSetup && (
-                    <button type="button" className="font-semibold text-[var(--kesar-text)] underline" onClick={() => setStock(rupeeText(view.stockSuggestion!.value))}>
+                    <button type="button" className="font-semibold text-[var(--accent-text)] underline" onClick={() => setStock(rupeeText(view.stockSuggestion!.value))}>
                       Use it
                     </button>
                   )}
@@ -168,7 +168,7 @@ export default function OpeningForm({ view, canSetup }: { view: View; canSetup: 
           <p className="flex justify-between gap-3">
             <span>
               Shops&apos; opening bills ({view.shops.count}){" "}
-              <Link href="/admin/khata" className="text-[var(--kesar-text)] underline">
+              <Link href="/admin/khata" className="text-[var(--accent-text)] underline">
                 khata
               </Link>
             </span>
@@ -179,7 +179,7 @@ export default function OpeningForm({ view, canSetup }: { view: View; canSetup: 
           <p className="flex justify-between gap-3">
             <span>
               Suppliers&apos; opening bills ({view.suppliers.count}){" "}
-              <Link href="/admin/books/suppliers" className="text-[var(--kesar-text)] underline">
+              <Link href="/admin/books/suppliers" className="text-[var(--accent-text)] underline">
                 suppliers
               </Link>
             </span>
@@ -194,7 +194,7 @@ export default function OpeningForm({ view, canSetup }: { view: View; canSetup: 
             <span className="block">
               Debit {formatINR(totals.debit)} · Credit {formatINR(totals.credit)}
             </span>
-            <span className={`block text-xs font-semibold ${totals.diff ? "text-[#a8281e]" : "text-[#2e7d4f]"}`}>
+            <span className={`block text-xs font-semibold ${totals.diff ? "text-[var(--risk-text)]" : "text-[#2e7d4f]"}`}>
               {totals.bad
                 ? "Fix the amounts that are not numbers"
                 : totals.diff
@@ -208,7 +208,7 @@ export default function OpeningForm({ view, canSetup }: { view: View; canSetup: 
             </button>
           )}
         </div>
-        {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+        {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
         {done && <p className="text-sm text-[#2e7d4f]">{done}</p>}
         {totals.diff !== 0 && !totals.bad && (
           <p className="text-xs text-[var(--muted)]">You can save before it agrees; until it does, the difference shows on the balance sheet under opening balances.</p>

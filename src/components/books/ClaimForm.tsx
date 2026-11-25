@@ -225,10 +225,10 @@ export default function ClaimForm({ options: o, initialCompany, initialType }: {
             )}
           </div>
         )}
-        {basis && basis.products === 0 && <p className="text-sm text-[#a8281e]">No products are linked to {company?.name}. Set the company on its products first.</p>}
-        {basis && basis.noCost.length > 0 && <p className="text-sm text-[#a8281e]">No cost known for {basis.noCost.join(", ")}: add those lines by hand.</p>}
+        {basis && basis.products === 0 && <p className="text-sm text-[var(--risk-text)]">No products are linked to {company?.name}. Set the company on its products first.</p>}
+        {basis && basis.noCost.length > 0 && <p className="text-sm text-[var(--risk-text)]">No cost known for {basis.noCost.join(", ")}: add those lines by hand.</p>}
         {basis && basis.overlaps.length > 0 && (
-          <p className="text-sm text-[#a8281e]">
+          <p className="text-sm text-[var(--risk-text)]">
             Already claimed for part of this period:{" "}
             {basis.overlaps.map((x, i) => (
               <span key={x.id}>
@@ -344,7 +344,7 @@ export default function ClaimForm({ options: o, initialCompany, initialType }: {
             <input className="input" value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} />
           </Field>
         </div>
-        {err && <p className="px-4 pb-4 text-sm text-[#a8281e]">{err}</p>}
+        {err && <p className="px-4 pb-4 text-sm text-[var(--risk-text)]">{err}</p>}
       </section>
 
       <div className="sticky bottom-[5.5rem] md:bottom-3 z-10">

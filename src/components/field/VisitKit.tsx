@@ -62,7 +62,7 @@ export function NoOrderSheet({
       onClose={onClose}
       footer={
         <div className="space-y-2">
-          {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+          {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
           <div className="flex gap-2">
             <button type="button" className="btn btn-quiet flex-1 min-h-[44px]" onClick={onClose} disabled={busy}>
               Back
@@ -80,7 +80,7 @@ export function NoOrderSheet({
           <label
             key={k}
             className={`flex items-center gap-3 rounded-xl border px-3 min-h-[48px] cursor-pointer ${
-              reason === k ? "border-[var(--mor)] bg-[var(--mint-tint)]" : "border-[var(--line)] bg-white"
+              reason === k ? "border-[var(--mor)] bg-[var(--success-tint)]" : "border-[var(--line)] bg-white"
             }`}
           >
             <input

@@ -98,13 +98,13 @@ export default function TeamTodayPage({ searchParams }: { searchParams: Promise<
       {day && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <Tile label="Present" value={counts.present} tone="text-[var(--mint-text)]" active={filter === "present"} onClick={() => pick("present")} />
+            <Tile label="Present" value={counts.present} tone="text-[var(--success-text)]" active={filter === "present"} onClick={() => pick("present")} />
             <Tile label="On leave" value={counts.leave} active={filter === "leave"} onClick={() => pick("leave")} />
-            <Tile label="Not in" value={counts.out} tone={counts.out ? "text-[var(--genda-text)]" : ""} active={filter === "out"} onClick={() => pick("out")} />
+            <Tile label="Not in" value={counts.out} tone={counts.out ? "text-[var(--scheme-text)]" : ""} active={filter === "out"} onClick={() => pick("out")} />
             <Tile
               label="With a problem"
               value={counts.exceptions}
-              tone={counts.exceptions ? "text-[#a8281e]" : ""}
+              tone={counts.exceptions ? "text-[var(--risk-text)]" : ""}
               active={filter === "exceptions"}
               onClick={() => pick("exceptions")}
             />

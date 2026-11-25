@@ -113,7 +113,7 @@ export default function SetupPage() {
           <li key={s.key} className={`card p-4 flex items-start gap-3 ${s.state !== "todo" ? "opacity-90" : ""}`}>
             <span
               className={`icon-tile !h-9 !w-9 text-sm font-bold ${
-                s.state === "done" ? "bg-[var(--mint-tint)] text-[var(--mint-text)]" : s.state === "skipped" ? "bg-ink/5 text-[var(--muted)]" : "bg-[var(--kesar-tint)] text-[var(--kesar-text)]"
+                s.state === "done" ? "bg-[var(--success-tint)] text-[var(--success-text)]" : s.state === "skipped" ? "bg-ink/5 text-[var(--muted)]" : "bg-[var(--accent-tint)] text-[var(--accent-text)]"
               }`}
               aria-hidden="true"
             >

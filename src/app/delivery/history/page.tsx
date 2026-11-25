@@ -57,7 +57,7 @@ export default async function DeliveryHistory() {
                   <p className="text-xs text-foreground/50">
                     {d.order.orderNumber} · {formatINR(d.order.totalAmount)}
                   </p>
-                  <p className="text-xs font-semibold text-[#a8281e] mt-0.5">Not delivered: {failLabel(d.failReason)}</p>
+                  <p className="text-xs font-semibold text-[var(--risk-text)] mt-0.5">Not delivered: {failLabel(d.failReason)}</p>
                 </div>
                 <span className="text-xs text-foreground/50 shrink-0">{when(d.failedAt)}</span>
               </div>
@@ -77,7 +77,7 @@ export default async function DeliveryHistory() {
                   {d.order.orderNumber} · {formatINR(amount)} · {d.paymentMethod}
                 </p>
                 {short > 0 && (
-                  <p className="text-xs font-semibold text-[var(--kesar-text)] mt-0.5">
+                  <p className="text-xs font-semibold text-[var(--accent-text)] mt-0.5">
                     Short: {short} line{short === 1 ? "" : "s"}
                   </p>
                 )}

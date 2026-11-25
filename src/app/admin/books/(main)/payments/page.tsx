@@ -75,7 +75,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                     {c.payment && (
                       <>
                         {" · "}
-                        <Link href={`/admin/books/payments/${c.payment.id}`} className="text-[var(--kesar-text)] font-semibold">
+                        <Link href={`/admin/books/payments/${c.payment.id}`} className="text-[var(--accent-text)] font-semibold">
                           {c.payment.number}
                         </Link>
                       </>
@@ -168,13 +168,13 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                     <tr key={p.id} className={`hover:bg-black/[0.02] ${p.cancelled ? "opacity-50" : ""}`}>
                       <td className="px-4 py-2 whitespace-nowrap">{showDay(p.date)}</td>
                       <td className="px-4 py-2 whitespace-nowrap">
-                        <Link href={`/admin/books/payments/${p.id}`} className="font-semibold text-[var(--kesar-text)]">
+                        <Link href={`/admin/books/payments/${p.id}`} className="font-semibold text-[var(--accent-text)]">
                           {p.number}
                         </Link>
                         {p.cancelled && <span className="chip !text-[10px] ml-1">{p.chequeStatus === "BOUNCED" ? "Bounced" : "Cancelled"}</span>}
                       </td>
                       <td className="px-4 py-2">
-                        <Link href={`/admin/books/suppliers/${p.supplierId}`} className="hover:text-[var(--kesar-text)]">
+                        <Link href={`/admin/books/suppliers/${p.supplierId}`} className="hover:text-[var(--accent-text)]">
                           {p.supplier}
                         </Link>
                       </td>

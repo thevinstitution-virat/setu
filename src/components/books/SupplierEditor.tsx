@@ -155,7 +155,7 @@ export default function SupplierEditor({ initial, buttonLabel, buttonClass = "bt
                 <input type="checkbox" checked={form.active} onChange={(e) => set({ active: e.target.checked })} /> In use (untick to hide from lists)
               </label>
             )}
-            {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+            {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
           </div>
         </Sheet>
       )}

@@ -47,7 +47,7 @@ export const expiryText = (iso: string | null) =>
 export function ShortList({ rows, place }: { rows: StockShort[]; place?: string }) {
   return (
     <div className="space-y-1">
-      <p className="text-sm font-semibold text-[var(--genda-text)] flex items-start gap-1.5">
+      <p className="text-sm font-semibold text-[var(--scheme-text)] flex items-start gap-1.5">
         <Icon name="alert" className="h-4 w-4 shrink-0 mt-0.5" /> The records show less in {place ?? "the warehouse"} than this needs:
       </p>
       <ul className="text-sm text-[var(--ink-2)] space-y-0.5 pl-6 list-disc">
@@ -150,9 +150,9 @@ export default function VanLoad({ tripId, version, onDone }: { tripId: string; v
                           In van <b>{r.inVan}</b>
                         </span>
                         {r.buffer > 0 && <span>Buffer {r.buffer}</span>}
-                        {r.loaded > 0 && <span className="text-[var(--mint-text)]">Loaded {r.loaded}</span>}
+                        {r.loaded > 0 && <span className="text-[var(--success-text)]">Loaded {r.loaded}</span>}
                       </p>
-                      <p className={`text-xs mt-0.5 ${over ? "text-[var(--genda-text)] font-semibold" : "text-[var(--muted)]"}`}>
+                      <p className={`text-xs mt-0.5 ${over ? "text-[var(--scheme-text)] font-semibold" : "text-[var(--muted)]"}`}>
                         Warehouse {r.warehouse} {r.unit}
                         {over ? " · less than you're loading" : ""}
                       </p>
@@ -191,7 +191,7 @@ export default function VanLoad({ tripId, version, onDone }: { tripId: string; v
 
           <div className="px-4 py-3 border-t border-[var(--line)] space-y-3">
             {short ? (
-              <div className="rounded-2xl bg-[var(--genda-tint)] p-3 space-y-2">
+              <div className="rounded-2xl bg-[var(--scheme-tint)] p-3 space-y-2">
                 <ShortList rows={short} place={data.warehouse?.name} />
                 <p className="text-xs text-[var(--ink-2)]">If the goods are really there, load anyway: the missing units are booked into the warehouse first.</p>
                 <div className="flex flex-wrap gap-2">
@@ -214,7 +214,7 @@ export default function VanLoad({ tripId, version, onDone }: { tripId: string; v
               </div>
             )}
             {!started && <p className="text-xs text-[var(--muted)]">Starting the trip also loads whatever the orders still need.</p>}
-            {failed && <p className="text-sm text-[#a8281e]">{failed}</p>}
+            {failed && <p className="text-sm text-[var(--risk-text)]">{failed}</p>}
           </div>
         </>
       )}

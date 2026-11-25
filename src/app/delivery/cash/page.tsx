@@ -49,7 +49,7 @@ export default function MyCashPage() {
   if (!data) {
     return error ? (
       <div className="card p-5 space-y-3">
-        <p className="text-sm text-[#a8281e]">{error}</p>
+        <p className="text-sm text-[var(--risk-text)]">{error}</p>
         <button className="btn btn-quiet btn-sm" onClick={load}>
           Try again
         </button>
@@ -156,12 +156,12 @@ export default function MyCashPage() {
               <span className="font-bold">{formatINR(h.counted)}</span>
             </div>
             {h.variance > 0 ? (
-              <div className="flex justify-between text-[#a8281e]">
+              <div className="flex justify-between text-[var(--risk-text)]">
                 <span className="font-semibold">Short</span>
                 <span className="font-bold">{formatINR(h.variance)}</span>
               </div>
             ) : (
-              <p className="flex items-center gap-1.5 text-[var(--mint-text)] font-semibold">
+              <p className="flex items-center gap-1.5 text-[var(--success-text)] font-semibold">
                 <Icon name="check" className="h-4 w-4" /> Matched
               </p>
             )}

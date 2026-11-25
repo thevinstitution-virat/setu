@@ -2,6 +2,7 @@
 
 import { formatINR } from "@/lib/money";
 import Icon from "@/components/Icon";
+import { Icon3D } from "@/components/icons3d/Icon3D";
 import { fileUrl } from "./format";
 import { endsLabel, ProductThumb, QtyControl, Sheet, StockChip, unitsOf, type CartEntry, type Offer, type StoreProduct } from "./shared";
 
@@ -37,7 +38,7 @@ export default function ProductSheet({
           <div className="min-w-0">
             <p className="text-xs text-[var(--muted)]">{entry ? `${units} ${p.unit} in cart` : "Not in cart"}</p>
             {entry && lineTotal != null ? (
-              <p className="font-bold">
+              <p className="font-heading font-bold num">
                 {formatINR(lineTotal)} <span className="text-xs font-medium text-[var(--muted)]">with GST</span>
               </p>
             ) : (
@@ -64,7 +65,7 @@ export default function ProductSheet({
             ))}
           </div>
         ) : (
-          <ProductThumb name={p.name} className="h-28 w-28 mx-auto !text-4xl" />
+          <ProductThumb name={p.name} category={p.category.name} className="h-40 w-full !rounded-2xl" iconSize={104} />
         )}
 
         <div>
@@ -83,7 +84,14 @@ export default function ProductSheet({
         <div className="card p-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
           <Fact label="Your rate" value={`${formatINR(p.price)} / ${p.unit}`} strong />
           <Fact label="MRP" value={formatINR(p.mrp)} />
-          {p.margin !== null && <Fact label="Your margin" value={`${p.margin}%`} />}
+          {p.margin !== null && (
+            <div className="min-w-0">
+              <p className="text-[11px] text-[var(--muted)]">Your margin</p>
+              <p className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--scheme)] text-[var(--on-scheme)] px-2 py-0.5 text-sm font-extrabold">
+                <Icon3D name="percent-tag" size={20} /> {p.margin}%
+              </p>
+            </div>
+          )}
           <Fact label="GST" value={p.gstRate > 0 ? `${p.gstRate}%` : "Nil"} />
           {p.caseSize && <Fact label="Case" value={`${p.caseUnit || "case"} of ${p.caseSize} ${p.unit}`} />}
           {p.moq > 1 && <Fact label="Minimum order" value={`${p.moq} ${p.unit}`} />}
@@ -101,8 +109,8 @@ export default function ProductSheet({
           <div className="space-y-2">
             <p className="page-kick">Offers</p>
             {offers.map((o) => (
-              <div key={o.id} className="rounded-xl bg-[var(--kesar-tint)] p-3">
-                <p className="flex items-center gap-1.5 text-sm font-bold text-[var(--kesar-text)]">
+              <div key={o.id} className="rounded-xl bg-[var(--scheme-tint)] p-3">
+                <p className="flex items-center gap-1.5 text-sm font-bold text-[var(--scheme-text)]">
                   <Icon name="tag" className="h-4 w-4 shrink-0" />
                   {o.summary}
                 </p>
@@ -113,7 +121,7 @@ export default function ProductSheet({
                 {o.description && <p className="text-xs text-[var(--ink-2)] mt-1">{o.description}</p>}
               </div>
             ))}
-            {p.specialOffer && <p className="text-sm font-semibold text-[var(--kesar-text)]">{p.specialOffer}</p>}
+            {p.specialOffer && <p className="text-sm font-semibold text-[var(--scheme-text)]">{p.specialOffer}</p>}
           </div>
         )}
       </div>

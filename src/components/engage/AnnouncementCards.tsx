@@ -31,11 +31,11 @@ export default function AnnouncementCards() {
           )}
           <div className="p-4 space-y-2">
             <div className="flex items-start gap-3">
-              <span className="icon-tile !h-10 !w-10 shrink-0 bg-[var(--genda-tint)] text-[var(--genda-text)]">
+              <span className="icon-tile !h-10 !w-10 shrink-0 bg-[var(--scheme-tint)] text-[var(--scheme-text)]">
                 <Icon name="megaphone" className="h-5 w-5" />
               </span>
               <div className="min-w-0 flex-1">
-                {a.pinned && <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--genda-text)]">Pinned</p>}
+                {a.pinned && <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--scheme-text)]">Pinned</p>}
                 <h2 className="font-bold text-base break-words">{a.title}</h2>
                 <p className="text-sm text-[var(--ink-2)] mt-1 whitespace-pre-line break-words">{a.body}</p>
               </div>

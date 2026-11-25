@@ -93,7 +93,7 @@ export default function StartCountForm({ tracking, places, companies, categories
       <Field label="Note (optional)">
         <input className="input" value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Year-end count, Ramesh and Suresh" />
       </Field>
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       <button type="submit" className="btn btn-mor" disabled={busy || (tracking && !place)}>
         {busy ? "Making the sheet…" : "Make the count sheet"}
       </button>

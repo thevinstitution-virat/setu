@@ -179,7 +179,7 @@ function GatewayForm({ initial }: { initial: Gateway }) {
               aria-checked={f.provider === v}
               onClick={() => set("provider", v)}
               className={`flex-1 min-w-0 rounded-xl py-2 px-2 text-sm font-bold transition ${
-                f.provider === v ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "text-[var(--ink-2)]"
+                f.provider === v ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "text-[var(--ink-2)]"
               }`}
             >
               {label}
@@ -189,7 +189,7 @@ function GatewayForm({ initial }: { initial: Gateway }) {
         </div>
         {f.provider === "none" && <p className="text-sm text-[var(--muted)]">Shops pay by UPI, cash or cheque as now. No links or QR codes are made.</p>}
         {f.provider === "simulator" && (
-          <p className="rounded-xl bg-[var(--genda-tint)] px-3 py-2 text-sm text-[var(--genda-text)] flex items-start gap-2">
+          <p className="rounded-xl bg-[var(--scheme-tint)] px-3 py-2 text-sm text-[var(--scheme-text)] flex items-start gap-2">
             <Icon name="alert" className="h-4 w-4 shrink-0 mt-0.5" />
             <span>Practice only. Links and QR codes open a test page with a button that marks them paid. No real money moves.</span>
           </p>
@@ -298,7 +298,7 @@ function GatewayForm({ initial }: { initial: Gateway }) {
             hint="Make up a long secret (8 to 128 characters), type it in Razorpay, and paste the same one here."
           />
           {!saved.hasWebhookSecret && (
-            <p className="text-xs text-[var(--genda-text)] flex items-start gap-1.5">
+            <p className="text-xs text-[var(--scheme-text)] flex items-start gap-1.5">
               <Icon name="alert" className="h-4 w-4 shrink-0" />
               <span>Without the webhook, payments still come in, but up to 10 minutes late.</span>
             </p>
@@ -310,11 +310,11 @@ function GatewayForm({ initial }: { initial: Gateway }) {
         <div className="card p-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm min-w-0">
             {error ? (
-              <span className="text-[#a8281e]">{error}</span>
+              <span className="text-[var(--risk-text)]">{error}</span>
             ) : dirty ? (
               <span className="text-[var(--ink-2)]">Unsaved online payment changes.</span>
             ) : savedAt ? (
-              <span className="text-[var(--mint-text)] inline-flex items-center gap-1.5">
+              <span className="text-[var(--success-text)] inline-flex items-center gap-1.5">
                 <Icon name="check" className="h-4 w-4" />
                 Saved at {savedAt.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
               </span>

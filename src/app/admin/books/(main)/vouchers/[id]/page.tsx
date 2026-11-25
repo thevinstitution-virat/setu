@@ -55,7 +55,7 @@ export default async function VoucherPage({ params }: { params: Promise<{ id: st
           <p className="font-heading text-2xl font-bold tabular-nums">{formatINR(v.amount)}</p>
         </div>
         {v.narration && <p className="text-sm text-[var(--ink-2)]">{v.narration}</p>}
-        {cancelled && <p className="text-sm text-[#a8281e]">Cancelled: {v.cancelReason}</p>}
+        {cancelled && <p className="text-sm text-[var(--risk-text)]">Cancelled: {v.cancelReason}</p>}
         <p className="text-xs text-[var(--muted)]">
           Entered by {v.createdBy ?? "the system"} on {new Date(v.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })}
           {v.handoverId ? " · with a cash handover" : ""}
@@ -83,7 +83,7 @@ export default async function VoucherPage({ params }: { params: Promise<{ id: st
           {v.lines.map((l) => (
             <li key={l.id} className="grid grid-cols-[1fr_6rem_6rem] gap-x-3 px-4 py-2.5 text-sm items-start">
               <span className="min-w-0">
-                <Link href={ledgerHref(l.code)} className="font-semibold hover:text-[var(--kesar-text)]">
+                <Link href={ledgerHref(l.code)} className="font-semibold hover:text-[var(--accent-text)]">
                   {l.name}
                 </Link>
                 {(ROLE[l.role] || l.note) && <span className="block text-xs text-[var(--muted)]">{[ROLE[l.role], l.note].filter(Boolean).join(" · ")}</span>}

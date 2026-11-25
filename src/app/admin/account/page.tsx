@@ -276,7 +276,7 @@ function DeleteSection({ account, error, onChanged }: { account: Account | null;
 
   return (
     <section className="rounded-2xl border-2 border-[#f3c3bd] bg-[#fff7f6] p-5 space-y-4">
-      <p className="font-heading font-bold text-[#a8281e] flex items-center gap-2">
+      <p className="font-heading font-bold text-[var(--risk-text)] flex items-center gap-2">
         <Icon name="trash" className="h-5 w-5" /> Close and delete the business
       </p>
       <ErrorLine text={error} />
@@ -328,7 +328,7 @@ function DeleteSection({ account, error, onChanged }: { account: Account | null;
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  className="btn !bg-[#a8281e] !text-white"
+                  className="btn !bg-[var(--risk-text)] !text-white"
                   disabled={busy || typed.trim() !== account.slug}
                   onClick={requestDelete}
                 >

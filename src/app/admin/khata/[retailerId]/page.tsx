@@ -87,7 +87,7 @@ const STATE: Record<Payment["state"], { label: string; cls: string }> = {
   CONFIRMED: { label: "Confirmed", cls: "chip-mint" },
   PENDING_VERIFICATION: { label: "To verify", cls: "chip-genda" },
   POST_DATED: { label: "Post-dated, held", cls: "chip-genda" },
-  REJECTED: { label: "Rejected", cls: "!bg-[#fde4e1] !text-[#a8281e] !border-transparent" },
+  REJECTED: { label: "Rejected", cls: "!bg-[var(--risk-tint)] !text-[var(--risk-text)] !border-transparent" },
   REVERSED: { label: "Reversed", cls: "!bg-black/5 !text-[var(--muted)]" },
 };
 
@@ -95,7 +95,7 @@ const CHEQUE: Record<NonNullable<Payment["cheque"]>["status"], { label: string; 
   RECEIVED: { label: "Cheque received", cls: "chip-genda" },
   DEPOSITED: { label: "Cheque deposited", cls: "chip-kesar" },
   CLEARED: { label: "Cheque cleared", cls: "chip-mint" },
-  BOUNCED: { label: "Cheque bounced", cls: "!bg-[#fde4e1] !text-[#a8281e] !border-transparent" },
+  BOUNCED: { label: "Cheque bounced", cls: "!bg-[var(--risk-tint)] !text-[var(--risk-text)] !border-transparent" },
 };
 
 const ENTRY_KIND: Record<string, string> = {
@@ -228,7 +228,7 @@ export default function RetailerKhataPage({ params }: { params: Promise<{ retail
     return (
       <div className="space-y-4">
         <BackLink />
-        {loadError ? <p className="card p-4 text-sm text-[#a8281e]">{loadError}</p> : <p className="text-sm text-[var(--muted)]">Loading…</p>}
+        {loadError ? <p className="card p-4 text-sm text-[var(--risk-text)]">{loadError}</p> : <p className="text-sm text-[var(--muted)]">Loading…</p>}
       </div>
     );
   }
@@ -271,7 +271,7 @@ export default function RetailerKhataPage({ params }: { params: Promise<{ retail
               {formatINR(Math.abs(balances.receivable))}
             </p>
             {data.overdue > 0 && (
-              <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#fde4e1] px-2.5 py-1 text-xs font-bold text-[#a8281e]">
+              <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-[var(--risk-tint)] px-2.5 py-1 text-xs font-bold text-[var(--risk-text)]">
                 <Icon name="alert" className="h-3.5 w-3.5" /> {formatINR(data.overdue)} overdue
               </p>
             )}
@@ -294,13 +294,13 @@ export default function RetailerKhataPage({ params }: { params: Promise<{ retail
 
       {data.postDated.count > 0 && (
         <div className="card p-4 flex items-start gap-3 print:hidden">
-          <span className="icon-tile bg-[var(--genda-tint)] text-[var(--genda-text)]">
+          <span className="icon-tile bg-[var(--scheme-tint)] text-[var(--scheme-text)]">
             <Icon name="clock" />
           </span>
           <p className="text-sm text-[var(--ink-2)]">
             {plural(data.postDated.count, "post-dated cheque")} worth <b>{formatINR(data.postDated.amount)}</b> {data.postDated.count === 1 ? "is" : "are"} held.{" "}
             {data.postDated.count === 1 ? "It is" : "They are"} not in the balance until banked on or after the cheque date.{" "}
-            <Link href="/admin/payments" className="font-bold text-[var(--kesar-text)]">
+            <Link href="/admin/payments" className="font-bold text-[var(--accent-text)]">
               See cheques →
             </Link>
           </p>
@@ -309,14 +309,14 @@ export default function RetailerKhataPage({ params }: { params: Promise<{ retail
 
       {data.pendingVerification.count > 0 && (
         <div className="card p-4 flex items-start gap-3 print:hidden">
-          <span className="icon-tile bg-[var(--genda-tint)] text-[var(--genda-text)]">
+          <span className="icon-tile bg-[var(--scheme-tint)] text-[var(--scheme-text)]">
             <Icon name="clock" />
           </span>
           <p className="text-sm text-[var(--ink-2)]">
             {plural(data.pendingVerification.count, "payment")} worth <b>{formatINR(data.pendingVerification.amount)}</b> reported by the
             retailer {data.pendingVerification.count === 1 ? "is" : "are"} waiting to be checked. {data.pendingVerification.count === 1 ? "It is" : "They are"} not in
             the balance yet.{" "}
-            <Link href="/admin/payments" className="font-bold text-[var(--kesar-text)]">
+            <Link href="/admin/payments" className="font-bold text-[var(--accent-text)]">
               Check payments →
             </Link>
           </p>
@@ -324,12 +324,12 @@ export default function RetailerKhataPage({ params }: { params: Promise<{ retail
       )}
 
       {flash && (
-        <p className="card p-3 text-sm font-semibold text-[var(--mint-text)] bg-[var(--mint-tint)] print:hidden" role="status">
+        <p className="card p-3 text-sm font-semibold text-[var(--success-text)] bg-[var(--success-tint)] print:hidden" role="status">
           <Icon name="check" className="inline h-4 w-4 mr-1" />
           {flash}
         </p>
       )}
-      {loadError && <p className="card p-3 text-sm text-[#a8281e] print:hidden">{loadError}</p>}
+      {loadError && <p className="card p-3 text-sm text-[var(--risk-text)] print:hidden">{loadError}</p>}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
         <div className="space-y-5 min-w-0">
@@ -421,7 +421,7 @@ function BillChip({ b }: { b: Bill }) {
   const today = istDay(new Date());
   if (b.overdue) {
     const d = today - istDay(b.dueDate);
-    return <span className="chip !py-0.5 !px-2 !text-[11.5px] !bg-[#fde4e1] !text-[#a8281e] !border-transparent">Overdue {plural(Math.max(d, 0), "day")}</span>;
+    return <span className="chip !py-0.5 !px-2 !text-[11.5px] !bg-[var(--risk-tint)] !text-[var(--risk-text)] !border-transparent">Overdue {plural(Math.max(d, 0), "day")}</span>;
   }
   const left = istDay(b.dueDate) - today;
   return (
@@ -439,7 +439,7 @@ function OpenBills({ bills, ageing }: { bills: Bill[]; ageing: Ageing }) {
           <span>0–7 days: <b className="text-[var(--ink)]">{formatINR(ageing.d0_7, { whole: true })}</b></span>
           <span>8–15: <b className="text-[var(--ink)]">{formatINR(ageing.d8_15, { whole: true })}</b></span>
           <span>16–30: <b className="text-[var(--ink)]">{formatINR(ageing.d16_30, { whole: true })}</b></span>
-          <span>30+: <b className={ageing.d30p > 0 ? "text-[#a8281e]" : "text-[var(--ink)]"}>{formatINR(ageing.d30p, { whole: true })}</b></span>
+          <span>30+: <b className={ageing.d30p > 0 ? "text-[var(--risk-text)]" : "text-[var(--ink)]"}>{formatINR(ageing.d30p, { whole: true })}</b></span>
         </div>
       )}
       {bills.length === 0 ? (
@@ -474,9 +474,9 @@ function OpenBills({ bills, ageing }: { bills: Bill[]; ageing: Ageing }) {
                   <td className="px-2 py-2.5 text-[var(--ink-2)]">{fmtDate(b.dueDate)}</td>
                   <td className="px-2 py-2.5 text-right">
                     {formatINR(b.amount)}
-                    {b.paid > 0 && <span className="block text-xs text-[var(--mint-text)]">{formatINR(b.paid)} paid</span>}
+                    {b.paid > 0 && <span className="block text-xs text-[var(--success-text)]">{formatINR(b.paid)} paid</span>}
                   </td>
-                  <td className={`px-2 py-2.5 text-right font-bold ${b.overdue ? "text-[#a8281e]" : ""}`}>{formatINR(b.due)}</td>
+                  <td className={`px-2 py-2.5 text-right font-bold ${b.overdue ? "text-[var(--risk-text)]" : ""}`}>{formatINR(b.due)}</td>
                   <td className="px-4 py-2.5 text-right">
                     <BillChip b={b} />
                   </td>
@@ -494,7 +494,7 @@ function OpenBills({ bills, ageing }: { bills: Bill[]; ageing: Ageing }) {
                       {BILL_KIND[b.kind]} · {fmtDate(b.date)}
                     </p>
                   </div>
-                  <p className={`text-sm font-bold shrink-0 ${b.overdue ? "text-[#a8281e]" : ""}`}>{formatINR(b.due)}</p>
+                  <p className={`text-sm font-bold shrink-0 ${b.overdue ? "text-[var(--risk-text)]" : ""}`}>{formatINR(b.due)}</p>
                 </div>
                 <div className="flex items-center justify-between gap-2 text-xs text-[var(--muted)]">
                   <span>
@@ -558,7 +558,7 @@ function Payments({ payments, onDone }: { payments: Payment[]; onDone: (msg?: st
                   <div className="min-w-0">
                     <p className="text-sm font-bold">
                       {p.number}
-                      {p.purpose === "WALLET" && <span className="ml-1.5 text-xs font-semibold text-[var(--mint-text)]">Wallet recharge</span>}
+                      {p.purpose === "WALLET" && <span className="ml-1.5 text-xs font-semibold text-[var(--success-text)]">Wallet recharge</span>}
                     </p>
                     <p className="text-xs text-[var(--muted)]">
                       {fmtDateTime(p.collectedAt)} · {METHOD[p.method]}
@@ -591,13 +591,13 @@ function Payments({ payments, onDone }: { payments: Payment[]; onDone: (msg?: st
                 {(p.note || p.rejectReason || p.cheque?.bounceReason) && (
                   <p className="text-xs text-[var(--ink-2)]">
                     {p.note}
-                    {p.rejectReason && <span className="block text-[#a8281e]">{p.state === "REVERSED" ? "Reversed" : "Rejected"}: {p.rejectReason}</span>}
-                    {p.cheque?.bounceReason && <span className="block text-[#a8281e]">Bounced: {p.cheque.bounceReason}</span>}
+                    {p.rejectReason && <span className="block text-[var(--risk-text)]">{p.state === "REVERSED" ? "Reversed" : "Rejected"}: {p.rejectReason}</span>}
+                    {p.cheque?.bounceReason && <span className="block text-[var(--risk-text)]">Bounced: {p.cheque.bounceReason}</span>}
                   </p>
                 )}
                 {openId === p.id && (
-                  <div className="rounded-xl bg-[#fde4e1]/60 p-3 space-y-2">
-                    <p className="text-xs font-semibold text-[#a8281e]">
+                  <div className="rounded-xl bg-[var(--risk-tint)]/60 p-3 space-y-2">
+                    <p className="text-xs font-semibold text-[var(--risk-text)]">
                       Reverse {formatINR(p.amount)}? It goes back on the retailer&apos;s balance. This can&apos;t be undone.
                     </p>
                     <input
@@ -607,7 +607,7 @@ function Payments({ payments, onDone }: { payments: Payment[]; onDone: (msg?: st
                       onChange={(e) => setReason(e.target.value)}
                       autoFocus
                     />
-                    {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+                    {error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
                     <div className="flex gap-2">
                       <button className="btn btn-danger btn-xs" disabled={busy} onClick={() => reverse(p)}>
                         {busy ? "Reversing…" : "Reverse payment"}
@@ -654,7 +654,7 @@ function SendStatement({ retailerId, outletName, onDone }: { retailerId: string;
         <Icon name="share" className="h-4 w-4" /> {busy ? "Sending…" : "Send statement"}
       </button>
       {error && (
-        <p className="basis-full text-xs text-[#a8281e]" role="alert">
+        <p className="basis-full text-xs text-[var(--risk-text)]" role="alert">
           {error}
         </p>
       )}
@@ -754,7 +754,7 @@ function Statement({
             This financial year
           </button>
         </div>
-        {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+        {error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
       </div>
 
       {!statement ? (
@@ -789,7 +789,7 @@ function Statement({
                         {r.memo && <span className="block text-xs text-[var(--muted)]">{r.memo}</span>}
                       </td>
                       <td className="px-2 py-2 text-right">{r.debit ? formatINR(r.debit) : ""}</td>
-                      <td className="px-2 py-2 text-right text-[var(--mint-text)]">{r.credit ? formatINR(r.credit) : ""}</td>
+                      <td className="px-2 py-2 text-right text-[var(--success-text)]">{r.credit ? formatINR(r.credit) : ""}</td>
                       <td className="px-4 py-2 text-right font-semibold whitespace-nowrap">{bal(r.balance)}</td>
                     </tr>
                   ))}
@@ -816,7 +816,7 @@ function Statement({
                       </p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className={`text-sm font-bold ${r.credit ? "text-[var(--mint-text)]" : ""}`}>
+                      <p className={`text-sm font-bold ${r.credit ? "text-[var(--success-text)]" : ""}`}>
                         {r.debit ? `+${formatINR(r.debit)}` : `−${formatINR(r.credit)}`}
                       </p>
                       <p className="text-xs text-[var(--muted)]">Bal {bal(r.balance)}</p>
@@ -829,7 +829,7 @@ function Statement({
 
           <div className="flex justify-between gap-2 px-4 py-2.5 text-sm bg-black/[0.03] border-t border-[var(--line)] print:bg-transparent">
             <span className="text-[var(--muted)]">Closing balance · {fmtDate(statement.to)}</span>
-            <b className={statement.closing < 0 ? "text-[var(--mint-text)]" : ""}>{bal(statement.closing)}</b>
+            <b className={statement.closing < 0 ? "text-[var(--success-text)]" : ""}>{bal(statement.closing)}</b>
           </div>
           <p className="px-4 pb-3 pt-1 text-[11px] text-[var(--muted)]">Debit = owes us more. Credit = paid or reduced. &quot;adv&quot; = paid in advance.</p>
         </>
@@ -851,7 +851,7 @@ function Toggle<T extends string>({ value, options, onChange }: { value: T; opti
           aria-checked={value === o.key}
           onClick={() => onChange(o.key)}
           className={`flex-1 rounded-xl py-1.5 text-xs font-bold transition ${
-            value === o.key ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "text-[var(--ink-2)]"
+            value === o.key ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "text-[var(--ink-2)]"
           }`}
         >
           {o.label}
@@ -915,7 +915,7 @@ function RecordPayment({ retailerId, receivable, bills, onDone }: { retailerId: 
                 Due now {formatINR(receivable)}.{" "}
                 <button
                   type="button"
-                  className="font-bold text-[var(--kesar-text)]"
+                  className="font-bold text-[var(--accent-text)]"
                   onClick={() => setValue({ ...value, amount: toRupeeInput(receivable) })}
                 >
                   Fill full amount
@@ -965,7 +965,7 @@ function RecordPayment({ retailerId, receivable, bills, onDone }: { retailerId: 
                   {pickedIds.length ? (
                     <>
                       Picked {formatINR(pickedDue)}.{" "}
-                      <button type="button" className="font-bold text-[var(--kesar-text)]" onClick={() => setValue({ ...value, amount: toRupeeInput(pickedDue) })}>
+                      <button type="button" className="font-bold text-[var(--accent-text)]" onClick={() => setValue({ ...value, amount: toRupeeInput(pickedDue) })}>
                         Fill this amount
                       </button>{" "}
                       Bills are paid in the order picked; anything more goes to the oldest bills.
@@ -982,7 +982,7 @@ function RecordPayment({ retailerId, receivable, bills, onDone }: { retailerId: 
           <span className="text-xs font-semibold text-[var(--ink-2)]">Note (optional)</span>
           <input className="input mt-1" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} />
         </label>
-        {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+        {error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
         <button className="btn btn-kesar btn-sm w-full" disabled={busy || !value.method} onClick={submit}>
           <Icon name="cash" className="h-4 w-4" />
           {busy ? "Saving…" : purpose === "WALLET" ? "Add to wallet" : "Record payment"}
@@ -1170,7 +1170,7 @@ function CreditTerms({
             </span>
           </span>
         </label>
-        {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+        {error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
         <button className="btn btn-mor btn-sm w-full" disabled={busy} onClick={save}>
           {busy ? "Saving…" : "Save terms"}
         </button>
@@ -1296,13 +1296,13 @@ function GstDetails({ retailerId, onDone }: { retailerId: string; onDone: (msg?:
             <p className="text-[11px] text-[var(--muted)]">
               A GSTIN sets the state by itself. Invoices already issued keep the old details; new ones use these.
             </p>
-            {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+            {error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
             <button className="btn btn-mor btn-sm w-full" disabled={busy || !dirty} onClick={save}>
               {busy ? "Saving…" : "Save GST details"}
             </button>
           </>
         )}
-        {!saved && error && <p className="text-xs text-[#a8281e]">{error}</p>}
+        {!saved && error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
       </div>
     </Section>
   );
@@ -1371,7 +1371,7 @@ function Adjust({ retailerId, hasOpening, onDone }: { retailerId: string; hasOpe
                 setError(null);
               }}
               className={`rounded-xl py-2 text-xs font-bold ${
-                action === a ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-black/5 text-foreground/70"
+                action === a ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "bg-black/5 text-foreground/70"
               }`}
             >
               {ADJUST[a].label}
@@ -1380,7 +1380,7 @@ function Adjust({ retailerId, hasOpening, onDone }: { retailerId: string; hasOpe
         </div>
         <p className="text-xs text-[var(--muted)]">{ADJUST[action].help}</p>
         {action === "opening" && hasOpening && (
-          <p className="text-xs font-semibold text-[var(--genda-text)] bg-[var(--genda-tint)] rounded-lg px-2.5 py-1.5">
+          <p className="text-xs font-semibold text-[var(--scheme-text)] bg-[var(--scheme-tint)] rounded-lg px-2.5 py-1.5">
             This retailer already seems to have an opening balance.
           </p>
         )}
@@ -1423,7 +1423,7 @@ function Adjust({ retailerId, hasOpening, onDone }: { retailerId: string; hasOpe
             onChange={(e) => setNote(e.target.value)}
           />
         </label>
-        {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+        {error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
         <button className="btn btn-outline btn-sm w-full" disabled={busy} onClick={submit}>
           {busy ? "Saving…" : ADJUST[action].button}
         </button>

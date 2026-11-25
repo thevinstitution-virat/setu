@@ -15,6 +15,7 @@ import LinesCard from "./LinesCard";
 import CollectCard from "./CollectCard";
 import QrPayCard, { type OnlinePaid } from "./QrPayCard";
 import ProofCard from "./ProofCard";
+import StepChecklist from "@/components/ui/StepChecklist";
 import ReturnablesCard, { cratesBody, type CrateState } from "./ReturnablesCard";
 import NotDeliveredSheet from "./NotDeliveredSheet";
 import DeliveredView from "./DeliveredView";
@@ -135,7 +136,7 @@ export default function DeliverOrder({
   if (!order) {
     return loadError ? (
       <div className="card p-5 space-y-3">
-        <p className="text-sm text-[#a8281e]">{loadError}</p>
+        <p className="text-sm text-[var(--risk-text)]">{loadError}</p>
         <Link href="/delivery" className="btn btn-outline w-full">
           Back to my stops
         </Link>
@@ -152,7 +153,7 @@ export default function DeliverOrder({
     return (
       <div className="space-y-5">
         <h1 className="page-title">{order.retailer.outletName}</h1>
-        <p className="rounded-xl bg-[#fde4e1] text-[#a8281e] p-3 text-sm font-bold">
+        <p className="rounded-xl bg-[var(--risk-tint)] text-[var(--risk-text)] p-3 text-sm font-bold">
           Not delivered: {r && r in FAIL_REASONS ? FAIL_REASONS[r as keyof typeof FAIL_REASONS] : "no reason"}
           {order.delivery.failNote ? ` (${order.delivery.failNote})` : ""}
         </p>
@@ -272,13 +273,21 @@ export default function DeliverOrder({
       </div>
 
       {blocked && (
-        <div className="rounded-xl bg-[var(--genda-tint)] text-[var(--genda-text)] p-3 text-sm font-semibold space-y-2">
+        <div className="rounded-xl bg-[var(--scheme-tint)] text-[var(--scheme-text)] p-3 text-sm font-semibold space-y-2">
           <p>{tripStatus === "PLANNED" ? "Start the trip first. Then you can deliver this order." : "This trip is closed."}</p>
           <Link href="/delivery" className="btn btn-outline btn-sm">
             Go to my trips
           </Link>
         </div>
       )}
+
+      <StepChecklist
+        steps={[
+          { label: "Items checked", hint: "Count each line below", done: linesError(order.items, lines) === null },
+          { label: "Proof", hint: photoRequired ? "Photo required, signature optional" : "Photo and signature", done: !!photoFile || (!!signature && !photoRequired) },
+          { label: "Payment", hint: "UPI, cash or khata", done: paidOnline || paymentError(shownPay) === null },
+        ]}
+      />
 
       {invoices.length > 0 && <DeliveryInvoiceCard invoices={invoices} />}
 
@@ -341,7 +350,7 @@ export default function DeliverOrder({
       <ProofCard photoRequired={photoRequired} photo={photo} onPhotoAction={handlePhoto} onSignatureAction={setSignature} />
 
       {error && (
-        <p role="alert" className="rounded-xl bg-[#fde4e1] text-[#a8281e] p-3 text-sm font-semibold">
+        <p role="alert" className="rounded-xl bg-[var(--risk-tint)] text-[var(--risk-text)] p-3 text-sm font-semibold">
           {error}
         </p>
       )}

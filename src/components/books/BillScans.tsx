@@ -74,7 +74,7 @@ export function ScanPicker({ value, onChange, disabled }: { value: string[]; onC
           </label>
         )}
       </div>
-      {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+      {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
     </div>
   );
 }
@@ -100,7 +100,7 @@ export function BillScans({ id, scans, canEdit }: { id: string; scans: string[];
   return (
     <div className="space-y-1">
       <ScanPicker value={keys} onChange={(k) => void save(k)} disabled={!canEdit} />
-      {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+      {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
     </div>
   );
 }

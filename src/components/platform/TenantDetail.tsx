@@ -56,7 +56,7 @@ export default function TenantDetail({ id }: { id: string }) {
       </section>
 
       {(h.messagesFailed24h > 0 || h.webhooksDead24h > 0 || h.einvoiceFailed > 0) && (
-        <div className="card p-4 !bg-[#fde4e1]/70 flex flex-wrap gap-x-5 gap-y-1 text-sm text-[#a8281e]">
+        <div className="card p-4 !bg-[var(--risk-tint)]/70 flex flex-wrap gap-x-5 gap-y-1 text-sm text-[var(--risk-text)]">
           <Icon name="alert" className="h-5 w-5 shrink-0" />
           {h.messagesFailed24h > 0 && <span>{num(h.messagesFailed24h)} messages failed (24 h)</span>}
           {h.webhooksDead24h > 0 && <span>{num(h.webhooksDead24h)} webhooks given up (24 h)</span>}
@@ -85,7 +85,7 @@ export default function TenantDetail({ id }: { id: string }) {
                       <span className="font-mono break-all">{d.host}</span>
                       <StatusChip value="x" label={d.verifiedAt ? "Verified" : "Not verified"} tone={d.verifiedAt ? "mint" : "genda"} />
                       {d.tlsStatus && <span className="text-xs text-[var(--muted)]">TLS: {d.tlsStatus}</span>}
-                      {d.lastError && <span className="text-xs text-[#a8281e] w-full">{d.lastError}</span>}
+                      {d.lastError && <span className="text-xs text-[var(--risk-text)] w-full">{d.lastError}</span>}
                     </li>
                   ))}
                 </ul>

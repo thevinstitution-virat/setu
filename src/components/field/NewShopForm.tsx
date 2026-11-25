@@ -268,7 +268,7 @@ export default function NewShopForm({ onSaved, onCancel }: { onSaved?: (name: st
             onChange={(e) => pickPhoto(e.target.files?.[0])}
           />
         </div>
-        {photoErr && <p className="text-xs text-[#a8281e]">{photoErr}</p>}
+        {photoErr && <p className="text-xs text-[var(--risk-text)]">{photoErr}</p>}
       </div>
 
       <div className="space-y-1.5">
@@ -279,14 +279,14 @@ export default function NewShopForm({ onSaved, onCancel }: { onSaved?: (name: st
             {locBusy ? "Finding you…" : loc ? "Use my location again" : "Use my location"}
           </button>
           {loc && (
-            <span className="text-xs text-[var(--mint-text)]">
+            <span className="text-xs text-[var(--success-text)]">
               Saved{loc.accuracy != null ? ` (±${Math.round(loc.accuracy)} m)` : ""}
               {loc.accuracy != null && loc.accuracy > 100 ? ". Not very exact: step outside and try again." : ""}
             </span>
           )}
         </div>
         {!loc && !locErr && <p className="text-xs text-[var(--muted)]">Stand at the shop and tap this, so drivers can find it.</p>}
-        {locErr && <p className="text-xs text-[#a8281e]">{locErr}</p>}
+        {locErr && <p className="text-xs text-[var(--risk-text)]">{locErr}</p>}
       </div>
 
       <Field label="Note for the office (optional)">
@@ -294,16 +294,16 @@ export default function NewShopForm({ onSaved, onCancel }: { onSaved?: (name: st
       </Field>
 
       {clashes.length > 0 && (
-        <div className="rounded-xl bg-[#fde4e1] px-3 py-2.5 space-y-1">
-          <p className="text-sm font-semibold text-[#a8281e]">This shop may already exist</p>
-          <ul className="list-disc pl-5 text-sm text-[#a8281e]">
+        <div className="rounded-xl bg-[var(--risk-tint)] px-3 py-2.5 space-y-1">
+          <p className="text-sm font-semibold text-[var(--risk-text)]">This shop may already exist</p>
+          <ul className="list-disc pl-5 text-sm text-[var(--risk-text)]">
             {clashes.map((c) => (
               <li key={c}>{c}</li>
             ))}
           </ul>
         </div>
       )}
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
 
       <div className="flex gap-2">
         {onCancel && (
@@ -328,7 +328,7 @@ export function MyShops() {
   if (!data.leads.length) {
     return (
       <div className="card p-6 text-center space-y-2">
-        <span className="icon-tile mx-auto bg-[var(--kesar-tint)] text-[var(--kesar-text)]">
+        <span className="icon-tile mx-auto bg-[var(--accent-tint)] text-[var(--accent-text)]">
           <Icon name="plus" />
         </span>
         <p className="text-sm text-[var(--ink-2)]">No new shops added yet.</p>
@@ -360,7 +360,7 @@ export function MyShops() {
                 {l.createdBy?.name ? ` by ${l.createdBy.name}` : ""}
               </p>
               {l.status === "REJECTED" && l.decisionNote && (
-                <p className="text-xs text-[#a8281e]">
+                <p className="text-xs text-[var(--risk-text)]">
                   {l.decidedBy?.name ? `${l.decidedBy.name}: ` : ""}
                   {l.decisionNote}
                 </p>

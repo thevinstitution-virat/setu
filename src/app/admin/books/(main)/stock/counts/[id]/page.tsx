@@ -49,14 +49,14 @@ export default async function CountPage({ params }: { params: Promise<{ id: stri
             {c.entryId && (
               <>
                 {" "}
-                <Link href={`/admin/books/daybook?${new URLSearchParams({ from: c.date, to: c.date, kind: "STOCK_COUNT" })}`} className="font-semibold text-[var(--kesar-text)] underline">
+                <Link href={`/admin/books/daybook?${new URLSearchParams({ from: c.date, to: c.date, kind: "STOCK_COUNT" })}`} className="font-semibold text-[var(--accent-text)] underline">
                   See it in the day book
                 </Link>
               </>
             )}
           </p>
         )}
-        {c.status === "CANCELLED" && <p className="text-sm text-[#a8281e]">Cancelled: {c.cancelReason}</p>}
+        {c.status === "CANCELLED" && <p className="text-sm text-[var(--risk-text)]">Cancelled: {c.cancelReason}</p>}
         <div className="pt-2">
           <SharePdf
             url={`/api/admin/books/stock/counts/${c.id}`}

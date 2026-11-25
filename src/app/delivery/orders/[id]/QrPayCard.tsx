@@ -144,7 +144,7 @@ export default function QrPayCard({
   if (full) {
     return (
       <div className="card p-4 space-y-2">
-        <p className="flex items-center gap-2 rounded-xl bg-[var(--mint-tint)] text-[var(--mint-text)] p-3 text-sm font-bold">
+        <p className="flex items-center gap-2 rounded-xl bg-[var(--success-tint)] text-[var(--success-text)] p-3 text-sm font-bold">
           <Icon name="check" className="h-4 w-4" /> Paid {formatINR(paid)} online
         </p>
         <p className="text-sm text-[var(--muted)]">Nothing to collect for this order. Mark it delivered.</p>
@@ -159,7 +159,7 @@ export default function QrPayCard({
   return (
     <div className="card p-4 space-y-3">
       <div className="flex items-center gap-3">
-        <span className="icon-tile bg-[var(--kesar-tint)] text-[var(--kesar-text)]">
+        <span className="icon-tile bg-[var(--accent-tint)] text-[var(--accent-text)]">
           <Icon name="qr" />
         </span>
         <div className="min-w-0">
@@ -169,7 +169,7 @@ export default function QrPayCard({
       </div>
 
       {paid > 0 && (
-        <p className="rounded-xl bg-[var(--mint-tint)] text-[var(--mint-text)] p-3 text-sm font-bold">
+        <p className="rounded-xl bg-[var(--success-tint)] text-[var(--success-text)] p-3 text-sm font-bold">
           Paid so far {formatINR(paid)} online. Collect the rest below.
         </p>
       )}
@@ -192,7 +192,7 @@ export default function QrPayCard({
             <Icon name="clock" className="h-3.5 w-3.5" /> Waiting for payment · open till {timeOf(current.expiresAt)}
           </p>
           {qrText && (
-            <a href={qrText} target="_blank" rel="noopener noreferrer" className="block text-xs font-semibold text-[var(--kesar-text)] underline break-all">
+            <a href={qrText} target="_blank" rel="noopener noreferrer" className="block text-xs font-semibold text-[var(--accent-text)] underline break-all">
               Practice link: {qrText}
             </a>
           )}
@@ -215,7 +215,7 @@ export default function QrPayCard({
         </>
       ) : null}
 
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
     </div>
   );
 }
