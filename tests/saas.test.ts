@@ -99,6 +99,10 @@ describe("gate (pause, support, modules)", () => {
     expect(featureForPath("/admin/stock")).toBe("inventory");
     expect(featureForPath("/admin/stock/lots")).toBe("inventory");
     expect(featureForPath("/admin/stockists")).toBeNull();
+    expect(featureForPath("/admin/books")).toBe("books");
+    expect(featureForPath("/admin/books/gst")).toBe("books");
+    expect(featureForPath("/api/admin/books/purchases/x")).toBe("books");
+    expect(featureForPath("/admin/bookshelf")).toBeNull();
     expect(featureForPath("/api/v1/orders")).toBe("integrations");
     expect(featureForPath("/team/beats")).toBe("field");
     expect(featureForPath("/api/orders")).toBeNull();

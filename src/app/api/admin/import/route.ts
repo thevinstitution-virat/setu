@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { withTenantTx } from "@/lib/db";
-import { countRetailers, entitlements } from "@/lib/plans";
+import { countRetailers, entitlements, FEATURES, hasFeature } from "@/lib/plans";
 import { audit, requestIp } from "@/lib/audit";
 import { emit } from "@/lib/jobs";
 import { MoneyError, openingBalance, openingBills, type OpeningBill } from "@/lib/ledger";
@@ -373,6 +373,12 @@ async function importBooks(tx: Tx, type: ImportType, valid: unknown[], tenantId:
 /** The owner imports anything; whoever enters purchases may import the suppliers' and purchase sheets. */
 const mayImport = (role: Role, type: ImportType) => can(role, "import.run") || (BOOKS_IMPORTS.includes(type) && can(role, "purchases.manage"));
 
+/** The suppliers' and purchase sheets belong to the accounts module. */
+async function booksLocked(tenantId: string, type: ImportType) {
+  if (!BOOKS_IMPORTS.includes(type) || (await hasFeature(tenantId, "books"))) return null;
+  return NextResponse.json({ error: `Not in your plan: ${FEATURES.books}. Move to a plan that has it under Billing.`, code: "upgrade", feature: "books" }, { status: 402 });
+}
+
 export async function GET(req: Request) {
   const auth = await guard();
   if (!auth.ok) return auth.res;
@@ -381,6 +387,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: `type must be one of ${IMPORT_TYPES.join(", ")}` }, { status: 400 });
   }
   if (!mayImport(auth.session.role, type)) return NextResponse.json({ error: "You don't have access to this" }, { status: 403 });
+  const lockedGet = await booksLocked(auth.tenant.id, type);
+  if (lockedGet) return lockedGet;
   return new NextResponse("﻿" + templateCsv(type, { purchaseCases: inventorySettings(auth.tenant.settings).purchaseCases }), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
@@ -408,6 +416,8 @@ export async function POST(req: Request) {
   if (!mayImport(session.role, type)) {
     return NextResponse.json({ error: BOOKS_IMPORTS.includes(type) ? "Only someone who enters purchases can import suppliers and their bills" : "You don't have access to this" }, { status: 403 });
   }
+  const locked = await booksLocked(tenant.id, type);
+  if (locked) return locked;
   if (!/\.(csv|xlsx)$/i.test(file.name)) {
     return NextResponse.json({ error: "Use a .csv or .xlsx file (old .xls: save as .xlsx first)" }, { status: 415 });
   }
