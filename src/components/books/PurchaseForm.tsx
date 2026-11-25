@@ -129,6 +129,7 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
   const [inclusive, setInclusive] = useState(false);
   const [againstId, setAgainstId] = useState<string>(initial.against ?? "");
   const [moveStock, setMoveStock] = useState(false);
+  const [fromDamaged, setFromDamaged] = useState(false);
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [billTotal, setBillTotal] = useState("");
@@ -223,6 +224,7 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
       againstId: type !== "BILL" && againstId ? againstId : null,
       purchaseId: type === "BILL" ? grnId : null,
       moveStock: type !== "CREDIT_NOTE" && !grnId ? moveStock : false,
+      fromDamaged: type === "DEBIT_NOTE" && moveStock ? fromDamaged : false,
       reason: reason || null,
       note: note || null,
       scans,
@@ -386,6 +388,11 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
           {canMove && (
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={moveStock} onChange={(e) => setMoveStock(e.target.checked)} /> {type === "BILL" ? "Bring these goods into stock now" : "Take these goods out of stock (sent back)"}
+            </label>
+          )}
+          {canMove && type === "DEBIT_NOTE" && moveStock && (
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={fromDamaged} onChange={(e) => setFromDamaged(e.target.checked)} /> From the damaged bin (damaged or expired goods going back)
             </label>
           )}
         </div>

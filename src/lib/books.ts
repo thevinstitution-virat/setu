@@ -103,6 +103,7 @@ export const KIND_LABEL: Record<EntryKind, string> = {
   CONTRA: "Contra",
   JOURNAL: "Journal voucher",
   STOCK_COUNT: "Stock count",
+  STOCK_MOVE: "Stock loss or surplus",
   GST_PAYMENT: "GST paid",
   TDS_DEDUCTION: "TDS kept back",
   TDS_PAYMENT: "TDS paid",
@@ -697,6 +698,10 @@ export async function checkBooks(ctx: Ctx): Promise<{ ok: boolean; results: Chec
     el AS (SELECT l."entryId", sum(l.amount) amt FROM "LedgerLine" l JOIN "LedgerAccount" a ON a.id = l."accountId" WHERE l."tenantId" = ${t} AND a.type = 'STOCK_LOSS' GROUP BY 1)
     SELECT (SELECT count(*) FROM sc LEFT JOIN el ON el."entryId" = sc."entryId" WHERE coalesce(el.amt, 0) <> sc.net OR (sc.net <> 0 AND sc."entryId" IS NULL))
       + (SELECT count(*) FROM "JournalEntry" j WHERE j."tenantId" = ${t} AND j.kind = 'STOCK_COUNT' AND NOT EXISTS (SELECT 1 FROM "StockCount" s WHERE s."entryId" = j.id)) c`;
+  const stockLoss = await q`WITH mv AS (SELECT "entryId", sum("bookValue") val FROM "StockMove" WHERE "tenantId" = ${t} AND "entryId" IS NOT NULL GROUP BY 1),
+    el AS (SELECT l."entryId", sum(l.amount) amt FROM "LedgerLine" l JOIN "LedgerAccount" a ON a.id = l."accountId" JOIN "JournalEntry" j ON j.id = l."entryId"
+      WHERE l."tenantId" = ${t} AND a.type = 'STOCK_LOSS' AND j.kind = 'STOCK_MOVE' GROUP BY 1)
+    SELECT count(*) c FROM mv FULL JOIN el ON el."entryId" = mv."entryId" WHERE coalesce(mv.val, 0) <> coalesce(el.amt, 0) OR mv."entryId" IS NULL OR el."entryId" IS NULL`;
   const gst = await q`WITH gl AS (SELECT l."entryId", a.type, sum(l.amount) amt FROM "LedgerLine" l JOIN "LedgerAccount" a ON a.id = l."accountId"
       WHERE l."tenantId" = ${t} AND a.type IN ('GST_INPUT', 'GST_OUTPUT') GROUP BY 1, 2),
     pb AS (SELECT p."entryId", CASE WHEN p.type = 'BILL' THEN p."itcTax" ELSE -p."itcTax" END itc FROM "PurchaseBill" p WHERE p."tenantId" = ${t} AND p."entryId" IS NOT NULL),
@@ -749,6 +754,7 @@ export async function checkBooks(ctx: Ctx): Promise<{ ok: boolean; results: Chec
     { key: "vouchers", title: "Vouchers agree with the ledger", ok: !vouchers, found: vouchers, detail: vouchers ? `${vouchers} vouchers differ from their entries` : "Every voucher's lines are in the ledger as entered, and every cancelled one is reversed", fix: "Open Books, Vouchers, then tell support." },
     { key: "cash", title: "No cash below zero", ok: !cashBelow, found: cashBelow, detail: cashBelow ? `${cashBelow} cash accounts show less than nothing` : "Office cash, petty cash and staff cash are all ₹0 or more", fix: "Open the cash book: a payment from cash was entered before the cash came in, or a receipt or handover is missing." },
     { key: "stock-counts", title: "Stock counts agree with the ledger", ok: !stockCounts, found: stockCounts, detail: stockCounts ? `${stockCounts} stock counts differ from their stock shortage entries` : "Every accepted count's shortage and excess at cost is in stock shortage", fix: "Open Books, Stock, Counts, then tell support." },
+    { key: "stock-loss", title: "Stock losses agree with the ledger", ok: !stockLoss, found: stockLoss, detail: stockLoss ? `${stockLoss} stock loss entries differ from the goods moved` : "Every damage, expiry, write-off and adjustment posted is in stock loss at cost", fix: "Open Stock, the place's history, then tell support." },
     { key: "gst", title: "GST input credit agrees with the bills", ok: !gst, found: gst, detail: gst ? `${gst} purchase bills, notes or GST settlements differ from their GST input / output entries` : "Every bill's and note's input credit, and every month's GST set-off, is in the ledger as worked out", fix: "Open Books, GST, then tell support." },
     { key: "tds", title: "TDS agrees with the documents", ok: !tds, found: tds, detail: tds ? `${tds} payments, TDS on bills, challans or shops' TDS differ from their TDS entries` : "Every TDS kept back, challan paid and shop's TDS is in the ledger as entered", fix: "Open Books, TDS, then tell support." },
     { key: "lock", title: "Nothing new in closed days", ok: !afterLock, found: afterLock, detail: lock ? (afterLock ? `${afterLock} entries were added on or before ${showDay(lock)} after the books were closed` : `Closed up to ${showDay(lock)}; nothing was added there since`) : "The books are not closed for any days yet", fix: "Ask the owner to look at the day book for those days." },

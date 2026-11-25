@@ -3,7 +3,7 @@ import { addDays, MoneyError, post, reverseEntry, type AccountRef, type Ctx, typ
 import { DOC_LABEL, GST_RATES, purchaseLineMoney } from "@/lib/purchase-math";
 import { docNumber, fyCode, isStateCode } from "@/lib/gst";
 import { nextSequence } from "@/lib/orders";
-import { defaultWarehouse, receiveGoods, stockOn, stockOut } from "@/lib/stock";
+import { damagedBin, defaultWarehouse, receiveGoods, stockOn, stockOut } from "@/lib/stock";
 import { dayEnd, dayStart, isDay, todayIst } from "@/lib/books";
 import { checkClaimLines, settleByCreditNote, unsettleCreditNote } from "@/lib/claims";
 import { keyBelongsTo } from "@/lib/storage";
@@ -77,6 +77,8 @@ export type PurchaseInput = {
   purchaseId?: string | null;
   /** Bill: bring its goods into stock now (stock tracking on, no GRN). Debit note: take them out. */
   moveStock?: boolean;
+  /** Debit note moving goods: they go back from the damaged bin (their loss is taken back out of stock loss). */
+  fromDamaged?: boolean;
   reason?: string | null;
   note?: string | null;
   /** The total printed on the supplier's bill; the difference (up to ₹1) is rounding. Blank = round to the rupee. */
@@ -394,9 +396,9 @@ export async function recordPurchase(ctx: Ctx, input: PurchaseInput) {
       await ctx.tx.purchaseBillLine.update({ where: { id: l.id }, data: { purchaseLineId: gl.id } });
     }
   } else if (moveStock && type === "DEBIT_NOTE" && goods.length) {
-    const wh = await defaultWarehouse(ctx);
+    const wh = input.fromDamaged ? await damagedBin(ctx) : await defaultWarehouse(ctx);
     for (const l of goods) {
-      await stockOut(ctx, { kind: "SUPPLIER_RETURN", sources: [wh.id], productId: l.productId!, qty: l.quantity + l.freeQty, onShort: "refuse", docId: doc.id, note: `Debit note ${number} to ${supplier.name}` });
+      await stockOut(ctx, { kind: "SUPPLIER_RETURN", sources: [wh.id], allowExpired: !!input.fromDamaged, productId: l.productId!, qty: l.quantity + l.freeQty, onShort: "refuse", docId: doc.id, note: `Debit note ${number} to ${supplier.name}` });
     }
     await ctx.tx.purchaseBill.update({ where: { id: doc.id }, data: { movedStock: true } });
   }

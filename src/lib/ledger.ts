@@ -152,7 +152,7 @@ export const NAMES: Record<AccountType, string> = {
   CLAIMS_RECEIVABLE: "Claims receivable",
   CLAIM_INCOME: "Claims on companies",
   ROUND_OFF: "Rounding off",
-  STOCK_LOSS: "Stock shortage",
+  STOCK_LOSS: "Stock loss and shortage",
   ISSUED_CHEQUES: "Cheques issued, not cleared",
   HEAD: "Account head",
 };

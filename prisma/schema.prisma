@@ -1140,6 +1140,7 @@ enum EntryKind {
   CONTRA // money moved between our own cash and banks
   JOURNAL // a journal voucher: any balanced lines, with a reason
   STOCK_COUNT // a physical stock count accepted: the net shortage moved from purchases to stock shortage
+  STOCK_MOVE // goods damaged, expired, written off or adjusted (or damaged goods back to the company): their cost between purchases and stock loss
   GST_PAYMENT // a month's GST set off: output tax paid from input credit and from the bank
   TDS_DEDUCTION // TDS kept back on a supplier's bill: Dr supplier, Cr TDS payable
   TDS_PAYMENT // a TDS challan: Dr TDS payable (+ interest / late fee), Cr bank
@@ -2145,12 +2146,17 @@ model StockMove {
   /// Credit note (RETURN) or purchase order.
   docId       String?
   actorId     String?
+  /// The books entry that moved this move's cost between purchases and stock loss (lib/stock-loss.ts).
+  entryId     String?
+  /// Its signed value in that entry: + a loss, − a surplus or a loss taken back.
+  bookValue   Int?
   createdAt   DateTime      @default(now())
 
   @@index([tenantId, productId, createdAt])
   @@index([tenantId, createdAt])
   @@index([tenantId, orderId])
   @@index([tenantId, tripId])
+  @@index([tenantId, entryId])
 }
 
 /// Principal company / supplier we buy from.
