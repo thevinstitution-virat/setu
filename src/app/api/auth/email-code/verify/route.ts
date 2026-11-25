@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { getTenant } from "@/lib/tenant";
 import { tenantDb } from "@/lib/db";
-import { requestIp } from "@/lib/audit";
+import { requestIp, audit } from "@/lib/audit";
 import { HOUR, limited } from "@/lib/rate-limit";
 import { checkEmailCode, EmailAuthError, normaliseEmail } from "@/lib/email-auth";
 import { finishSignIn } from "@/lib/mfa";
 
-/** POST { email, code } — step one of signing in with an emailed code (staff then do step two). */
+/**
+ * POST { email, code } — checks the emailed code and signs in. The code itself proves the
+ * address, so a first sign-in marks it confirmed. Where the browser goes next is decided
+ * from the role: the first-sign-in form while it is due, else the person's own dashboard.
+ */
 export async function POST(req: Request) {
   const tenant = await getTenant();
   if (!tenant) return NextResponse.json({ error: "Unknown business address" }, { status: 404 });
@@ -33,13 +37,24 @@ export async function POST(req: Request) {
   if (!challenge) return NextResponse.json({ error: "That code is wrong or has expired" }, { status: 400 });
 
   const user = await db.user.findUnique({ where: { id: challenge.userId }, select: { id: true, role: true, active: true, email: true, emailVerifiedAt: true } });
-  // The address must still be this login's verified one (it could have been removed since the code went out).
-  if (!user || !user.emailVerifiedAt || user.email?.toLowerCase() !== email) return NextResponse.json({ error: "That code is wrong or has expired" }, { status: 400 });
+  // The address must still be this login's (the office could have changed it since the code went out).
+  if (!user || user.email?.toLowerCase() !== email) return NextResponse.json({ error: "That code is wrong or has expired" }, { status: 400 });
   if (!user.active) return NextResponse.json({ error: "This account has been deactivated" }, { status: 403 });
   if (tenant.status === "SUSPENDED" && user.role !== "ADMIN") {
     return NextResponse.json({ error: "This business is paused. Please contact the office.", code: "paused" }, { status: 423 });
   }
 
+  if (!user.emailVerifiedAt) {
+    try {
+      await db.user.update({ where: { id: user.id }, data: { emailVerifiedAt: new Date() } });
+    } catch (e) {
+      // User_verified_email_once: another login here confirmed this address first.
+      if ((e as { code?: string })?.code === "P2002") return NextResponse.json({ error: "That code is wrong or has expired" }, { status: 400 });
+      throw e;
+    }
+  }
+
+  await audit(db, { actorId: user.id, action: "auth.email_code", entity: "User", entityId: user.id, ip });
   const redirect = await finishSignIn(tenant.id, user.id, "email");
   return NextResponse.json({ ok: true, redirect });
 }

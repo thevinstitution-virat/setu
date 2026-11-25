@@ -25,12 +25,12 @@ import { hashRecovery, matchTotp, newRecoveryCodes, newTotpSecret, spendRecovery
 export type Via = NonNullable<SessionPayload["via"]>;
 
 /** Staff always; a shop only after turning it on. */
-export const twoStepOff = () => process.env.TWO_STEP_OFF === "1";
+export const twoStepOff = () => process.env.TWO_STEP_OFF !== "0";
 
 /**
- * TWO_STEP_OFF=1 (demo mode) skips the authenticator step for everyone: a
- * confirmed email code or link signs in on its own. Unset it to bring back the
- * mandatory step for staff and the console.
+ * The authenticator step is OFF for everyone (owner's decision, 26 Nov 2026): the emailed
+ * one-time code is the only sign-in. Secrets already saved are kept. Set TWO_STEP_OFF=0 to
+ * bring the mandatory step back for staff and the console.
  */
 export const mfaRequired = (role: Role, totpEnabledAt: Date | null | undefined) => !twoStepOff() && (role !== "RETAILER" || !!totpEnabledAt);
 
@@ -89,11 +89,11 @@ const safeNext = (next: string | undefined) => (next && next.startsWith("/") && 
  * leaves the half-signed-in cookie. Returns where to send the browser.
  */
 export async function finishSignIn(tenantId: string, userId: string, via: Via, extra: { phone?: string; next?: string } = {}): Promise<string> {
-  const user = await tenantDb(tenantId).user.findUnique({ where: { id: userId }, select: { id: true, role: true, name: true, totpEnabledAt: true } });
+  const user = await tenantDb(tenantId).user.findUnique({ where: { id: userId }, select: { id: true, role: true, name: true, totpEnabledAt: true, onboardingDue: true } });
   if (!user) throw new Error("finishSignIn: no such user");
   if (!mfaRequired(user.role, user.totpEnabledAt)) {
     await createSessionCookie({ userId: user.id, tenantId, role: user.role, name: user.name, via, phone: extra.phone });
-    return safeNext(extra.next) ?? roleHome(user.role);
+    return safeNext(extra.next) ?? (user.onboardingDue ? "/welcome" : roleHome(user.role));
   }
   await setPending({ userId: user.id, tenantId, via, ...(extra.phone ? { phone: extra.phone } : {}), ...(safeNext(extra.next) ? { next: extra.next } : {}) });
   return "/login/2fa";
@@ -101,11 +101,11 @@ export async function finishSignIn(tenantId: string, userId: string, via: Via, e
 
 /** Step two passed: the real session, marked mfa. */
 export async function completeSignIn(p: Pending): Promise<string> {
-  const user = await tenantDb(p.tenantId).user.findUnique({ where: { id: p.userId }, select: { role: true, name: true } });
+  const user = await tenantDb(p.tenantId).user.findUnique({ where: { id: p.userId }, select: { role: true, name: true, onboardingDue: true } });
   if (!user) throw new Error("completeSignIn: no such user");
   await createSessionCookie({ userId: p.userId, tenantId: p.tenantId, role: user.role, name: user.name, via: p.via, phone: p.phone, mfa: true });
   await clearPending();
-  return safeNext(p.next) ?? roleHome(user.role);
+  return safeNext(p.next) ?? (user.onboardingDue ? "/welcome" : roleHome(user.role));
 }
 
 // ---- Codes (shared by business users and console users) -------------------

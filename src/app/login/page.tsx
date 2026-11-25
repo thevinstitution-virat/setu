@@ -2,7 +2,9 @@ import { noticeText } from "@/lib/login-notices";
 import { currentBrand } from "@/lib/branding-server";
 import { appNameOf } from "@/lib/branding";
 import LoginCard from "@/components/signup/LoginCard";
-import { googleConfigured } from "@/lib/google";
+import { redirect } from "next/navigation";
+import { pageSession } from "@/lib/guard";
+import { roleHome } from "@/lib/auth";
 
 type Query = Promise<Record<string, string | string[] | undefined>>;
 
@@ -23,6 +25,9 @@ const normaliseRef = (v: string) => v.trim().toUpperCase().replace(/[^A-Z0-9]/g,
  */
 export default async function LoginPage({ searchParams }: { searchParams: Query }) {
   const [q, { tenant, brand }] = await Promise.all([searchParams, currentBrand()]);
+  // Already signed in: straight to the dashboard that belongs to the role.
+  const session = await pageSession();
+  if (session && !one(q.notice) && !one(q.error)) redirect(roleHome(session.role));
   const raw = one(q.phone).replace(/\D/g, "");
   return (
     <LoginCard
@@ -36,7 +41,6 @@ export default async function LoginPage({ searchParams }: { searchParams: Query 
       linkError={noticeText(one(q.error))}
       notice={noticeText(one(q.notice))}
       initialRef={normaliseRef(one(q.ref))}
-      google={googleConfigured()}
     />
   );
 }

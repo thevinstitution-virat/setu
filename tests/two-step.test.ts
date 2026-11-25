@@ -65,10 +65,12 @@ describe("recovery codes", () => {
 });
 
 describe("who needs the second step", () => {
-  it("is every staff role, and a shop only once it turned it on", () => {
+  it("is every staff role, and a shop only once it turned it on (when TWO_STEP_OFF=0)", () => {
+    process.env.TWO_STEP_OFF = "0";
     for (const role of ["ADMIN", "SUPERVISOR", "SALES_AGENT", "DELIVERY_AGENT"] as const) expect(mfaRequired(role, null)).toBe(true);
     expect(mfaRequired("RETAILER", null)).toBe(false);
     expect(mfaRequired("RETAILER", new Date())).toBe(true);
+    delete process.env.TWO_STEP_OFF;
   });
 
   it("never lets an SMS be both steps", () => {

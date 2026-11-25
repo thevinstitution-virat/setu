@@ -118,30 +118,23 @@ export default function AdminTeamPage() {
   async function createUser() {
     setError(null);
     setFlash(null);
-    if (!form.name.trim() || !form.loginId.trim() || !form.password) {
-      setError("Fill in name, login ID and password");
-      return;
-    }
-    if (form.phone && !validMobile(form.phone)) {
-      setError("Enter a 10-digit mobile number");
-      return;
-    }
-    if (form.email.trim() && !looksLikeEmail(form.email)) {
-      setError("Enter a real email address");
+    if (!looksLikeEmail(form.email.trim())) {
+      setError("Enter the person's real email address");
       return;
     }
     setLoading(true);
     try {
-      await send("/api/admin/users", "POST", {
-        name: form.name.trim(),
-        loginId: form.loginId.trim(),
-        password: form.password,
+      const r = await send<{ emailed: boolean; changed: boolean }>("/api/admin/users/role", "POST", {
+        email: form.email.trim(),
         role: form.role,
-        ...(form.phone ? { phone: form.phone } : {}),
-        ...(form.email.trim() ? { email: form.email.trim() } : {}),
+        ...(form.name.trim() ? { name: form.name.trim() } : {}),
         ...(form.role !== "SUPERVISOR" && form.role !== "ADMIN" && form.role !== "ACCOUNTANT" && form.supervisorId ? { supervisorId: form.supervisorId } : {}),
       });
-      setFlash(`${form.name.trim()} added`);
+      setFlash(
+        r.emailed
+          ? `${form.email.trim()} is now ${roleInfo(form.role).label.toLowerCase()}. We emailed them a welcome with how to sign in.`
+          : `Saved, but the welcome email could not be sent. Ask ${form.email.trim()} to sign in with their email address.`
+      );
       setForm({ ...EMPTY, role: form.role, supervisorId: form.supervisorId });
       reload();
     } catch (e) {
@@ -222,10 +215,15 @@ export default function AdminTeamPage() {
       </div>
 
       <div className="card p-4 space-y-3">
-        <p className="text-sm font-semibold">Add staff</p>
+        <div>
+          <p className="text-sm font-semibold">Give someone a role</p>
+          <p className="text-xs text-[var(--muted)] mt-0.5">
+            Type their email address and choose a role. They get a polite email saying what the role is and how to sign in (with a one-time code, no password). The first time they sign in they fill a short form, and after that they go straight to their own dashboard. Someone who already signed in as a shopkeeper keeps their login and gets the new role.
+          </p>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Full name">
-            <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <Field label="Email address">
+            <input className="input" type="email" autoCapitalize="none" autoComplete="off" placeholder="name@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           </Field>
           <Field label="Role">
             <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
@@ -236,24 +234,8 @@ export default function AdminTeamPage() {
               ))}
             </select>
           </Field>
-          <Field label="Login ID">
-            <input className="input" autoCapitalize="none" value={form.loginId} onChange={(e) => setForm({ ...form, loginId: e.target.value })} />
-          </Field>
-          <Field label="Password" hint="At least 10 characters, not the login ID.">
-            <input className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-          </Field>
-          <Field label="Mobile number (optional)" hint={PHONE_HINT}>
-            <input
-              className="input"
-              inputMode="numeric"
-              maxLength={10}
-              placeholder="98765 43210"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "").slice(0, 10) })}
-            />
-          </Field>
-          <Field label="Email" hint={EMAIL_HINT}>
-            <input className="input" type="email" autoCapitalize="none" autoComplete="off" placeholder="name@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          <Field label="Full name (optional)" hint="Used in the welcome email. They can correct it in their first-sign-in form.">
+            <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </Field>
           {form.role !== "SUPERVISOR" && form.role !== "ADMIN" && form.role !== "ACCOUNTANT" && (
             <Field label="Supervisor" hint={supervisors.length ? undefined : "Add a supervisor first to build a team."}>
@@ -265,7 +247,7 @@ export default function AdminTeamPage() {
         <Flash text={flash} />
         <button onClick={createUser} disabled={loading} className="btn btn-kesar btn-sm">
           <Icon name="plus" className="h-4 w-4" />
-          {loading ? "Adding…" : "Add"}
+          {loading ? "Saving…" : "Give role and send email"}
         </button>
       </div>
 

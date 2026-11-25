@@ -112,7 +112,7 @@ export default function LoginCard({
           )}
 
           {EMAIL_AND_GOOGLE_ONLY ? (
-            <SimpleSignIn business={brand.business} google={google} />
+            <SimpleSignIn business={brand.business} />
           ) : (
             <>
           {!brand.business && (
@@ -180,7 +180,7 @@ export default function LoginCard({
  * emailed code; on the main address one email with a sign-in link for each
  * business the confirmed address belongs to (and the console).
  */
-function SimpleSignIn({ business, google }: { business: boolean; google: boolean }) {
+function SimpleSignIn({ business }: { business: boolean }) {
   const { t } = useLanguage();
   if (!business) {
     return (
@@ -199,16 +199,6 @@ function SimpleSignIn({ business, google }: { business: boolean; google: boolean
   }
   return (
     <div className="space-y-4">
-      {google && (
-        <>
-          <GoogleButton href="/api/auth/google/start" label={t("google.continue")} />
-          <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            <span className="h-px flex-1 bg-[var(--line)]" aria-hidden />
-            {t("google.or")}
-            <span className="h-px flex-1 bg-[var(--line)]" aria-hidden />
-          </div>
-        </>
-      )}
       <EmailCodeLogin />
     </div>
   );

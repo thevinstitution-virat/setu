@@ -261,6 +261,8 @@ model User {
   isOwner         Boolean   @default(false)
   /// Bumped to end every signed-in session of this person ("sign out everywhere"); sessions carry it as sv.
   sessionVersion  Int       @default(0)
+  /// True until the person has filled the first-sign-in form for their role (new shops, and anyone the admin gave a role).
+  onboardingDue   Boolean   @default(false)
   createdAt       DateTime  @default(now())
   /// The supervisor this person reports to (field staff). Supervisors see and manage their team.
   supervisorId    String?

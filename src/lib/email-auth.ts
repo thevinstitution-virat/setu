@@ -51,6 +51,20 @@ export function userByVerifiedEmail(db: TenantDb, email: string) {
   });
 }
 
+/**
+ * The login this address belongs to, verified or not (the admin vouches for the staff addresses they type
+ * in, and a new shop's address is proved by the code itself). A verified owner wins over an unverified one.
+ */
+export async function userByEmail(db: TenantDb, email: string) {
+  const rows = await db.user.findMany({
+    where: { email: { equals: email, mode: "insensitive" }, isSupport: false },
+    select: { id: true, name: true, role: true, active: true, loginId: true, email: true, emailVerifiedAt: true },
+    orderBy: { createdAt: "asc" },
+    take: 5,
+  });
+  return rows.find((r) => r.emailVerifiedAt) ?? rows[0] ?? null;
+}
+
 /** A new sign-in or verification code for this person and address (returned for the caller to send). */
 export async function issueEmailCode(db: TenantDb, userId: string, email: string, purpose: "SIGN_IN" | "VERIFY", now = Date.now()): Promise<string> {
   const recent = await db.emailChallenge.count({ where: { email, purpose, createdAt: { gte: new Date(now - SEND_WINDOW_MS) } } });
