@@ -78,7 +78,7 @@ export default function PickCard({
               <p className="text-sm font-semibold break-words">{r.name}</p>
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0 text-xs text-[var(--muted)]">
-                  <p className={r.free === 0 ? "text-[#a8281e] font-semibold" : ""}>{unitsLabel(r.free, r.unit, r.caseSize)} free</p>
+                  <p className={r.free === 0 ? "text-[var(--risk-text)] font-semibold" : ""}>{unitsLabel(r.free, r.unit, r.caseSize)} free</p>
                   {hasCase && (
                     <button
                       type="button"
@@ -94,7 +94,7 @@ export default function PickCard({
                 <Stepper value={qty} max={Math.max(r.free, 0)} label={r.name} onChangeAction={(n) => set(r.productId, n)} />
               </div>
               {short && (
-                <p className="text-xs font-semibold text-[#a8281e]">
+                <p className="text-xs font-semibold text-[var(--risk-text)]">
                   {over[r.productId] > 0 ? `Only ${over[r.productId]} free in the van (free goods count too).` : "None free in the van now."}
                 </p>
               )}

@@ -97,7 +97,7 @@ export default function VanUnload({ tripId, version, onDone }: { tripId: string;
               <p className="text-sm font-semibold break-words min-w-0">{r.name}</p>
               <p className="text-xs text-[var(--ink-2)] shrink-0">
                 On van <b>{r.onHand}</b> {r.unit}
-                {r.expired > 0 && <span className="text-[#a8281e]"> · {r.expired} expired</span>}
+                {r.expired > 0 && <span className="text-[var(--risk-text)]"> · {r.expired} expired</span>}
               </p>
             </div>
             {r.reserved > 0 && <p className="text-[11px] text-[var(--muted)]">{r.reserved} needed by the van&apos;s next trips: keep them in the van if it goes out again.</p>}
@@ -116,7 +116,7 @@ export default function VanUnload({ tripId, version, onDone }: { tripId: string;
               ))}
             </div>
             {missing !== 0 && (
-              <p className={`text-xs font-semibold ${missing > 0 ? "text-[#a8281e]" : "text-[var(--genda-text)]"}`}>
+              <p className={`text-xs font-semibold ${missing > 0 ? "text-[var(--risk-text)]" : "text-[var(--scheme-text)]"}`}>
                 {missing > 0 ? `${missing} ${r.unit} missing from the van` : `${-missing} ${r.unit} more than the records show`}
               </p>
             )}
@@ -125,7 +125,7 @@ export default function VanUnload({ tripId, version, onDone }: { tripId: string;
       </ul>
       <div className="px-4 py-3 border-t border-[var(--line)] space-y-3">
         {(missingTotal > 0 || extraTotal > 0) && (
-          <p className="rounded-xl bg-[var(--genda-tint)] px-3 py-2 text-sm text-[var(--genda-text)]">
+          <p className="rounded-xl bg-[var(--scheme-tint)] px-3 py-2 text-sm text-[var(--scheme-text)]">
             {missingTotal > 0 && `${plural(missingTotal, "unit")} missing will be written off. `}
             {extraTotal > 0 && `${plural(extraTotal, "extra unit")} will be booked in.`}
           </p>
@@ -139,7 +139,7 @@ export default function VanUnload({ tripId, version, onDone }: { tripId: string;
             <Icon name="check" className="h-4 w-4" /> {busy ? "Unloading…" : "Unload"}
           </button>
         </div>
-        {failed && <p className="text-sm text-[#a8281e]">{failed}</p>}
+        {failed && <p className="text-sm text-[var(--risk-text)]">{failed}</p>}
       </div>
     </section>
   );
@@ -151,20 +151,20 @@ function UnloadResult({ result, names, units, onClose }: { result: Result; names
     <section className="card p-4 space-y-3" role="status">
       <div className="flex items-start justify-between gap-2">
         <p className="font-heading font-bold flex items-center gap-2">
-          <Icon name="check" className="h-5 w-5 text-[var(--mint-text)]" /> Van unloaded
+          <Icon name="check" className="h-5 w-5 text-[var(--success-text)]" /> Van unloaded
         </p>
         <button type="button" className="btn btn-quiet btn-xs !px-2 !min-h-[40px] !min-w-[40px]" aria-label="Close" onClick={onClose}>
           <Icon name="x" className="h-4 w-4" />
         </button>
       </div>
       <div className="grid grid-cols-3 gap-2 text-center">
-        <Tile n={result.back} label="Back in warehouse" tone="bg-[var(--mint-tint)] text-[var(--mint-text)]" />
-        <Tile n={result.damaged} label="Damaged" tone={result.damaged ? "bg-[#fde4e1] text-[#a8281e]" : "bg-ink/5"} />
+        <Tile n={result.back} label="Back in warehouse" tone="bg-[var(--success-tint)] text-[var(--success-text)]" />
+        <Tile n={result.damaged} label="Damaged" tone={result.damaged ? "bg-[var(--risk-tint)] text-[var(--risk-text)]" : "bg-ink/5"} />
         <Tile n={result.kept} label="Kept in van" tone="bg-ink/5" />
       </div>
       {result.missing.length > 0 && (
         <div className="text-sm">
-          <p className="font-semibold text-[#a8281e]">Missing ({plural(result.missing.length, "product")}), written off</p>
+          <p className="font-semibold text-[var(--risk-text)]">Missing ({plural(result.missing.length, "product")}), written off</p>
           <ul className="list-disc pl-5 text-[var(--ink-2)]">
             {result.missing.map((m) => (
               <li key={m.productId}>{line(m)}</li>
@@ -174,7 +174,7 @@ function UnloadResult({ result, names, units, onClose }: { result: Result; names
       )}
       {result.found.length > 0 && (
         <div className="text-sm">
-          <p className="font-semibold text-[var(--genda-text)]">Extra, booked in</p>
+          <p className="font-semibold text-[var(--scheme-text)]">Extra, booked in</p>
           <ul className="list-disc pl-5 text-[var(--ink-2)]">
             {result.found.map((m) => (
               <li key={m.productId}>{line(m)}</li>

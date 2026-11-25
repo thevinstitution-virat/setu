@@ -41,7 +41,7 @@ export default async function ReportsOverview({ searchParams }: { searchParams: 
         <Section title="Money received, by how it was paid" sub={`Against dues; wallet top-ups ${rs(d.collections.walletTopUps)} not counted.`}>
           <ShareBars rows={d.collections.byMethod.map((m) => ({ label: METHOD[m.method] ?? m.method, value: m.amount, note: `${m.count}` }))} />
         </Section>
-        <Section title="Unpaid bills by age" sub={`${num(d.outstanding.shops)} shops owe ${rs(d.outstanding.total)}`} action={<Link href="/admin/khata" className="text-sm font-bold text-[var(--kesar-text)]">Khata →</Link>}>
+        <Section title="Unpaid bills by age" sub={`${num(d.outstanding.shops)} shops owe ${rs(d.outstanding.total)}`} action={<Link href="/admin/khata" className="text-sm font-bold text-[var(--accent-text)]">Khata →</Link>}>
           <ShareBars rows={d.outstanding.ageing.map((a) => ({ label: a.label, value: a.amount, note: `${a.share}%` }))} />
         </Section>
       </div>
@@ -52,7 +52,7 @@ export default async function ReportsOverview({ searchParams }: { searchParams: 
             head={["Shop", "Owes", "Overdue", "Oldest bill"]}
             align={["l", "r", "r", "r"]}
             rows={d.outstanding.debtors.map((r) => [
-              <Link key={r.retailerId} href={`/admin/khata/${r.retailerId}`} className="hover:text-[var(--kesar-text)]">
+              <Link key={r.retailerId} href={`/admin/khata/${r.retailerId}`} className="hover:text-[var(--accent-text)]">
                 {r.outletName}
                 <span className="block text-xs font-normal text-[var(--muted)]">{r.area}</span>
               </Link>,
@@ -69,7 +69,7 @@ export default async function ReportsOverview({ searchParams }: { searchParams: 
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <Section title="Sales by category" sub="Net taxable value" action={<Link href={`/admin/reports/sales${qs}`} className="text-sm font-bold text-[var(--kesar-text)]">Sales →</Link>}>
+        <Section title="Sales by category" sub="Net taxable value" action={<Link href={`/admin/reports/sales${qs}`} className="text-sm font-bold text-[var(--accent-text)]">Sales →</Link>}>
           <ShareBars rows={d.categories.map((c) => ({ label: c.name, value: c.taxable, note: `${c.share}%` }))} />
         </Section>
         <Section title="Delivery" sub={`${num(d.delivery.trips)} trips · ${d.delivery.dropsPerTrip} drops a trip · ${pct(d.delivery.firstAttemptRate)} first attempt`}>
@@ -88,7 +88,7 @@ export default async function ReportsOverview({ searchParams }: { searchParams: 
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
-        <Section title="Sales team" sub={`Orders they booked in the period; target is for ${d.team.month}`} action={<Link href={`/admin/reports/team${qs}`} className="text-sm font-bold text-[var(--kesar-text)]">Team →</Link>}>
+        <Section title="Sales team" sub={`Orders they booked in the period; target is for ${d.team.month}`} action={<Link href={`/admin/reports/team${qs}`} className="text-sm font-bold text-[var(--accent-text)]">Team →</Link>}>
           <Table
             head={["Name", "Orders", "Value", "Strike rate", "Collected", "Target"]}
             align={["l", "r", "r", "r", "r", "r"]}

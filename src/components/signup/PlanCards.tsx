@@ -80,12 +80,12 @@ export function PlanCards({
 
             <ul className="mt-3 space-y-1.5">
               <li className="flex gap-2 text-sm text-[var(--ink-2)]">
-                <Icon name="check" className="h-4 w-4 mt-0.5 shrink-0 text-[var(--mint-text)]" />
+                <Icon name="check" className="h-4 w-4 mt-0.5 shrink-0 text-[var(--success-text)]" />
                 Ordering, delivery and GST invoices
               </li>
               {p.features.map((f) => (
                 <li key={f.code} className="flex gap-2 text-sm text-[var(--ink-2)]">
-                  <Icon name="check" className="h-4 w-4 mt-0.5 shrink-0 text-[var(--mint-text)]" />
+                  <Icon name="check" className="h-4 w-4 mt-0.5 shrink-0 text-[var(--success-text)]" />
                   {f.label}
                 </li>
               ))}
@@ -111,7 +111,7 @@ export function PlanCards({
       </button>
 
       {error && (
-        <p id="f-planCode-err" role="alert" className="text-xs font-semibold text-[#a8281e]">
+        <p id="f-planCode-err" role="alert" className="text-xs font-semibold text-[var(--risk-text)]">
           {error}
         </p>
       )}

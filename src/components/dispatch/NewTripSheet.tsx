@@ -57,7 +57,7 @@ export default function NewTripSheet({
       onClose={onClose}
       footer={
         <div className="space-y-2">
-          {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+          {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
           <div className="flex gap-2 justify-end">
             <button type="button" className="btn btn-quiet" onClick={onClose} disabled={busy}>
               Cancel
@@ -84,7 +84,7 @@ export default function NewTripSheet({
               aria-checked={slot === s.key}
               onClick={() => setSlot(s.key)}
               className={`min-h-[44px] rounded-xl px-4 text-sm font-bold transition ${
-                slot === s.key ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-ink/5 text-[var(--ink-2)]"
+                slot === s.key ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "bg-ink/5 text-[var(--ink-2)]"
               }`}
             >
               {s.label}
@@ -97,7 +97,7 @@ export default function NewTripSheet({
         {board.drivers.length === 0 ? (
           <p className="text-sm text-[var(--muted)]">
             No delivery staff yet.{" "}
-            <Link href="/admin/team" className="font-bold text-[var(--kesar-text)]">
+            <Link href="/admin/team" className="font-bold text-[var(--accent-text)]">
               Add one in Team
             </Link>
           </p>

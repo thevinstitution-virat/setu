@@ -49,7 +49,7 @@ export default function VanStockPage() {
         {head}
         {error ? (
           <div className="card p-5 space-y-3">
-            <p className="text-sm text-[#a8281e]">{error}</p>
+            <p className="text-sm text-[var(--risk-text)]">{error}</p>
             <button type="button" className="btn btn-outline w-full" onClick={() => setNonce((n) => n + 1)}>
               Try again
             </button>
@@ -127,14 +127,14 @@ export default function VanStockPage() {
             )
           ) : (
             trip.status === "PLANNED" && (
-              <p className="rounded-xl bg-[var(--genda-tint)] text-[var(--genda-text)] p-3 text-sm font-semibold">
+              <p className="rounded-xl bg-[var(--scheme-tint)] text-[var(--scheme-text)] p-3 text-sm font-semibold">
                 Start your trip to make spot sales from the van.
               </p>
             )
           )}
 
           {expiredRows > 0 && (
-            <p className="flex items-start gap-2 rounded-xl bg-[#fde4e1] text-[#a8281e] p-3 text-sm font-semibold">
+            <p className="flex items-start gap-2 rounded-xl bg-[var(--risk-tint)] text-[var(--risk-text)] p-3 text-sm font-semibold">
               <Icon name="alert" className="h-4 w-4 shrink-0 mt-0.5" />
               <span>
                 {expiredRows} product{expiredRows === 1 ? " has" : "s have"} expired stock. Don&apos;t sell it; hand it back at the office.
@@ -205,9 +205,9 @@ function VanRowCard({ row: r }: { row: VanRow }) {
           <p className="text-[11px] text-[var(--muted)]">For stops</p>
           <p className="font-bold text-sm mt-0.5">{r.reserved}</p>
         </div>
-        <div className={`rounded-xl p-2 ${r.free > 0 ? "bg-[var(--kesar-tint)]" : "bg-black/[0.04]"}`}>
-          <p className={`text-[11px] ${r.free > 0 ? "text-[var(--kesar-text)]" : "text-[var(--muted)]"}`}>Free to sell</p>
-          <p className={`font-bold text-sm mt-0.5 ${r.free > 0 ? "text-[var(--kesar-text)]" : ""}`}>{r.free}</p>
+        <div className={`rounded-xl p-2 ${r.free > 0 ? "bg-[var(--accent-tint)]" : "bg-black/[0.04]"}`}>
+          <p className={`text-[11px] ${r.free > 0 ? "text-[var(--accent-text)]" : "text-[var(--muted)]"}`}>Free to sell</p>
+          <p className={`font-bold text-sm mt-0.5 ${r.free > 0 ? "text-[var(--accent-text)]" : ""}`}>{r.free}</p>
         </div>
       </div>
       <p className="text-xs text-[var(--muted)]">
@@ -215,7 +215,7 @@ function VanRowCard({ row: r }: { row: VanRow }) {
         {r.free > 0 && r.caseSize && r.caseSize > 1 ? ` · free: ${unitsLabel(r.free, r.unit, r.caseSize)}` : ""}
       </p>
       {r.reserved > r.onHand - r.expired && (
-        <p className="text-xs font-semibold text-[#a8281e]">
+        <p className="text-xs font-semibold text-[var(--risk-text)]">
           Short for your stops by {r.reserved - (r.onHand - r.expired)} {r.unit}.
         </p>
       )}
@@ -227,14 +227,14 @@ function VanRowCard({ row: r }: { row: VanRow }) {
             return (
               <li
                 key={`${l.batch}-${l.expiry ?? ""}-${i}`}
-                className={`py-2 flex items-center justify-between gap-3 text-xs ${gone ? "text-[#a8281e]" : ""}`}
+                className={`py-2 flex items-center justify-between gap-3 text-xs ${gone ? "text-[var(--risk-text)]" : ""}`}
               >
                 <span className="min-w-0 break-words">
                   {l.batch ? <b>Batch {l.batch}</b> : <b>No batch</b>}
                   {l.expiry ? ` · ${gone ? "expired" : "expires"} ${expiryLabel(l.expiry)}` : ""}
                 </span>
                 <span className="flex items-center gap-1.5 shrink-0">
-                  {gone && <span className="chip !py-0.5 !text-[11px] !bg-[#fde4e1] !text-[#a8281e] !border-transparent">Expired</span>}
+                  {gone && <span className="chip !py-0.5 !text-[11px] !bg-[var(--risk-tint)] !text-[var(--risk-text)] !border-transparent">Expired</span>}
                   <span className="font-bold">{l.qty}</span>
                 </span>
               </li>

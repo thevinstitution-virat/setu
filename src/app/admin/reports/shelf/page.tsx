@@ -33,7 +33,7 @@ export default async function ShelfReport({ searchParams }: { searchParams: Prom
           align={["l", "l", "r", "r", "r", "r", "r", "l"]}
           rows={r.rows.map((s) => [
             <span key="n" className="block min-w-0">
-              <Link href={`/admin/reports/shops/${s.retailerId}`} className="font-semibold hover:text-[var(--kesar-text)]">
+              <Link href={`/admin/reports/shops/${s.retailerId}`} className="font-semibold hover:text-[var(--accent-text)]">
                 {s.outletName}
               </Link>
               <span className="block text-xs text-[var(--muted)]">{s.area}</span>
@@ -44,16 +44,16 @@ export default async function ShelfReport({ searchParams }: { searchParams: Prom
             </span>,
             num(s.ours),
             num(s.others),
-            s.empty ? <span key="e" className="font-semibold text-[var(--kesar-text)]">{num(s.empty)}</span> : "0",
+            s.empty ? <span key="e" className="font-semibold text-[var(--accent-text)]">{num(s.empty)}</span> : "0",
             pct(s.share),
             s.change === null ? (
               "–"
             ) : (
-              <span key="c" className={`text-xs font-bold ${s.change === 0 ? "text-[var(--muted)]" : s.change > 0 ? "text-[var(--mint-text)]" : "text-[#a8281e]"}`}>
+              <span key="c" className={`text-xs font-bold ${s.change === 0 ? "text-[var(--muted)]" : s.change > 0 ? "text-[var(--success-text)]" : "text-[var(--risk-text)]"}`}>
                 {s.change === 0 ? "→ same" : `${s.change > 0 ? "▲" : "▼"} ${Math.abs(s.change)} pts`}
               </span>
             ),
-            <a key="p" href={fileUrl(s.photoKey)} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--kesar-text)] underline">
+            <a key="p" href={fileUrl(s.photoKey)} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--accent-text)] underline">
               {s.flagged ? "Open · used before" : "Open"}
             </a>,
           ])}

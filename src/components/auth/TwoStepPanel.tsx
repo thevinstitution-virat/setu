@@ -198,7 +198,7 @@ export default function TwoStepPanel({
           />
         </label>
         {error && (
-          <p role="alert" className="text-sm text-[#a8281e]">
+          <p role="alert" className="text-sm text-[var(--risk-text)]">
             {error}
             {expired && (
               <>
@@ -218,16 +218,16 @@ export default function TwoStepPanel({
       {mode === "verify" && (
         <div className="flex flex-col items-start gap-2 text-sm">
           {kind !== "recovery" ? (
-            <button type="button" className="font-semibold text-[var(--kesar-text)] hover:underline" onClick={() => { setKind("recovery"); setCode(""); setError(null); }}>
+            <button type="button" className="font-semibold text-[var(--accent-text)] hover:underline" onClick={() => { setKind("recovery"); setCode(""); setError(null); }}>
               {t("mfa.useRecovery")}
             </button>
           ) : (
-            <button type="button" className="font-semibold text-[var(--kesar-text)] hover:underline" onClick={() => { setKind("app"); setCode(""); setError(null); }}>
+            <button type="button" className="font-semibold text-[var(--accent-text)] hover:underline" onClick={() => { setKind("app"); setCode(""); setError(null); }}>
               {t("mfa.useApp")}
             </button>
           )}
           {smsPhone && kind !== "sms" && (
-            <button type="button" className="font-semibold text-[var(--kesar-text)] hover:underline disabled:opacity-50" disabled={busy} onClick={sendSms}>
+            <button type="button" className="font-semibold text-[var(--accent-text)] hover:underline disabled:opacity-50" disabled={busy} onClick={sendSms}>
               {t("mfa.smsSend")}
             </button>
           )}

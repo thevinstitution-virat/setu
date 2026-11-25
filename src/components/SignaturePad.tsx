@@ -70,7 +70,7 @@ export default function SignaturePad({ onChangeAction }: { onChangeAction: (data
       <div className="flex items-center justify-between">
         <span className="text-xs text-foreground/50">Customer signature</span>
         {hasInk && (
-          <button type="button" onClick={clear} className="text-xs text-[var(--kesar-text)] font-medium">
+          <button type="button" onClick={clear} className="text-xs text-[var(--accent-text)] font-medium">
             Clear
           </button>
         )}

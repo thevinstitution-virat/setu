@@ -154,7 +154,7 @@ export default function InvoicesPage() {
           setPage(1);
         }}
       />
-      {badRange && <p className="text-sm text-[#a8281e]">The start date must be on or before the end date.</p>}
+      {badRange && <p className="text-sm text-[var(--risk-text)]">The start date must be on or before the end date.</p>}
 
       {tab === "reports" ? (
         !badRange && <Reports from={period.from} to={period.to} periodText={periodText} />
@@ -358,7 +358,7 @@ function InvoiceRow({ r }: { r: Row }) {
     <>
       {r.einvStatus !== "NOT_REQUIRED" && <span className={`${EINV_CHIP[r.einvStatus]} !py-0.5 !px-2 !text-[11px]`}>{EINV_LABEL[r.einvStatus]}</span>}
       {r.ewbNo && <span className="chip !py-0.5 !px-2 !text-[11px]">E-way bill</span>}
-      {r.due !== null && r.due > 0 && !note && <span className="text-[11px] font-semibold text-[var(--kesar-text)]">Due {formatINR(r.due)}</span>}
+      {r.due !== null && r.due > 0 && !note && <span className="text-[11px] font-semibold text-[var(--accent-text)]">Due {formatINR(r.due)}</span>}
     </>
   );
   const sub = [r.order ? `Order ${r.order.orderNumber}` : null, r.original ? `On ${r.original.number}` : null].filter(Boolean).join(" · ");
@@ -448,7 +448,7 @@ function Reports({ from, to, periodText }: { from: string; to: string; periodTex
               </p>
               <p className="text-sm text-[var(--muted)] mt-0.5">{it.help}</p>
               {it.warn && (
-                <p className="text-xs text-[var(--kesar-text)] mt-1 flex items-start gap-1">
+                <p className="text-xs text-[var(--accent-text)] mt-1 flex items-start gap-1">
                   <Icon name="alert" className="h-3.5 w-3.5 shrink-0 mt-0.5" /> {it.warn}
                 </p>
               )}

@@ -40,7 +40,7 @@ export default function BillCard({
                 {l.gstRate > 0 ? ` · GST ${l.gstRate}%` : ""}
               </p>
               {l.discount > 0 && (
-                <p className="text-xs font-semibold text-[var(--mint-text)]">
+                <p className="text-xs font-semibold text-[var(--success-text)]">
                   −{formatINR(l.discount)}
                   {l.schemes.length > 0 ? ` · ${l.schemes.join(", ")}` : ""}
                 </p>
@@ -52,11 +52,11 @@ export default function BillCard({
       </ul>
 
       {quote.free.length > 0 && (
-        <div className="rounded-xl bg-[var(--mint-tint)] p-3 space-y-2">
+        <div className="rounded-xl bg-[var(--success-tint)] p-3 space-y-2">
           {quote.free.map((f) => (
             <div key={`${f.schemeId}-${f.productId}`} className="flex items-start justify-between gap-3 text-sm">
               <div className="min-w-0">
-                <p className="font-semibold text-[var(--mint-text)] break-words">
+                <p className="font-semibold text-[var(--success-text)] break-words">
                   {f.name} · {f.quantity} {f.unit}
                 </p>
                 <p className="text-xs text-[var(--ink-2)]">{f.schemeName}. Hand it over from the van too.</p>
@@ -80,14 +80,14 @@ export default function BillCard({
 
       {error && <QuoteError message={error} onRetryAction={onRetryAction} />}
       {fresh && quote.problems.length > 0 && (
-        <ul role="alert" className="rounded-xl bg-[#fde4e1] text-[#a8281e] p-3 text-sm font-semibold space-y-1 list-disc pl-7">
+        <ul role="alert" className="rounded-xl bg-[var(--risk-tint)] text-[var(--risk-text)] p-3 text-sm font-semibold space-y-1 list-disc pl-7">
           {quote.problems.map((m) => (
             <li key={m}>{m}</li>
           ))}
         </ul>
       )}
       {fresh && quote.warnings.length > 0 && (
-        <ul className="rounded-xl bg-[var(--genda-tint)] text-[var(--genda-text)] p-3 text-sm font-semibold space-y-1 list-disc pl-7">
+        <ul className="rounded-xl bg-[var(--scheme-tint)] text-[var(--scheme-text)] p-3 text-sm font-semibold space-y-1 list-disc pl-7">
           {quote.warnings.map((m) => (
             <li key={m}>{m}</li>
           ))}
@@ -99,7 +99,7 @@ export default function BillCard({
 
 function QuoteError({ message, onRetryAction }: { message: string; onRetryAction: () => void }) {
   return (
-    <div className="rounded-xl bg-[#fde4e1] text-[#a8281e] p-3 text-sm font-semibold space-y-2">
+    <div className="rounded-xl bg-[var(--risk-tint)] text-[var(--risk-text)] p-3 text-sm font-semibold space-y-2">
       <p>{message}</p>
       <button type="button" className="btn btn-outline btn-sm" onClick={onRetryAction}>
         Check prices again
@@ -110,7 +110,7 @@ function QuoteError({ message, onRetryAction }: { message: string; onRetryAction
 
 function Row({ label, value, mint }: { label: string; value: string; mint?: boolean }) {
   return (
-    <div className={`flex justify-between gap-3 ${mint ? "text-[var(--mint-text)] font-semibold" : "text-[var(--ink-2)]"}`}>
+    <div className={`flex justify-between gap-3 ${mint ? "text-[var(--success-text)] font-semibold" : "text-[var(--ink-2)]"}`}>
       <span>{label}</span>
       <span>{value}</span>
     </div>

@@ -46,7 +46,7 @@ export default function StockPlacesPage() {
       {error && <ErrorBox message={error} onRetry={reload} />}
       {!data && !error && <p className="text-sm text-[var(--muted)]">Loading…</p>}
       {flash && (
-        <p className="card p-3 text-sm font-semibold text-[var(--mint-text)] bg-[var(--mint-tint)] flex items-center gap-2" role="status">
+        <p className="card p-3 text-sm font-semibold text-[var(--success-text)] bg-[var(--success-tint)] flex items-center gap-2" role="status">
           <Icon name="check" className="h-4 w-4 shrink-0" />
           <span className="min-w-0">{flash}</span>
         </p>
@@ -88,7 +88,7 @@ export default function StockPlacesPage() {
               <ul className="card divide-y divide-[var(--line)] overflow-hidden">
                 {vans.map((v) => (
                   <li key={v.id} className="flex items-center gap-3 px-4 py-3 min-h-[56px]">
-                    <span className="icon-tile bg-[var(--kesar-tint)] text-[var(--kesar-text)]">
+                    <span className="icon-tile bg-[var(--accent-tint)] text-[var(--accent-text)]">
                       <Icon name="truck" />
                     </span>
                     <div className="min-w-0 flex-1">
@@ -172,7 +172,7 @@ function WarehouseCard({ w, onEdit, onChanged }: { w: Place; onEdit: () => void;
   return (
     <div className={`card p-4 space-y-3 min-w-0 ${w.active ? "" : "opacity-75"}`}>
       <div className="flex items-start gap-3">
-        <span className="icon-tile bg-[#e1eeec] text-mor">
+        <span className="icon-tile bg-[var(--mor-tint)] text-mor">
           <Icon name="home" />
         </span>
         <div className="min-w-0 flex-1">
@@ -208,7 +208,7 @@ function WarehouseCard({ w, onEdit, onChanged }: { w: Place; onEdit: () => void;
           </button>
         )}
       </div>
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
     </div>
   );
 }

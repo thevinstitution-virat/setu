@@ -5,7 +5,7 @@ export default function PrefNote({ pref, note }: { pref: string | null; note: st
   const label = pref && pref in PREF_LABEL ? PREF_LABEL[pref as keyof typeof PREF_LABEL] : null;
   if (!label && !note) return null;
   return (
-    <p className="rounded-xl bg-[var(--genda-tint)] text-[var(--genda-text)] px-3 py-2 text-sm">
+    <p className="rounded-xl bg-[var(--scheme-tint)] text-[var(--scheme-text)] px-3 py-2 text-sm">
       {label && <b>{label}</b>}
       {label && note && " · "}
       {note}

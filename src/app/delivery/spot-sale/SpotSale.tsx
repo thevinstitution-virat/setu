@@ -29,7 +29,7 @@ function Step({ n, title, done }: { n: number; title: string; done?: boolean }) 
     <div className="flex items-center gap-2.5">
       <span
         className={`h-7 w-7 shrink-0 rounded-lg grid place-items-center text-xs font-bold ${
-          done ? "bg-[var(--mint-tint)] text-[var(--mint-text)]" : "bg-[var(--kesar-tint)] text-[var(--kesar-text)]"
+          done ? "bg-[var(--success-tint)] text-[var(--success-text)]" : "bg-[var(--accent-tint)] text-[var(--accent-text)]"
         }`}
       >
         {done ? <Icon name="check" className="h-3.5 w-3.5" /> : n}
@@ -215,7 +215,7 @@ export default function SpotSale({ photoRequired }: { photoRequired: boolean }) 
         {!van ? (
           vanError ? (
             <div className="card p-5 space-y-3">
-              <p className="text-sm text-[#a8281e]">{vanError}</p>
+              <p className="text-sm text-[var(--risk-text)]">{vanError}</p>
               <button type="button" className="btn btn-outline w-full" onClick={() => setVanNonce((n) => n + 1)}>
                 Try again
               </button>
@@ -224,7 +224,7 @@ export default function SpotSale({ photoRequired }: { photoRequired: boolean }) 
             <p className="text-sm text-[var(--muted)]">Loading…</p>
           )
         ) : (
-          <div className="rounded-xl bg-[var(--genda-tint)] text-[var(--genda-text)] p-3 text-sm font-semibold">{blocked}</div>
+          <div className="rounded-xl bg-[var(--scheme-tint)] text-[var(--scheme-text)] p-3 text-sm font-semibold">{blocked}</div>
         )}
         <Link href="/delivery" className="btn btn-outline w-full">
           <Icon name="chevronLeft" className="h-4 w-4" /> Back to trip
@@ -347,7 +347,7 @@ export default function SpotSale({ photoRequired }: { photoRequired: boolean }) 
           <ProofCard key={proofKey} photoRequired={photoRequired} photo={photo} onPhotoAction={handlePhoto} onSignatureAction={setSignature} />
 
           {error && (
-            <p role="alert" className="rounded-xl bg-[#fde4e1] text-[#a8281e] p-3 text-sm font-semibold">
+            <p role="alert" className="rounded-xl bg-[var(--risk-tint)] text-[var(--risk-text)] p-3 text-sm font-semibold">
               {error}
             </p>
           )}
@@ -364,14 +364,14 @@ export default function SpotSale({ photoRequired }: { photoRequired: boolean }) 
                     : "Sell and deliver"}
             </button>
             {fresh && quote && quote.problems.length > 0 && (
-              <p className="text-xs text-center text-[#a8281e] font-semibold">Fix the problems in the bill first.</p>
+              <p className="text-xs text-center text-[var(--risk-text)] font-semibold">Fix the problems in the bill first.</p>
             )}
           </div>
         </>
       )}
 
       {shop && items.length === 0 && error && (
-        <p role="alert" className="rounded-xl bg-[#fde4e1] text-[#a8281e] p-3 text-sm font-semibold">
+        <p role="alert" className="rounded-xl bg-[var(--risk-tint)] text-[var(--risk-text)] p-3 text-sm font-semibold">
           {error}
         </p>
       )}

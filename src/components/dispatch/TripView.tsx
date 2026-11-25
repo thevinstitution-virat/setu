@@ -60,7 +60,7 @@ export default function TripView({ id }: { id: string }) {
         </div>
       )}
       {flash && (
-        <p className="card p-3 text-sm font-semibold text-[var(--mint-text)] bg-[var(--mint-tint)] print:hidden" role="status">
+        <p className="card p-3 text-sm font-semibold text-[var(--success-text)] bg-[var(--success-tint)] print:hidden" role="status">
           <Icon name="check" className="inline h-4 w-4 mr-1" />
           {flash}
         </p>
@@ -164,7 +164,7 @@ function PrimaryAction({ data, onDone }: { data: TripDetail; onDone: (msg?: stri
                 ? `Starting sends all ${plural(summary.stops, "order")} out for delivery and puts the driver on duty.`
                 : "Add orders from the dispatch board first."}
             </p>
-            {error && <p className="text-sm text-[#a8281e] mt-1">{error}</p>}
+            {error && <p className="text-sm text-[var(--risk-text)] mt-1">{error}</p>}
           </div>
           {!short && (
             <button type="button" className="btn btn-kesar shrink-0" disabled={busy || summary.stops === 0} onClick={() => start(false)}>
@@ -173,7 +173,7 @@ function PrimaryAction({ data, onDone }: { data: TripDetail; onDone: (msg?: stri
           )}
         </div>
         {short && (
-          <div className="rounded-2xl bg-[var(--genda-tint)] p-3 space-y-2">
+          <div className="rounded-2xl bg-[var(--scheme-tint)] p-3 space-y-2">
             <ShortList rows={short} />
             <p className="text-xs text-[var(--ink-2)]">Starting tops the van up for every order. If the goods are really there, start anyway: the missing units are booked in first.</p>
             <div className="flex flex-wrap gap-2">
@@ -207,8 +207,8 @@ function PrimaryAction({ data, onDone }: { data: TripDetail; onDone: (msg?: stri
         )}
       </div>
       {blocked && (
-        <div className="rounded-2xl bg-[var(--genda-tint)] p-3 space-y-2">
-          <p className="text-sm text-[var(--genda-text)] flex items-start gap-1.5">
+        <div className="rounded-2xl bg-[var(--scheme-tint)] p-3 space-y-2">
+          <p className="text-sm text-[var(--scheme-text)] flex items-start gap-1.5">
             <Icon name="alert" className="h-4 w-4 shrink-0 mt-0.5" /> {blocked}
           </p>
           <p className="text-xs text-[var(--ink-2)]">Close anyway marks the open stops &ldquo;Not delivered: ran out of time&rdquo;. Those orders go back to Ready to go.</p>
@@ -222,7 +222,7 @@ function PrimaryAction({ data, onDone }: { data: TripDetail; onDone: (msg?: stri
           </div>
         </div>
       )}
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
     </div>
   );
 }

@@ -145,7 +145,7 @@ export function InvoiceView({ doc }: { doc: InvoiceJson }) {
         <div className="text-right">
           <p className="text-xs text-[var(--muted)]">Total</p>
           <p className="text-xl font-semibold">{formatINR(doc.total)}</p>
-          {doc.due !== null && (doc.due > 0 ? <p className="text-xs font-medium text-[var(--kesar-text)]">Due {formatINR(doc.due)}</p> : <p className="text-xs font-medium text-emerald-700">Paid</p>)}
+          {doc.due !== null && (doc.due > 0 ? <p className="text-xs font-medium text-[var(--accent-text)]">Due {formatINR(doc.due)}</p> : <p className="text-xs font-medium text-emerald-700">Paid</p>)}
         </div>
       </div>
 
@@ -216,7 +216,7 @@ export function InvoiceView({ doc }: { doc: InvoiceJson }) {
           {doc.irn && <p className="break-all"><span className="text-[var(--muted)]">IRN</span> {doc.irn}</p>}
           {doc.ackNo && <p><span className="text-[var(--muted)]">Ack</span> {doc.ackNo} · {fmtDate(doc.ackDate)}</p>}
           {doc.einvStatus === "PENDING" && <p className="text-[var(--muted)]">e-Invoice is being generated.</p>}
-          {doc.einvStatus === "FAILED" && <p className="text-[var(--kesar-text)]">e-Invoice failed: {doc.einvError}</p>}
+          {doc.einvStatus === "FAILED" && <p className="text-[var(--accent-text)]">e-Invoice failed: {doc.einvError}</p>}
           {doc.ewbNo && <p><span className="text-[var(--muted)]">E-way bill</span> {doc.ewbNo}{doc.ewbVehicle ? ` · ${doc.ewbVehicle}` : ""}{doc.ewbValidUntil ? ` · valid till ${fmtDate(doc.ewbValidUntil)}` : ""}</p>}
         </div>
       )}
@@ -331,7 +331,7 @@ export function InvoicePanel({
     load();
   }, [load]);
 
-  if (error) return <div className="card p-4 text-sm text-[var(--kesar-text)]">{error}</div>;
+  if (error) return <div className="card p-4 text-sm text-[var(--accent-text)]">{error}</div>;
   if (!data) return <div className="card p-4 text-sm text-[var(--muted)]">Loading…</div>;
   return (
     <div className="space-y-4">

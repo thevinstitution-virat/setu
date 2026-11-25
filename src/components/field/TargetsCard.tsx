@@ -84,7 +84,7 @@ function MyTargets({ period }: { period: string }) {
   if (!data.targets.length) {
     return (
       <div className="card p-6 text-center space-y-2">
-        <span className="icon-tile mx-auto bg-[var(--genda-tint)] text-[var(--genda-text)]">
+        <span className="icon-tile mx-auto bg-[var(--scheme-tint)] text-[var(--scheme-text)]">
           <Icon name="chart" />
         </span>
         <p className="text-sm text-[var(--ink-2)]">No targets set for you this month.</p>
@@ -169,14 +169,14 @@ function Leaderboard({ period }: { period: string }) {
             return (
               <li
                 key={r.userId}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2 min-h-[44px] ${me ? "bg-[var(--genda-tint)]" : ""}`}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2 min-h-[44px] ${me ? "bg-[var(--scheme-tint)]" : ""}`}
               >
-                <span className={`w-7 text-center font-heading font-bold ${r.rank <= 3 ? "text-[var(--kesar-text)]" : "text-[var(--muted)]"}`}>
+                <span className={`w-7 text-center font-heading font-bold ${r.rank <= 3 ? "text-[var(--accent-text)]" : "text-[var(--muted)]"}`}>
                   {r.rank}
                 </span>
                 <span className="flex-1 min-w-0 text-sm font-semibold truncate">
                   {r.name}
-                  {me && <span className="text-xs font-bold text-[var(--genda-text)]"> (you)</span>}
+                  {me && <span className="text-xs font-bold text-[var(--scheme-text)]"> (you)</span>}
                 </span>
                 <span className="text-sm font-bold shrink-0">{metricValue(metric, r.achieved)}</span>
                 {r.pct !== null && <span className="text-xs text-[var(--muted)] w-10 text-right shrink-0">{r.pct}%</span>}

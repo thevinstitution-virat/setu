@@ -65,7 +65,7 @@ export default async function RetailerInvoices({ searchParams }: { searchParams:
     return `/retailer/invoices${s ? `?${s}` : ""}`;
   };
   const chip = (on: boolean) =>
-    `shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold whitespace-nowrap ${on ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-black/5 text-[var(--ink-2)]"}`;
+    `shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold whitespace-nowrap ${on ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "bg-black/5 text-[var(--ink-2)]"}`;
 
   return (
     <div className="space-y-4">
@@ -115,7 +115,7 @@ export default async function RetailerInvoices({ searchParams }: { searchParams:
       )}
 
       <p className="text-xs text-[var(--muted)]">
-        What you owe in total is in your <Link href="/retailer/khata" className="font-semibold text-[var(--kesar-text)]">khata</Link>.
+        What you owe in total is in your <Link href="/retailer/khata" className="font-semibold text-[var(--accent-text)]">khata</Link>.
       </p>
     </div>
   );

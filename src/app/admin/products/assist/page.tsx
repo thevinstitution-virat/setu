@@ -75,7 +75,7 @@ export default function CatalogueAssistPage() {
     <div className="space-y-5">
       <div className="page-head">
         <div className="min-w-0">
-          <Link href="/admin/products" className="text-xs font-bold text-[var(--kesar-text)]">
+          <Link href="/admin/products" className="text-xs font-bold text-[var(--accent-text)]">
             ← Products
           </Link>
           <h1 className="page-title">Catalogue assist</h1>
@@ -88,7 +88,7 @@ export default function CatalogueAssistPage() {
 
       {data && (
         <>
-          <p className={`rounded-xl px-3 py-2 text-sm ${data.ai.available ? "bg-[var(--mint-tint)]" : "bg-ink/5"}`} role="status">
+          <p className={`rounded-xl px-3 py-2 text-sm ${data.ai.available ? "bg-[var(--success-tint)]" : "bg-ink/5"}`} role="status">
             {data.ai.available
               ? `AI is on: about one credit per 25 products${data.ai.cap !== null ? ` (${data.ai.used} of ${data.ai.cap} used this month)` : ""}. Check brand spellings and tax codes before applying.`
               : data.ai.message}
@@ -115,7 +115,7 @@ export default function CatalogueAssistPage() {
           </div>
           <p className="text-xs text-[var(--muted)]">
             Tidying an Excel sheet before import is on{" "}
-            <Link href="/admin/import" className="font-bold text-[var(--kesar-text)]">
+            <Link href="/admin/import" className="font-bold text-[var(--accent-text)]">
               Import
             </Link>{" "}
             (Products → “Tidy the sheet first”).

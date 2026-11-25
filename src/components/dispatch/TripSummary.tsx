@@ -47,7 +47,7 @@ export function LoadSheet({ summary }: { summary: TripSummary }) {
                   <td className="px-2 py-2 text-[var(--ink-2)]">{r.unit}</td>
                   <td className="px-2 py-2 text-right font-semibold">{r.loaded}</td>
                   <td className="px-2 py-2 text-right">{r.delivered}</td>
-                  <td className={`px-4 py-2 text-right ${r.returned ? "font-semibold text-[var(--kesar-text)]" : ""}`}>{r.returned}</td>
+                  <td className={`px-4 py-2 text-right ${r.returned ? "font-semibold text-[var(--accent-text)]" : ""}`}>{r.returned}</td>
                 </tr>
               ))}
             </tbody>
@@ -80,9 +80,9 @@ export function DayClose({ summary, status }: { summary: TripSummary; status: Tr
       </div>
       <div className="p-4 space-y-4">
         <div className="grid grid-cols-3 gap-2 text-center">
-          <Tile n={summary.delivered} label="Delivered" tone="bg-[var(--mint-tint)] text-[var(--mint-text)]" />
-          <Tile n={summary.failed} label="Not delivered" tone={summary.failed ? "bg-[#fde4e1] text-[#a8281e]" : "bg-ink/5"} />
-          <Tile n={summary.pending} label="Open" tone={summary.pending ? "bg-[var(--genda-tint)] text-[var(--genda-text)]" : "bg-ink/5"} />
+          <Tile n={summary.delivered} label="Delivered" tone="bg-[var(--success-tint)] text-[var(--success-text)]" />
+          <Tile n={summary.failed} label="Not delivered" tone={summary.failed ? "bg-[var(--risk-tint)] text-[var(--risk-text)]" : "bg-ink/5"} />
+          <Tile n={summary.pending} label="Open" tone={summary.pending ? "bg-[var(--scheme-tint)] text-[var(--scheme-text)]" : "bg-ink/5"} />
         </div>
 
         <dl className="space-y-1.5 text-sm">
@@ -108,7 +108,7 @@ export function DayClose({ summary, status }: { summary: TripSummary; status: Tr
           <Row label="Cash expected from this trip" value={formatINR(summary.cashExpected)} strong />
           <Row label="Driver's cash in hand now" value={formatINR(summary.cashInHand)} />
           {summary.cashInHand > 0 && (
-            <Link href="/admin/cash" className="inline-flex items-center gap-1 text-sm font-bold text-[var(--kesar-text)] pt-1">
+            <Link href="/admin/cash" className="inline-flex items-center gap-1 text-sm font-bold text-[var(--accent-text)] pt-1">
               Receive the cash <Icon name="arrow" className="h-4 w-4" />
             </Link>
           )}

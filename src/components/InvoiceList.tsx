@@ -65,16 +65,16 @@ export default function InvoiceList({ rows, hrefBase, empty = "No invoices yet."
               )}
             </div>
             <div className="text-right shrink-0">
-              <p className={`font-bold ${credit ? "text-[var(--mint-text)]" : ""}`}>
+              <p className={`font-bold ${credit ? "text-[var(--success-text)]" : ""}`}>
                 {credit ? "− " : ""}
                 {formatINR(r.total)}
               </p>
               {credit ? (
                 <p className="text-xs text-[var(--muted)] mt-1">Less from dues</p>
               ) : r.due === null ? null : r.due > 0 ? (
-                <p className="text-xs font-semibold text-[var(--kesar-text)] mt-1">Due {formatINR(r.due)}</p>
+                <p className="text-xs font-semibold text-[var(--accent-text)] mt-1">Due {formatINR(r.due)}</p>
               ) : (
-                <p className="text-xs font-semibold text-[var(--mint-text)] mt-1">Paid</p>
+                <p className="text-xs font-semibold text-[var(--success-text)] mt-1">Paid</p>
               )}
             </div>
           </Link>

@@ -138,9 +138,9 @@ function Checks({ options, value, onChange }: { options: Record<string, string>;
 /** A secret or key shown once, with copy and a warning. */
 function ShowOnce({ title, value, onDone, note }: { title: string; value: string; onDone: () => void; note?: string }) {
   return (
-    <div className="card p-4 space-y-3 !bg-[var(--genda-tint)]">
+    <div className="card p-4 space-y-3 !bg-[var(--scheme-tint)]">
       <div className="flex items-start gap-2">
-        <Icon name="alert" className="h-5 w-5 shrink-0 text-[var(--genda-text)] mt-0.5" />
+        <Icon name="alert" className="h-5 w-5 shrink-0 text-[var(--scheme-text)] mt-0.5" />
         <div className="min-w-0 text-sm">
           <p className="font-semibold">{title}</p>
           <p className="text-[var(--ink-2)]">{note ?? "Copy it now and keep it safe. It will not be shown again."}</p>
@@ -194,7 +194,7 @@ function ApiKeysTab({ data, onChanged }: { data: Data; onChanged: () => void }) 
           <p className="text-xs text-[var(--muted)]">Put your key in place of &lt;key&gt;.</p>
         </div>
         <details className="group">
-          <summary className="cursor-pointer text-xs font-bold text-[var(--kesar-text)] list-none">
+          <summary className="cursor-pointer text-xs font-bold text-[var(--accent-text)] list-none">
             <span className="group-open:hidden">What you can read</span>
             <span className="hidden group-open:inline">Hide</span>
           </summary>
@@ -289,7 +289,7 @@ function NewKey({ scopes, onMade }: { scopes: Record<string, string>; onMade: (m
         <button type="submit" className="btn btn-kesar btn-sm" disabled={busy}>
           <Icon name="plus" className="h-4 w-4" /> {busy ? "Making…" : "Make key"}
         </button>
-        {error && <span className="text-sm text-[#a8281e]">{error}</span>}
+        {error && <span className="text-sm text-[var(--risk-text)]">{error}</span>}
       </div>
     </form>
   );
@@ -335,7 +335,7 @@ function KeyRow({ k, scopes, onRevoked }: { k: ApiKey; scopes: Record<string, st
           <button type="button" className="btn btn-danger btn-xs" disabled={busy} onClick={revoke}>
             {busy ? "Revoking…" : "Revoke"}
           </button>
-          {error && <span className="text-xs text-[#a8281e]">{error}</span>}
+          {error && <span className="text-xs text-[var(--risk-text)]">{error}</span>}
         </div>
       )}
     </div>
@@ -373,7 +373,7 @@ function WebhooksTab({ data, onChanged }: { data: Data; onChanged: () => void })
           </p>
         </div>
         <details className="group">
-          <summary className="cursor-pointer text-xs font-bold text-[var(--kesar-text)] list-none">
+          <summary className="cursor-pointer text-xs font-bold text-[var(--accent-text)] list-none">
             <span className="group-open:hidden">How to check a webhook is really from us</span>
             <span className="hidden group-open:inline">Hide</span>
           </summary>
@@ -483,7 +483,7 @@ function NewEndpoint({ events, onMade }: { events: Record<string, string>; onMad
         <button type="submit" className="btn btn-kesar btn-sm" disabled={busy}>
           <Icon name="plus" className="h-4 w-4" /> {busy ? "Adding…" : "Add address"}
         </button>
-        {error && <span className="text-sm text-[#a8281e]">{error}</span>}
+        {error && <span className="text-sm text-[var(--risk-text)]">{error}</span>}
       </div>
     </form>
   );
@@ -574,13 +574,13 @@ function EndpointCard({
         hint={e.active ? undefined : "Off: nothing is sent. Turning it on also clears the failure count."}
       />
       {!e.active && e.disabledReason && (
-        <p className="rounded-xl bg-[var(--kesar-tint)] px-3 py-2 text-xs text-[var(--kesar-text)] break-words flex items-start gap-1.5">
+        <p className="rounded-xl bg-[var(--accent-tint)] px-3 py-2 text-xs text-[var(--accent-text)] break-words flex items-start gap-1.5">
           <Icon name="alert" className="h-4 w-4 shrink-0" />
           <span>{e.disabledReason}</span>
         </p>
       )}
       {e.active && e.failStreak > 0 && (
-        <p className="text-xs text-[var(--genda-text)]">{plural(e.failStreak, "failed send")} in a row.</p>
+        <p className="text-xs text-[var(--scheme-text)]">{plural(e.failStreak, "failed send")} in a row.</p>
       )}
 
       <div className="flex flex-wrap gap-1">
@@ -597,16 +597,16 @@ function EndpointCard({
           <span>
             <b>{n("SENT")}</b> sent
           </span>
-          <span className={n("DEAD") ? "text-[#a8281e]" : ""}>
+          <span className={n("DEAD") ? "text-[var(--risk-text)]" : ""}>
             <b>{n("DEAD")}</b> gave up
           </span>
-          {n("FAILED") > 0 && <span className="text-[var(--genda-text)]">{n("FAILED")} retrying</span>}
+          {n("FAILED") > 0 && <span className="text-[var(--scheme-text)]">{n("FAILED")} retrying</span>}
           {n("PENDING") > 0 && <span className="text-[var(--muted)]">{n("PENDING")} waiting</span>}
         </div>
       </div>
 
       {test && (
-        <p className={`text-sm break-words ${test.ok ? "text-[var(--mint-text)]" : "text-[#a8281e]"}`}>
+        <p className={`text-sm break-words ${test.ok ? "text-[var(--success-text)]" : "text-[var(--risk-text)]"}`}>
           {test.ok ? "Test reached your address" : "Test failed"}
           {test.code !== null && ` · answered ${test.code}`}
           {test.ms !== null && ` · ${test.ms} ms`}
@@ -634,7 +634,7 @@ function EndpointCard({
           <Icon name="trash" className="h-3.5 w-3.5" /> {busy === "delete" ? "Deleting…" : "Delete"}
         </button>
       </div>
-      {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+      {error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
 
       {editing && (
         <EditEndpoint
@@ -707,7 +707,7 @@ function EditEndpoint({ e, events, onCancel, onSaved }: { e: Endpoint; events: R
         <button type="button" className="btn btn-quiet btn-sm" disabled={busy} onClick={onCancel}>
           Cancel
         </button>
-        {error && <span className="text-sm text-[#a8281e]">{error}</span>}
+        {error && <span className="text-sm text-[var(--risk-text)]">{error}</span>}
       </div>
     </form>
   );
@@ -789,10 +789,10 @@ function DeliveryRow({ d, onAgain }: { d: Delivery; onAgain: () => void }) {
         {d.status === "SENT" && d.sentAt && ` · sent ${shortDate(d.sentAt, true)}`}
         {d.status === "FAILED" && ` · next try ${shortDate(d.nextAttemptAt, true)}`}
       </p>
-      {d.lastError && d.status !== "SENT" && <p className="text-xs text-[#a8281e] break-words">{d.lastError}</p>}
+      {d.lastError && d.status !== "SENT" && <p className="text-xs text-[var(--risk-text)] break-words">{d.lastError}</p>}
       <div className="flex flex-wrap items-center gap-2">
         <details className="group min-w-0 flex-1">
-          <summary className="cursor-pointer text-xs font-bold text-[var(--kesar-text)] list-none">
+          <summary className="cursor-pointer text-xs font-bold text-[var(--accent-text)] list-none">
             <span className="group-open:hidden">Show body</span>
             <span className="hidden group-open:inline">Hide body</span>
           </summary>
@@ -809,7 +809,7 @@ function DeliveryRow({ d, onAgain }: { d: Delivery; onAgain: () => void }) {
           </button>
         )}
       </div>
-      {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+      {error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
     </div>
   );
 }
@@ -890,7 +890,7 @@ function MapsTab({ maps, onChanged }: { maps: Data["maps"]; onChanged: () => voi
           {google && maps.unpinned > 50 && <p className="text-xs text-[var(--muted)]">Up to 50 shops at a time. Press again for more.</p>}
         </div>
         {result && <Flash text={result} />}
-        {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+        {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       </section>
     </div>
   );

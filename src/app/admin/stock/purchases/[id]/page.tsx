@@ -87,7 +87,7 @@ export default function PurchasePage({ params }: { params: Promise<{ id: string 
           </Item>
           <Item label="Purchase order">
             {p.po ? (
-              <Link href={`/admin/stock/purchase-orders/${p.po.id}`} className="font-semibold text-[var(--kesar-text)]">
+              <Link href={`/admin/stock/purchase-orders/${p.po.id}`} className="font-semibold text-[var(--accent-text)]">
                 {p.po.number}
               </Link>
             ) : (

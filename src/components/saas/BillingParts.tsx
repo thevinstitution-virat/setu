@@ -85,7 +85,7 @@ export function PlanOption({
           const has = plan.features.includes(m.code);
           return (
             <li key={m.code} className={`flex items-start gap-2 ${has ? "" : "text-[var(--muted)]"}`}>
-              <Icon name={has ? "check" : "x"} className={`h-4 w-4 shrink-0 mt-0.5 ${has ? "text-[var(--mint-text)]" : "opacity-50"}`} />
+              <Icon name={has ? "check" : "x"} className={`h-4 w-4 shrink-0 mt-0.5 ${has ? "text-[var(--success-text)]" : "opacity-50"}`} />
               <span className={has ? "" : "line-through decoration-1"}>{m.label}</span>
             </li>
           );

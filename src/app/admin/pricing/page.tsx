@@ -166,7 +166,7 @@ function ListsTab() {
               <input className="input" value={description} maxLength={200} onChange={(e) => setDescription(e.target.value)} />
             </Field>
           </div>
-          {formError && <p className="text-sm text-[#a8281e]">{formError}</p>}
+          {formError && <p className="text-sm text-[var(--risk-text)]">{formError}</p>}
           <div className="flex gap-2">
             <button type="submit" className="btn btn-kesar btn-sm" disabled={busy}>
               {busy ? "Creating…" : "Create and set rates"}
@@ -184,7 +184,7 @@ function ListsTab() {
         <div className="card overflow-hidden divide-y divide-[var(--line)]">
           {lists.map((l) => (
             <Link key={l.id} href={`/admin/pricing/${l.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-black/[0.03]">
-              <span className="icon-tile bg-[#e1eeec] text-mor">
+              <span className="icon-tile bg-[var(--mor-tint)] text-mor">
                 <Icon name="rupee" />
               </span>
               <div className="min-w-0 flex-1">
@@ -255,7 +255,7 @@ function GroupsTab() {
             {busy ? "Adding…" : "Add group"}
           </button>
         </div>
-        {formError && <p className="text-sm text-[#a8281e]">{formError}</p>}
+        {formError && <p className="text-sm text-[var(--risk-text)]">{formError}</p>}
       </form>
       <Flash text={flash} />
       {groups.error && <ErrorBox message={groups.error} onRetry={groups.reload} />}
@@ -263,7 +263,7 @@ function GroupsTab() {
         <div className="card overflow-hidden divide-y divide-[var(--line)]">
           {groups.data.groups.map((g) => (
             <button key={g.id} type="button" className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-black/[0.03]" onClick={() => setOpenId(g.id)}>
-              <span className="icon-tile bg-[var(--kesar-tint)] text-[var(--kesar-text)]">
+              <span className="icon-tile bg-[var(--accent-tint)] text-[var(--accent-text)]">
                 <Icon name="users" />
               </span>
               <div className="min-w-0 flex-1">
@@ -364,7 +364,7 @@ function GroupSheet({
       {!g && !error && <p className="text-sm text-[var(--muted)]">Loading…</p>}
       {g && (
         <>
-          {msg && (msg.ok ? <Flash text={msg.text} /> : <p className="text-sm text-[#a8281e]">{msg.text}</p>)}
+          {msg && (msg.ok ? <Flash text={msg.text} /> : <p className="text-sm text-[var(--risk-text)]">{msg.text}</p>)}
           <section className="card p-4 space-y-3">
             <Field label="Name">
               <input className="input" value={nameV} maxLength={60} onChange={(e) => setName(e.target.value)} />
@@ -430,8 +430,8 @@ function GroupSheet({
 
           <section className="pt-2 border-t border-[var(--line)] space-y-2">
             {confirmDel ? (
-              <div className="rounded-xl bg-[#fde4e1] p-3 space-y-2">
-                <p className="text-sm text-[#a8281e]">Delete “{g.name}”? Retailers stay; only the group goes.</p>
+              <div className="rounded-xl bg-[var(--risk-tint)] p-3 space-y-2">
+                <p className="text-sm text-[var(--risk-text)]">Delete “{g.name}”? Retailers stay; only the group goes.</p>
                 <div className="flex gap-2">
                   <button type="button" className="btn btn-danger btn-sm !bg-white" disabled={busy !== null} onClick={remove}>
                     {busy === "delete" ? "Deleting…" : "Yes, delete group"}
@@ -463,7 +463,7 @@ function RetailersTab({ retailerId, onPick }: { retailerId: string | null; onPic
     <div className="space-y-4">
       <div className="card p-4 space-y-2">
         <p className="font-heading font-bold">Retailer</p>
-        {users.error && <p className="text-sm text-[#a8281e]">{users.error}</p>}
+        {users.error && <p className="text-sm text-[var(--risk-text)]">{users.error}</p>}
         <SearchPick options={options} value={retailerId} onChange={onPick} placeholder={users.data ? "Search outlet, owner, phone or area" : "Loading retailers…"} />
         <p className="text-xs text-[var(--muted)]">Set their price list, groups and special rates, then check what they see.</p>
       </div>
@@ -554,7 +554,7 @@ function ListAndGroups({ r, lists, groups, onSaved }: { r: RetailerPricing; list
         <button type="button" className="btn btn-mor btn-sm" disabled={!dirty || busy} onClick={save}>
           {busy ? "Saving…" : "Save list and groups"}
         </button>
-        {msg && (msg.ok ? <Flash text={msg.text} /> : <p className="text-sm text-[#a8281e]">{msg.text}</p>)}
+        {msg && (msg.ok ? <Flash text={msg.text} /> : <p className="text-sm text-[var(--risk-text)]">{msg.text}</p>)}
       </div>
     </section>
   );
@@ -636,7 +636,7 @@ function SpecialRates({ r, products, onSaved }: { r: RetailerPricing; products: 
             const diff = typeof p === "number" && x.base > 0 ? Math.round(((p - x.base) / x.base) * 1000) / 10 : null;
             const changed = !x.orig || x.orig.price !== p || x.orig.note !== x.note.trim();
             return (
-              <div key={x.productId} className={`p-3 space-y-2 ${changed ? "bg-[var(--genda-tint)]/50" : ""}`}>
+              <div key={x.productId} className={`p-3 space-y-2 ${changed ? "bg-[var(--scheme-tint)]/50" : ""}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-bold truncate">{x.name}</p>
@@ -662,7 +662,7 @@ function SpecialRates({ r, products, onSaved }: { r: RetailerPricing; products: 
                 </div>
                 <p className="text-xs text-[var(--ink-2)]">
                   {diff !== null && (
-                    <span className={diff < 0 ? "text-[var(--mint-text)] font-semibold" : diff > 0 ? "text-[#a8281e] font-semibold" : ""}>
+                    <span className={diff < 0 ? "text-[var(--success-text)] font-semibold" : diff > 0 ? "text-[var(--risk-text)] font-semibold" : ""}>
                       {diff === 0 ? "Same as default" : `${diff > 0 ? "+" : ""}${diff}% vs default`}
                     </span>
                   )}{" "}
@@ -682,7 +682,7 @@ function SpecialRates({ r, products, onSaved }: { r: RetailerPricing; products: 
         <button type="button" className="btn btn-kesar btn-sm" disabled={!dirty || busy} onClick={save}>
           {busy ? "Saving…" : "Save special rates"}
         </button>
-        {msg && (msg.ok ? <Flash text={msg.text} /> : <p className="text-sm text-[#a8281e]">{msg.text}</p>)}
+        {msg && (msg.ok ? <Flash text={msg.text} /> : <p className="text-sm text-[var(--risk-text)]">{msg.text}</p>)}
       </div>
     </section>
   );
@@ -744,7 +744,7 @@ function ViewAsPanel({ retailerId, version }: { retailerId: string; version: num
           </p>
         </div>
       </div>
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       {!data && !error && <p className="text-sm text-[var(--muted)]">Loading…</p>}
       {data && (
         <>
@@ -768,7 +768,7 @@ function ViewAsPanel({ retailerId, version }: { retailerId: string; version: num
                 type="button"
                 onClick={() => setSource(k)}
                 className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${
-                  source === k ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-black/5 text-foreground/60"
+                  source === k ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "bg-black/5 text-foreground/60"
                 }`}
               >
                 {label}
@@ -856,7 +856,7 @@ function ViewAsPanel({ retailerId, version }: { retailerId: string; version: num
             {data.offers.length === 0 && <p className="text-sm text-[var(--muted)]">No schemes running for this retailer.</p>}
             {data.offers.map((o) => (
               <div key={o.id} className="card p-3 flex flex-wrap items-center gap-2">
-                <span className="icon-tile bg-[var(--kesar-tint)] text-[var(--kesar-text)] !h-9 !w-9">
+                <span className="icon-tile bg-[var(--accent-tint)] text-[var(--accent-text)] !h-9 !w-9">
                   <Icon name="percent" />
                 </span>
                 <div className="min-w-0 flex-1">

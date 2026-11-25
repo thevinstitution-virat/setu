@@ -91,13 +91,13 @@ export default function LoginCard({
           <p className="page-sub mb-6">{brand.tagline || t("brand.tagline")}</p>
 
           {notice && (
-            <p role="status" className="text-sm rounded-lg bg-[var(--genda-tint)] text-[var(--genda-text)] px-3 py-2 mb-4 break-words">
+            <p role="status" className="text-sm rounded-lg bg-[var(--scheme-tint)] text-[var(--scheme-text)] px-3 py-2 mb-4 break-words">
               {notice}
             </p>
           )}
 
           {linkError && (
-            <p role="alert" className="text-sm rounded-lg bg-[#a8281e]/10 text-[#a8281e] px-3 py-2 mb-4 break-words">
+            <p role="alert" className="text-sm rounded-lg bg-[var(--risk-text)]/10 text-[var(--risk-text)] px-3 py-2 mb-4 break-words">
               {t("login.switchFailed")} {linkError}
             </p>
           )}
@@ -125,7 +125,7 @@ export default function LoginCard({
                 aria-selected={mode === m}
                 className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition ${
                   mode === m
-                    ? "bg-gradient-to-br from-mor to-[#0c3634] text-white shadow-[0_10px_20px_-12px_rgba(8,38,37,.9)]"
+                    ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white shadow-[0_10px_20px_-12px_rgba(8,38,37,.9)]"
                     : "text-[var(--ink-2)]"
                 }`}
                 onClick={() => setMode(m)}
@@ -141,7 +141,7 @@ export default function LoginCard({
         {!brand.business && (
           <p className="text-sm text-center text-[var(--ink-2)] mt-5">
             {t("login.newHere")}{" "}
-            <Link href="/start" className="font-bold text-[var(--kesar-text)] whitespace-nowrap">
+            <Link href="/start" className="font-bold text-[var(--accent-text)] whitespace-nowrap">
               {t("login.startTrial")}
             </Link>
           </p>
@@ -164,9 +164,9 @@ export default function LoginCard({
 function FailureNote({ failure }: { failure: LoginFailure | null }) {
   const { t } = useLanguage();
   if (!failure) return null;
-  if (!failure.paused) return <p role="alert" className="text-sm text-[#a8281e]">{failure.text}</p>;
+  if (!failure.paused) return <p role="alert" className="text-sm text-[var(--risk-text)]">{failure.text}</p>;
   return (
-    <div role="alert" className="flex gap-2.5 rounded-xl bg-[#a8281e]/10 text-[#a8281e] px-3 py-2.5">
+    <div role="alert" className="flex gap-2.5 rounded-xl bg-[var(--risk-text)]/10 text-[var(--risk-text)] px-3 py-2.5">
       <Icon name="lock" className="h-5 w-5 shrink-0 mt-0.5" />
       <div className="text-sm">
         <p className="font-bold">{t("login.pausedTitle")}</p>
@@ -304,7 +304,7 @@ function RetailerLogin({ initialRef = "" }: { initialRef?: string }) {
             {t("login.verify")}
           </Button>
           <button
-            className="text-sm text-[var(--kesar-text)] w-full text-center"
+            className="text-sm text-[var(--accent-text)] w-full text-center"
             onClick={() => {
               setStep("phone");
               setError(null);
@@ -395,10 +395,10 @@ function RetailerLogin({ initialRef = "" }: { initialRef?: string }) {
                 <span className="block text-xs text-[var(--muted)] mt-1">Checking…</span>
               )}
               {referralCode && referral.state === "ok" && (
-                <span className="block text-xs font-semibold text-[var(--mint-text)] mt-1">Code from {referral.shop}</span>
+                <span className="block text-xs font-semibold text-[var(--success-text)] mt-1">Code from {referral.shop}</span>
               )}
               {referralCode && (referral.state === "error" || referral.state === "off") && (
-                <span className={`block text-xs mt-1 ${referralCode.length < 5 && referral.state === "error" ? "text-[var(--muted)]" : "text-[#a8281e]"}`}>
+                <span className={`block text-xs mt-1 ${referralCode.length < 5 && referral.state === "error" ? "text-[var(--muted)]" : "text-[var(--risk-text)]"}`}>
                   {referral.message}
                   {referral.state === "off" ? ". You can still sign up." : ""}
                 </span>
@@ -614,7 +614,7 @@ function StaffOtpLogin({ initialPhone }: { initialPhone: string }) {
           </Button>
           <button
             type="button"
-            className="text-sm text-[var(--kesar-text)] w-full text-center min-h-[44px]"
+            className="text-sm text-[var(--accent-text)] w-full text-center min-h-[44px]"
             onClick={() => {
               setStep("phone");
               setError(null);
@@ -645,7 +645,7 @@ function OtpCodeField({
   return (
     <>
       {devCode && (
-        <p className="text-xs rounded-lg bg-[var(--genda-tint)] text-[var(--genda-text)] px-3 py-2">
+        <p className="text-xs rounded-lg bg-[var(--scheme-tint)] text-[var(--scheme-text)] px-3 py-2">
           {t("login.demoOtp")} <span className="font-semibold">{devCode}</span>.
         </p>
       )}

@@ -25,7 +25,7 @@ export default async function SchemesReport({ searchParams }: { searchParams: Pr
             ? "Every shop that bought used a scheme, so there is no fair comparison for extra sales. Pick a longer period, or keep some shops off schemes."
             : `Extra sales = how much more the shops on the scheme bought than in the period before, after the ${s.controlGrowth}% change the ${s.controlShops} shops with no scheme had anyway.`
         }
-        action={<Link href="/admin/schemes" className="text-sm font-bold text-[var(--kesar-text)]">Schemes →</Link>}
+        action={<Link href="/admin/schemes" className="text-sm font-bold text-[var(--accent-text)]">Schemes →</Link>}
       >
         <Table
           head={["Scheme", "Cost", "Orders", "Shops", "Sales on orders", "Shops before → now", "Uplift", "Extra sales", "ROI", "Budget used"]}

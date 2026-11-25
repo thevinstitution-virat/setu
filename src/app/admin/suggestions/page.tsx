@@ -154,7 +154,7 @@ function SuggestionCard({ s, onDone }: { s: Item; onDone: () => void }) {
       {s.reasons.length > 0 && (
         <ul className="flex flex-wrap gap-1.5" aria-label="Why">
           {s.reasons.map((r) => (
-            <li key={r} className="rounded-full bg-[var(--mint-tint)] px-2.5 py-0.5 text-xs text-[var(--ink)]">
+            <li key={r} className="rounded-full bg-[var(--success-tint)] px-2.5 py-0.5 text-xs text-[var(--ink)]">
               {r}
             </li>
           ))}
@@ -187,7 +187,7 @@ function SuggestionCard({ s, onDone }: { s: Item; onDone: () => void }) {
                   />
                 )}
                 <span className="min-w-0 flex-1">
-                  <Link href={`/admin/reports/shops/${x.retailerId}`} className="font-semibold text-[var(--ink)] hover:text-[var(--kesar-text)]">
+                  <Link href={`/admin/reports/shops/${x.retailerId}`} className="font-semibold text-[var(--ink)] hover:text-[var(--accent-text)]">
                     {x.name}
                   </Link>
                   <span className="text-xs text-[var(--muted)]">
@@ -259,7 +259,7 @@ function SuggestionCard({ s, onDone }: { s: Item; onDone: () => void }) {
         <p className="text-sm">
           Limit: <span className="font-semibold">{rs(s.payload.from as number | null | undefined ?? (s.payload.effective as number | null))}</span> →{" "}
           <span className="font-semibold">{rs(s.payload.to as number)}</span>
-          <Link href={`/admin/khata/${s.subjectId}`} className="ml-3 text-xs font-bold text-[var(--kesar-text)]">
+          <Link href={`/admin/khata/${s.subjectId}`} className="ml-3 text-xs font-bold text-[var(--accent-text)]">
             Khata →
           </Link>
         </p>
@@ -282,7 +282,7 @@ function SuggestionCard({ s, onDone }: { s: Item; onDone: () => void }) {
               {REJECT_LABEL[s.kind] ?? "Reject"}
             </button>
             {err && (
-              <span className="text-sm text-[#a8281e]" role="alert">
+              <span className="text-sm text-[var(--risk-text)]" role="alert">
                 {err}
               </span>
             )}
@@ -297,7 +297,7 @@ function SuggestionCard({ s, onDone }: { s: Item; onDone: () => void }) {
           {s.kind === "reorder" && s.result && typeof s.result.poId === "string" && (
             <>
               {" · "}
-              <Link href={`/admin/stock/purchase-orders/${s.result.poId}`} className="font-bold text-[var(--kesar-text)]">
+              <Link href={`/admin/stock/purchase-orders/${s.result.poId}`} className="font-bold text-[var(--accent-text)]">
                 {String(s.result.number)}
               </Link>
             </>
@@ -308,7 +308,7 @@ function SuggestionCard({ s, onDone }: { s: Item; onDone: () => void }) {
               {(s.result.trips as { id: string; number: string }[]).map((t, i) => (
                 <span key={t.id}>
                   {i > 0 && ", "}
-                  <Link href={`/admin/dispatch/${t.id}`} className="font-bold text-[var(--kesar-text)]">
+                  <Link href={`/admin/dispatch/${t.id}`} className="font-bold text-[var(--accent-text)]">
                     {t.number}
                   </Link>
                 </span>

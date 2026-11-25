@@ -61,14 +61,14 @@ export default function TeamReportsPage() {
         {REPORTS.map((r) => {
           const inner = (
             <>
-              <span className="icon-tile bg-[var(--mint-tint)] text-[var(--mint-text)] shrink-0">
+              <span className="icon-tile bg-[var(--success-tint)] text-[var(--success-text)] shrink-0">
                 <Icon name={r.icon} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block font-heading font-bold">{r.title}</span>
                 <span className="block text-xs text-[var(--muted)]">{r.sub}</span>
               </span>
-              <Icon name="download" className="h-5 w-5 shrink-0 text-[var(--kesar-text)]" />
+              <Icon name="download" className="h-5 w-5 shrink-0 text-[var(--accent-text)]" />
             </>
           );
           return problem ? (

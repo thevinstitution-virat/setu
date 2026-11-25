@@ -65,6 +65,7 @@ export default function BeatPage() {
     }
   }
 
+  const nextId = isToday && r ? (r.route.find((x) => !x.visit)?.retailer.id ?? null) : null;
   const shown = new Set<string>([...(r?.route ?? []).map((s) => s.visit?.id), ...(r?.extra ?? []).map((s) => s.visit?.id), ...(r?.offRoute ?? []).map((v) => v.id)].filter(Boolean) as string[]);
   const actions = {
     isToday,
@@ -112,9 +113,9 @@ export default function BeatPage() {
 
       {/* A visit still open that isn't on this list (yesterday's, or a shop not shown here). */}
       {isToday && open && r && !shown.has(open.id) && (
-        <div className="card p-4 space-y-3 border-2 !border-[var(--kesar)]">
+        <div className="card p-4 space-y-3 border-2 !border-[var(--accent)]">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--kesar-text)]">Still checked in</p>
+            <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--accent-text)]">Still checked in</p>
             <p className="font-bold text-sm">{open.retailer.outletName}</p>
             <p className="text-xs text-[var(--muted)]">Since {clock(open.checkInAt)}{istDay(new Date(open.checkInAt)) !== today ? ` on ${dayText(istDay(new Date(open.checkInAt)))}` : ""}</p>
           </div>
@@ -128,16 +129,26 @@ export default function BeatPage() {
         <p className="text-sm text-[var(--muted)]">Loading the beat…</p>
       ) : (
         <>
-          <div className="panel-dark p-5">
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-genda">
-              {r.source === "plan" ? "Planned for this day" : r.source === "weekday" ? "Your usual beat for this day" : "Beat"}
-            </p>
-            <p className="font-heading font-bold text-xl mt-1">{r.beat?.name ?? "No beat"}</p>
-            {r.plan?.note && <p className="text-sm text-white/80 mt-1">{r.plan.note}</p>}
-            {r.planned > 0 && (
-              <p className="text-sm text-white/80 mt-2">
-                {r.covered} of {r.planned} visited · {r.ordered} ordered
+          <div className="panel-dark p-5 space-y-3" data-ground="dark">
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-genda">
+                {r.source === "plan" ? "Planned for this day" : r.source === "weekday" ? "Your usual beat for this day" : "Beat"}
               </p>
+              <p className="font-heading font-bold text-[22px] leading-tight mt-1">{r.planned > 0 ? `${r.covered} of ${r.planned} shops visited` : (r.beat?.name ?? "No beat")}</p>
+              {r.planned > 0 && <p className="text-sm text-white/75 mt-0.5">{r.beat?.name ?? "No beat"}</p>}
+              {r.plan?.note && <p className="text-sm text-white/80 mt-1">{r.plan.note}</p>}
+            </div>
+            {r.planned > 0 && (
+              <>
+                <div className="h-2 rounded-full bg-white/20 overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={r.planned} aria-valuenow={r.covered} aria-label="Shops visited">
+                  <div className="h-full rounded-full bg-genda transition-[width] duration-500" style={{ width: `${Math.round((r.covered / r.planned) * 100)}%` }} />
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <MiniStat label="Ordered" value={String(r.ordered)} />
+                  <MiniStat label="Order value" value={rupees(r.route.reduce((a, x) => a + (x.visit?.order?.totalAmount ?? 0), 0))} />
+                  <MiniStat label="Left" value={String(Math.max(0, r.planned - r.covered))} />
+                </div>
+              </>
             )}
           </div>
 
@@ -148,7 +159,7 @@ export default function BeatPage() {
           ) : (
             <ol className="space-y-3">
               {r.route.map((s) => (
-                <RouteRow key={s.retailer.id} shop={s} {...actions} />
+                <RouteRow key={s.retailer.id} shop={s} next={s.retailer.id === nextId} {...actions} />
               ))}
             </ol>
           )}
@@ -188,7 +199,7 @@ export default function BeatPage() {
                       <VisitChip visit={v} />
                     </div>
                     {isToday && !v.checkOutAt && open?.id === v.id && <OpenVisitActions visit={v} {...actions} />}
-                    {rowErr?.id === v.retailerId && <p className="text-sm text-[#a8281e]">{rowErr.text}</p>}
+                    {rowErr?.id === v.retailerId && <p className="text-sm text-[var(--risk-text)]">{rowErr.text}</p>}
                   </li>
                 ))}
               </ul>
@@ -250,7 +261,16 @@ function OpenVisitActions({ visit, busy, onCheckOut, onNoOrder }: { visit: Visit
   );
 }
 
-function RouteRow({ shop, ...a }: { shop: RouteShop } & Actions) {
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[12px] bg-white text-[var(--ink)] px-3 py-2">
+      <p className="text-[10.5px] font-semibold text-[var(--muted)]">{label}</p>
+      <p className="font-heading font-bold text-[15px] num truncate">{value}</p>
+    </div>
+  );
+}
+
+function RouteRow({ shop, next = false, ...a }: { shop: RouteShop; next?: boolean } & Actions) {
   const { retailer: s, visit } = shop;
   const map = shopMapUrl({ lat: s.lat, lng: s.lng, address: [s.shopNumber, s.complexName, s.area?.name, s.pinCode].filter(Boolean).join(", ") });
   const isOpen = !!visit && !visit.checkOutAt;
@@ -258,11 +278,11 @@ function RouteRow({ shop, ...a }: { shop: RouteShop } & Actions) {
   const working = a.busy?.id === s.id;
 
   return (
-    <li className={`card p-4 space-y-3 ${isOpen ? "border-2 !border-[var(--kesar)]" : ""}`}>
+    <li className={`card p-4 space-y-3 ${isOpen || next ? "border-2 !border-[var(--accent)]" : ""} ${visit?.checkOutAt ? "opacity-70" : ""}`}>
       <div className="flex items-start gap-3">
         <span
           className={`icon-tile font-heading font-bold ${
-            visit ? (visit.checkOutAt ? "bg-[var(--mint-tint)] text-[var(--mint-text)]" : "bg-[var(--kesar-tint)] text-[var(--kesar-text)]") : "bg-black/[0.06] text-[var(--ink-2)]"
+            visit ? (visit.checkOutAt ? "bg-[var(--success-tint)] text-[var(--success-text)]" : "bg-[var(--accent-tint)] text-[var(--accent-text)]") : "bg-black/[0.06] text-[var(--ink-2)]"
           }`}
         >
           {visit?.checkOutAt ? <Icon name="check" /> : shop.seq + 1}
@@ -273,7 +293,7 @@ function RouteRow({ shop, ...a }: { shop: RouteShop } & Actions) {
             {s.shopNumber}, {s.complexName} · {s.area?.name}
           </p>
           {!!shop.reasons?.length && (
-            <p className="text-xs font-semibold text-[var(--kesar-text)] mt-0.5">{shop.reasons.map((x) => VISIT_REASON[x as VisitReason] ?? x).join(" · ")}</p>
+            <p className="text-xs font-semibold text-[var(--accent-text)] mt-0.5">{shop.reasons.map((x) => VISIT_REASON[x as VisitReason] ?? x).join(" · ")}</p>
           )}
           {visit && (
             <p className="text-xs text-[var(--ink-2)] mt-0.5">
@@ -301,7 +321,7 @@ function RouteRow({ shop, ...a }: { shop: RouteShop } & Actions) {
         {a.isToday && !visit && (
           <button
             type="button"
-            className="btn btn-kesar btn-sm min-h-[44px] ml-auto"
+            className="btn btn-kesar min-h-[48px] ml-auto px-6"
             disabled={working || !!elsewhere}
             onClick={() => a.onCheckIn(s.id)}
           >
@@ -314,7 +334,7 @@ function RouteRow({ shop, ...a }: { shop: RouteShop } & Actions) {
         <p className="text-xs text-[var(--muted)]">Check out of {elsewhere.retailer.outletName} first.</p>
       )}
       {a.isToday && isOpen && visit && <OpenVisitActions visit={{ ...visit, retailerId: s.id }} {...a} />}
-      {a.rowErr?.id === s.id && <p className="text-sm text-[#a8281e]">{a.rowErr.text}</p>}
+      {a.rowErr?.id === s.id && <p className="text-sm text-[var(--risk-text)]">{a.rowErr.text}</p>}
     </li>
   );
 }
@@ -398,7 +418,7 @@ function OtherShop({
                   {busy?.id === s.id ? "Checking in…" : open?.retailerId === s.id ? "Checked in" : "Check in"}
                 </button>
               </div>
-              {rowErr?.id === s.id && <p className="text-sm text-[#a8281e]">{rowErr.text}</p>}
+              {rowErr?.id === s.id && <p className="text-sm text-[var(--risk-text)]">{rowErr.text}</p>}
             </li>
           ))}
         </ul>

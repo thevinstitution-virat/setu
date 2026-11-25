@@ -59,7 +59,7 @@ export default function RateDelivery({ orderId, focus, stars }: { orderId: strin
   if (done) {
     return (
       <section className="card p-4 flex items-center gap-3">
-        <span className="icon-tile bg-[var(--mint-tint)] text-[var(--mint-text)] shrink-0">
+        <span className="icon-tile bg-[var(--success-tint)] text-[var(--success-text)] shrink-0">
           <Icon name="check" />
         </span>
         <p className="text-sm font-semibold">Thank you for rating this delivery.</p>
@@ -127,7 +127,7 @@ export default function RateDelivery({ orderId, focus, stars }: { orderId: strin
         </>
       )}
 
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       <button type="button" className="btn btn-kesar w-full" disabled={saving || !rating} onClick={submit}>
         {saving ? "Sending…" : "Send rating"}
       </button>

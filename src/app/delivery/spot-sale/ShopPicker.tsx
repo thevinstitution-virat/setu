@@ -43,7 +43,7 @@ export default function ShopPicker({
   if (shop) {
     return (
       <div className="flex items-center gap-3">
-        <span className="icon-tile bg-[var(--mint-tint)] text-[var(--mint-text)]">
+        <span className="icon-tile bg-[var(--success-tint)] text-[var(--success-text)]">
           <Icon name="home" />
         </span>
         <div className="flex-1 min-w-0">
@@ -80,7 +80,7 @@ export default function ShopPicker({
 
       {err ? (
         <div className="space-y-2">
-          <p className="text-sm text-[#a8281e]">{err}</p>
+          <p className="text-sm text-[var(--risk-text)]">{err}</p>
           <button type="button" className="btn btn-outline btn-sm" onClick={() => setNonce((n) => n + 1)}>
             Try again
           </button>

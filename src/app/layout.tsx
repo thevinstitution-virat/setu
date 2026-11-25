@@ -69,7 +69,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   // The retailer surface is green, but a white-label business colour wins there too
   // (it has to come after the surface rules, hence the extra specificity).
   const tenantAccent = themeVars(brand)["--kesar"]
-    ? `html [data-surface="retailer"]{--accent:var(--kesar-mid);--accent-hover:var(--kesar-dark);--accent-text:var(--kesar-text);--accent-tint:var(--kesar-tint);--chrome-highlight:var(--kesar-mid)}`
+    ? `html [data-surface="retailer"]{--accent:var(--kesar-mid);--accent-hover:var(--kesar-dark);--accent-text:var(--accent-text);--accent-tint:var(--accent-tint);--chrome-highlight:var(--kesar-mid)}`
     : "";
   const theme = base + tenantAccent;
   return (

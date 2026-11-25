@@ -81,9 +81,9 @@ export default function TenantPlanPanel({ data, onChanged }: { data: TenantData;
       )}
 
       {t.status === "SUSPENDED" ? (
-        <div className="rounded-2xl bg-[#fde4e1]/60 p-3 space-y-2">
+        <div className="rounded-2xl bg-[var(--risk-tint)]/60 p-3 space-y-2">
           <p className="text-sm">
-            <span className="font-semibold text-[#a8281e]">Paused</span> {t.suspendedAt && `since ${when(t.suspendedAt, true)}`}
+            <span className="font-semibold text-[var(--risk-text)]">Paused</span> {t.suspendedAt && `since ${when(t.suspendedAt, true)}`}
             {t.suspendReason && <span className="block text-[var(--ink-2)]">{t.suspendReason}</span>}
           </p>
           <button type="button" className="btn btn-primary btn-sm" disabled={!!busy} onClick={() => patch("reactivate", { reactivate: true })}>

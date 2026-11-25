@@ -187,7 +187,7 @@ function Payments() {
             aria-selected={tab === t.key}
             onClick={() => pick(t.key)}
             className={`flex-1 rounded-xl py-2 text-sm font-bold transition ${
-              tab === t.key ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "text-[var(--ink-2)]"
+              tab === t.key ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "text-[var(--ink-2)]"
             }`}
           >
             {t.label}
@@ -299,7 +299,7 @@ function PhotoCheckLine({ p, onChecked }: { p: Payment; onChecked: (c: PhotoChec
         </ul>
       )}
       {c && <p className="text-[11px] text-[var(--muted)]">{c.source === "ai" ? "Read by AI from the photo. You still decide." : "Checked for a reused photo and UTR (AI reading is off)."}</p>}
-      {err && <p className="text-xs text-[var(--kesar-text)]">{err}</p>}
+      {err && <p className="text-xs text-[var(--accent-text)]">{err}</p>}
     </div>
   );
 }
@@ -428,7 +428,7 @@ function VerifyTab({ onCount, onProof }: { onCount: (n: number) => void; onProof
         </button>
       </div>
       {done && (
-        <p className="text-sm text-[var(--mint-text)] flex items-center gap-1.5">
+        <p className="text-sm text-[var(--success-text)] flex items-center gap-1.5">
           <Icon name="check" className="h-4 w-4" /> {done}
         </p>
       )}
@@ -484,7 +484,7 @@ function VerifyTab({ onCount, onProof }: { onCount: (n: number) => void; onProof
               </button>
             </div>
           )}
-          {rowError?.id === p.id && <p className="text-sm text-[#a8281e]">{rowError.message}</p>}
+          {rowError?.id === p.id && <p className="text-sm text-[var(--risk-text)]">{rowError.message}</p>}
         </div>
       ))}
     </div>
@@ -609,7 +609,7 @@ function AllTab({ onProof }: { onProof: (src: string) => void }) {
             ))}
           </select>
         </label>
-        {rangeError && <p className="col-span-full text-sm text-[#a8281e]">{rangeError}</p>}
+        {rangeError && <p className="col-span-full text-sm text-[var(--risk-text)]">{rangeError}</p>}
       </div>
 
       {error && <ErrorBox message={error} onRetry={load} />}
@@ -618,7 +618,7 @@ function AllTab({ onProof }: { onProof: (src: string) => void }) {
         <div className="card p-4 space-y-3">
           <p className="text-xs font-bold text-[var(--ink-2)]">Confirmed money in this period</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <div className="rounded-xl bg-[var(--mint-tint)] p-3">
+            <div className="rounded-xl bg-[var(--success-tint)] p-3">
               <p className="stat-num !text-xl">{formatINR(grand, { whole: true })}</p>
               <p className="stat-lbl">Total</p>
             </div>
@@ -668,7 +668,7 @@ function AllTab({ onProof }: { onProof: (src: string) => void }) {
                       <span className="font-mono text-xs break-all">{p.reference ?? "—"}</span>
                       {p.cheque && <p className="text-xs text-[var(--muted)]">{p.cheque.bank}</p>}
                       {p.proofKey && (
-                        <button className="block text-xs font-bold text-[var(--kesar-text)]" onClick={() => onProof(fileUrl(p.proofKey!))}>
+                        <button className="block text-xs font-bold text-[var(--accent-text)]" onClick={() => onProof(fileUrl(p.proofKey!))}>
                           View proof
                         </button>
                       )}
@@ -683,7 +683,7 @@ function AllTab({ onProof }: { onProof: (src: string) => void }) {
                     </td>
                     <td className="px-4 py-3 min-w-44">
                       {actions(p)}
-                      {rowError?.id === p.id && <p className="text-xs text-[#a8281e] mt-1">{rowError.message}</p>}
+                      {rowError?.id === p.id && <p className="text-xs text-[var(--risk-text)] mt-1">{rowError.message}</p>}
                     </td>
                   </tr>
                 ))}
@@ -716,7 +716,7 @@ function AllTab({ onProof }: { onProof: (src: string) => void }) {
                 </div>
                 {p.rejectReason && <p className="text-xs text-[var(--muted)]">{p.rejectReason}</p>}
                 {actions(p)}
-                {rowError?.id === p.id && <p className="text-xs text-[#a8281e]">{rowError.message}</p>}
+                {rowError?.id === p.id && <p className="text-xs text-[var(--risk-text)]">{rowError.message}</p>}
               </div>
             ))}
           </div>
@@ -793,7 +793,7 @@ function ChequesTab() {
             key={f.key || "open"}
             onClick={() => setStatus(f.key)}
             className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${
-              status === f.key ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-black/5 text-foreground/60"
+              status === f.key ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "bg-black/5 text-foreground/60"
             }`}
           >
             {f.label}
@@ -895,7 +895,7 @@ function ChequesTab() {
                     </button>
                   </div>
                 ))}
-              {rowError?.id === c.id && <p className="text-sm text-[#a8281e]">{rowError.message}</p>}
+              {rowError?.id === c.id && <p className="text-sm text-[var(--risk-text)]">{rowError.message}</p>}
             </div>
           );
         })}
@@ -907,7 +907,7 @@ function ChequesTab() {
 function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div className="card p-4 flex flex-wrap items-center justify-between gap-2">
-      <p className="text-sm text-[#a8281e]">{message}</p>
+      <p className="text-sm text-[var(--risk-text)]">{message}</p>
       <button className="btn btn-quiet btn-xs" onClick={onRetry}>
         Try again
       </button>

@@ -51,11 +51,11 @@ export default function SummaryCard({ canEdit }: { canEdit: boolean }) {
         <h2 className="font-heading font-bold text-[var(--ink)]">Daily summary to the owner</h2>
         <p className="text-xs text-[var(--muted)] mt-0.5">One message every evening with the day&apos;s sales, money and deliveries.</p>
       </div>
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       {!data && !error && <p className="text-sm text-[var(--muted)]">Loading…</p>}
       {data && (
         <>
-          <div className="rounded-2xl bg-[var(--mint-tint)]/60 border border-[var(--line)] p-3 text-sm leading-relaxed text-[var(--ink)]">
+          <div className="rounded-2xl bg-[var(--success-tint)]/60 border border-[var(--line)] p-3 text-sm leading-relaxed text-[var(--ink)]">
             <p className="font-bold">Today so far</p>
             <p>
               Invoiced {rs(data.today.sales)}. New orders: {data.today.orders}, worth {rs(data.today.orderValue)}. Collected {rs(data.today.collected)} (cash {rs(data.today.cash)}). Delivered {data.today.delivered}, not delivered {data.today.failed}. Outstanding {rs(data.today.outstanding)}, of which {rs(data.today.overdue)} overdue. Waiting to be confirmed: {data.today.waiting}.
@@ -76,7 +76,7 @@ export default function SummaryCard({ canEdit }: { canEdit: boolean }) {
               </label>
               <p className="text-xs text-[var(--muted)]">
                 WhatsApp: turn it on for &ldquo;Daily summary (owner)&rdquo; in{" "}
-                <Link href="/admin/settings#messages" className="font-bold text-[var(--kesar-text)]">
+                <Link href="/admin/settings#messages" className="font-bold text-[var(--accent-text)]">
                   Messages
                 </Link>{" "}
                 (needs your WhatsApp channel set up).

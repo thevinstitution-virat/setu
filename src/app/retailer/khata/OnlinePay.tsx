@@ -57,7 +57,7 @@ export function OnlinePayPanel({
   }
 
   const tab = (on: boolean) =>
-    `flex-1 rounded-xl py-3 text-sm font-semibold ${on ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-black/5 text-foreground/70"}`;
+    `flex-1 rounded-xl py-3 text-sm font-semibold ${on ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "bg-black/5 text-foreground/70"}`;
 
   return (
     <div className="card p-4 space-y-4 print:hidden">
@@ -96,7 +96,7 @@ export function OnlinePayPanel({
         </button>
       )}
 
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       <button className="btn btn-kesar w-full !min-h-[52px] text-base" onClick={go} disabled={busy}>
         <Icon name="card" />
         {busy ? "Opening…" : paise > 0 ? `Pay ${formatINR(paise)} online` : "Pay all dues online"}

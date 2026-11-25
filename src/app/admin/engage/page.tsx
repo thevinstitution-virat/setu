@@ -102,7 +102,7 @@ export default function EngagePage() {
 
       <p className="text-xs text-[var(--muted)]">
         Which channels each message goes on, payment reminders and refer-and-earn rewards are set in{" "}
-        <Link href="/admin/settings" className="font-bold text-[var(--kesar-text)]">
+        <Link href="/admin/settings" className="font-bold text-[var(--accent-text)]">
           Settings
         </Link>
         .
@@ -133,7 +133,7 @@ function HubCard({
   return (
     <Link href={href} className="card p-4 block min-w-0 transition hover:shadow-lg">
       <div className="flex items-center gap-3">
-        <span className={`icon-tile ${alert ? "bg-[#fde4e1] text-[#a8281e]" : "bg-[var(--mint-tint)] text-[var(--mint-text)]"}`}>
+        <span className={`icon-tile ${alert ? "bg-[var(--risk-tint)] text-[var(--risk-text)]" : "bg-[var(--success-tint)] text-[var(--success-text)]"}`}>
           <Icon name={icon} />
         </span>
         <p className="font-heading font-bold flex-1 min-w-0 truncate">{title}</p>
@@ -141,11 +141,11 @@ function HubCard({
       </div>
       <div className="mt-3">
         {error ? (
-          <p className="text-sm text-[#a8281e]">{error}</p>
+          <p className="text-sm text-[var(--risk-text)]">{error}</p>
         ) : value === null ? (
           <p className="stat-num !text-2xl text-[var(--muted)]">…</p>
         ) : (
-          <p className={`stat-num !text-2xl ${alert ? "text-[#a8281e]" : ""}`}>{value}</p>
+          <p className={`stat-num !text-2xl ${alert ? "text-[var(--risk-text)]" : ""}`}>{value}</p>
         )}
         <p className="stat-lbl">{label}</p>
         {note && !error && <p className="text-xs text-[var(--muted)] mt-1">{note}</p>}

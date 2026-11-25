@@ -84,7 +84,7 @@ export default function SecurityPanel({
 
   return (
     <div className="space-y-4">
-      <Link href={homeHref} className="text-sm font-semibold text-[var(--kesar-text)] hover:underline">
+      <Link href={homeHref} className="text-sm font-semibold text-[var(--accent-text)] hover:underline">
         ← {t("sec.back")}
       </Link>
       <h1 className="page-title">{t("sec.title")}</h1>
@@ -93,7 +93,7 @@ export default function SecurityPanel({
       <section className="card p-5 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-heading font-bold">{t("mfa.kick")}</h2>
-          <span className={`text-xs font-bold rounded-full px-2.5 py-1 ${status.enabled ? "bg-[var(--genda-tint)] text-[var(--genda-text)]" : "bg-ink/5 text-[var(--muted)]"}`}>
+          <span className={`text-xs font-bold rounded-full px-2.5 py-1 ${status.enabled ? "bg-[var(--scheme-tint)] text-[var(--scheme-text)]" : "bg-ink/5 text-[var(--muted)]"}`}>
             {status.enabled ? t("sec.on") : t("sec.off")}
           </span>
         </div>
@@ -146,7 +146,7 @@ export default function SecurityPanel({
                 placeholder="••••••"
               />
             </label>
-            {error && <p role="alert" className="text-sm text-[#a8281e]">{error}</p>}
+            {error && <p role="alert" className="text-sm text-[var(--risk-text)]">{error}</p>}
             <div className="flex gap-2">
               <button type="button" className="btn btn-outline flex-1" onClick={reset}>
                 {t("sec.cancel")}
@@ -165,7 +165,7 @@ export default function SecurityPanel({
               {t("sec.newCodes")}
             </button>
             {!status.required && (
-              <button type="button" className="btn btn-quiet btn-sm text-[#a8281e]" onClick={() => setFlow("disable")}>
+              <button type="button" className="btn btn-quiet btn-sm text-[var(--risk-text)]" onClick={() => setFlow("disable")}>
                 {t("sec.turnOff")}
               </button>
             )}
@@ -188,7 +188,7 @@ export default function SecurityPanel({
           ) : (
             <GoogleButton href={`${googleStart}?intent=link`} label={t("sec.connect")} />
           )}
-          {error && !flow && <p role="alert" className="text-sm text-[#a8281e]">{error}</p>}
+          {error && !flow && <p role="alert" className="text-sm text-[var(--risk-text)]">{error}</p>}
         </section>
       )}
     </div>

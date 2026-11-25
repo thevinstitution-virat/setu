@@ -53,7 +53,7 @@ export default function DutySwitch({ onDuty: on0, since: since0 }: { onDuty: boo
         className="card w-full p-4 flex items-center gap-3 text-left min-h-[72px] disabled:opacity-70"
       >
         <span
-          className={`icon-tile ${duty.onDuty ? "bg-[var(--mint-tint)] text-[var(--mint-text)]" : "bg-black/[0.06] text-[var(--muted)]"}`}
+          className={`icon-tile ${duty.onDuty ? "bg-[var(--success-tint)] text-[var(--success-text)]" : "bg-black/[0.06] text-[var(--muted)]"}`}
         >
           <Icon name={duty.onDuty ? "truck" : "clock"} />
         </span>
@@ -72,7 +72,7 @@ export default function DutySwitch({ onDuty: on0, since: since0 }: { onDuty: boo
           />
         </span>
       </button>
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       <p className="text-xs text-[var(--muted)] px-1">
         Your location is saved when you go on or off duty. While you are on duty it is also saved every few minutes, but
         only if your business has turned location tracking on. Never off duty. Check out on Attendance to end your day.

@@ -64,7 +64,7 @@ export default function HelpDesk({
       </div>
 
       {waiting > 0 && (
-        <p className="card p-3 text-sm font-semibold text-[var(--kesar-text)] border-2 !border-[var(--kesar)]">
+        <p className="card p-3 text-sm font-semibold text-[var(--accent-text)] border-2 !border-[var(--kesar)]">
           {waiting === 1 ? "1 complaint is" : `${waiting} complaints are`} waiting for your answer.
         </p>
       )}
@@ -75,7 +75,7 @@ export default function HelpDesk({
         <p className="text-sm text-[var(--muted)]">Loading…</p>
       ) : items.length === 0 ? (
         <div className="card p-6 text-center space-y-3">
-          <span className="icon-tile mx-auto bg-[var(--mint-tint)] text-[var(--mint-text)]">
+          <span className="icon-tile mx-auto bg-[var(--success-tint)] text-[var(--success-text)]">
             <Icon name="chat" />
           </span>
           <p className="text-sm text-[var(--ink-2)]">No complaints. If something is wrong with an order, tell us here.</p>

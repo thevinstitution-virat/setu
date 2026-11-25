@@ -274,9 +274,9 @@ function ReceiveForm({ initialPoId, onDone }: { initialPoId: string | null; onDo
   return (
     <div className="space-y-4">
       {!enabled && (
-        <div className="card p-4 flex items-start gap-3 !bg-[var(--genda-tint)]">
-          <Icon name="alert" className="h-5 w-5 shrink-0 text-[var(--genda-text)] mt-0.5" />
-          <p className="text-sm text-[var(--genda-text)]">
+        <div className="card p-4 flex items-start gap-3 !bg-[var(--scheme-tint)]">
+          <Icon name="alert" className="h-5 w-5 shrink-0 text-[var(--scheme-text)] mt-0.5" />
+          <p className="text-sm text-[var(--scheme-text)]">
             Stock tracking is off. Turn it on in{" "}
             <Link href="/admin/settings" className="font-bold underline">
               Settings
@@ -289,7 +289,7 @@ function ReceiveForm({ initialPoId, onDone }: { initialPoId: string | null; onDo
       {/* Where from */}
       <section className="card p-4 space-y-4">
         {activeSuppliers.length === 0 ? (
-          <div className="rounded-2xl bg-[var(--genda-tint)] p-3 text-sm text-[var(--genda-text)]">
+          <div className="rounded-2xl bg-[var(--scheme-tint)] p-3 text-sm text-[var(--scheme-text)]">
             Add a supplier first.{" "}
             <Link href="/admin/stock/suppliers" className="font-bold underline">
               Suppliers
@@ -308,10 +308,10 @@ function ReceiveForm({ initialPoId, onDone }: { initialPoId: string | null; onDo
           </Field>
         )}
 
-        {poId && poData.error && <p className="text-sm text-[#a8281e]">Purchase order: {poData.error}</p>}
+        {poId && poData.error && <p className="text-sm text-[var(--risk-text)]">Purchase order: {poData.error}</p>}
         {poId && !po && !poData.error && <p className="text-sm text-[var(--muted)]">Loading the purchase order…</p>}
         {po && !poOpen && (
-          <p className="rounded-xl bg-[var(--genda-tint)] px-3 py-2 text-sm text-[var(--genda-text)]">
+          <p className="rounded-xl bg-[var(--scheme-tint)] px-3 py-2 text-sm text-[var(--scheme-text)]">
             Purchase order {po.number} is {po.status === "RECEIVED" ? "fully received" : "cancelled"}. These goods will be received without it.
           </p>
         )}
@@ -408,7 +408,7 @@ function ReceiveForm({ initialPoId, onDone }: { initialPoId: string | null; onDo
               <Icon name="check" className="h-4 w-4" /> {busy ? "Saving…" : "Save receipt"}
             </button>
           </div>
-          {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+          {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
         </div>
       </div>
     </div>
@@ -514,10 +514,10 @@ function LineCard({
         </label>
         <label className="block min-w-0">
           <span className="block text-xs font-medium text-[var(--ink-2)] mb-1">
-            Expiry date{needExpiry ? <span className="text-[#a8281e]"> · needed</span> : <span className="text-[var(--muted)]"> · optional</span>}
+            Expiry date{needExpiry ? <span className="text-[var(--risk-text)]"> · needed</span> : <span className="text-[var(--muted)]"> · optional</span>}
           </span>
           <input
-            className={`input !px-2 ${problem === "Enter the expiry date" ? "!border-[#a8281e]" : ""}`}
+            className={`input !px-2 ${problem === "Enter the expiry date" ? "!border-[var(--risk-text)]" : ""}`}
             type="date"
             required={needExpiry}
             aria-required={needExpiry}
@@ -545,7 +545,7 @@ function LineCard({
         </button>
       </div>
 
-      {problem && <p className="text-xs font-semibold text-[#a8281e]">{problem}</p>}
+      {problem && <p className="text-xs font-semibold text-[var(--risk-text)]">{problem}</p>}
     </li>
   );
 }
@@ -577,7 +577,7 @@ function Success({ done, onMore }: { done: Done; onMore: () => void }) {
   return (
     <section className="card p-5 space-y-4" role="status">
       <div className="flex items-start gap-3">
-        <span className="icon-tile bg-[var(--mint-tint)] text-[var(--mint-text)]">
+        <span className="icon-tile bg-[var(--success-tint)] text-[var(--success-text)]">
           <Icon name="check" />
         </span>
         <div className="min-w-0">

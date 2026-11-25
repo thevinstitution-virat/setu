@@ -84,11 +84,11 @@ export default function ComplaintsPage({ searchParams }: { searchParams: Promise
 
       {c && c.overdue > 0 && view !== "overdue" && (
         <button type="button" onClick={() => pick("overdue")} className="card w-full p-4 flex items-center gap-3 text-left hover:bg-white/80">
-          <span className="icon-tile bg-[#fde4e1] text-[#a8281e]">
+          <span className="icon-tile bg-[var(--risk-tint)] text-[var(--risk-text)]">
             <Icon name="alert" />
           </span>
           <span className="min-w-0 flex-1 text-sm">
-            <b className="text-[#a8281e]">
+            <b className="text-[var(--risk-text)]">
               {c.overdue} complaint{c.overdue === 1 ? " is" : "s are"} past the deadline.
             </b>{" "}
             <span className="text-[var(--ink-2)]">Show them</span>
@@ -182,7 +182,7 @@ function TicketRow({ t, now }: { t: Row; now: number }) {
         </p>
         <p className="text-xs text-[var(--muted)] mt-0.5">
           Raised {ago(t.createdAt, now)}
-          {open && !t.firstResponseAt && <span className="font-semibold text-[var(--kesar-text)]"> · No reply yet</span>}
+          {open && !t.firstResponseAt && <span className="font-semibold text-[var(--accent-text)]"> · No reply yet</span>}
         </p>
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm lg:contents">

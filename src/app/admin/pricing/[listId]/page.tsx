@@ -260,7 +260,7 @@ function Editor({
         <div className="card p-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm min-w-0">
             {error ? (
-              <span className="text-[#a8281e]">{error}</span>
+              <span className="text-[var(--risk-text)]">{error}</span>
             ) : dirty ? (
               <span className="text-[var(--ink-2)]">
                 {changed.out.length ? `${changed.out.length} rate${changed.out.length === 1 ? "" : "s"} changed` : "Details changed"} — not saved yet.
@@ -293,7 +293,7 @@ function RateRow({ p, value, onChange, layout }: { p: Row; value: string; onChan
   const changed = (typeof v === "number" ? v : v === null ? null : "bad") !== p.listPrice;
   const input = (
     <input
-      className={`input !py-1.5 ${v === "bad" ? "!border-[#a8281e]" : ""}`}
+      className={`input !py-1.5 ${v === "bad" ? "!border-[var(--risk-text)]" : ""}`}
       inputMode="decimal"
       value={value}
       placeholder={rupeeText(p.price)}
@@ -302,11 +302,11 @@ function RateRow({ p, value, onChange, layout }: { p: Row; value: string; onChan
     />
   );
   const diffText =
-    diff === null ? <span className="text-[var(--muted)]">default</span> : <span className={diff < 0 ? "text-[var(--mint-text)] font-semibold" : diff > 0 ? "text-[#a8281e] font-semibold" : ""}>{diff > 0 ? "+" : ""}{diff}%</span>;
+    diff === null ? <span className="text-[var(--muted)]">default</span> : <span className={diff < 0 ? "text-[var(--success-text)] font-semibold" : diff > 0 ? "text-[var(--risk-text)] font-semibold" : ""}>{diff > 0 ? "+" : ""}{diff}%</span>;
 
   if (layout === "table") {
     return (
-      <tr className={changed ? "bg-[var(--genda-tint)]/60" : ""}>
+      <tr className={changed ? "bg-[var(--scheme-tint)]/60" : ""}>
         <td className="px-4 py-2">
           <p className="font-bold">{p.name}</p>
           <p className="text-xs text-[var(--muted)]">
@@ -327,7 +327,7 @@ function RateRow({ p, value, onChange, layout }: { p: Row; value: string; onChan
     );
   }
   return (
-    <div className={`px-4 py-3 space-y-2 ${changed ? "bg-[var(--genda-tint)]/60" : ""}`}>
+    <div className={`px-4 py-3 space-y-2 ${changed ? "bg-[var(--scheme-tint)]/60" : ""}`}>
       <div className="min-w-0">
         <p className="text-sm font-bold truncate">{p.name}</p>
         <p className="text-xs text-[var(--muted)] truncate">

@@ -100,7 +100,7 @@ export default function DomainsPage() {
   return (
     <div className="space-y-5 max-w-2xl pb-16">
       <div>
-        <Link href="/admin/settings" className="text-xs font-bold text-[var(--kesar-text)] inline-flex items-center gap-1">
+        <Link href="/admin/settings" className="text-xs font-bold text-[var(--accent-text)] inline-flex items-center gap-1">
           <Icon name="chevronLeft" className="h-3.5 w-3.5" /> Settings
         </Link>
         <h1 className="page-title">Your web address</h1>
@@ -209,14 +209,14 @@ export default function DomainsPage() {
                 )}
 
                 {d.lastError && !d.verified && (
-                  <p className="text-sm rounded-xl bg-[var(--genda-tint)] text-[var(--genda-text)] px-3 py-2 flex items-start gap-2">
+                  <p className="text-sm rounded-xl bg-[var(--scheme-tint)] text-[var(--scheme-text)] px-3 py-2 flex items-start gap-2">
                     <Icon name="alert" className="h-4 w-4 shrink-0 mt-0.5" />
                     <span className="min-w-0 break-words">{d.lastError}</span>
                   </p>
                 )}
 
                 <div className="flex items-start gap-2 text-sm">
-                  <Icon name="lock" className={`h-4 w-4 shrink-0 mt-0.5 ${tls.tone === "ok" ? "text-[var(--mint-text)]" : tls.tone === "bad" ? "text-[#a8281e]" : "text-[var(--muted)]"}`} />
+                  <Icon name="lock" className={`h-4 w-4 shrink-0 mt-0.5 ${tls.tone === "ok" ? "text-[var(--success-text)]" : tls.tone === "bad" ? "text-[var(--risk-text)]" : "text-[var(--muted)]"}`} />
                   <span className="min-w-0 text-[var(--ink-2)]">Secure certificate: {tls.text}</span>
                 </div>
 

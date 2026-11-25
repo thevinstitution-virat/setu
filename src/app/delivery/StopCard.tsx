@@ -12,10 +12,10 @@ const failLabel = (r: string | null) => (r && r in FAIL_REASONS ? FAIL_REASONS[r
 function Seq({ n, tone }: { n: number; tone: "open" | "done" | "failed" }) {
   const cls =
     tone === "open"
-      ? "bg-[var(--kesar-tint)] text-[var(--kesar-text)]"
+      ? "bg-[var(--accent-tint)] text-[var(--accent-text)]"
       : tone === "done"
-        ? "bg-[var(--mint-tint)] text-[var(--mint-text)]"
-        : "bg-[#fde4e1] text-[#a8281e]";
+        ? "bg-[var(--success-tint)] text-[var(--success-text)]"
+        : "bg-[var(--risk-tint)] text-[var(--risk-text)]";
   return <span className={`icon-tile font-heading font-bold ${cls}`}>{n}</span>;
 }
 
@@ -35,7 +35,7 @@ export default function StopCard({ stop }: { stop: TripStop }) {
             {stop.order.orderNumber} · {formatINR(stop.order.total)}
           </p>
           {!delivered && (
-            <p className="text-xs font-semibold text-[#a8281e] mt-0.5">Not delivered: {failLabel(stop.failReason)}</p>
+            <p className="text-xs font-semibold text-[var(--risk-text)] mt-0.5">Not delivered: {failLabel(stop.failReason)}</p>
           )}
         </div>
         {delivered && (

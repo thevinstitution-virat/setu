@@ -70,14 +70,14 @@ export default function TicketThread({ id, statusText }: { id: string; statusTex
           {category} · Raised {shortDate(t.createdAt, true)}
         </p>
         {t.order && (
-          <Link href={`/retailer/orders/${t.order.id}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--kesar-text)]">
+          <Link href={`/retailer/orders/${t.order.id}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--accent-text)]">
             <Icon name="box" className="h-4 w-4" /> {t.order.orderNumber} · {formatINR(t.order.totalAmount)}
           </Link>
         )}
       </div>
 
       {t.status === "WAITING" && (
-        <p className="card p-3 text-sm font-semibold text-[var(--kesar-text)] border-2 !border-[var(--kesar)]">
+        <p className="card p-3 text-sm font-semibold text-[var(--accent-text)] border-2 !border-[var(--kesar)]">
           We asked you something below. Please reply so we can fix this.
         </p>
       )}
@@ -128,7 +128,7 @@ export default function TicketThread({ id, statusText }: { id: string; statusTex
 
 function BackLink() {
   return (
-    <Link href="/retailer/help" className="inline-flex items-center gap-1 text-sm text-[var(--kesar-text)] min-h-[44px]">
+    <Link href="/retailer/help" className="inline-flex items-center gap-1 text-sm text-[var(--accent-text)] min-h-[44px]">
       <Icon name="chevronLeft" className="h-4 w-4" /> All complaints
     </Link>
   );
@@ -216,7 +216,7 @@ function ReplyBox({
         placeholder={reopen ? "For example: the replacement box is also damaged." : "Write here"}
       />
       <PhotoPicker value={photos} onChange={setPhotos} onBusy={setUploading} />
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       <div className="flex gap-2">
         {onCancel && (
           <button type="button" className="btn btn-quiet flex-1" onClick={onCancel} disabled={saving}>

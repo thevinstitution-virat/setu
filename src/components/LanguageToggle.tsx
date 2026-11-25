@@ -7,7 +7,7 @@ export default function LanguageToggle() {
 
   return (
     <div
-      className="inline-flex shrink-0 rounded-[10px] p-[3px] text-xs font-bold bg-[#eef2f1]"
+      className="inline-flex shrink-0 rounded-[10px] p-[3px] text-xs font-bold bg-[var(--line)]"
       role="group"
       aria-label="Language"
     >

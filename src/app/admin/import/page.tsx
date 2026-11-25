@@ -90,7 +90,7 @@ export default function ImportPage() {
               aria-selected={type === t}
               onClick={() => pickType(t)}
               className={`flex-1 rounded-xl py-2 text-sm font-bold transition ${
-                type === t ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "text-[var(--ink-2)]"
+                type === t ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "text-[var(--ink-2)]"
               }`}
             >
               {TYPES[t].label}
@@ -100,7 +100,7 @@ export default function ImportPage() {
 
         <p className="text-sm text-[var(--muted)]">
           Columns: {TYPES[type].hint}{" "}
-          <a className="font-bold text-[var(--kesar-text)] underline" href={`/api/admin/import?type=${type}`}>
+          <a className="font-bold text-[var(--accent-text)] underline" href={`/api/admin/import?type=${type}`}>
             Download template
           </a>
         </p>
@@ -145,7 +145,7 @@ export default function ImportPage() {
             {busy === "commit" ? "Importing…" : "Import now"}
           </button>
         </div>
-        {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+        {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       </div>
 
       {result && (
@@ -180,7 +180,7 @@ export default function ImportPage() {
                 </details>
               )}
               {result.tidy.duplicates.length > 0 && (
-                <div className="rounded-xl bg-[var(--kesar-tint)] p-3 text-sm">
+                <div className="rounded-xl bg-[var(--accent-tint)] p-3 text-sm">
                   <p className="font-bold">Possible duplicates (imported as they are; check them):</p>
                   <ul className="mt-1 space-y-1">
                     {result.tidy.duplicates.map((d, i) => (

@@ -57,7 +57,7 @@ export default function ShellNotices({ chrome, isOffice, children }: { chrome: C
       {paused ? (
         <section className="card p-6 max-w-xl">
           <div className="flex items-center gap-3 mb-2">
-            <Icon name="lock" className="h-6 w-6 text-[var(--kesar-text)]" />
+            <Icon name="lock" className="h-6 w-6 text-[var(--accent-text)]" />
             <h1 className="font-heading text-xl font-bold">{t("shell.paused")}</h1>
           </div>
           {chrome.notice?.kind === "paused" && chrome.notice.reason && !chrome.notice.reason.startsWith("billing:") && (
@@ -72,7 +72,7 @@ export default function ShellNotices({ chrome, isOffice, children }: { chrome: C
       ) : locked ? (
         <section className="card p-6 max-w-xl">
           <div className="flex items-center gap-3 mb-2">
-            <Icon name="lock" className="h-6 w-6 text-[var(--kesar-text)]" />
+            <Icon name="lock" className="h-6 w-6 text-[var(--accent-text)]" />
             <h1 className="font-heading text-xl font-bold">{t("shell.notInPlan")}</h1>
           </div>
           <p className="font-semibold mb-1">{locked.label}</p>
@@ -109,7 +109,7 @@ function Notice({ notice }: { notice: NonNullable<Chrome["notice"]> }) {
   const box = "mb-4 flex flex-wrap items-center gap-3 rounded-2xl border px-4 py-3 text-sm";
   if (notice.kind === "trial") {
     return (
-      <div className={`${box} border-[var(--line)] bg-[var(--kesar-tint)] text-[var(--kesar-text)]`} role="status">
+      <div className={`${box} border-[var(--line)] bg-[var(--accent-tint)] text-[var(--accent-text)]`} role="status">
         <Icon name="clock" className="h-5 w-5 shrink-0" />
         <p className="flex-1 min-w-0 font-semibold">
           {t("shell.trial")}: {notice.daysLeft} {t("shell.daysLeft")} ({fmtDate(notice.endsAt)})

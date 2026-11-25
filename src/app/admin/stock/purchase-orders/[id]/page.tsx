@@ -105,7 +105,7 @@ export default function PurchaseOrderPage({ params }: { params: Promise<{ id: st
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex items-start gap-3 min-w-0">
-              <span className="icon-tile bg-[var(--kesar-tint)] text-[var(--kesar-text)]">
+              <span className="icon-tile bg-[var(--accent-tint)] text-[var(--accent-text)]">
                 <Icon name="truck" />
               </span>
               <div className="min-w-0">
@@ -116,7 +116,7 @@ export default function PurchaseOrderPage({ params }: { params: Promise<{ id: st
                     {po.supplier.contactName}
                     {po.supplier.contactName && po.supplier.phone ? " · " : ""}
                     {po.supplier.phone && (
-                      <a href={`tel:${po.supplier.phone}`} className="font-semibold text-[var(--kesar-text)]">
+                      <a href={`tel:${po.supplier.phone}`} className="font-semibold text-[var(--accent-text)]">
                         {po.supplier.phone}
                       </a>
                     )}
@@ -125,7 +125,7 @@ export default function PurchaseOrderPage({ params }: { params: Promise<{ id: st
               </div>
             </div>
             <div className="flex items-start gap-3 min-w-0">
-              <span className="icon-tile bg-[var(--mint-tint)] text-[var(--mint-text)]">
+              <span className="icon-tile bg-[var(--success-tint)] text-[var(--success-text)]">
                 <Icon name="clock" />
               </span>
               <div className="min-w-0 text-sm">
@@ -141,12 +141,12 @@ export default function PurchaseOrderPage({ params }: { params: Promise<{ id: st
           <div className="grid grid-cols-3 gap-2 text-center">
             <Tile label="Value" value={value ? formatINR(value, { whole: true }) : "—"} />
             <Tile label="Ordered" value={String(units)} />
-            <Tile label="Received" value={String(received)} tone={received >= units && units > 0 ? "text-[var(--mint-text)]" : ""} />
+            <Tile label="Received" value={String(received)} tone={received >= units && units > 0 ? "text-[var(--success-text)]" : ""} />
           </div>
         </div>
 
         {flash && (
-          <p className="card p-3 text-sm font-semibold text-[var(--mint-text)] bg-[var(--mint-tint)]" role="status">
+          <p className="card p-3 text-sm font-semibold text-[var(--success-text)] bg-[var(--success-tint)]" role="status">
             <Icon name="check" className="inline h-4 w-4 mr-1" />
             {flash}
           </p>
@@ -254,14 +254,14 @@ function Actions({ po, business, onDone, onCopied }: { po: Po; business: Busines
           <Icon name="share" className="h-4 w-4" /> Copy for WhatsApp
         </button>
         {open && !confirmCancel && (
-          <button type="button" className="btn btn-quiet btn-sm !min-h-[44px] text-[#a8281e]" disabled={busy} onClick={() => setConfirmCancel(true)}>
+          <button type="button" className="btn btn-quiet btn-sm !min-h-[44px] text-[var(--risk-text)]" disabled={busy} onClick={() => setConfirmCancel(true)}>
             <Icon name="x" className="h-4 w-4" /> Cancel order
           </button>
         )}
       </div>
       {confirmCancel && (
-        <div className="rounded-2xl bg-[#fde4e1] p-3 space-y-2">
-          <p className="text-sm text-[#a8281e] font-semibold">Cancel {po.number}?</p>
+        <div className="rounded-2xl bg-[var(--risk-tint)] p-3 space-y-2">
+          <p className="text-sm text-[var(--risk-text)] font-semibold">Cancel {po.number}?</p>
           <p className="text-xs text-[var(--ink-2)]">
             {po.status === "PARTLY_RECEIVED"
               ? "Goods already received stay in stock. The rest is no longer expected."
@@ -277,7 +277,7 @@ function Actions({ po, business, onDone, onCopied }: { po: Po; business: Busines
           </div>
         </div>
       )}
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
     </section>
   );
 }
@@ -331,7 +331,7 @@ function Lines({ po, value }: { po: Po; value: number }) {
           const left = Math.max(0, l.quantity - l.receivedQty);
           const done = l.receivedQty >= l.quantity;
           const amount = l.unitCost !== null ? l.quantity * l.unitCost : null;
-          const recvTone = !showReceived ? "" : done ? "text-[var(--mint-text)] font-semibold" : l.receivedQty > 0 ? "text-[var(--genda-text)] font-semibold" : "";
+          const recvTone = !showReceived ? "" : done ? "text-[var(--success-text)] font-semibold" : l.receivedQty > 0 ? "text-[var(--scheme-text)] font-semibold" : "";
           return (
             <li key={l.id} className="px-4 py-3">
               {/* Phone */}

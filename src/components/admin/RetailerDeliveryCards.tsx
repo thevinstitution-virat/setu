@@ -111,7 +111,7 @@ function DeliveryCard({ retailerId, canEdit, onDone }: { retailerId: string; can
   return (
     <Card title="Delivery">
       {!saved && !error && <p className="text-sm text-[var(--muted)]">Loading…</p>}
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       {saved && !canEdit && (
         <dl className="space-y-2 text-sm">
           <div>
@@ -226,7 +226,7 @@ function CratesCard({ retailerId, canEdit, onDone }: { retailerId: string; canEd
   if (!balances) {
     return (
       <Card title="Crates & jars held">
-        {error ? <p className="text-sm text-[#a8281e]">{error}</p> : <p className="text-sm text-[var(--muted)]">Loading…</p>}
+        {error ? <p className="text-sm text-[var(--risk-text)]">{error}</p> : <p className="text-sm text-[var(--muted)]">Loading…</p>}
       </Card>
     );
   }
@@ -236,11 +236,11 @@ function CratesCard({ retailerId, canEdit, onDone }: { retailerId: string; canEd
 
   return (
     <Card title="Crates & jars held">
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       {types.length === 0 && held.length === 0 ? (
         <p className="text-sm text-[var(--muted)]">
           No crate or jar types set up.{" "}
-          <Link href="/admin/settings#delivery" className="font-bold text-[var(--kesar-text)]">
+          <Link href="/admin/settings#delivery" className="font-bold text-[var(--accent-text)]">
             Add them in Settings
           </Link>
         </p>
@@ -256,7 +256,7 @@ function CratesCard({ retailerId, canEdit, onDone }: { retailerId: string; canEd
                   <span className="block text-xs text-[var(--muted)]">{formatINR(b.balance * b.unitCharge)} if none come back</span>
                 )}
               </span>
-              <span className={`font-heading text-lg font-bold shrink-0 ${b.balance < 0 ? "text-[#a8281e]" : ""}`}>{b.balance}</span>
+              <span className={`font-heading text-lg font-bold shrink-0 ${b.balance < 0 ? "text-[var(--risk-text)]" : ""}`}>{b.balance}</span>
             </li>
           ))}
         </ul>
@@ -317,7 +317,7 @@ function ChargeForm({
     return (
       <p className="rounded-2xl bg-ink/5 p-3 text-sm text-[var(--ink-2)]">
         Nothing to charge: the shop holds none, or no charge is set.{" "}
-        <Link href="/admin/settings#delivery" className="font-bold text-[var(--kesar-text)]">
+        <Link href="/admin/settings#delivery" className="font-bold text-[var(--accent-text)]">
           Set charges in Settings
         </Link>
       </p>
@@ -367,7 +367,7 @@ function ChargeForm({
           {n} × {formatINR(pick.unitCharge)} = <b>{formatINR(n * pick.unitCharge)}</b> added to the bill
         </p>
       )}
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       <div className="flex gap-2 justify-end">
         <button type="button" className="btn btn-quiet btn-sm !min-h-[44px]" onClick={onCancel} disabled={busy}>
           Cancel
@@ -478,7 +478,7 @@ function CountForm({
         <span className="text-xs font-semibold text-[var(--ink-2)]">{opening ? "Note (optional)" : "Why the count changed"}</span>
         <input className="input mt-1" maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} />
       </label>
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       <div className="flex gap-2 justify-end">
         <button type="button" className="btn btn-quiet btn-sm !min-h-[44px]" onClick={onCancel} disabled={busy}>
           Cancel

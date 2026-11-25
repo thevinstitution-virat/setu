@@ -182,7 +182,7 @@ function ReferralCard({ r, onCancelled }: { r: Referral; onCancelled: (msg: stri
               />
             </label>
             <p className="text-xs text-[var(--muted)]">A cancelled referral never pays. This can&apos;t be undone.</p>
-            {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+            {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
             <div className="flex flex-wrap gap-2">
               <button type="button" className="btn btn-danger btn-xs" disabled={busy} onClick={cancel}>
                 {busy ? "Cancelling…" : "Cancel referral"}

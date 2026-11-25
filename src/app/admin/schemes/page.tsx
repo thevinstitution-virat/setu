@@ -354,7 +354,7 @@ export default function SchemesPage() {
             type="button"
             onClick={() => setFilter(f.key)}
             className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${
-              filter === f.key ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-black/5 text-foreground/60"
+              filter === f.key ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "bg-black/5 text-foreground/60"
             }`}
           >
             {f.label}
@@ -475,7 +475,7 @@ function SchemeForm({ scheme, opts, onClose, onSaved }: { scheme: Scheme | null;
       wide
       footer={
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-[#a8281e] min-w-0">{error}</p>
+          <p className="text-sm text-[var(--risk-text)] min-w-0">{error}</p>
           <div className="flex gap-2 ml-auto">
             <button type="button" className="btn btn-quiet btn-sm" onClick={onClose} disabled={busy}>
               Cancel
@@ -512,7 +512,7 @@ function SchemeForm({ scheme, opts, onClose, onSaved }: { scheme: Scheme | null;
                 disabled={!!scheme && !on}
                 onClick={() => set("type", t.key)}
                 className={`rounded-xl p-3 text-left transition border ${
-                  on ? "bg-gradient-to-br from-mor to-[#0c3634] text-white border-transparent" : "bg-white/70 border-[var(--line)] disabled:opacity-40"
+                  on ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white border-transparent" : "bg-white/70 border-[var(--line)] disabled:opacity-40"
                 }`}
               >
                 <span className="block text-sm font-bold">{t.label}</span>
@@ -551,7 +551,7 @@ function SchemeForm({ scheme, opts, onClose, onSaved }: { scheme: Scheme | null;
                   role="radio"
                   aria-checked={f.freeMode === k}
                   onClick={() => set("freeMode", k)}
-                  className={`flex-1 rounded-xl py-2 text-sm font-bold ${f.freeMode === k ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "text-[var(--ink-2)]"}`}
+                  className={`flex-1 rounded-xl py-2 text-sm font-bold ${f.freeMode === k ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "text-[var(--ink-2)]"}`}
                 >
                   {label}
                 </button>
@@ -584,7 +584,7 @@ function SchemeForm({ scheme, opts, onClose, onSaved }: { scheme: Scheme | null;
                 role="radio"
                 aria-checked={f.basis === k}
                 onClick={() => set("basis", k)}
-                className={`flex-1 rounded-xl py-2 text-sm font-bold ${f.basis === k ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "text-[var(--ink-2)]"}`}
+                className={`flex-1 rounded-xl py-2 text-sm font-bold ${f.basis === k ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "text-[var(--ink-2)]"}`}
               >
                 {label}
               </button>

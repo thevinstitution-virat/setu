@@ -147,7 +147,7 @@ function LeadCard({ l, children }: { l: Lead; children?: React.ReactNode }) {
             <span className={`${STATUS[l.status].cls} !py-0.5 !px-2 !text-[11.5px] shrink-0`}>{STATUS[l.status].label}</span>
           </div>
           <p className="text-sm">{l.ownerName}</p>
-          <a href={`tel:${l.phone}`} className="text-sm font-semibold text-[var(--kesar-text)] inline-flex items-center gap-1 min-h-[32px]">
+          <a href={`tel:${l.phone}`} className="text-sm font-semibold text-[var(--accent-text)] inline-flex items-center gap-1 min-h-[32px]">
             <Icon name="phone" className="h-3.5 w-3.5" /> {l.phone}
           </a>
         </div>
@@ -258,13 +258,13 @@ function DecideSheet({
       {detail.error && <p className={errorText}>{detail.error}</p>}
       {!detail.data && !detail.error && <p className="text-sm text-[var(--muted)]">Checking for clashes…</p>}
       {detail.data && shown.length === 0 && (
-        <p className="text-sm text-[var(--mint-text)] flex items-center gap-1.5">
+        <p className="text-sm text-[var(--success-text)] flex items-center gap-1.5">
           <Icon name="check" className="h-4 w-4 shrink-0" /> No other shop has this phone or GSTIN.
         </p>
       )}
       {shown.length > 0 && (
-        <div className="rounded-2xl bg-[var(--kesar-tint)] p-3 space-y-1">
-          <p className="text-sm font-bold text-[var(--kesar-text)] flex items-center gap-1.5">
+        <div className="rounded-2xl bg-[var(--accent-tint)] p-3 space-y-1">
+          <p className="text-sm font-bold text-[var(--accent-text)] flex items-center gap-1.5">
             <Icon name="alert" className="h-4 w-4 shrink-0" /> Check before approving
           </p>
           <ul className="list-disc pl-5 text-sm text-[var(--ink-2)] space-y-0.5">

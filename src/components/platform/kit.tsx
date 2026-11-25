@@ -90,7 +90,7 @@ export const paiseToText = (p: number | null | undefined) => (p ? String(p / 100
 // ───────────────────────────── chips ─────────────────────────────
 
 const CHIP = "chip !py-0.5 !px-2 !text-[11.5px]";
-const RED = "!bg-[#fde4e1] !text-[#a8281e] !border-transparent";
+const RED = "!bg-[var(--risk-tint)] !text-[var(--risk-text)] !border-transparent";
 
 const TONES: Record<string, string> = {
   TRIAL: "chip-genda",
@@ -174,8 +174,8 @@ export function ConfirmButton({
     );
   }
   return (
-    <span className="inline-flex flex-wrap items-center gap-2 rounded-xl bg-[#fde4e1]/60 px-2.5 py-1.5">
-      <span className="text-sm font-semibold text-[#a8281e]">{question}</span>
+    <span className="inline-flex flex-wrap items-center gap-2 rounded-xl bg-[var(--risk-tint)]/60 px-2.5 py-1.5">
+      <span className="text-sm font-semibold text-[var(--risk-text)]">{question}</span>
       <button
         type="button"
         className="btn btn-xs btn-danger"
@@ -197,7 +197,7 @@ export function ConfirmButton({
 /** An error line under a form or action. */
 export function ErrLine({ text }: { text: string | null }) {
   if (!text) return null;
-  return <p className="text-sm text-[#a8281e]">{text}</p>;
+  return <p className="text-sm text-[var(--risk-text)]">{text}</p>;
 }
 
 /** Card section with a heading. */

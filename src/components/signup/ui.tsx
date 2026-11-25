@@ -8,7 +8,7 @@ export function fieldProps(id: string, error?: string | null) {
     id: `f-${id}`,
     "aria-invalid": error ? true : undefined,
     "aria-describedby": error ? `f-${id}-err` : undefined,
-    style: error ? { borderColor: "#a8281e" } : undefined,
+    style: error ? { borderColor: "var(--risk-text)" } : undefined,
   } as const;
 }
 
@@ -36,7 +36,7 @@ export function Field({
       </label>
       {children}
       {error ? (
-        <p id={`f-${id}-err`} role="alert" className="text-xs font-semibold text-[#a8281e] mt-1 break-words">
+        <p id={`f-${id}-err`} role="alert" className="text-xs font-semibold text-[var(--risk-text)] mt-1 break-words">
           {error}
         </p>
       ) : hint ? (
@@ -50,7 +50,7 @@ export function Field({
 export function FormError({ message }: { message: string | null | undefined }) {
   if (!message) return null;
   return (
-    <div role="alert" className="flex gap-2 rounded-xl bg-[#a8281e]/10 text-[#a8281e] px-3 py-2.5 text-sm">
+    <div role="alert" className="flex gap-2 rounded-xl bg-[var(--risk-text)]/10 text-[var(--risk-text)] px-3 py-2.5 text-sm">
       <Icon name="alert" className="h-5 w-5 shrink-0" />
       <p className="break-words">{message}</p>
     </div>
@@ -67,7 +67,7 @@ export function Progress({ steps, active }: { steps: readonly string[]; active: 
             <div className={`h-1.5 rounded-full ${i <= active ? "bg-[var(--kesar)]" : "bg-black/10"}`} />
             <span
               className={`hidden sm:block mt-1.5 text-[11.5px] font-bold truncate ${
-                i === active ? "text-[var(--kesar-text)]" : i < active ? "text-[var(--ink-2)]" : "text-[var(--muted)]"
+                i === active ? "text-[var(--accent-text)]" : i < active ? "text-[var(--ink-2)]" : "text-[var(--muted)]"
               }`}
             >
               {s}
@@ -75,7 +75,7 @@ export function Progress({ steps, active }: { steps: readonly string[]; active: 
           </li>
         ))}
       </ol>
-      <p className="sm:hidden mt-1.5 text-xs font-bold text-[var(--kesar-text)]">
+      <p className="sm:hidden mt-1.5 text-xs font-bold text-[var(--accent-text)]">
         Step {active + 1} of {steps.length} · {steps[active]}
       </p>
     </div>

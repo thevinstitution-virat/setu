@@ -28,8 +28,8 @@ export function StartTripButton({ tripId, stops }: { tripId: string; stops: numb
   return (
     <div className="space-y-2">
       {confirm ? (
-        <div className="rounded-2xl bg-[var(--kesar-tint)] p-3 space-y-3">
-          <p className="text-sm font-semibold text-[var(--kesar-text)]">
+        <div className="rounded-2xl bg-[var(--accent-tint)] p-3 space-y-3">
+          <p className="text-sm font-semibold text-[var(--accent-text)]">
             Goods for all {stops} stop{stops === 1 ? "" : "s"} loaded in the van?
           </p>
           <div className="grid grid-cols-2 gap-2">
@@ -46,7 +46,7 @@ export function StartTripButton({ tripId, stops }: { tripId: string; stops: numb
           <Icon name="truck" /> Start trip
         </button>
       )}
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
     </div>
   );
 }
@@ -90,7 +90,7 @@ export function SortStopsButton({ tripId, className = "" }: { tripId: string; cl
       <button type="button" className="btn btn-quiet w-full" onClick={sort} disabled={busy}>
         <Icon name="route" className="h-4 w-4" /> {busy ? "Sorting…" : "Sort by distance"}
       </button>
-      {note && <p className={`text-xs mt-1.5 ${note.ok ? "text-[var(--muted)]" : "text-[#a8281e]"}`}>{note.text}</p>}
+      {note && <p className={`text-xs mt-1.5 ${note.ok ? "text-[var(--muted)]" : "text-[var(--risk-text)]"}`}>{note.text}</p>}
     </div>
   );
 }

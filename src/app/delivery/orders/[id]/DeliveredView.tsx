@@ -16,7 +16,7 @@ export default function DeliveredView({ order, invoices }: { order: OrderDetail;
         <h1 className="page-title">{order.retailer.outletName}</h1>
         <p className="text-sm text-foreground/50">{order.orderNumber}</p>
       </div>
-      <p className="flex items-center gap-2 rounded-xl bg-[var(--mint-tint)] text-[var(--mint-text)] p-3 text-sm font-bold">
+      <p className="flex items-center gap-2 rounded-xl bg-[var(--success-tint)] text-[var(--success-text)] p-3 text-sm font-bold">
         <Icon name="check" className="h-4 w-4" /> Delivered
       </p>
 

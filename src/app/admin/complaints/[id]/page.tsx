@@ -102,8 +102,8 @@ export default function ComplaintPage({ params }: { params: Promise<{ id: string
         </p>
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
           {isOpenStatus(t.status) && (
-            <span className={t.overdue ? "rounded-full bg-[#fde4e1] px-2.5 py-0.5 text-[#a8281e] font-bold" : "text-white/85"}>
-              <SlaText status={t.status} slaDueAt={t.slaDueAt} now={now} className={t.overdue ? "!text-[#a8281e]" : "!text-white"} />
+            <span className={t.overdue ? "rounded-full bg-[var(--risk-tint)] px-2.5 py-0.5 text-[var(--risk-text)] font-bold" : "text-white/85"}>
+              <SlaText status={t.status} slaDueAt={t.slaDueAt} now={now} className={t.overdue ? "!text-[var(--risk-text)]" : "!text-white"} />
               <span className={t.overdue ? "font-normal" : "text-white/60"}> · due {shortDate(t.slaDueAt, true)}</span>
             </span>
           )}
@@ -175,14 +175,14 @@ function Thread({ messages }: { messages: Message[] }) {
                   <div
                     className={`max-w-[88%] sm:max-w-[80%] min-w-0 rounded-2xl px-3.5 py-2.5 ${
                       m.internal
-                        ? "border-2 border-dashed border-[var(--genda)] bg-[var(--genda-tint)]"
+                        ? "border-2 border-dashed border-[var(--genda)] bg-[var(--scheme-tint)]"
                         : shop
                           ? "border border-[var(--line)] bg-white"
-                          : "bg-[var(--mint-tint)]"
+                          : "bg-[var(--success-tint)]"
                     }`}
                   >
                     {m.internal && (
-                      <p className="mb-1 flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-[0.08em] text-[var(--genda-text)]">
+                      <p className="mb-1 flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-[0.08em] text-[var(--scheme-text)]">
                         <Icon name="eye" className="h-3.5 w-3.5" /> Internal note · Only staff see this
                       </p>
                     )}
@@ -283,7 +283,7 @@ function ReplyBox({ ticket, onDone }: { ticket: Ticket; onDone: (msg: string) =>
         <Toggle checked={internal} onChange={setInternal} label="Internal note" hint="Only staff see it. The shop is not told." />
       </div>
       <textarea
-        className={`input min-h-[110px] ${internal ? "!bg-[var(--genda-tint)]" : ""}`}
+        className={`input min-h-[110px] ${internal ? "!bg-[var(--scheme-tint)]" : ""}`}
         value={body}
         maxLength={2000}
         placeholder={internal ? "Note for your team…" : "Write to the shop…"}
@@ -341,7 +341,7 @@ function ReplyBox({ ticket, onDone }: { ticket: Ticket; onDone: (msg: string) =>
         </div>
       )}
       {error && (
-        <p className="text-sm text-[#a8281e]" role="alert">
+        <p className="text-sm text-[var(--risk-text)]" role="alert">
           {error}
         </p>
       )}
@@ -404,7 +404,7 @@ function Handling({ ticket, staff, onDone }: { ticket: Ticket; staff: { id: stri
         hint="Damaged, missing and expired goods start as high."
       />
       {error && (
-        <p className="text-sm text-[#a8281e]" role="alert">
+        <p className="text-sm text-[var(--risk-text)]" role="alert">
           {error}
         </p>
       )}

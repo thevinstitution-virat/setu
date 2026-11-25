@@ -254,7 +254,7 @@ export default function SettingsPage() {
       .catch((e) => setLoadError(e instanceof Error ? e.message : "Could not load settings"));
   }, []);
 
-  if (loadError) return <p className="text-sm text-[#a8281e]">{loadError}</p>;
+  if (loadError) return <p className="text-sm text-[var(--risk-text)]">{loadError}</p>;
   if (!form || !saved || !cart || !cartSaved || !cartRaw || !gst || !delivery || !inventory || !field || !engage) return <p className="text-sm text-[var(--muted)]">Loading…</p>;
 
   const moneyDirty = JSON.stringify(form) !== JSON.stringify(saved);
@@ -397,7 +397,7 @@ export default function SettingsPage() {
                   aria-checked={form.defaultPaymentMode === v}
                   onClick={() => set("defaultPaymentMode", v)}
                   className={`flex-1 rounded-xl py-2 px-2 text-sm font-bold transition ${
-                    form.defaultPaymentMode === v ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "text-[var(--ink-2)]"
+                    form.defaultPaymentMode === v ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "text-[var(--ink-2)]"
                   }`}
                 >
                   {label}
@@ -622,7 +622,7 @@ export default function SettingsPage() {
                     type="button"
                     aria-pressed={closed}
                     onClick={() => setC("closedWeekdays", closed ? cart.closedWeekdays.filter((x) => x !== i) : [...cart.closedWeekdays, i].sort())}
-                    className={`rounded-xl py-2 text-xs font-bold transition ${closed ? "bg-[#fde4e1] text-[#a8281e]" : "bg-ink/5 text-[var(--ink-2)]"}`}
+                    className={`rounded-xl py-2 text-xs font-bold transition ${closed ? "bg-[var(--risk-tint)] text-[var(--risk-text)]" : "bg-ink/5 text-[var(--ink-2)]"}`}
                   >
                     {d}
                   </button>
@@ -691,11 +691,11 @@ export default function SettingsPage() {
           <div className="card p-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm">
               {error ? (
-                <span className="text-[#a8281e]">{error}</span>
+                <span className="text-[var(--risk-text)]">{error}</span>
               ) : dirty ? (
                 <span className="text-[var(--ink-2)]">You have unsaved changes.</span>
               ) : savedAt ? (
-                <span className="text-[var(--mint-text)] inline-flex items-center gap-1.5">
+                <span className="text-[var(--success-text)] inline-flex items-center gap-1.5">
                   <Icon name="check" className="h-4 w-4" />
                   Saved at {savedAt.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
                 </span>
@@ -867,7 +867,7 @@ function Choice<T extends string>({
           aria-checked={value === v}
           onClick={() => onChange(v)}
           className={`flex-1 rounded-xl py-2 px-2 text-sm font-bold transition ${
-            value === v ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "text-[var(--ink-2)]"
+            value === v ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "text-[var(--ink-2)]"
           }`}
         >
           {label}
@@ -947,8 +947,8 @@ function GstSettings({ invoice, business }: { invoice: InvoiceSettings; business
       </div>
 
       {missing.length > 0 && (
-        <div className="card p-4 flex items-start gap-3 !bg-[var(--genda-tint)]">
-          <Icon name="alert" className="h-5 w-5 shrink-0 text-[var(--genda-text)] mt-0.5" />
+        <div className="card p-4 flex items-start gap-3 !bg-[var(--scheme-tint)]">
+          <Icon name="alert" className="h-5 w-5 shrink-0 text-[var(--scheme-text)] mt-0.5" />
           <div className="text-sm min-w-0">
             <p className="font-semibold">Still missing</p>
             <ul className="list-disc pl-5">
@@ -1152,11 +1152,11 @@ function GstSettings({ invoice, business }: { invoice: InvoiceSettings; business
         <div className="card p-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm min-w-0">
             {error ? (
-              <span className="text-[#a8281e]">{error}</span>
+              <span className="text-[var(--risk-text)]">{error}</span>
             ) : dirty ? (
               <span className="text-[var(--ink-2)]">Unsaved GST &amp; invoice changes.</span>
             ) : savedAt ? (
-              <span className="text-[var(--mint-text)] inline-flex items-center gap-1.5">
+              <span className="text-[var(--success-text)] inline-flex items-center gap-1.5">
                 <Icon name="check" className="h-4 w-4" />
                 Saved at {savedAt.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
               </span>

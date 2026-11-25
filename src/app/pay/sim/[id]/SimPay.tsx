@@ -72,7 +72,7 @@ export default function SimPay({ id }: { id: string }) {
   }
 
   const banner = (
-    <p className="flex items-center gap-2 rounded-xl bg-[var(--genda-tint)] text-[var(--genda-text)] p-3 text-sm font-bold">
+    <p className="flex items-center gap-2 rounded-xl bg-[var(--scheme-tint)] text-[var(--scheme-text)] p-3 text-sm font-bold">
       <Icon name="alert" className="h-4 w-4 shrink-0" /> Practice payment — no real money moves
     </p>
   );
@@ -83,7 +83,7 @@ export default function SimPay({ id }: { id: string }) {
         {banner}
         {loadError ? (
           <div className="card p-5 space-y-3">
-            <p className="text-sm text-[#a8281e]">{loadError}</p>
+            <p className="text-sm text-[var(--risk-text)]">{loadError}</p>
             <button className="btn btn-quiet btn-sm" onClick={load}>
               Try again
             </button>
@@ -118,7 +118,7 @@ export default function SimPay({ id }: { id: string }) {
 
       {req.status === "PAID" ? (
         <div className="card p-5 space-y-4 text-center">
-          <span className="icon-tile mx-auto bg-[var(--mint-tint)] text-[var(--mint-text)]">
+          <span className="icon-tile mx-auto bg-[var(--success-tint)] text-[var(--success-text)]">
             <Icon name="check" />
           </span>
           <div>
@@ -134,10 +134,10 @@ export default function SimPay({ id }: { id: string }) {
       ) : open ? (
         <div className="space-y-3">
           {paidNow !== null && (
-            <p className="rounded-xl bg-[var(--mint-tint)] text-[var(--mint-text)] p-3 text-sm font-bold">{formatINR(paidNow)} paid.</p>
+            <p className="rounded-xl bg-[var(--success-tint)] text-[var(--success-text)] p-3 text-sm font-bold">{formatINR(paidNow)} paid.</p>
           )}
           {error && (
-            <p role="alert" className="rounded-xl bg-[#fde4e1] text-[#a8281e] p-3 text-sm font-semibold">
+            <p role="alert" className="rounded-xl bg-[var(--risk-tint)] text-[var(--risk-text)] p-3 text-sm font-semibold">
               {error}
             </p>
           )}

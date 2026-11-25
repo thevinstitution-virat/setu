@@ -76,7 +76,7 @@ export function Pills<K extends string>({
               {typeof f.count === "number" && (
                 <span
                   className={`text-xs ${
-                    f.alert && f.count > 0 ? (on ? "rounded-full bg-white/20 px-1.5 text-white" : "rounded-full bg-[#fde4e1] px-1.5 text-[#a8281e]") : on ? "text-white/75" : "text-[var(--muted)]"
+                    f.alert && f.count > 0 ? (on ? "rounded-full bg-white/20 px-1.5 text-white" : "rounded-full bg-[var(--risk-tint)] px-1.5 text-[var(--risk-text)]") : on ? "text-white/75" : "text-[var(--muted)]"
                   }`}
                 >
                   {f.count}
@@ -156,10 +156,10 @@ export function SlaText({ status, slaDueAt, now, className = "" }: { status: str
   if (!isOpenStatus(status)) return null;
   const left = new Date(slaDueAt).getTime() - now;
   if (left < 0) {
-    return <span className={`font-bold text-[#a8281e] whitespace-nowrap ${className}`}>Overdue by {spanText(left)}</span>;
+    return <span className={`font-bold text-[var(--risk-text)] whitespace-nowrap ${className}`}>Overdue by {spanText(left)}</span>;
   }
   const soon = left < 4 * 3600_000;
-  return <span className={`whitespace-nowrap ${soon ? "font-bold text-[var(--genda-text)]" : "text-[var(--ink-2)]"} ${className}`}>{spanText(left)} left</span>;
+  return <span className={`whitespace-nowrap ${soon ? "font-bold text-[var(--scheme-text)]" : "text-[var(--ink-2)]"} ${className}`}>{spanText(left)} left</span>;
 }
 
 export function Stars({ value, className = "" }: { value: number; className?: string }) {

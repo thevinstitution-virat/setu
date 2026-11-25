@@ -71,8 +71,8 @@ export default function LinesCard({
                 <Stepper value={qty} max={ordered} label={i.product.name} onChangeAction={(n) => set(i.id, { qty: n })} />
               </div>
               {short && (
-                <label className="block rounded-xl bg-[var(--kesar-tint)] p-2.5">
-                  <span className="text-xs font-bold text-[var(--kesar-text)]">
+                <label className="block rounded-xl bg-[var(--accent-tint)] p-2.5">
+                  <span className="text-xs font-bold text-[var(--accent-text)]">
                     {ordered - qty} short. Why?
                   </span>
                   <select

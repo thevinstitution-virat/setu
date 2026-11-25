@@ -125,7 +125,7 @@ export default function PushCard({
   return (
     <section className="card p-4 space-y-3">
       <div className="flex items-start gap-3">
-        <span className="icon-tile bg-[var(--kesar-tint)] text-[var(--kesar-text)] shrink-0">
+        <span className="icon-tile bg-[var(--accent-tint)] text-[var(--accent-text)] shrink-0">
           <Icon name="bell" />
         </span>
         <div className="min-w-0">
@@ -153,7 +153,7 @@ export default function PushCard({
         </p>
       ) : state === "on" ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-[var(--mint-text)] flex items-center gap-1.5">
+          <p className="text-sm font-semibold text-[var(--success-text)] flex items-center gap-1.5">
             <Icon name="check" className="h-4 w-4" /> On for this phone
           </p>
           <button type="button" className="btn btn-quiet btn-sm" disabled={busy} onClick={turnOff}>
@@ -165,7 +165,7 @@ export default function PushCard({
           <Icon name="bell" className="h-4 w-4" /> {busy ? "Turning on…" : "Turn on notifications"}
         </button>
       )}
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
     </section>
   );
 }

@@ -18,7 +18,7 @@ export default function LegalDoc({ title, children }: { title: string; children:
         <h1 className="text-2xl font-bold text-ink">{title}</h1>
         <p className="text-sm text-[var(--muted)]">Last updated {LEGAL_UPDATED}</p>
         {LEGAL_DRAFT && (
-          <p role="note" className="rounded-xl border border-[var(--genda)]/50 bg-[var(--genda-tint)] px-3 py-2 text-sm font-semibold text-[var(--genda-text)]">
+          <p role="note" className="rounded-xl border border-[var(--genda)]/50 bg-[var(--scheme-tint)] px-3 py-2 text-sm font-semibold text-[var(--scheme-text)]">
             Draft. This text is being reviewed and will be replaced by the final version before the service opens to other businesses.
           </p>
         )}

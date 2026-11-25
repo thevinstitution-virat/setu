@@ -19,13 +19,13 @@ type Tone = "ok" | "warn" | "bad";
 
 const TONE: Record<Tone, string> = {
   ok: "border-[var(--mint)]/40",
-  warn: "!bg-[var(--genda-tint)] border-[var(--genda)]/50",
-  bad: "!bg-[#fde4e1] border-[#a8281e]/30",
+  warn: "!bg-[var(--scheme-tint)] border-[var(--genda)]/50",
+  bad: "!bg-[var(--risk-tint)] border-[var(--risk-text)]/30",
 };
 
 function Light({ tone, title, value, note }: { tone: Tone; title: string; value: string; note?: string }) {
   const icon = tone === "ok" ? "check" : "alert";
-  const color = tone === "ok" ? "text-[var(--mint-text)]" : tone === "warn" ? "text-[var(--genda-text)]" : "text-[#a8281e]";
+  const color = tone === "ok" ? "text-[var(--success-text)]" : tone === "warn" ? "text-[var(--scheme-text)]" : "text-[var(--risk-text)]";
   return (
     <div className={`card p-4 border-2 ${TONE[tone]} min-w-0`}>
       <p className={`text-sm font-semibold flex items-center gap-1.5 ${color}`}>
@@ -39,7 +39,7 @@ function Light({ tone, title, value, note }: { tone: Tone; title: string; value:
 
 const RANK = { fail: 0, warn: 1, ok: 2 } as const;
 
-const bad = (n: number) => (n > 0 ? "text-[#a8281e] font-semibold" : "text-[var(--muted)]");
+const bad = (n: number) => (n > 0 ? "text-[var(--risk-text)] font-semibold" : "text-[var(--muted)]");
 
 export default function HealthPage() {
   const { data, error, reload } = useFetch<Data>("/api/platform/health");
@@ -91,7 +91,7 @@ export default function HealthPage() {
                   <li key={c.id} className="py-2 text-sm flex gap-2 items-start">
                     <Icon
                       name={c.status === "ok" ? "check" : "alert"}
-                      className={`h-4 w-4 shrink-0 mt-0.5 ${c.status === "ok" ? "text-[var(--mint-text)]" : c.status === "warn" ? "text-[var(--genda-text)]" : "text-[#a8281e]"}`}
+                      className={`h-4 w-4 shrink-0 mt-0.5 ${c.status === "ok" ? "text-[var(--success-text)]" : c.status === "warn" ? "text-[var(--scheme-text)]" : "text-[var(--risk-text)]"}`}
                     />
                     <span className="min-w-0">
                       <span className="font-semibold">{c.label}</span>
@@ -104,7 +104,7 @@ export default function HealthPage() {
 
           <Section title="Problems by business" sub="Messages and webhooks: last 24 hours. E-invoices: all still failed. Overdue: unpaid past the due date.">
             {data.tenants.length === 0 ? (
-              <p className="text-sm text-[var(--mint-text)] flex items-center gap-1.5">
+              <p className="text-sm text-[var(--success-text)] flex items-center gap-1.5">
                 <Icon name="check" className="h-4 w-4" /> Nothing wrong.
               </p>
             ) : (
@@ -169,7 +169,7 @@ export default function HealthPage() {
                       <Link href={`/platform/tenants/${d.id}`} className="font-semibold text-[var(--mor)] hover:underline">
                         {d.name}
                       </Link>
-                      <span className="text-[#a8281e] font-semibold">{when(d.deleteAfter, true)}</span>
+                      <span className="text-[var(--risk-text)] font-semibold">{when(d.deleteAfter, true)}</span>
                     </li>
                   ))}
                 </ul>

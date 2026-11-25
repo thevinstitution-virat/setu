@@ -73,14 +73,14 @@ export default async function SharedInvoicePage({ params }: { params: Promise<{ 
           </div>
           {doc.due !== null ? (
             doc.due > 0 ? (
-              <div className="rounded-xl bg-[var(--kesar-tint)] p-3">
-                <p className="text-xs text-[var(--kesar-text)]">Amount due</p>
-                <p className="font-bold text-lg mt-0.5 text-[var(--kesar-text)]">{formatINR(doc.due)}</p>
+              <div className="rounded-xl bg-[var(--accent-tint)] p-3">
+                <p className="text-xs text-[var(--accent-text)]">Amount due</p>
+                <p className="font-bold text-lg mt-0.5 text-[var(--accent-text)]">{formatINR(doc.due)}</p>
               </div>
             ) : (
-              <div className="rounded-xl bg-[var(--mint-tint)] p-3">
-                <p className="text-xs text-[var(--mint-text)]">Amount due</p>
-                <p className="font-bold text-lg mt-0.5 text-[var(--mint-text)]">Paid</p>
+              <div className="rounded-xl bg-[var(--success-tint)] p-3">
+                <p className="text-xs text-[var(--success-text)]">Amount due</p>
+                <p className="font-bold text-lg mt-0.5 text-[var(--success-text)]">Paid</p>
               </div>
             )
           ) : (

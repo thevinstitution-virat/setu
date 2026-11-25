@@ -155,7 +155,7 @@ export default function FieldSettings({ field }: { field: FieldRules }) {
             label="Record positions while on duty"
             hint="Shows where your staff are and the route they took on the Field team screens."
           />
-          <div className="rounded-2xl bg-[var(--genda-tint)] p-3 text-xs text-[var(--ink-2)] flex items-start gap-2">
+          <div className="rounded-2xl bg-[var(--scheme-tint)] p-3 text-xs text-[var(--ink-2)] flex items-start gap-2">
             <Icon name="alert" className="h-4 w-4 shrink-0 mt-0.5" />
             <div className="space-y-1">
               <p className="font-bold">Tell your staff first.</p>
@@ -198,11 +198,11 @@ export default function FieldSettings({ field }: { field: FieldRules }) {
         <div className="card p-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm min-w-0">
             {error ? (
-              <span className="text-[#a8281e]">{error}</span>
+              <span className="text-[var(--risk-text)]">{error}</span>
             ) : dirty ? (
               <span className="text-[var(--ink-2)]">Unsaved field team changes.</span>
             ) : savedAt ? (
-              <span className="text-[var(--mint-text)] inline-flex items-center gap-1.5">
+              <span className="text-[var(--success-text)] inline-flex items-center gap-1.5">
                 <Icon name="check" className="h-4 w-4" />
                 Saved at {savedAt.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
               </span>

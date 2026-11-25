@@ -49,7 +49,7 @@ export default function PlatformNav({ name, role }: { name: string; role: string
           <BrandMark size={30} />
           <span className="font-heading font-bold leading-none">
             VBiz Pro console
-            <span className="block text-[11px] font-bold text-[var(--kesar-text)] mt-0.5">Platform</span>
+            <span className="block text-[11px] font-bold text-[var(--accent-text)] mt-0.5">Platform</span>
           </span>
         </Link>
         <div className="ml-auto flex items-center gap-2 min-w-0 sm:order-3">
@@ -80,7 +80,7 @@ export default function PlatformNav({ name, role }: { name: string; role: string
             })}
           </ul>
         </nav>
-        {error && <p className="w-full text-sm text-[#a8281e] sm:order-4">{error}</p>}
+        {error && <p className="w-full text-sm text-[var(--risk-text)] sm:order-4">{error}</p>}
       </div>
     </header>
   );

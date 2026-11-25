@@ -117,7 +117,7 @@ function ChannelChip({
       <input type="checkbox" className="sr-only" checked={checked && !disabled} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
       <span
         aria-hidden="true"
-        className={`grid h-3.5 w-3.5 place-items-center rounded-[4px] border ${checked && !disabled ? "border-transparent bg-[var(--mint-text)] text-white" : "border-current"}`}
+        className={`grid h-3.5 w-3.5 place-items-center rounded-[4px] border ${checked && !disabled ? "border-transparent bg-[var(--success-text)] text-white" : "border-current"}`}
       >
         {checked && !disabled && <Icon name="check" className="h-2.5 w-2.5" />}
       </span>
@@ -237,7 +237,7 @@ export default function MessageSettings({ notify, channels }: { notify: NotifySe
                   </span>
                 </div>
                 {note && f.channels[ch] && (
-                  <p className="ml-14 rounded-xl bg-[var(--genda-tint)] px-3 py-2 text-xs text-[var(--ink-2)] flex items-start gap-1.5">
+                  <p className="ml-14 rounded-xl bg-[var(--scheme-tint)] px-3 py-2 text-xs text-[var(--ink-2)] flex items-start gap-1.5">
                     <Icon name="alert" className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                     <span>{note}</span>
                   </p>
@@ -343,11 +343,11 @@ export default function MessageSettings({ notify, channels }: { notify: NotifySe
         <div className="card p-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm min-w-0">
             {error ? (
-              <span className="text-[#a8281e]">{error}</span>
+              <span className="text-[var(--risk-text)]">{error}</span>
             ) : dirty ? (
               <span className="text-[var(--ink-2)]">Unsaved message changes.</span>
             ) : savedAt ? (
-              <span className="text-[var(--mint-text)] inline-flex items-center gap-1.5">
+              <span className="text-[var(--success-text)] inline-flex items-center gap-1.5">
                 <Icon name="check" className="h-4 w-4" />
                 Saved at {savedAt.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })}
               </span>

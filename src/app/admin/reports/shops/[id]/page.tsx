@@ -25,7 +25,7 @@ export default async function ShopReport({ params, searchParams }: { params: Pro
     <div className="space-y-5">
       <div className="card p-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Link href={`/admin/reports/shops${qs}`} className="text-xs font-bold text-[var(--kesar-text)]">
+          <Link href={`/admin/reports/shops${qs}`} className="text-xs font-bold text-[var(--accent-text)]">
             ← All shops
           </Link>
           <h2 className="font-heading text-xl font-bold text-[var(--ink)] mt-1">{d.shop.outletName}</h2>

@@ -137,7 +137,7 @@ export default function ShelfAuditCard({ retailerId, visitId }: { retailerId: st
           </button>
         )}
       </div>
-      {done && <p className="text-sm font-semibold text-[var(--mint-text)]">{done}</p>}
+      {done && <p className="text-sm font-semibold text-[var(--success-text)]">{done}</p>}
 
       {open && (
         <div className="border-t border-black/5 pt-3 space-y-3">
@@ -199,7 +199,7 @@ export default function ShelfAuditCard({ retailerId, visitId }: { retailerId: st
               )}
             </>
           )}
-          {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+          {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
           <div className="flex gap-2">
             <button type="button" className="btn btn-quiet flex-1" onClick={() => (reset(), setOpen(false))} disabled={saving}>
               Cancel

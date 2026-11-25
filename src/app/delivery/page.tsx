@@ -116,7 +116,7 @@ export default async function DeliveryHome() {
               href={`/delivery/orders/${d.order.id}`}
               className="card p-4 flex items-center gap-3 min-h-[64px] hover:-translate-y-0.5 transition"
             >
-              <span className="icon-tile bg-[var(--kesar-tint)] text-[var(--kesar-text)] font-heading font-bold">{i + 1}</span>
+              <span className="icon-tile bg-[var(--accent-tint)] text-[var(--accent-text)] font-heading font-bold">{i + 1}</span>
               <div className="flex-1 min-w-0">
                 <p className="font-bold text-sm truncate">{d.order.retailer.outletName}</p>
                 <p className="text-xs text-[var(--muted)] truncate">
@@ -147,7 +147,7 @@ export default async function DeliveryHome() {
 
       {active.length === 0 && loose.length === 0 && (
         <div className="card p-6 text-center">
-          <span className="icon-tile mx-auto mb-3 bg-[var(--mint-tint)] text-[var(--mint-text)]">
+          <span className="icon-tile mx-auto mb-3 bg-[var(--success-tint)] text-[var(--success-text)]">
             <Icon name="check" />
           </span>
           <p className="text-sm text-[var(--ink-2)]">

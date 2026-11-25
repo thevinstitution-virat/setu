@@ -112,7 +112,7 @@ export default function PaymentFields({
             aria-checked={value.method === m}
             onClick={() => set({ method: m })}
             className={`flex-1 min-w-[72px] rounded-xl py-2 text-sm font-semibold ${
-              value.method === m ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "bg-black/5 text-foreground/70"
+              value.method === m ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "bg-black/5 text-foreground/70"
             }`}
           >
             {m ? LABEL[m] : noneLabel}

@@ -78,7 +78,7 @@ export default function DeliveryPrefsCard({ pref: pref0, note: note0 }: { pref: 
         />
       </label>
 
-      {msg && <p className={`text-sm ${msg.ok ? "text-[var(--mint-text)]" : "text-[#a8281e]"}`}>{msg.text}</p>}
+      {msg && <p className={`text-sm ${msg.ok ? "text-[var(--success-text)]" : "text-[var(--risk-text)]"}`}>{msg.text}</p>}
       <button type="button" className="btn btn-kesar w-full" onClick={save} disabled={busy || !dirty}>
         {busy ? "Saving…" : "Save"}
       </button>

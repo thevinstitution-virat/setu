@@ -135,7 +135,7 @@ function Inbox() {
         {items.map((n) => {
           const fresh = !n.readAt;
           return (
-            <li key={n.id} className={fresh ? "bg-[var(--kesar-tint)]/50" : ""}>
+            <li key={n.id} className={fresh ? "bg-[var(--accent-tint)]/50" : ""}>
               <button
                 type="button"
                 onClick={() => open(n)}
@@ -143,7 +143,7 @@ function Inbox() {
               >
                 <span
                   className={`icon-tile !h-10 !w-10 shrink-0 ${
-                    fresh ? "bg-[var(--kesar-tint)] text-[var(--kesar-text)]" : "bg-ink/5 text-[var(--muted)]"
+                    fresh ? "bg-[var(--accent-tint)] text-[var(--accent-text)]" : "bg-ink/5 text-[var(--muted)]"
                   }`}
                 >
                   <Icon name={iconFor(n.event)} className="h-5 w-5" />
@@ -162,7 +162,7 @@ function Inbox() {
         })}
       </ul>
 
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
       {more && (
         <button type="button" className="btn btn-quiet w-full" disabled={busy} onClick={older}>
           {busy ? "Loading…" : "Show older"}
@@ -288,7 +288,7 @@ function Settings() {
         </section>
       )}
 
-      {msg && (msg.ok ? <Flash text={msg.text} /> : <p className="text-sm text-[#a8281e]">{msg.text}</p>)}
+      {msg && (msg.ok ? <Flash text={msg.text} /> : <p className="text-sm text-[var(--risk-text)]">{msg.text}</p>)}
     </div>
   );
 }

@@ -400,7 +400,7 @@ export default function SignupWizard({ domain }: { domain: string }) {
     return (
       <Shell>
         <div className="card card-deco p-6 sm:p-7 text-center">
-          <span className="mx-auto grid place-items-center h-12 w-12 rounded-full bg-[var(--mint-tint)] text-[var(--mint-text)]">
+          <span className="mx-auto grid place-items-center h-12 w-12 rounded-full bg-[var(--success-tint)] text-[var(--success-text)]">
             <Icon name="check" className="h-6 w-6" />
           </span>
           <h1 className="page-title mt-3">Your business is ready</h1>
@@ -575,12 +575,12 @@ export default function SignupWizard({ domain }: { domain: string }) {
               <div aria-live="polite" className="text-sm min-h-[24px]">
                 {slugState.kind === "checking" && <span className="text-[var(--muted)]">Checking…</span>}
                 {slugState.kind === "ok" && (
-                  <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--mint-text)]">
+                  <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--success-text)]">
                     <Icon name="check" className="h-4 w-4" />
                     Free to use
                   </span>
                 )}
-                {slugState.kind === "bad" && !errors.slug && <span className="font-semibold text-[#a8281e]">{slugState.message}</span>}
+                {slugState.kind === "bad" && !errors.slug && <span className="font-semibold text-[var(--risk-text)]">{slugState.message}</span>}
               </div>
               <div className="rounded-xl bg-ink/5 px-3 py-2.5">
                 <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--muted)]">Your business will be at</p>
@@ -597,7 +597,7 @@ export default function SignupWizard({ domain }: { domain: string }) {
           {step === 2 && (
             <>
               <h2 className="font-heading font-bold text-lg text-ink">Pick a plan</h2>
-              <div className="rounded-xl bg-[var(--mint-tint)] text-[var(--mint-text)] px-3 py-2.5 text-sm">
+              <div className="rounded-xl bg-[var(--success-tint)] text-[var(--success-text)] px-3 py-2.5 text-sm">
                 <p className="font-bold">Every business starts with a {trialDays}-day free trial.</p>
                 <p>Nothing is charged now. The plan you pick starts when the trial ends, and you can change it from Billing.</p>
               </div>
@@ -627,13 +627,13 @@ export default function SignupWizard({ domain }: { domain: string }) {
                 </button>
               </div>
               {errors.phone && (
-                <p id="f-phone-err" role="alert" className="text-xs font-semibold text-[#a8281e]">
+                <p id="f-phone-err" role="alert" className="text-xs font-semibold text-[var(--risk-text)]">
                   {errors.phone}
                 </p>
               )}
 
               {verified ? (
-                <p className="flex items-center gap-2 rounded-xl bg-[var(--mint-tint)] text-[var(--mint-text)] px-3 py-2.5 text-sm font-bold">
+                <p className="flex items-center gap-2 rounded-xl bg-[var(--success-tint)] text-[var(--success-text)] px-3 py-2.5 text-sm font-bold">
                   <Icon name="check" className="h-5 w-5" />
                   Mobile checked
                 </p>
@@ -644,7 +644,7 @@ export default function SignupWizard({ domain }: { domain: string }) {
               ) : (
                 <>
                   {challenge.devCode && (
-                    <p className="text-xs rounded-lg bg-[var(--genda-tint)] text-[var(--genda-text)] px-3 py-2">
+                    <p className="text-xs rounded-lg bg-[var(--scheme-tint)] text-[var(--scheme-text)] px-3 py-2">
                       Dev mode, no SMS sent. The code is <span className="font-semibold">{challenge.devCode}</span>.
                     </p>
                   )}
@@ -666,13 +666,13 @@ export default function SignupWizard({ domain }: { domain: string }) {
                   <button type="button" className="btn btn-kesar w-full" disabled={busy} onClick={verifyCode}>
                     {busy ? "Checking…" : "Verify"}
                   </button>
-                  <button type="button" className="text-sm text-[var(--kesar-text)] w-full text-center min-h-[44px]" disabled={busy} onClick={sendCode}>
+                  <button type="button" className="text-sm text-[var(--accent-text)] w-full text-center min-h-[44px]" disabled={busy} onClick={sendCode}>
                     Send a new code
                   </button>
                 </>
               )}
               {!challenge && errors.code && (
-                <p role="alert" className="text-xs font-semibold text-[#a8281e]">
+                <p role="alert" className="text-xs font-semibold text-[var(--risk-text)]">
                   {errors.code}
                 </p>
               )}
@@ -694,7 +694,7 @@ export default function SignupWizard({ domain }: { domain: string }) {
                       <dt className="text-xs text-[var(--muted)]">{label}</dt>
                       <dd className="font-semibold text-ink break-all">{value}</dd>
                     </div>
-                    <button type="button" className="text-xs font-bold text-[var(--kesar-text)] min-h-[36px] px-1" onClick={() => goTo(n as number)}>
+                    <button type="button" className="text-xs font-bold text-[var(--accent-text)] min-h-[36px] px-1" onClick={() => goTo(n as number)}>
                       Edit
                     </button>
                   </div>
@@ -725,7 +725,7 @@ export default function SignupWizard({ domain }: { domain: string }) {
                   />
                   <button
                     type="button"
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--kesar-text)] px-2 min-h-[36px]"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[var(--accent-text)] px-2 min-h-[36px]"
                     onClick={() => setShowPassword((v) => !v)}
                     aria-pressed={showPassword}
                   >
@@ -746,18 +746,18 @@ export default function SignupWizard({ domain }: { domain: string }) {
                   />
                   <span>
                     I accept the{" "}
-                    <a href="/legal/terms" target="_blank" rel="noopener" className="font-semibold text-[var(--kesar-text)] underline">
+                    <a href="/legal/terms" target="_blank" rel="noopener" className="font-semibold text-[var(--accent-text)] underline">
                       terms of service
                     </a>{" "}
                     and the{" "}
-                    <a href="/legal/privacy" target="_blank" rel="noopener" className="font-semibold text-[var(--kesar-text)] underline">
+                    <a href="/legal/privacy" target="_blank" rel="noopener" className="font-semibold text-[var(--accent-text)] underline">
                       privacy notice
                     </a>
                     .
                   </span>
                 </label>
                 {errors.acceptTerms && (
-                  <p id="f-acceptTerms-err" role="alert" className="text-xs font-semibold text-[#a8281e] mt-1">
+                  <p id="f-acceptTerms-err" role="alert" className="text-xs font-semibold text-[var(--risk-text)] mt-1">
                     {errors.acceptTerms}
                   </p>
                 )}

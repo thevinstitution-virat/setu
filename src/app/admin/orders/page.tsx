@@ -160,13 +160,13 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
               }`}
             >
               {f === "ALL" ? "All" : t(`status.${f}`)}
-              <span className={`rounded-full px-2 py-px text-xs num ${on ? "bg-[var(--kesar-tint)] text-[var(--kesar-text)]" : "bg-[#eef2f1]"}`}>{n}</span>
+              <span className={`rounded-full px-2 py-px text-xs num ${on ? "bg-[var(--accent-tint)] text-[var(--accent-text)]" : "bg-[var(--line)]"}`}>{n}</span>
             </button>
           );
         })}
       </div>
 
-      <label className="flex items-center gap-2 max-w-md h-11 px-3 rounded-[10px] border border-[var(--app-line-2)] bg-white text-[var(--muted)] focus-within:border-[var(--mor)] focus-within:ring-[3px] focus-within:ring-[var(--mint-tint)]">
+      <label className="flex items-center gap-2 max-w-md h-11 px-3 rounded-[10px] border border-[var(--app-line-2)] bg-white text-[var(--muted)] focus-within:border-[var(--mor)] focus-within:ring-[3px] focus-within:ring-[var(--success-tint)]">
         <Icon name="search" className="h-[18px] w-[18px] shrink-0" />
         <input
           type="search"
@@ -178,7 +178,7 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
         />
       </label>
 
-      {loadError && <p className="text-sm text-[#a8281e]">{loadError}</p>}
+      {loadError && <p className="text-sm text-[var(--risk-text)]">{loadError}</p>}
 
       <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_400px] xl:gap-5 xl:items-start">
         <div className="min-w-0">
@@ -213,7 +213,7 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
                             {o.retailer.outletName}
                             {o.spot && <span className="chip chip-genda !py-0 !text-[11px]">Spot</span>}
                             {held && (
-                              <span className="text-[#a8281e]" title="Credit hold">
+                              <span className="text-[var(--risk-text)]" title="Credit hold">
                                 <Icon name="lock" className="h-3.5 w-3.5" />
                               </span>
                             )}
@@ -241,7 +241,7 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
               const held = o.creditHold && !o.creditApprovedAt && o.status !== "DELIVERED" && o.status !== "CANCELLED";
               return (
                 <li key={o.id}>
-                  <button type="button" onClick={() => setSelectedId(o.id)} className="card w-full text-left p-3.5 sm:p-4 flex flex-col gap-2 active:bg-[#f8faf9]">
+                  <button type="button" onClick={() => setSelectedId(o.id)} className="card w-full text-left p-3.5 sm:p-4 flex flex-col gap-2 active:bg-[var(--surface-2)]">
                     <span className="flex items-start gap-3">
                       <span className="min-w-0 flex-1">
                         <span className="block font-bold truncate">{o.retailer.outletName}</span>
@@ -254,7 +254,7 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
                     <span className="flex flex-wrap items-center gap-2">
                       <span className={`text-[11px] px-2 py-0.5 rounded-full ${STATUS_COLOR[o.status]}`}>{t(`status.${o.status}`)}</span>
                       {o.spot && <span className="chip chip-genda !py-0 !text-[11px]">Spot sale</span>}
-                      {held && <span className="chip !py-0 !text-[11px] !bg-[#fde4e1] !text-[#a8281e] !border-transparent">Credit hold</span>}
+                      {held && <span className="chip !py-0 !text-[11px] !bg-[var(--risk-tint)] !text-[var(--risk-text)] !border-transparent">Credit hold</span>}
                       <span className="flex-1" />
                       <span className="text-xs text-[var(--muted)]">
                         {o.items.length} {o.items.length === 1 ? "item" : "items"}
@@ -284,7 +284,7 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
           />
         ) : (
           <aside className="hidden xl:flex card sticky top-20 flex-col items-center gap-2 px-6 py-10 text-center text-sm text-[var(--muted)]">
-            <Icon name="box" className="h-7 w-7 text-[#9aaeaa]" />
+            <Icon name="box" className="h-7 w-7 text-[var(--faint)]" />
             Pick an order to see its items and move it on.
           </aside>
         )}
@@ -331,7 +331,7 @@ function OrderPanel({
     <div className="fixed inset-0 z-40 flex justify-end xl:sticky xl:inset-auto xl:z-auto xl:block xl:top-20" role="dialog" aria-label={`Order ${o.orderNumber}`}>
       <button type="button" className="xl:hidden absolute inset-0 bg-[rgba(8,38,37,.45)]" aria-label="Close" onClick={onClose} />
       <section className="relative w-full sm:max-w-[440px] h-full overflow-y-auto overscroll-contain bg-white xl:max-w-none xl:h-auto xl:max-h-[calc(100vh-6rem)] xl:rounded-[14px] xl:border xl:border-[var(--app-line)]">
-        <div className="sticky top-0 z-10 bg-white flex items-start gap-3 px-5 pt-5 pb-4 border-b border-[#eef2f1]">
+        <div className="sticky top-0 z-10 bg-white flex items-start gap-3 px-5 pt-5 pb-4 border-b border-[var(--line)]">
           <div className="min-w-0 flex-1">
             <p className="text-[13px] text-[var(--muted)] num">
               {o.orderNumber} · {fmtTime(o.createdAt)}
@@ -339,7 +339,7 @@ function OrderPanel({
             <h2 className="font-heading text-xl font-bold leading-tight break-words">{o.retailer.outletName}</h2>
             <p className="text-[13px] text-[var(--muted)]">{o.retailer.area.name}</p>
           </div>
-          <button type="button" onClick={onClose} className="grid place-items-center h-10 w-10 shrink-0 rounded-[10px] border border-[var(--app-line-2)] text-[var(--ink-2)] hover:bg-[#f8faf9]" aria-label="Close order">
+          <button type="button" onClick={onClose} className="grid place-items-center h-10 w-10 shrink-0 rounded-[10px] border border-[var(--app-line-2)] text-[var(--ink-2)] hover:bg-[var(--surface-2)]" aria-label="Close order">
             <Icon name="x" className="h-4 w-4" />
           </button>
         </div>
@@ -369,7 +369,7 @@ function OrderPanel({
 
           {o.delivery?.deliveryAgent && (
             <div className="flex items-center gap-3 rounded-xl bg-[#fdf3ec] px-3.5 py-3">
-              <span className="icon-tile !h-9 !w-9 !rounded-[10px] bg-[var(--kesar-tint)] text-[var(--kesar-text)]">
+              <span className="icon-tile !h-9 !w-9 !rounded-[10px] bg-[var(--accent-tint)] text-[var(--accent-text)]">
                 <Icon name="truck" className="!h-[18px] !w-[18px]" />
               </span>
               <span className="text-sm">
@@ -420,7 +420,7 @@ function OrderPanel({
           )}
 
           {error && (
-            <p className="text-sm text-[#a8281e]" role="alert">
+            <p className="text-sm text-[var(--risk-text)]" role="alert">
               {error}
             </p>
           )}

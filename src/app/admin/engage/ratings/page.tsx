@@ -35,7 +35,7 @@ const PERIODS = [
 type Period = (typeof PERIODS)[number]["key"];
 
 const barColour = (n: number) => (n >= 4 ? "var(--mint)" : n === 3 ? "var(--genda)" : "var(--kesar)");
-const avgTone = (a: number) => (a < 3 ? "text-[#a8281e]" : a < 4 ? "text-[var(--genda-text)]" : "text-[var(--mint-text)]");
+const avgTone = (a: number) => (a < 3 ? "text-[var(--risk-text)]" : a < 4 ? "text-[var(--scheme-text)]" : "text-[var(--success-text)]");
 
 export default function RatingsPage() {
   const [days, setDays] = useState<Period>("30");
@@ -157,7 +157,7 @@ export default function RatingsPage() {
             ) : (
               <ul className="divide-y divide-[var(--line)]">
                 {rows.slice(0, limit).map((r) => (
-                  <li key={r.id} className={`px-4 py-3 space-y-1 ${r.rating <= 2 ? "bg-[#fde4e1]/40" : ""}`}>
+                  <li key={r.id} className={`px-4 py-3 space-y-1 ${r.rating <= 2 ? "bg-[var(--risk-tint)]/40" : ""}`}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="min-w-0 font-bold break-words">
                         <Link href={`/admin/khata/${r.retailer.id}`} className="hover:underline">

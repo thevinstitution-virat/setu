@@ -92,7 +92,7 @@ export default function LeaveCard() {
                     {busyId === l.id ? "Cancelling…" : "Cancel this leave"}
                   </button>
                 )}
-                {rowError?.id === l.id && <p className="text-xs text-[#a8281e]">{rowError.text}</p>}
+                {rowError?.id === l.id && <p className="text-xs text-[var(--risk-text)]">{rowError.text}</p>}
               </li>
             );
           })}
@@ -145,7 +145,7 @@ function AskLeaveSheet({ onClose, onSaved }: { onClose: () => void; onSaved: () 
       onClose={onClose}
       footer={
         <div className="space-y-2">
-          {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+          {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
           <div className="flex gap-2">
             <button type="button" className="btn btn-quiet flex-1 min-h-[44px]" onClick={onClose} disabled={busy}>
               Cancel

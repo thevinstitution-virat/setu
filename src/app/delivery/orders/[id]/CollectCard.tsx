@@ -46,13 +46,13 @@ export default function CollectCard({
       <p className="text-sm font-semibold">Payment</p>
 
       {onHold && (
-        <p className="rounded-xl bg-[#fde4e1] text-[#a8281e] p-3 text-sm font-semibold">
+        <p className="rounded-xl bg-[var(--risk-tint)] text-[var(--risk-text)] p-3 text-sm font-semibold">
           On credit hold: {holdReason ?? "needs approval"}. Ask the office to approve before you deliver.
         </p>
       )}
 
       {prepaid && (
-        <p className="flex items-center gap-2 rounded-xl bg-[var(--mint-tint)] text-[var(--mint-text)] p-3 text-sm font-bold">
+        <p className="flex items-center gap-2 rounded-xl bg-[var(--success-tint)] text-[var(--success-text)] p-3 text-sm font-bold">
           <Icon name="wallet" className="h-4 w-4" /> Paid from wallet {formatINR(walletPaid)}
         </p>
       )}
@@ -64,16 +64,16 @@ export default function CollectCard({
         </div>
         <div className="rounded-xl bg-black/[0.04] p-2">
           <p className="text-[11px] text-[var(--muted)]">{oldDues < 0 ? "Advance" : "Old dues"}</p>
-          <p className={`font-bold text-sm mt-0.5 ${overdue > 0 ? "text-[#a8281e]" : ""}`}>
+          <p className={`font-bold text-sm mt-0.5 ${overdue > 0 ? "text-[var(--risk-text)]" : ""}`}>
             {duesLoaded ? formatINR(Math.abs(oldDues), { whole: true }) : duesError ? "—" : "…"}
           </p>
         </div>
-        <div className="rounded-xl bg-[var(--kesar-tint)] p-2">
-          <p className="text-[11px] text-[var(--kesar-text)]">Total due</p>
-          <p className="font-bold text-sm mt-0.5 text-[var(--kesar-text)]">{formatINR(totalDue, { whole: true })}</p>
+        <div className="rounded-xl bg-[var(--accent-tint)] p-2">
+          <p className="text-[11px] text-[var(--accent-text)]">Total due</p>
+          <p className="font-bold text-sm mt-0.5 text-[var(--accent-text)]">{formatINR(totalDue, { whole: true })}</p>
         </div>
       </div>
-      {overdue > 0 && <p className="text-xs font-semibold text-[#a8281e]">{formatINR(overdue)} of the old dues is overdue.</p>}
+      {overdue > 0 && <p className="text-xs font-semibold text-[var(--risk-text)]">{formatINR(overdue)} of the old dues is overdue.</p>}
       {duesError && <p className="text-xs text-[var(--muted)]">Could not load old dues.</p>}
 
       {(thisOrder > 0 || (duesLoaded && totalDue > 0)) && (

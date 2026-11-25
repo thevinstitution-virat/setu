@@ -81,10 +81,10 @@ export default function PunchCard() {
   }
 
   const tone = checkedOut
-    ? "bg-[var(--mint-tint)] text-[var(--mint-text)]"
+    ? "bg-[var(--success-tint)] text-[var(--success-text)]"
     : checkedIn
-      ? "bg-[var(--mint-tint)] text-[var(--mint-text)]"
-      : "bg-[var(--genda-tint)] text-[var(--genda-text)]";
+      ? "bg-[var(--success-tint)] text-[var(--success-text)]"
+      : "bg-[var(--scheme-tint)] text-[var(--scheme-text)]";
 
   return (
     <div className="card p-4 space-y-3">
@@ -137,7 +137,7 @@ export default function PunchCard() {
 
       {/* Actions */}
       {!checkedIn && driver && (
-        <div className="rounded-xl bg-[var(--genda-tint)] text-[var(--genda-text)] px-3 py-2.5 text-sm space-y-2">
+        <div className="rounded-xl bg-[var(--scheme-tint)] text-[var(--scheme-text)] px-3 py-2.5 text-sm space-y-2">
           <p>Going on duty checks you in. Starting a trip does it too.</p>
           <Link href="/delivery" className="btn btn-kesar btn-sm min-h-[44px]">
             Go on duty <Icon name="arrow" className="h-4 w-4" />
@@ -187,7 +187,7 @@ export default function PunchCard() {
         </div>
       )}
 
-      {err && <p className="text-sm text-[#a8281e]">{err}</p>}
+      {err && <p className="text-sm text-[var(--risk-text)]">{err}</p>}
     </div>
   );
 }

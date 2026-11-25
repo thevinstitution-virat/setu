@@ -50,9 +50,9 @@ export default function TenantSupport({ data, onChanged }: { data: TenantData; o
   return (
     <Section title="Support access" sub="Work inside this business with a reason. The business sees every session in its audit log and a banner while it runs.">
       {link && (
-        <div className="card p-4 space-y-2 !bg-[var(--genda-tint)]">
+        <div className="card p-4 space-y-2 !bg-[var(--scheme-tint)]">
           <p className="text-sm font-semibold flex items-center gap-2">
-            <Icon name="alert" className="h-4 w-4 text-[var(--genda-text)]" /> Sign-in link ({link.mode === "WRITE" ? "can change things" : "read only"})
+            <Icon name="alert" className="h-4 w-4 text-[var(--scheme-text)]" /> Sign-in link ({link.mode === "WRITE" ? "can change things" : "read only"})
           </p>
           <p className="text-sm text-[var(--ink-2)]">Single use and expires in 5 minutes. Open it in a private window. The session itself lasts until {when(link.expiresAt, true)}.</p>
           <CopyLine value={link.url} />

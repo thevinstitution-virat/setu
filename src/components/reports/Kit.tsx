@@ -25,7 +25,7 @@ export function Change({ value, invert = false }: { value: number | null; invert
   const good = invert ? !up : up;
   const flat = value === 0;
   return (
-    <span className={`text-xs font-bold ${flat ? "text-[var(--muted)]" : good ? "text-[var(--mint-text)]" : "text-[#a8281e]"}`}>
+    <span className={`text-xs font-bold ${flat ? "text-[var(--muted)]" : good ? "text-[var(--success-text)]" : "text-[var(--risk-text)]"}`}>
       {flat ? "→" : up ? "▲" : "▼"} {Math.abs(value)}% <span className="font-normal text-[var(--muted)]">vs before</span>
     </span>
   );
@@ -78,7 +78,7 @@ export function ShareBars({ rows, format = rs }: { rows: { label: string; value:
     <ul className="space-y-2.5">
       {rows.map((r) => {
         const label = r.href ? (
-          <Link href={r.href} className="hover:text-[var(--kesar-text)]">
+          <Link href={r.href} className="hover:text-[var(--accent-text)]">
             {r.label}
           </Link>
         ) : (
@@ -193,5 +193,5 @@ export function Table({ head, rows, align }: { head: string[]; rows: ReactNode[]
 }
 
 export function ErrorCard({ message }: { message: string }) {
-  return <p className="card p-4 text-sm text-[#a8281e]">{message}</p>;
+  return <p className="card p-4 text-sm text-[var(--risk-text)]">{message}</p>;
 }

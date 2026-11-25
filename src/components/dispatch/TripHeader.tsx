@@ -32,21 +32,21 @@ export default function TripHeader({ data, onDone }: { data: TripDetail; onDone:
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="icon-tile bg-[var(--mint-tint)] text-[var(--mint-text)] print:hidden">
+          <span className="icon-tile bg-[var(--success-tint)] text-[var(--success-text)] print:hidden">
             <Icon name="user" />
           </span>
           <div className="min-w-0">
             <p className="text-xs text-[var(--muted)]">Driver</p>
             <p className="text-sm font-semibold truncate">{trip.driver.name}</p>
             {trip.driver.phone && (
-              <a href={`tel:${trip.driver.phone}`} className="text-sm font-semibold text-[var(--kesar-text)]">
+              <a href={`tel:${trip.driver.phone}`} className="text-sm font-semibold text-[var(--accent-text)]">
                 {trip.driver.phone}
               </a>
             )}
           </div>
         </div>
         <div className="flex items-center gap-3 min-w-0">
-          <span className="icon-tile bg-[var(--kesar-tint)] text-[var(--kesar-text)] print:hidden">
+          <span className="icon-tile bg-[var(--accent-tint)] text-[var(--accent-text)] print:hidden">
             <Icon name="truck" />
           </span>
           <div className="min-w-0">
@@ -117,7 +117,7 @@ function EditSheet({ data, onClose, onSaved }: { data: TripDetail; onClose: () =
       onClose={onClose}
       footer={
         <div className="space-y-2">
-          {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+          {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
           <div className="flex gap-2 justify-end">
             <button type="button" className="btn btn-quiet" onClick={onClose} disabled={busy}>
               Cancel
@@ -129,7 +129,7 @@ function EditSheet({ data, onClose, onSaved }: { data: TripDetail; onClose: () =
         </div>
       }
     >
-      {lists.error && <p className="text-sm text-[#a8281e]">{lists.error}</p>}
+      {lists.error && <p className="text-sm text-[var(--risk-text)]">{lists.error}</p>}
       {!lists.data && !lists.error && <p className="text-sm text-[var(--muted)]">Loading…</p>}
       {lists.data && (
         <>

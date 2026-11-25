@@ -155,7 +155,7 @@ export default function RetailerDetail({ id, invoices }: { id: string; invoices?
     return (
       <div>
         <button
-          className="text-sm text-[var(--kesar-text)] mb-3 min-h-[44px]"
+          className="text-sm text-[var(--accent-text)] mb-3 min-h-[44px]"
           onClick={() => {
             setShowOrder(false);
             if (window.location.search.includes("order=1")) router.replace(`/sales/retailers/${id}`);
@@ -202,13 +202,13 @@ export default function RetailerDetail({ id, invoices }: { id: string; invoices?
           {openVisit ? (
             <>
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--kesar-text)]">Visit in progress</p>
+                <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--accent-text)]">Visit in progress</p>
                 <p className="text-sm font-medium">
                   Checked in at {clock(openVisit.checkInAt)}
                   {openVisit.orderId ? " · Order placed" : ""}
                 </p>
               </div>
-              {placed && <p className="text-sm font-semibold text-[var(--mint-text)]">{placed}</p>}
+              {placed && <p className="text-sm font-semibold text-[var(--success-text)]">{placed}</p>}
               {openVisit.orderId ? (
                 <button onClick={() => checkOutVisit(openVisit.id)} disabled={visitBusy} className="btn btn-kesar w-full min-h-[44px]">
                   {visitBusy ? "Saving…" : "Check out"}
@@ -222,7 +222,7 @@ export default function RetailerDetail({ id, invoices }: { id: string; invoices?
           ) : openElsewhere ? (
             <p className="text-sm">
               You are checked in at{" "}
-              <Link href={`/sales/retailers/${openElsewhere.retailerId}`} className="font-semibold text-[var(--kesar-text)] underline">
+              <Link href={`/sales/retailers/${openElsewhere.retailerId}`} className="font-semibold text-[var(--accent-text)] underline">
                 {openElsewhere.retailer.outletName}
               </Link>
               . Check out there before visiting this shop.
@@ -235,7 +235,7 @@ export default function RetailerDetail({ id, invoices }: { id: string; invoices?
               </button>
             </div>
           )}
-          {visitError && <p className="text-sm text-[#a8281e]">{visitError}</p>}
+          {visitError && <p className="text-sm text-[var(--risk-text)]">{visitError}</p>}
         </div>
       )}
 
@@ -263,24 +263,24 @@ export default function RetailerDetail({ id, invoices }: { id: string; invoices?
               </p>
             </div>
             {dues.overdue > 0 ? (
-              <span className="chip bg-[#fde4e1] text-[#a8281e] border-transparent">{formatINR(dues.overdue, { whole: true })} overdue</span>
+              <span className="chip bg-[var(--risk-tint)] text-[var(--risk-text)] border-transparent">{formatINR(dues.overdue, { whole: true })} overdue</span>
             ) : dues.terms.mode === "PREPAID" ? (
               <span className="chip chip-mint">Wallet {formatINR(dues.balances.walletAvailable, { whole: true })}</span>
             ) : null}
           </div>
           {dues.openBills[0] && (
-            <p className={`text-xs ${dues.openBills[0].overdue ? "text-[#a8281e] font-semibold" : "text-[var(--muted)]"}`}>
+            <p className={`text-xs ${dues.openBills[0].overdue ? "text-[var(--risk-text)] font-semibold" : "text-[var(--muted)]"}`}>
               Oldest bill {dues.openBills[0].number}: {formatINR(dues.openBills[0].due)},{" "}
               {daysOld(dues.openBills[0].date)} days old
             </p>
           )}
-          {payDone && <p className="text-sm font-semibold text-[var(--mint-text)]">{payDone}</p>}
+          {payDone && <p className="text-sm font-semibold text-[var(--success-text)]">{payDone}</p>}
 
           {collecting ? (
             <div className="border-t border-black/5 pt-3 space-y-3">
               <p className="text-sm font-semibold">Collect payment</p>
               <PaymentFields value={pay} onChangeAction={setPay} methods={["CASH", "UPI", "CHEQUE"]} field />
-              {payError && <p className="text-sm text-[#a8281e]">{payError}</p>}
+              {payError && <p className="text-sm text-[var(--risk-text)]">{payError}</p>}
               <div className="flex gap-2">
                 <button className="btn btn-quiet flex-1" onClick={() => setCollecting(false)} disabled={paySaving}>
                   Cancel
@@ -327,7 +327,7 @@ export default function RetailerDetail({ id, invoices }: { id: string; invoices?
             Raise complaint
           </button>
         </div>
-        {raised && <p className="text-sm font-semibold text-[var(--mint-text)]">{raised}</p>}
+        {raised && <p className="text-sm font-semibold text-[var(--success-text)]">{raised}</p>}
       </div>
 
       {complaint && (

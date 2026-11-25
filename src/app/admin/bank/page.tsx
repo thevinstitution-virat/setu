@@ -332,7 +332,7 @@ function UploadCard({ accounts, onDone }: { accounts: string[]; onDone: (r: Uplo
   return (
     <div className="card p-4 sm:p-5 space-y-4">
       <div className="flex items-start gap-3">
-        <span className="icon-tile bg-[var(--mint-tint)] text-[var(--mint-text)]">
+        <span className="icon-tile bg-[var(--success-tint)] text-[var(--success-text)]">
           <Icon name="upload" />
         </span>
         <div className="min-w-0">
@@ -382,7 +382,7 @@ function UploadCard({ accounts, onDone }: { accounts: string[]; onDone: (r: Uplo
         <Icon name="upload" className="h-4 w-4" />
         {busy ? "Uploading…" : "Upload and match"}
       </button>
-      {error && <p className="text-sm text-[#a8281e]">{error}</p>}
+      {error && <p className="text-sm text-[var(--risk-text)]">{error}</p>}
 
       {result && <UploadSummary r={result} />}
     </div>
@@ -402,8 +402,8 @@ function UploadSummary({ r }: { r: UploadResult }) {
   const cols = Object.entries(r.columns).filter(([, v]) => v);
 
   return (
-    <div className="rounded-xl bg-[var(--mint-tint)] p-3 space-y-2">
-      <p className="text-sm font-bold text-[var(--mint-text)] flex items-start gap-1.5">
+    <div className="rounded-xl bg-[var(--success-tint)] p-3 space-y-2">
+      <p className="text-sm font-bold text-[var(--success-text)] flex items-start gap-1.5">
         <Icon name="check" className="h-4 w-4 shrink-0 mt-0.5" />
         <span>
           {plural(total, "line")}: {parts.join(", ")}.
@@ -610,7 +610,7 @@ function LineList({
             </div>
           )}
 
-          {rowError?.id === l.id && <p className="text-sm text-[#a8281e]">{rowError.message}</p>}
+          {rowError?.id === l.id && <p className="text-sm text-[var(--risk-text)]">{rowError.message}</p>}
         </div>
       ))}
     </div>
@@ -649,7 +649,7 @@ function Suggestions({ line, busy, onPick }: { line: Line; busy: boolean; onPick
       {list.map((s, i) => (
         <div
           key={`${s.kind}-${s.ref ?? s.retailerId ?? i}`}
-          className={`flex flex-wrap items-center gap-2 rounded-xl p-2.5 ${s.exact ? "bg-[var(--mint-tint)]" : "bg-ink/5"}`}
+          className={`flex flex-wrap items-center gap-2 rounded-xl p-2.5 ${s.exact ? "bg-[var(--success-tint)]" : "bg-ink/5"}`}
         >
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium break-words">
@@ -722,7 +722,7 @@ function FeeForm({
         <input className="input" inputMode="decimal" autoFocus placeholder="0" value={fee} onChange={(e) => setFee(e.target.value.replace(/[^\d.,]/g, ""))} />
       </label>
       <NoteInput value={note} onChange={setNote} />
-      {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+      {error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
       <div className="flex gap-2">
         <button type="submit" className="btn btn-mor btn-sm" disabled={busy}>
           {busy ? "Saving…" : "Book payout"}
@@ -774,7 +774,7 @@ function ShopForm({
     <FormBox onSubmit={submit}>
       <p className="text-xs text-[var(--ink-2)]">Records a bank payment of {formatINR(amount)} from the shop you choose.</p>
       {shopsError ? (
-        <p className="text-xs text-[#a8281e]">{shopsError}</p>
+        <p className="text-xs text-[var(--risk-text)]">{shopsError}</p>
       ) : !shops ? (
         <p className="text-xs text-[var(--muted)]">Loading shops…</p>
       ) : (
@@ -794,7 +794,7 @@ function ShopForm({
             aria-checked={purpose === o.key}
             onClick={() => setPurpose(o.key)}
             className={`flex-1 rounded-xl py-1.5 text-xs font-bold transition ${
-              purpose === o.key ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "text-[var(--ink-2)]"
+              purpose === o.key ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "text-[var(--ink-2)]"
             }`}
           >
             {o.label}
@@ -802,7 +802,7 @@ function ShopForm({
         ))}
       </div>
       <NoteInput value={note} onChange={setNote} />
-      {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+      {error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
       <div className="flex gap-2">
         <button type="submit" className="btn btn-mor btn-sm" disabled={busy || !shops}>
           {busy ? "Saving…" : "Record payment"}

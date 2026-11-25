@@ -5,7 +5,7 @@ export default async function RetailerInvoice({ params }: { params: Promise<{ id
   const { id } = await params;
   return (
     <div className="space-y-4">
-      <Link href="/retailer/invoices" className="inline-block text-sm font-semibold text-[var(--kesar-text)]">
+      <Link href="/retailer/invoices" className="inline-block text-sm font-semibold text-[var(--accent-text)]">
         ← My invoices
       </Link>
       <InvoicePanel id={id} />

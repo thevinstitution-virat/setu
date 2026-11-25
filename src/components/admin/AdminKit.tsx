@@ -92,7 +92,7 @@ export function margin(price: number, gstRate: number, mrp: number): number | nu
 
 export function MarginText({ value }: { value: number | null }) {
   if (value === null) return <span className="text-[var(--muted)]">—</span>;
-  const tone = value < 0 ? "text-[#a8281e]" : value < 5 ? "text-[var(--genda-text)]" : "text-[var(--mint-text)]";
+  const tone = value < 0 ? "text-[var(--risk-text)]" : value < 5 ? "text-[var(--scheme-text)]" : "text-[var(--success-text)]";
   return <span className={`font-semibold ${tone}`}>{value}%</span>;
 }
 
@@ -144,7 +144,7 @@ export function TabBar<K extends string>({
             aria-selected={value === t.key}
             onClick={() => onChange(t.key)}
             className={`flex-1 sm:flex-none whitespace-nowrap rounded-xl py-2 px-3.5 text-sm font-bold transition ${
-              value === t.key ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "text-[var(--ink-2)]"
+              value === t.key ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "text-[var(--ink-2)]"
             }`}
           >
             {t.label}
@@ -220,7 +220,7 @@ export function ActiveChip({ active, on = "Active", off = "Off" }: { active: boo
 export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="card p-4 flex flex-wrap items-center justify-between gap-2">
-      <p className="text-sm text-[#a8281e]">{message}</p>
+      <p className="text-sm text-[var(--risk-text)]">{message}</p>
       {onRetry && (
         <button type="button" className="btn btn-quiet btn-xs" onClick={onRetry}>
           Try again
@@ -233,7 +233,7 @@ export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () =
 export function Flash({ text }: { text: string | null }) {
   if (!text) return null;
   return (
-    <p className="text-sm text-[var(--mint-text)] flex items-center gap-1.5">
+    <p className="text-sm text-[var(--success-text)] flex items-center gap-1.5">
       <Icon name="check" className="h-4 w-4 shrink-0" /> {text}
     </p>
   );
@@ -456,7 +456,7 @@ export function SearchPick({
               <button
                 key={o.id}
                 type="button"
-                className={`block w-full px-3 py-2 text-left text-sm hover:bg-black/[0.04] ${o.id === value ? "bg-[var(--mint-tint)]" : ""}`}
+                className={`block w-full px-3 py-2 text-left text-sm hover:bg-black/[0.04] ${o.id === value ? "bg-[var(--success-tint)]" : ""}`}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   onChange(o.id);
@@ -549,7 +549,7 @@ export function ImageField({
         </div>
         <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
       </div>
-      {error && <p className="text-xs text-[#a8281e]">{error}</p>}
+      {error && <p className="text-xs text-[var(--risk-text)]">{error}</p>}
     </div>
   );
 }

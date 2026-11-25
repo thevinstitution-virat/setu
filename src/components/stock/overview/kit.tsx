@@ -120,9 +120,9 @@ export function daysUntil(ymd: string) {
 /** Expiry in words and its colour: red when expired, marigold when within the warning days. */
 export function expiryInfo(ymd: string, alertDays: number) {
   const d = daysUntil(ymd);
-  if (d < 0) return { text: `Expired ${ymdText(ymd)}`, tone: "text-[#a8281e]", chip: "chip !bg-[#fde4e1] !text-[#a8281e] !border-transparent" };
+  if (d < 0) return { text: `Expired ${ymdText(ymd)}`, tone: "text-[var(--risk-text)]", chip: "chip !bg-[var(--risk-tint)] !text-[var(--risk-text)] !border-transparent" };
   const when = d === 0 ? "today" : d === 1 ? "tomorrow" : `in ${d} days`;
-  if (d <= alertDays) return { text: `Expires ${when} · ${ymdText(ymd)}`, tone: "text-[var(--genda-text)]", chip: "chip chip-genda" };
+  if (d <= alertDays) return { text: `Expires ${when} · ${ymdText(ymd)}`, tone: "text-[var(--scheme-text)]", chip: "chip chip-genda" };
   return { text: `Expires ${ymdText(ymd)}`, tone: "text-[var(--muted)]", chip: "chip" };
 }
 
@@ -140,7 +140,7 @@ export function MoveRow({ m, showProduct = true }: { m: Move; showProduct?: bool
   const into = m.to && !m.from;
   const outOf = m.from && !m.to;
   const sign = into ? "+" : outOf ? "−" : "";
-  const tone = into ? "text-[var(--mint-text)]" : outOf || OUT_KINDS.has(m.kind) ? "text-[#a8281e]" : "text-[var(--ink)]";
+  const tone = into ? "text-[var(--success-text)]" : outOf || OUT_KINDS.has(m.kind) ? "text-[var(--risk-text)]" : "text-[var(--ink)]";
   const path = m.from && m.to ? `${m.from} → ${m.to}` : m.from ? `from ${m.from}` : m.to ? `into ${m.to}` : "";
   return (
     <div className="flex items-start gap-3 px-4 py-3 min-w-0">
@@ -169,7 +169,7 @@ export function MoveRow({ m, showProduct = true }: { m: Move; showProduct?: bool
           {m.orderNumber && (
             <>
               {" · "}
-              <Link href={`/admin/orders?q=${encodeURIComponent(m.orderNumber)}`} className="font-semibold text-[var(--kesar-text)] hover:underline">
+              <Link href={`/admin/orders?q=${encodeURIComponent(m.orderNumber)}`} className="font-semibold text-[var(--accent-text)] hover:underline">
                 {m.orderNumber}
               </Link>
             </>
@@ -206,7 +206,7 @@ export function Segmented<T extends string>({
           aria-checked={value === v}
           onClick={() => onChange(v)}
           className={`flex-1 min-h-[40px] rounded-xl px-3 text-sm font-bold transition ${
-            value === v ? "bg-gradient-to-br from-mor to-[#0c3634] text-white" : "text-[var(--ink-2)]"
+            value === v ? "bg-gradient-to-br from-mor to-[var(--mor-mid)] text-white" : "text-[var(--ink-2)]"
           }`}
         >
           {text}
@@ -239,7 +239,7 @@ export function SheetFooter({
   return (
     <div className="space-y-2">
       {error && (
-        <p className="text-sm text-[#a8281e]" role="alert">
+        <p className="text-sm text-[var(--risk-text)]" role="alert">
           {error}
         </p>
       )}
