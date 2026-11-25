@@ -295,9 +295,12 @@ export async function setDefaultBank(ctx: Ctx, id: string) {
 }
 
 /**
- * Close the books up to a day (nothing dated on or before it can be posted or
- * reversed). Moving the lock forward is for the accountant; opening closed
- * days again (moving it back, or clearing it) only the owner may do.
+ * Close the books up to a day: nothing dated on or before it can be posted,
+ * and no entry can be dated there. A document from those days can still be
+ * cancelled; the reversal is dated on the day of cancelling, so the closed
+ * days' figures don't change. Moving the lock forward is for the accountant;
+ * opening closed days again (moving it back, or clearing it) only the owner
+ * may do.
  */
 export async function setBooksLock(ctx: Ctx, until: string | null, isOwner: boolean) {
   if (until !== null && !isDay(until)) throw new MoneyError("Pick a date");

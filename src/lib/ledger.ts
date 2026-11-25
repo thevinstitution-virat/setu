@@ -227,7 +227,12 @@ const lockCache = new WeakMap<object, number | null>();
 const dayOfDate = (d: Date) => Math.floor(d.getTime() / DAY_MS);
 const ddmmyyyy = (day: number) => new Date(day * DAY_MS).toISOString().slice(0, 10).split("-").reverse().join("/");
 
-/** Refuses a posting dated on or before the day the books are closed up to. */
+/**
+ * Refuses a posting dated on or before the day the books are closed up to.
+ * It is checked against the date of the new entry: a document from closed
+ * days can still be cancelled, because its reversal is dated today (an open
+ * day), so the closed days' figures never change.
+ */
 export async function assertBooksOpen(ctx: Ctx, when: Date) {
   let locked = lockCache.get(ctx.tx);
   if (locked === undefined) {
@@ -283,7 +288,12 @@ export async function post(
   });
 }
 
-/** Cancel an entry with an equal and opposite one. Each entry can be reversed once. `at` dates the reversal (default now). */
+/**
+ * Cancel an entry with an equal and opposite one. Each entry can be reversed
+ * once. `at` dates the reversal (default now); the books lock is checked
+ * against that date, not the original's, so an entry from closed days is
+ * cancelled in an open day and the closed days stay as they were.
+ */
 export async function reverseEntry(ctx: Ctx, entryId: string, memo: string, at?: Date) {
   const orig = await ctx.tx.journalEntry.findUnique({
     where: { id: entryId },

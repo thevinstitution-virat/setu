@@ -13,10 +13,14 @@ export const noHeads = (): Heads => ({ igst: 0, cgst: 0, sgst: 0 });
 export const addHeads = (a: Heads, b: Heads, k = 1): Heads => ({ igst: a.igst + k * b.igst, cgst: a.cgst + k * b.cgst, sgst: a.sgst + k * b.sgst });
 export const headsTotal = (h: Heads) => h.igst + h.cgst + h.sgst;
 
-/** CGST and SGST halves of a tax (the odd paisa to SGST), or all IGST. */
+/**
+ * CGST and SGST halves of a tax, or all IGST. The odd paisa goes to CGST, as
+ * on invoices and purchase bills (gst.ts splitTax); a negative tax mirrors a
+ * positive one.
+ */
 export function splitHeads(tax: number, interState: boolean): Heads {
   if (interState) return { igst: tax, cgst: 0, sgst: 0 };
-  const cgst = Math.trunc(tax / 2);
+  const cgst = tax >= 0 ? Math.ceil(tax / 2) : -Math.ceil(-tax / 2);
   return { igst: 0, cgst, sgst: tax - cgst };
 }
 
