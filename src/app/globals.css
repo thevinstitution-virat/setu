@@ -1,8 +1,6 @@
 @import "tailwindcss";
 @import "../styles/tokens.css";
 @import "../styles/icon3d.css";
-@import "../components/landing/landing.css";
-@import "../components/landing/pro.css";
 
 /* The design tokens live in styles/tokens.css. The names below are the old
    ones, kept as aliases so every existing component keeps working. A tenant's

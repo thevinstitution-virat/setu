@@ -457,3 +457,300 @@
   .bt-cta-card .bt-sub { font-size: 16px; }
   .bt-cta-card .bt-hcta { flex-direction: column; margin-top: 24px; }
 }
+
+
+/* ---------- Footer (moved from pro.css; the rest of the old landing styles were unused) ---------- */
+.vp {
+  --vp-ink: #0f1d1d;
+  --vp-ink-2: #45524f;
+  --vp-muted: #6a7775;
+  --vp-line: #e4e8e7;
+  --vp-soft: #f5f7f6;
+  --vp-dark: #0a1111;
+  --vp-kesar: #db5c17;
+  --vp-kesar-d: #bf4b0d;
+  --vp-kesar-t: rgba(219, 92, 23, 0.1);
+  --vp-mor-t: rgba(21, 86, 81, 0.09);
+  --vp-shadow: 0 1px 2px rgba(15, 29, 29, 0.05), 0 12px 32px -14px rgba(15, 29, 29, 0.22);
+  background: #fff;
+  color: var(--vp-ink);
+  font-family: var(--font-body), var(--font-deva), sans-serif;
+}
+.vp a {
+  text-decoration: none;
+}
+.vp .tnum {
+  font-variant-numeric: tabular-nums;
+}
+.vp-wrap {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+.vp-foot {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding: 76px 0 28px;
+  color: rgba(255, 255, 255, 0.86);
+  background:
+    radial-gradient(55% 70% at 100% 0%, rgba(219, 92, 23, 0.18), transparent 62%),
+    radial-gradient(50% 70% at 0% 100%, rgba(21, 86, 81, 0.55), transparent 70%),
+    #0a1c1c;
+}
+.vp-foot::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--kesar) 30%, #f0803f 50%, var(--kesar) 70%, transparent);
+  opacity: 0.85;
+}
+.vp-foot-wm {
+  position: absolute;
+  right: -40px;
+  bottom: -60px;
+  width: 380px;
+  opacity: 0.05;
+  z-index: -1;
+  pointer-events: none;
+}
+.vp-foot-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 0.9fr) minmax(0, 1.35fr);
+  gap: 40px;
+}
+.vp-foot-logo {
+  display: inline-flex;
+  line-height: 0;
+}
+.vp-foot-brand p {
+  margin: 18px 0 18px;
+  max-width: 360px;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.7);
+}
+.vp-foot-chips {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.vp-foot-chips li {
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.82);
+}
+.vp-foot-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(219, 92, 23, 0.35);
+  background: rgba(219, 92, 23, 0.08);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+}
+.vp-foot-badge i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f0803f, var(--kesar));
+  box-shadow: 0 0 0 3px rgba(219, 92, 23, 0.2);
+}
+.vp-foot-lang {
+  margin-top: 20px;
+}
+.vp-foot-lang > div {
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+.vp-foot-lang button[aria-pressed="false"] {
+  color: rgba(255, 255, 255, 0.72);
+}
+.vp-foot-lang button[aria-pressed="true"] {
+  background: var(--kesar);
+}
+.vp-foot h3 {
+  margin: 4px 0 16px;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ff9a5c;
+}
+.vp-foot nav a {
+  display: block;
+  width: fit-content;
+  padding: 6px 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+.vp-foot nav a:hover {
+  color: #fff;
+  transform: translateX(3px);
+}
+.vp-foot-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.vp-foot-list li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+}
+.vp-foot-list li::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--kesar);
+  flex-shrink: 0;
+}
+.vp-foot-contact a, .vp-foot-contact p {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.78);
+}
+.vp-foot-contact a {
+  font-weight: 700;
+  transition: color 0.2s ease;
+}
+.vp-foot-contact a:hover {
+  color: #fff;
+}
+.vp-foot-contact small {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.5);
+}
+.vp-foot-contact p {
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.66);
+}
+.vp-foot-ic {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: rgba(219, 92, 23, 0.14);
+  color: #ff9a5c;
+}
+.vp-foot-ic svg {
+  width: 16px;
+  height: 16px;
+}
+.vp-foot-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 52px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.62);
+}
+.vp-foot-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+.vp-foot-links a {
+  color: rgba(255, 255, 255, 0.62);
+}
+.vp-foot-links a:hover {
+  color: #fff;
+}
+.vp-foot-legal {
+  display: grid;
+  gap: 6px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+}
+.vp-foot-legal p {
+  margin: 0;
+}
+.vp-foot-legal a {
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 700;
+}
+.vp-foot-legal a:hover {
+  color: #ff9a5c;
+}
+@media (max-width: 900px) {
+  .vp-foot-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 36px 28px;
+  }
+  .vp-foot-brand, .vp-foot-contact {
+    grid-column: 1 / -1;
+  }
+  .vp-foot-contact {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    column-gap: 24px;
+  }
+  .vp-foot-contact h3 {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 640px) {
+  .vp-wrap {
+    padding: 0 16px;
+  }
+}
+@media (max-width: 640px) {
+  .vp-foot {
+    padding-top: 56px;
+  }
+  .vp-foot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .vp-foot-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .vp-foot-wm {
+    width: 240px;
+  }
+}
+
+/* 3D icons inside the landing tiles (the tile colours stay as drawn). */
+.bt-ring > span > span { background: transparent !important; }
+.bt-ring .i3d { width: 52px; height: 52px; }
+.bt-gic { background: var(--bt-paper, #fff7ec) !important; box-shadow: none !important; width: 56px; height: 56px; }
+.bt-feats > li > span:first-child .i3d { flex: none; }
+.bt-gcard > .bt-gic .i3d { display: block; }
