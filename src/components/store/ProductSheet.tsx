@@ -101,8 +101,8 @@ export default function ProductSheet({
           <div className="space-y-2">
             <p className="page-kick">Offers</p>
             {offers.map((o) => (
-              <div key={o.id} className="rounded-xl bg-[var(--kesar-tint)] p-3">
-                <p className="flex items-center gap-1.5 text-sm font-bold text-[var(--kesar-text)]">
+              <div key={o.id} className="rounded-xl bg-[var(--accent-tint)] p-3">
+                <p className="flex items-center gap-1.5 text-sm font-bold text-[var(--accent-text)]">
                   <Icon name="tag" className="h-4 w-4 shrink-0" />
                   {o.summary}
                 </p>
@@ -113,7 +113,7 @@ export default function ProductSheet({
                 {o.description && <p className="text-xs text-[var(--ink-2)] mt-1">{o.description}</p>}
               </div>
             ))}
-            {p.specialOffer && <p className="text-sm font-semibold text-[var(--kesar-text)]">{p.specialOffer}</p>}
+            {p.specialOffer && <p className="text-sm font-semibold text-[var(--accent-text)]">{p.specialOffer}</p>}
           </div>
         )}
       </div>

@@ -297,7 +297,7 @@ export function QtyControl({
 
   if (!entry) {
     return (
-      <div className="flex items-center gap-1.5">
+      <div className={`flex items-center gap-1.5 ${compact ? "w-full" : ""}`}>
         {hasCase && !compact && (
           <button
             type="button"
@@ -312,7 +312,7 @@ export function QtyControl({
         )}
         <button
           type="button"
-          className="add-btn"
+          className={`add-btn ${compact ? "w-full" : ""}`}
           onClick={(e) => {
             flyToCart(e.currentTarget);
             onChangeAction({ mode: "units", qty: startQty(p, "units") });
@@ -331,7 +331,7 @@ export function QtyControl({
   }
 
   return (
-    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+    <div className={`flex items-center gap-1.5 flex-wrap justify-end ${compact ? "w-full" : ""}`}>
       {hasCase && (
         <div className="inline-flex rounded-lg bg-[var(--surface-2)] p-0.5 text-[11.5px] font-bold" role="group" aria-label="Order in">
           {(["units", "cases"] as const).map((m) => (
@@ -347,12 +347,12 @@ export function QtyControl({
           ))}
         </div>
       )}
-      <div className="stepper-pop inline-flex items-center rounded-[12px] bg-[var(--accent)] text-[var(--accent-on)]">
-        <button type="button" aria-label="One less" className="step-btn" {...less}>
+      <div className={`stepper-pop flex items-center rounded-[12px] bg-[var(--accent)] text-[var(--accent-on)] ${compact ? "w-full" : ""}`}>
+        <button type="button" aria-label="One less" className={`step-btn ${compact ? "flex-1" : ""}`} {...less}>
           <Icon name="minus" className="h-4 w-4" weight="bold" />
         </button>
         <QtyInput value={entry.qty} onCommitAction={(q) => (q > 0 ? onChangeAction({ ...entry, qty: Math.min(MAX_QTY, q) }) : onChangeAction(null))} />
-        <button type="button" aria-label="One more" className="step-btn" {...more}>
+        <button type="button" aria-label="One more" className={`step-btn ${compact ? "flex-1" : ""}`} {...more}>
           <Icon name="plus" className="h-4 w-4" weight="bold" />
         </button>
       </div>
@@ -366,7 +366,7 @@ function QtyInput({ value, onCommitAction }: { value: number; onCommitAction: (q
     <input
       inputMode="numeric"
       aria-label="Quantity"
-      className="h-12 w-10 bg-transparent text-center text-[15px] font-extrabold outline-none num text-inherit"
+      className="h-12 w-9 shrink-0 bg-transparent text-center text-[15px] font-extrabold outline-none num text-inherit"
       value={text ?? String(value)}
       onFocus={(e) => {
         setText(String(value));

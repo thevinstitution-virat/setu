@@ -96,7 +96,7 @@ export default function HomeShelves() {
         <section className="space-y-2">
           <div className="flex items-center justify-between gap-3">
             <p className="page-kick">Schemes for you</p>
-            <Link href={CATALOGUE} className="text-xs font-bold text-[var(--kesar-text)]">
+            <Link href={CATALOGUE} className="text-xs font-bold text-[var(--accent-text)]">
               See all
             </Link>
           </div>
@@ -115,7 +115,7 @@ export default function HomeShelves() {
         <section className="space-y-2">
           <div className="flex items-center justify-between gap-3">
             <p className="page-kick">Buy again</p>
-            <Link href={CATALOGUE} className="text-xs font-bold text-[var(--kesar-text)]">
+            <Link href={CATALOGUE} className="text-xs font-bold text-[var(--accent-text)]">
               Catalogue
             </Link>
           </div>

@@ -10,7 +10,14 @@ import ProductSheet from "@/components/store/ProductSheet";
 import CartReview, { type PlaceError } from "@/components/store/CartReview";
 import OrderByText, { type TextAdd } from "@/components/store/OrderByText";
 import { fileUrl } from "@/components/store/format";
+import CartBar from "@/components/ui/CartBar";
+import CategoryRail from "@/components/ui/CategoryRail";
+import BrandFilter from "@/components/ui/BrandFilter";
+import EmptyState from "@/components/ui/EmptyState";
+import SchemeCarousel, { type SchemeBannerData } from "@/components/ui/SchemeBanner";
+import { ProductCardSkeleton } from "@/components/ui/Skeleton";
 import {
+  endsLabel,
   isScoped,
   offerCovers,
   ProductThumb,
@@ -66,6 +73,24 @@ export default function Storefront({
   const [scheme, setScheme] = useState<string | null>(initial?.scheme ?? null);
   const [openProduct, setOpenProduct] = useState<string | null>(initial?.product ?? null);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [schemeOnly, setSchemeOnly] = useState(false);
+  const [inStock, setInStock] = useState(false);
+  const [voiceKey, setVoiceKey] = useState(0);
+  const [view, setView] = useState<"grid" | "list">(() => {
+    try {
+      return localStorage.getItem("vbiz:view") === "list" ? "list" : "grid";
+    } catch {
+      return "grid";
+    }
+  });
+  const changeView = (v: "grid" | "list") => {
+    setView(v);
+    try {
+      localStorage.setItem("vbiz:view", v);
+    } catch {
+      // storage blocked: the choice just won't be remembered
+    }
+  };
 
   const [quoted, setQuoted] = useState<{ key: string; quote: QuoteJson } | null>(null);
   const [quoteError, setQuoteError] = useState<{ key: string; message: string } | null>(null);
@@ -231,9 +256,11 @@ export default function Storefront({
           (!q.trim() || matches(p.search, q)) &&
           (!category || p.categoryPath.includes(category)) &&
           (!brand || p.brand?.id === brand) &&
-          (!schemeOffer || offerCovers(schemeOffer, p))
+          (!schemeOffer || offerCovers(schemeOffer, p)) &&
+          (!schemeOnly || !!p.specialOffer || offers.some((o) => isScoped(o) && offerCovers(o, p))) &&
+          (!inStock || p.stock !== "out")
       ),
-    [products, q, category, brand, schemeOffer]
+    [products, q, category, brand, schemeOffer, schemeOnly, inStock, offers]
   );
 
   const categories = useMemo(() => data?.categories ?? [], [data]);
@@ -283,8 +310,27 @@ export default function Storefront({
     }
   }
 
-  if (loadError) return <p className="text-sm text-[#a8281e]">{loadError}</p>;
-  if (!data) return <p className="text-sm text-[var(--muted)]">Loading the catalogue…</p>;
+  if (loadError)
+    return (
+      <div className="rounded-xl bg-[var(--risk-tint)] text-[var(--risk-text)] p-3 text-sm font-semibold flex items-center justify-between gap-3">
+        {loadError}
+        <button type="button" className="btn btn-danger btn-xs" onClick={() => window.location.reload()}>
+          Retry
+        </button>
+      </div>
+    );
+  if (!data)
+    return (
+      <div className="space-y-4" role="status" aria-label="Loading the catalogue">
+        <div className="skeleton h-12" />
+        <div className="skeleton h-[136px] !rounded-[28px]" />
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5">
+          {Array.from({ length: 6 }, (_, i) => (
+            <ProductCardSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    );
 
   const cartIds = Object.keys(cart);
   const unitCount = cartIds.length;
@@ -312,74 +358,104 @@ export default function Storefront({
     if (draft) setFromDraft(draft);
   }
 
+  const schemeItems: SchemeBannerData[] = [
+    ...data.banners.map((b) => ({
+      id: `b-${b.id}`,
+      title: b.title,
+      subtitle: b.subtitle,
+      imageUrl: b.imageKey ? fileUrl(b.imageKey) : null,
+      onClickAction: b.linkType && b.linkId ? () => openBanner(b) : undefined,
+    })),
+    ...offers.slice(0, 5).map((o) => ({
+      id: `o-${o.id}`,
+      kicker: `Scheme${endsLabel(o.endsAt) ? ` · ${endsLabel(o.endsAt)}` : ""}`,
+      title: o.summary,
+      subtitle: o.name,
+      cta: "Show products",
+      onClickAction: () => setScheme(o.id),
+    })),
+  ];
+
+  const cartNote = [quote && quote.free.length > 0 ? `${quote.free.length} free` : "", quote && quote.discountAmount > 0 ? `saving ${formatINR(quote.discountAmount, { whole: true })}` : ""]
+    .filter(Boolean)
+    .join(" · ");
+
+  const grid = view === "grid";
+  const listCls = grid ? "grid gap-2.5 grid-cols-2 md:grid-cols-3 2xl:grid-cols-4" : "grid gap-2.5 md:grid-cols-2";
+
   return (
     <div className="space-y-4">
-      {/* Search */}
-      <div className="sticky top-16 z-10 -mt-1 pt-1 pb-2 bg-[rgba(246,241,231,0.85)] backdrop-blur-xl">
-        <div className="relative">
-          <input
-            className="input !pr-10"
-            type="text"
-            enterKeyHint="search"
-            placeholder="Search products, brands… (Hindi or English)"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            aria-label="Search products"
-          />
-          {q && (
+      {/* Search + mic */}
+      <div className="sticky top-16 z-10 -mx-4 px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8 pt-1 pb-2 bg-[color-mix(in_srgb,var(--canvas)_92%,transparent)] backdrop-blur-xl">
+        <div className="flex gap-2">
+          <div className="relative flex-1 min-w-0">
+            <Icon name="search" className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-[var(--faint)] pointer-events-none" />
+            <input
+              className="input !pl-11 !pr-10"
+              type="text"
+              enterKeyHint="search"
+              placeholder="Search products, brands… (Hindi or English)"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              aria-label="Search products"
+            />
+            {q && (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => setQ("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 grid place-items-center h-8 w-8 rounded-full bg-[var(--surface-2)]"
+              >
+                <Icon name="x" className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          {data.orderText && (
             <button
               type="button"
-              aria-label="Clear search"
-              onClick={() => setQ("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full bg-ink/5 text-sm font-bold"
+              aria-label="Speak or type your order"
+              title="Speak or type your order"
+              onClick={() => {
+                setVoiceKey((k) => k + 1);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className="grid place-items-center h-12 w-12 shrink-0 rounded-[12px] bg-[var(--accent)] text-[var(--accent-on)]"
             >
-              ×
+              <Icon name="mic" className="h-5 w-5" weight="bold" />
             </button>
           )}
         </div>
       </div>
 
-      {/* Banners */}
-      {!filtering && data.banners.length > 0 && (
-        <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-1 [scrollbar-width:none]">
-          {data.banners.map((b) => (
-            <BannerTile key={b.id} banner={b} onOpenAction={() => openBanner(b)} />
-          ))}
-        </div>
-      )}
+      {/* Scheme banners (business banners first, then live offers) */}
+      {!filtering && schemeItems.length > 0 && <SchemeCarousel items={schemeItems} />}
 
-      {/* Schemes for you */}
-      {offers.length > 0 && (
-        <section className="space-y-2">
-          <p className="page-kick">Schemes for you</p>
-          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
-            {offers.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                aria-pressed={scheme === o.id}
-                onClick={() => setScheme(scheme === o.id ? null : o.id)}
-                className={`chip shrink-0 !py-1.5 ${scheme === o.id ? "chip-mor" : "chip-kesar"}`}
-                title={o.name}
-              >
-                <Icon name="tag" className="h-3.5 w-3.5" />
-                {o.summary}
-              </button>
-            ))}
-          </div>
-          {schemeOffer && (
-            <p className="text-xs text-[var(--ink-2)]">
-              <span className="font-bold">{schemeOffer.name}</span>
-              {schemeOffer.description ? ` · ${schemeOffer.description}` : ""}
-              {!isScoped(schemeOffer) && " · on everything in the catalogue"}
-            </p>
-          )}
-        </section>
+      {schemeOffer && (
+        <div className="flex items-center gap-2 rounded-[14px] bg-[var(--scheme-tint)] text-[var(--scheme-text)] px-3 py-2 text-sm">
+          <Icon name="tag" className="h-4 w-4 shrink-0" />
+          <span className="min-w-0 flex-1">
+            <span className="font-bold">{schemeOffer.name}</span>
+            {schemeOffer.description ? ` · ${schemeOffer.description}` : ""}
+            {!isScoped(schemeOffer) && " · on everything in the catalogue"}
+          </span>
+          <button type="button" aria-label="Clear scheme" className="grid place-items-center h-8 w-8 rounded-full bg-white/70" onClick={() => setScheme(null)}>
+            <Icon name="x" className="h-4 w-4" />
+          </button>
+        </div>
       )}
 
       {/* Type or speak your order (A1) */}
       {(draftId || (!filtering && data.orderText)) && (
-        <OrderByText retailerId={retailerId} products={products} byId={byId} inCartAction={(id) => !!cart[id]} draftId={draftId} onAddAction={addFromText} />
+        <OrderByText
+          key={voiceKey}
+          defaultOpen={voiceKey > 0}
+          retailerId={retailerId}
+          products={products}
+          byId={byId}
+          inCartAction={(id) => !!cart[id]}
+          draftId={draftId}
+          onAddAction={addFromText}
+        />
       )}
 
       {/* Usual order (A2) */}
@@ -388,9 +464,7 @@ export default function Storefront({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="page-kick">Usual order</p>
-              <p className="text-xs text-[var(--muted)] mt-0.5">
-                What this shop buys most times, from its last {data.usual!.basedOn} orders
-              </p>
+              <p className="text-xs text-[var(--muted)] mt-0.5">What this shop buys most times, from its last {data.usual!.basedOn} orders</p>
             </div>
             <button type="button" className="btn btn-primary btn-sm shrink-0" disabled={!usualMissing.length} onClick={addUsual}>
               {usualMissing.length ? `Add ${usualMissing.length} to cart` : "All in cart"}
@@ -402,9 +476,9 @@ export default function Storefront({
                 <button type="button" className="min-w-0 truncate text-left" onClick={() => setOpenProduct(u.productId)}>
                   {u.product.name}
                 </button>
-                <span className="shrink-0 tabular-nums text-[var(--muted)]">
+                <span className="shrink-0 num text-[var(--muted)]">
                   {u.qty} {u.product.unit}
-                  {cart[u.productId] && <span className="ml-1.5 text-[var(--mint-text)] font-semibold">✓</span>}
+                  {cart[u.productId] && <span className="ml-1.5 text-[var(--success-text)] font-semibold">✓</span>}
                 </span>
               </li>
             ))}
@@ -415,14 +489,20 @@ export default function Storefront({
       {/* Buy again */}
       {!filtering && buyAgain.length > 0 && (
         <section className="space-y-2">
-          <p className="page-kick">Buy again</p>
-          <div className="flex gap-2.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+          <p className="page-kick">Order again</p>
+          <div className="flex gap-2.5 overflow-x-auto pb-1 no-scrollbar">
             {buyAgain.map((p) => (
-              <div key={p.id} className="card shrink-0 w-[148px] p-2.5 flex flex-col gap-2">
+              <div key={p.id} data-product-card className="card shrink-0 w-[164px] p-2.5 flex flex-col gap-2">
                 <button type="button" onClick={() => setOpenProduct(p.id)} className="text-left space-y-1.5 min-w-0">
-                  <ProductThumb name={p.name} imageKey={p.images[0]} className={`h-12 w-12 ${p.stock === "out" ? "opacity-60" : ""}`} />
+                  <ProductThumb
+                    name={p.name}
+                    imageKey={p.images[0]}
+                    category={p.category.name}
+                    className={`h-14 w-14 ${p.stock === "out" ? "opacity-60" : ""}`}
+                    iconSize={38}
+                  />
                   <span className="block text-xs font-semibold leading-snug line-clamp-2">{p.name}</span>
-                  <span className="block text-xs text-[var(--muted)]">
+                  <span className="block text-xs text-[var(--muted)] num">
                     {formatINR(p.price)} / {p.unit}
                   </span>
                   <StockChip stock={p.stock} />
@@ -436,130 +516,124 @@ export default function Storefront({
         </section>
       )}
 
-      {/* Categories and brands */}
-      {(tops.length > 1 || data.brands.length > 1) && (
-        <section className="space-y-2">
-          {tops.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
-              <button type="button" onClick={() => setCategory(null)} className={`chip shrink-0 !py-1.5 ${!category ? "chip-mor" : ""}`}>
-                All
-              </button>
-              {tops.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  aria-pressed={activeTop === c.id}
-                  onClick={() => setCategory(activeTop === c.id && category === c.id ? null : c.id)}
-                  className={`chip shrink-0 !py-1.5 ${activeTop === c.id ? "chip-mor" : ""}`}
-                >
-                  {c.name}
-                </button>
-              ))}
-            </div>
-          )}
+      {/* Brand filter, sticky chips */}
+      {data.brands.length > 1 && <BrandFilter brands={data.brands} value={brand} onChangeAction={setBrand} param="brand" />}
+
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+        <button
+          type="button"
+          aria-pressed={schemeOnly}
+          onClick={() => setSchemeOnly((v) => !v)}
+          className={`chip shrink-0 min-h-10 !px-3.5 ${schemeOnly ? "chip-scheme" : ""}`}
+        >
+          <Icon name="tag" className="h-4 w-4" /> Scheme only
+        </button>
+        <button type="button" aria-pressed={inStock} onClick={() => setInStock((v) => !v)} className={`chip shrink-0 min-h-10 !px-3.5 ${inStock ? "chip-mint" : ""}`}>
+          <Icon name="check" className="h-4 w-4" /> In stock
+        </button>
+        <span className="flex-1" />
+        <div className="seg shrink-0" role="group" aria-label="View">
+          <button type="button" aria-pressed={grid} className={grid ? "is-on" : ""} onClick={() => changeView("grid")} aria-label="Grid view">
+            <Icon name="grid" className="h-4 w-4" />
+          </button>
+          <button type="button" aria-pressed={!grid} className={!grid ? "is-on" : ""} onClick={() => changeView("list")} aria-label="List view">
+            <Icon name="menu" className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {(filtering || schemeOnly || inStock) && (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-[var(--muted)]">
+            {visible.length} product{visible.length === 1 ? "" : "s"}
+          </p>
+          <button
+            type="button"
+            className="btn btn-quiet btn-xs"
+            onClick={() => {
+              clearFilters();
+              setSchemeOnly(false);
+              setInStock(false);
+            }}
+          >
+            Clear filters
+          </button>
+        </div>
+      )}
+
+      {/* Category rail + products */}
+      <div className={tops.length > 1 ? "grid grid-cols-[76px_minmax(0,1fr)] gap-3 items-start" : ""}>
+        {tops.length > 1 && (
+          <aside className="sticky top-36 max-h-[calc(100dvh-10rem)] overflow-y-auto no-scrollbar pr-2 -mr-2">
+            <CategoryRail items={tops} value={activeTop} onChangeAction={(id) => setCategory(id)} />
+          </aside>
+        )}
+        <div className="space-y-4 min-w-0">
           {subs.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+            <div className="flex gap-2 overflow-x-auto no-scrollbar">
               {subs.map((c) => (
                 <button
                   key={c.id}
                   type="button"
                   aria-pressed={category === c.id}
                   onClick={() => setCategory(category === c.id ? activeTop : c.id)}
-                  className={`chip shrink-0 !py-1 !text-[12px] ${category === c.id ? "chip-genda" : ""}`}
+                  className={`chip shrink-0 min-h-9 ${category === c.id ? "chip-kesar" : ""}`}
                 >
                   {c.name}
                 </button>
               ))}
             </div>
           )}
-          {data.brands.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
-              {data.brands.map((b) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  aria-pressed={brand === b.id}
-                  onClick={() => setBrand(brand === b.id ? null : b.id)}
-                  className={`chip shrink-0 !py-1 !text-[12px] ${brand === b.id ? "chip-mor" : ""}`}
-                >
-                  {b.logoKey && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={fileUrl(b.logoKey)} alt="" className="h-4 w-4 rounded object-contain" />
-                  )}
-                  {b.name}
-                </button>
-              ))}
-            </div>
+
+          {groups.length === 0 ? (
+            products.length === 0 ? (
+              <EmptyState icon="empty-cart" title="No products yet" text="Your distributor has not added any products to your catalogue." />
+            ) : (
+              <EmptyState
+                icon="no-results"
+                title="Nothing matches"
+                text="Try another word or clear the filters."
+                action={{
+                  label: "Clear filters",
+                  onClick: () => {
+                    clearFilters();
+                    setSchemeOnly(false);
+                    setInStock(false);
+                  },
+                }}
+              />
+            )
+          ) : (
+            groups.map((g) => (
+              <section key={g.id} className="space-y-2">
+                <h3 className="page-kick">{g.name}</h3>
+                <div className={listCls}>
+                  {g.items.map((p) => (
+                    <ProductCard
+                      key={p.id}
+                      variant={view}
+                      product={p}
+                      offers={cardOffers(p)}
+                      entry={cart[p.id]}
+                      onChangeAction={(e) => setEntry(p.id, e)}
+                      onOpenAction={() => setOpenProduct(p.id)}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))
           )}
-        </section>
-      )}
-
-      {filtering && (
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-[var(--muted)]">
-            {visible.length} product{visible.length === 1 ? "" : "s"}
-          </p>
-          <button type="button" className="btn btn-quiet btn-xs" onClick={clearFilters}>
-            Clear filters
-          </button>
         </div>
-      )}
+      </div>
 
-      {/* Products */}
-      {groups.length === 0 ? (
-        <div className="card p-6 text-center text-sm text-[var(--muted)]">
-          {products.length === 0 ? "No products to show yet." : "Nothing matches. Try another word or clear the filters."}
-        </div>
-      ) : (
-        groups.map((g) => (
-          <section key={g.id} className="space-y-2">
-            <h3 className="page-kick">{g.name}</h3>
-            <div className="grid gap-2.5 md:grid-cols-2">
-              {g.items.map((p) => (
-                <ProductCard
-                  key={p.id}
-                  product={p}
-                  offers={cardOffers(p)}
-                  entry={cart[p.id]}
-                  onChangeAction={(e) => setEntry(p.id, e)}
-                  onOpenAction={() => setOpenProduct(p.id)}
-                />
-              ))}
-            </div>
-          </section>
-        ))
-      )}
-
-      {/* Cart bar */}
-      {unitCount > 0 && (
-        <>
-          <div aria-hidden="true" className="h-24" />
-          <div className="fixed bottom-[92px] md:bottom-4 inset-x-3 z-30">
-            <button
-              type="button"
-              onClick={() => setReviewOpen(true)}
-              className="panel-dark w-full max-w-5xl mx-auto flex items-center justify-between gap-3 px-4 py-3 text-left"
-            >
-              <span className="min-w-0">
-                <span className="block text-xs text-white/70 truncate">
-                  {unitCount} item{unitCount === 1 ? "" : "s"}
-                  {quote && quote.free.length > 0 && ` · ${quote.free.length} free`}
-                  {quote && quote.discountAmount > 0 && ` · saving ${formatINR(quote.discountAmount, { whole: true })}`}
-                </span>
-                <span className={`block font-heading font-bold text-lg ${fresh ? "" : "opacity-60"}`}>
-                  {quote ? formatINR(quote.totalAmount) : "Checking prices…"}
-                </span>
-                {fresh && quote && quote.shortBy > 0 && (
-                  <span className="block text-[11.5px] font-semibold text-genda">Add {formatINR(quote.shortBy)} more to order</span>
-                )}
-              </span>
-              <span className="btn btn-kesar btn-sm shrink-0">
-                Review cart <Icon name="arrow" className="h-4 w-4" />
-              </span>
-            </button>
-          </div>
-        </>
-      )}
+      <CartBar
+        count={unitCount}
+        total={quote ? quote.totalAmount : null}
+        stale={!fresh}
+        note={cartNote}
+        warn={fresh && quote && quote.shortBy > 0 ? `Add ${formatINR(quote.shortBy)} more to order` : null}
+        onClickAction={() => setReviewOpen(true)}
+      />
 
       <ProductSheet
         product={sheetProduct}
@@ -601,36 +675,6 @@ export default function Storefront({
         onRetryAction={() => setNonce((n) => n + 1)}
       />
     </div>
-  );
-}
-
-function BannerTile({ banner: b, onOpenAction }: { banner: Banner; onOpenAction: () => void }) {
-  const body = (
-    <>
-      {b.imageKey && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={fileUrl(b.imageKey)} alt="" className="absolute inset-0 h-full w-full object-cover" />
-      )}
-      <span className={`absolute inset-0 ${b.imageKey ? "bg-gradient-to-t from-[rgba(8,38,37,0.85)] via-[rgba(8,38,37,0.25)] to-transparent" : ""}`} />
-      <span className="relative mt-auto block p-4">
-        <span className="block font-heading font-bold text-lg leading-tight text-white">{b.title}</span>
-        {b.subtitle && <span className="block text-xs text-white/80 mt-0.5">{b.subtitle}</span>}
-      </span>
-    </>
-  );
-  const cls = "panel-dark relative overflow-hidden snap-start shrink-0 w-[85%] sm:w-[360px] h-36 flex flex-col text-left";
-  if (b.linkType === "url" && b.linkId && /^https:\/\//i.test(b.linkId)) {
-    return (
-      <a href={b.linkId} target="_blank" rel="noopener noreferrer" className={cls}>
-        {body}
-      </a>
-    );
-  }
-  if (!b.linkType || !b.linkId) return <div className={cls}>{body}</div>;
-  return (
-    <button type="button" onClick={onOpenAction} className={cls}>
-      {body}
-    </button>
   );
 }
 

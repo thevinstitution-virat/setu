@@ -82,7 +82,7 @@ export default function CartReview({
       footer={
         <div className="space-y-2">
           {placeError && (
-            <div className="rounded-xl bg-[#fde4e1] text-[#a8281e] p-3 text-sm font-semibold">
+            <div className="rounded-xl bg-[var(--risk-tint)] text-[var(--risk-text)] p-3 text-sm font-semibold">
               <p>{placeError.message}</p>
               {placeError.status === 402 && forRetailer && (
                 <Link href="/retailer/khata" className="inline-flex items-center gap-1 mt-1 underline">
@@ -221,7 +221,7 @@ export default function CartReview({
                 <div className="min-w-0">
                   <p className="font-bold text-sm">{coupon}</p>
                   {quote?.coupon && quote.coupon.code === coupon && (
-                    <p className={`text-xs font-semibold ${quote.coupon.valid ? "text-[var(--mint-text)]" : "text-[#a8281e]"}`}>
+                    <p className={`text-xs font-semibold ${quote.coupon.valid ? "text-[var(--mint-text)]" : "text-[var(--risk-text)]"}`}>
                       {quote.coupon.message}
                     </p>
                   )}
@@ -313,9 +313,9 @@ export default function CartReview({
             </div>
           )}
 
-          {quoteError && <p className="text-sm font-semibold text-[#a8281e]">{quoteError}</p>}
+          {quoteError && <p className="text-sm font-semibold text-[var(--risk-text)]">{quoteError}</p>}
           {fresh && quote && quote.problems.length > 0 && (
-            <ul className="rounded-xl bg-[#fde4e1] text-[#a8281e] p-3 text-sm space-y-1 list-disc pl-7">
+            <ul className="rounded-xl bg-[var(--risk-tint)] text-[var(--risk-text)] p-3 text-sm space-y-1 list-disc pl-7">
               {quote.problems.map((m) => (
                 <li key={m}>{m}</li>
               ))}
