@@ -1,95 +1,178 @@
+import type { ComponentType } from "react";
+import {
+  ArrowLeftIcon as ArrowLeft,
+  ArrowRightIcon as ArrowRight,
+  ArrowsClockwiseIcon as ArrowsClockwise,
+  BarcodeIcon as Barcode,
+  BasketIcon as Basket,
+  BellIcon as Bell,
+  BookOpenTextIcon as BookOpenText,
+  CalendarCheckIcon as CalendarCheck,
+  CalendarDotsIcon as CalendarDots,
+  CameraIcon as Camera,
+  CaretDownIcon as CaretDown,
+  CaretLeftIcon as CaretLeft,
+  CaretRightIcon as CaretRight,
+  ChartBarIcon as ChartBar,
+  ChatCircleTextIcon as ChatCircleText,
+  CheckIcon as Check,
+  ClockIcon as Clock,
+  ClipboardTextIcon as ClipboardText,
+  CreditCardIcon as CreditCard,
+  CrosshairIcon as Crosshair,
+  CurrencyInrIcon as CurrencyInr,
+  DownloadSimpleIcon as DownloadSimple,
+  EyeIcon as Eye,
+  EyeSlashIcon as EyeSlash,
+  FileTextIcon as FileText,
+  FunnelSimpleIcon as FunnelSimple,
+  GaugeIcon as Gauge,
+  GearSixIcon as GearSix,
+  GiftIcon as Gift,
+  HandCoinsIcon as HandCoins,
+  HeartIcon as Heart,
+  HouseIcon as House,
+  ImageIcon as ImageIcon,
+  ListIcon as List,
+  LockIcon as Lock,
+  MagnifyingGlassIcon as MagnifyingGlass,
+  MapPinIcon as MapPin,
+  MapTrifoldIcon as MapTrifold,
+  MegaphoneIcon as Megaphone,
+  MicrophoneIcon as Microphone,
+  MinusIcon as Minus,
+  MoneyIcon as Money,
+  PencilSimpleIcon as PencilSimple,
+  PathIcon as Path,
+  PercentIcon as Percent,
+  PhoneIcon as Phone,
+  PlusIcon as Plus,
+  QrCodeIcon as QrCode,
+  ReceiptIcon as Receipt,
+  ShareNetworkIcon as ShareNetwork,
+  ShoppingCartSimpleIcon as ShoppingCartSimple,
+  SignOutIcon as SignOut,
+  SortAscendingIcon as SortAscending,
+  SparkleIcon as Sparkle,
+  SquaresFourIcon as SquaresFour,
+  StackIcon as Stack,
+  StarIcon as Star,
+  StorefrontIcon as Storefront,
+  TagIcon as Tag,
+  TargetIcon as Target,
+  TrashIcon as Trash,
+  TrophyIcon as Trophy,
+  TruckIcon as Truck,
+  UploadSimpleIcon as UploadSimple,
+  UserIcon as User,
+  UsersThreeIcon as UsersThree,
+  VanIcon as Van,
+  WalletIcon as Wallet,
+  WarehouseIcon as Warehouse,
+  WarningCircleIcon as WarningCircle,
+  WhatsappLogoIcon as WhatsappLogo,
+  XIcon as X,
+} from "@phosphor-icons/react/dist/ssr";
+import type { IconProps } from "@phosphor-icons/react";
+
 /**
- * Line icons for the in-app screens — same stroke style as the landing page
- * (24px grid, 2px round strokes, currentColor) so the app and the landing
- * read as one product instead of falling back to emoji.
+ * Line icons for every screen: one set (Phosphor), one API. The names below are
+ * the ones the app already used, so call sites did not change; the new names
+ * (back, minus, camera, …) came with the redesign. 3D icons are a separate
+ * system (components/icons3d) and never appear in buttons, tabs or tables.
  */
+const ICONS = {
+  home: House,
+  bell: Bell,
+  chat: ChatCircleText,
+  lock: Lock,
+  megaphone: Megaphone,
+  gift: Gift,
+  star: Star,
+  cart: ShoppingCartSimple,
+  box: ClipboardText,
+  user: User,
+  chart: ChartBar,
+  tag: Tag,
+  users: UsersThree,
+  map: MapTrifold,
+  pin: MapPin,
+  route: Path,
+  clock: Clock,
+  truck: Truck,
+  receipt: Receipt,
+  share: ShareNetwork,
+  download: DownloadSimple,
+  file: FileText,
+  check: Check,
+  arrow: ArrowRight,
+  plus: Plus,
+  wallet: Wallet,
+  upload: UploadSimple,
+  logout: SignOut,
+  book: BookOpenText,
+  cash: Money,
+  card: CreditCard,
+  settings: GearSix,
+  alert: WarningCircle,
+  qr: QrCode,
+  percent: Percent,
+  rupee: CurrencyInr,
+  x: X,
+  trash: Trash,
+  eye: Eye,
+  eyeOff: EyeSlash,
+  image: ImageIcon,
+  edit: PencilSimple,
+  search: MagnifyingGlass,
+  chevronLeft: CaretLeft,
+  chevronRight: CaretRight,
+  chevronDown: CaretDown,
+  phone: Phone,
+  stock: Warehouse,
+  layers: Stack,
+  clipboard: ClipboardText,
+  mic: Microphone,
+  sparkle: Sparkle,
+  menu: List,
+  grid: SquaresFour,
+  // added with the redesign
+  back: ArrowLeft,
+  minus: Minus,
+  camera: Camera,
+  whatsapp: WhatsappLogo,
+  handCoins: HandCoins,
+  gauge: Gauge,
+  storefront: Storefront,
+  reorder: ArrowsClockwise,
+  calendar: CalendarDots,
+  filter: FunnelSimple,
+  sort: SortAscending,
+  barcode: Barcode,
+  crosshair: Crosshair,
+  crate: Basket,
+  target: Target,
+  trophy: Trophy,
+  van: Van,
+  heart: Heart,
+  attendance: CalendarCheck,
+} as const satisfies Record<string, ComponentType<IconProps>>;
 
-const PATHS = {
-  home: "M3 10.5 12 3l9 7.5M5 9v11h5v-6h4v6h5V9",
-  bell: "M6 16V11a6 6 0 1 1 12 0v5l2 2H4l2-2ZM10 21h4",
-  chat: "M4 5h16v11H9l-5 4V5ZM8 9h8M8 12h5",
-  lock: "M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z",
-  megaphone: "M3 10v4h3l7 4V6l-7 4H3ZM16 9a4 4 0 0 1 0 6M6 14l1.5 6H10",
-  gift: "M3 9h18v4H3zM5 13v8h14v-8M12 9v12M12 9S10.5 4 8 4a2.5 2.5 0 0 0 0 5M12 9s1.5-5 4-5a2.5 2.5 0 0 1 0 5",
-  star: "M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9L12 3Z",
-  cart: "M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2M9.5 20.5h.01M17.5 20.5h.01",
-  box: "M21 8 12 3 3 8v8l9 5 9-5V8ZM3 8l9 5 9-5M12 13v8",
-  user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0",
-  chart: "M4 20V10M10 20V4M16 20v-7M22 20H2",
-  tag: "M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8ZM7.5 7.5h.01",
-  users: "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM2 21a7 7 0 0 1 14 0M16 3.2a4 4 0 0 1 0 7.6M22 21a7 7 0 0 0-4-6.3",
-  map: "M9 4 3 6.5v13.5L9 17.5l6 2.5 6-2.5V4L15 6.5 9 4ZM9 4v13.5M15 6.5V20",
-  pin: "M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21ZM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z",
-  route: "M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM18 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM6 15V9a4 4 0 0 1 4-4h4M18 9v6a4 4 0 0 1-4 4h-4",
-  clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 7v5l3 2",
-  truck: "M2 6h11v10H2zM13 10h4l4 4v2h-8M6.5 19.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM17.5 19.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z",
-  receipt: "M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2V3ZM9 8h6M9 12h6M9 16h3",
-  share: "M18 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM18 22a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM8.6 13.5l6.8 4M15.4 6.5l-6.8 4",
-  download: "M12 4v12M7 11l5 5 5-5M4 20h16",
-  file: "M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8l-5-5ZM14 3v5h5M9 13h6M9 17h6",
-  check: "M5 12.5 10 17.5 19 7",
-  arrow: "M5 12h14M13 6l6 6-6 6",
-  plus: "M12 5v14M5 12h14",
-  wallet: "M3 7a2 2 0 0 1 2-2h13v4M3 7v10a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2ZM16.5 14h.01",
-  upload: "M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3",
-  logout: "M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3",
-  book: "M4 4.5A1.5 1.5 0 0 1 5.5 3H20v15H5.5A1.5 1.5 0 0 0 4 19.5v-15ZM4 19.5A1.5 1.5 0 0 0 5.5 21H20M8 7h8M8 11h6",
-  cash: "M2 6h20v12H2zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 9v.01M18 15v.01",
-  card: "M2 5h20v14H2zM2 10h20M6 15h4",
-  settings: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z",
-  alert: "M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z",
-  qr: "M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h3v3h-3zM20 14v.01M14 20h.01M17 17h4v4h-4",
-  percent: "M19 5 5 19M7 9.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM17 19.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z",
-  rupee: "M6 4h12M6 9h12M9 4c6.5 0 6.5 10 0 10H6l8.5 7",
-  x: "M6 6l12 12M18 6 6 18",
-  trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
-  eye: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12ZM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
-  image: "M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6M15.5 9.5h.01",
-  edit: "M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4",
-  search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM20 20l-4-4",
-  chevronLeft: "M15 6l-6 6 6 6",
-  chevronRight: "M9 6l6 6-6 6",
-  phone: "M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z",
-  /** Stock: a warehouse rack. */
-  stock: "M3 21V8l9-5 9 5v13M7 21v-8h10v8M7 17h10",
-  /** Layers (batches). */
-  layers: "M12 3 2 8l10 5 10-5-10-5ZM2 13l10 5 10-5M2 18l10 5 10-5",
-  /** Clipboard (purchase orders, counts). */
-  clipboard: "M9 4h6v3H9zM8 5H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2M9 12h6M9 16h4",
-  /** Microphone (speak an order). */
-  mic: "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3ZM5 11a7 7 0 0 0 14 0M12 18v3M9 21h6",
-  /** Sparkle (questions, smart help). */
-  sparkle: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3ZM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16Z",
-  /** Menu (the phone "More" tab). */
-  menu: "M4 6h16M4 12h16M4 18h16",
-  /** Dashboard tiles. */
-  grid: "M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z",
-  chevronDown: "M6 9l6 6 6-6",
-} as const;
-
-export type IconName = keyof typeof PATHS;
+export type IconName = keyof typeof ICONS;
+export const ICON_NAMES = Object.keys(ICONS) as IconName[];
 
 export default function Icon({
   name,
   className = "h-5 w-5",
-  strokeWidth = 2,
+  weight = "regular",
 }: {
   name: IconName;
   className?: string;
+  /** "duotone" for nav and feature tiles, "regular" (default) inline, "fill" for a selected tab. */
+  weight?: "regular" | "duotone" | "fill" | "bold";
+  /** @deprecated Kept so old call sites compile; the weight prop replaces it. */
   strokeWidth?: number;
 }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={strokeWidth}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d={PATHS[name]} />
-    </svg>
-  );
+  const Cmp = ICONS[name];
+  return <Cmp aria-hidden="true" className={className} weight={weight} />;
 }

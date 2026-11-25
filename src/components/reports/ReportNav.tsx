@@ -82,7 +82,7 @@ export default function ReportNav() {
         </button>
         {!onShop && (
           <a href={csv} className="btn btn-outline btn-xs ml-auto" download>
-            <Icon name="upload" className="h-3.5 w-3.5 rotate-180" /> CSV
+            <Icon name="download" className="h-3.5 w-3.5" /> CSV
           </a>
         )}
       </div>

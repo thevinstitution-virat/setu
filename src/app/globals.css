@@ -1,60 +1,55 @@
 @import "tailwindcss";
+@import "../styles/tokens.css";
+@import "../styles/icon3d.css";
 @import "../components/landing/landing.css";
 @import "../components/landing/pro.css";
 
+/* The design tokens live in styles/tokens.css. The names below are the old
+   ones, kept as aliases so every existing component keeps working. A tenant's
+   white-label colours (themeCss) override --mor/--kesar/--background on :root. */
 :root {
-  /* Ground + ink */
-  --background: #f6f1e7;
-  --foreground: #0f2a2a;
-  --ink: #0f2a2a;
-  --ink-2: #36504e;
-  --muted: #5b6f6c;
-  --line: rgba(15, 42, 42, 0.09);
-
-  /* Kesar (saffron) — primary action */
-  --kesar: #db5c17;
-  --kesar-mid: #c94a0c;
-  --kesar-dark: #a93c08;
-  --kesar-text: #a93c08;
-  --kesar-tint: #fde7d7;
-
-  /* Mor (deep teal) — dark surfaces */
-  --mor: #155651;
-  --mor-mid: #0c3634;
-  --mor-dark: #082625;
-
-  /* Genda (marigold) — highlights / warnings */
-  --genda: #f2b33d;
-  --genda-tint: #fcefd0;
-  --genda-text: #6e4e00;
-
-  /* Pudina (mint) — success / delivered */
-  --mint: #3cc9a0;
-  --mint-tint: #ddf6ec;
-  --mint-text: #0e6b52;
-
-  /* Legacy aliases kept for existing in-app components */
+  --background: var(--canvas);
+  --foreground: var(--ink);
   --brand: var(--mor);
   --brand-dark: var(--mor-dark);
   --brand-light: var(--mint-tint);
   --gold: var(--genda);
   --gold-dark: var(--kesar-dark);
+  --app-ground: var(--canvas);
+  --app-line: var(--line);
+  --app-line-2: var(--line-2);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-money: var(--money);
+  --color-scheme: var(--scheme);
+  --color-risk: var(--risk);
+  --color-success: var(--success);
   --color-brand: var(--brand);
   --color-brand-dark: var(--brand-dark);
   --color-brand-light: var(--brand-light);
-  --color-ink: var(--ink);
-  --color-ink-2: var(--ink-2);
   --color-gold: var(--gold);
   --color-gold-dark: var(--gold-dark);
   --color-kesar: var(--kesar);
   --color-mor: var(--mor);
   --color-genda: var(--genda);
   --color-mint: var(--mint);
+  --color-cat-1: var(--cat-1);
+  --color-cat-2: var(--cat-2);
+  --color-cat-3: var(--cat-3);
+  --color-cat-4: var(--cat-4);
+  --color-cat-5: var(--cat-5);
+  --color-cat-6: var(--cat-6);
   --font-sans: var(--font-body);
   --font-heading: var(--font-heading);
   --font-mono: var(--font-geist-mono);
@@ -62,11 +57,7 @@
 }
 
 body {
-  background:
-    radial-gradient(55% 42% at 0% 0%, rgba(219, 92, 23, 0.14), transparent 62%),
-    radial-gradient(50% 45% at 100% 6%, rgba(21, 86, 81, 0.16), transparent 62%),
-    radial-gradient(60% 50% at 70% 100%, rgba(242, 179, 61, 0.2), transparent 62%),
-    var(--background);
+  background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body), var(--font-deva), system-ui, sans-serif;
 }
@@ -89,28 +80,41 @@ h3 {
   font-family: var(--font-heading), var(--font-deva), sans-serif;
 }
 
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ───────── Inputs ───────── */
 .input {
   width: 100%;
-  border-radius: 0.75rem;
-  border: 1px solid var(--line);
-  background: white;
-  padding: 0.65rem 0.9rem;
-  font-size: 0.95rem;
+  min-height: 48px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0.7rem 0.95rem;
+  font-size: 15px;
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
 }
-
+.input::placeholder {
+  color: var(--faint);
+}
 .input:focus {
-  border-color: var(--mor);
-  box-shadow: 0 0 0 3px var(--mint-tint);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+textarea.input {
+  min-height: 96px;
 }
 
+/* ───────── Cards ───────── */
 .card {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(14px) saturate(1.3);
-  border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 14px 30px -20px rgba(15, 42, 42, 0.35);
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  box-shadow: var(--e-1);
 }
 
 /* Brand artwork in a card's corners (sign-in, sign-up): a route hub (one
@@ -146,70 +150,162 @@ h3 {
   opacity: 0.1;
 }
 
-/* App-wide buttons, matching the VBiz Pro brand */
+/* ───────── Buttons ─────────
+   Variants: primary (accent), outline, money, scheme, soft, quiet (ghost), danger, mor.
+   Sizes: default 48, .btn-sm 40, .btn-xs 32 (dense table actions), .btn-lg 56 (delivery). */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 44px;
-  padding: 0 18px;
-  border-radius: 14px;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: var(--r-md);
   border: 0;
   cursor: pointer;
   font: 700 14.5px/1 var(--font-body), var(--font-deva), sans-serif;
   white-space: nowrap;
-  transition: transform 0.2s, filter 0.2s;
+  transition: transform var(--dur-fast) var(--ease-out), background var(--dur-fast), filter var(--dur-fast), box-shadow var(--dur-fast);
 }
-
 .btn:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
-
 .btn:focus-visible {
-  outline: 2px solid var(--mor);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
+}
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+.btn-sm {
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 13.5px;
+}
+.btn-xs {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+}
+.btn-lg {
+  min-height: 56px;
+  padding: 0 26px;
+  border-radius: 14px;
+  font-size: 16px;
+}
+/* Loading: keep the width, swap the label for a spinner. */
+.btn.is-loading {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+}
+.btn.is-loading::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  animation: spin 0.7s linear infinite;
+}
+.btn-outline.is-loading::after,
+.btn-glass.is-loading::after,
+.btn-quiet.is-loading::after {
+  border-color: var(--line-2);
+  border-top-color: var(--ink);
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .btn-kesar,
 .btn-primary {
-  background: linear-gradient(180deg, var(--kesar) 0%, var(--kesar-mid) 52%, var(--kesar-dark) 100%);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.5) inset,
-    0 -2px 0 rgba(110, 30, 0, 0.25) inset,
-    0 12px 24px -10px rgba(219, 92, 23, 0.85);
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-on);
+  box-shadow: 0 1px 2px rgba(15, 42, 42, 0.18);
 }
-
 .btn-kesar:hover,
 .btn-primary:hover {
-  filter: brightness(0.95);
+  background: var(--accent-hover);
+}
+.btn-lg.btn-kesar,
+.btn-lg.btn-primary {
+  box-shadow: var(--e-cta);
 }
 
 .btn-mor,
 .btn-secondary {
-  background: linear-gradient(150deg, var(--mor), var(--mor-mid) 60%, var(--mor-dark));
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.14) inset, 0 14px 26px -16px rgba(8, 38, 37, 0.9);
+  background: var(--mor);
   color: #fff;
+  box-shadow: 0 1px 2px rgba(8, 38, 37, 0.3);
 }
-
 .btn-mor:hover,
 .btn-secondary:hover {
-  filter: brightness(1.08);
+  background: var(--mor-mid);
 }
 
 .btn-glass,
 .btn-outline {
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(18px);
-  border: 1.5px solid var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-2);
   color: var(--ink);
   font-weight: 700;
 }
-
 .btn-glass:hover,
 .btn-outline:hover {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--surface-2);
+  border-color: var(--faint);
+}
+
+.btn-money {
+  background: var(--money);
+  color: #fff;
+}
+.btn-money:hover {
+  background: var(--money-dark);
+}
+.btn-scheme {
+  background: var(--scheme);
+  color: #1a1200;
+}
+.btn-scheme:hover {
+  filter: brightness(0.95);
+}
+
+.btn-soft {
+  background: var(--accent-tint);
+  color: var(--accent-text);
+}
+.btn-soft:hover {
+  filter: brightness(0.97);
+}
+.btn-quiet {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.btn-quiet:hover {
+  background: var(--line);
+}
+.btn-danger {
+  background: var(--risk-tint);
+  color: var(--risk-text);
+}
+.btn-danger:hover {
+  filter: brightness(0.97);
+}
+
+/* Dense staff screens on a desktop: tighter default buttons. */
+@media (min-width: 768px) {
+  .app-shell:not([data-surface="retailer"]) .btn:not(.btn-lg):not(.btn-sm):not(.btn-xs) {
+    min-height: 44px;
+  }
 }
 
 .glass {
@@ -219,88 +315,57 @@ h3 {
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.95) inset, 0 14px 34px -20px rgba(15, 42, 42, 0.4);
 }
 
+/* ───────── Chips ───────── */
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 5px 11px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   font-size: 12.5px;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(15, 42, 42, 0.08);
+  background: var(--surface);
+  border: 1px solid var(--line-2);
   white-space: nowrap;
 }
-
 .chip-kesar {
   background: var(--kesar-tint);
   color: var(--kesar-text);
   border-color: transparent;
 }
-
 .chip-mor {
   background: var(--ink);
   color: var(--genda);
   border-color: transparent;
 }
-
-.chip-genda {
-  background: var(--genda-tint);
-  color: var(--genda-text);
+.chip-genda,
+.chip-scheme {
+  background: var(--scheme-tint);
+  color: var(--scheme-text);
   border-color: transparent;
 }
-
 .chip-mint {
   background: var(--mint-tint);
   color: var(--mint-text);
   border-color: transparent;
 }
-
-/* ───────── In-app pages (retailer / sales / delivery / admin) ───────── */
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
+.chip-money {
+  background: var(--money-tint);
+  color: var(--money);
+  border-color: transparent;
 }
-
-.btn-sm {
-  min-height: 36px;
-  padding: 0 14px;
-  border-radius: 12px;
-  font-size: 13.5px;
+.chip-risk {
+  background: var(--risk-tint);
+  color: var(--risk-text);
+  border-color: transparent;
 }
-
-.btn-xs {
-  min-height: 30px;
-  padding: 0 11px;
-  border-radius: 10px;
-  font-size: 12.5px;
-}
-
-.btn-soft {
-  background: var(--kesar-tint);
-  color: var(--kesar-text);
-}
-
-.btn-soft:hover {
-  filter: brightness(0.97);
-}
-
-.btn-quiet {
-  background: rgba(15, 42, 42, 0.06);
+.chip-neutral {
+  background: var(--surface-2);
+  border-color: transparent;
   color: var(--ink);
 }
 
-.btn-quiet:hover {
-  background: rgba(15, 42, 42, 0.1);
-}
-
-.btn-danger {
-  background: #fde4e1;
-  color: #a8281e;
-}
-
+/* ───────── Page furniture ───────── */
 .page-head {
   display: flex;
   flex-wrap: wrap;
@@ -308,124 +373,107 @@ h3 {
   justify-content: space-between;
   gap: 12px;
 }
-
 .page-kick {
-  font-size: 11.5px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--kesar-text);
+  color: var(--muted);
 }
-
 .page-title {
   font-family: var(--font-heading), var(--font-deva), sans-serif;
   font-weight: 700;
-  font-size: clamp(24px, 3.2vw, 30px);
-  line-height: 1.1;
+  font-size: clamp(24px, 3vw, 30px);
+  line-height: 1.12;
   letter-spacing: -0.015em;
   color: var(--ink);
   margin-top: 4px;
 }
-
 .page-sub {
   color: var(--muted);
   font-size: 14.5px;
   margin-top: 4px;
 }
-
 .stat-num {
   font-family: var(--font-heading), var(--font-deva), sans-serif;
   font-weight: 700;
   font-size: 28px;
   line-height: 1;
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
-
 .stat-lbl {
   font-size: 12.5px;
   font-weight: 600;
   color: var(--muted);
   margin-top: 6px;
 }
-
 .panel-dark {
-  background: linear-gradient(150deg, var(--mor), var(--mor-mid) 60%, var(--mor-dark));
+  background: linear-gradient(150deg, var(--mor), var(--mor-mid) 70%);
   color: #fff;
-  border-radius: 1.25rem;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.14) inset, 0 24px 44px -24px rgba(8, 38, 37, 0.9);
+  border-radius: var(--r-xl);
+  box-shadow: var(--e-2);
 }
-
 .icon-tile {
   display: grid;
   place-items: center;
   width: 40px;
   height: 40px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   flex: 0 0 auto;
 }
-
 .icon-tile svg {
   width: 20px;
   height: 20px;
 }
 
-/* Order status chips */
+/* Order status pills (StatusPill maps onto these) */
 .st {
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
   font-weight: 700 !important;
 }
-
 .st-placed {
-  background: var(--genda-tint);
-  color: var(--genda-text);
+  background: var(--scheme-tint);
+  color: var(--scheme-text);
 }
-
 .st-confirmed {
-  background: #e1eeec;
+  background: var(--mor-tint);
   color: var(--mor);
 }
-
 .st-packed {
   background: var(--ink);
   color: var(--genda);
 }
-
 .st-out {
   background: var(--kesar-tint);
   color: var(--kesar-text);
 }
-
 .st-delivered {
-  background: var(--mint-tint);
-  color: var(--mint-text);
+  background: var(--success-tint);
+  color: var(--success-text);
 }
-
 .st-cancelled {
-  background: #fde4e1;
-  color: #a8281e;
+  background: var(--risk-tint);
+  color: var(--risk-text);
 }
 
-/* Stage tiles (admin pipeline) — tinted like the landing owner dashboard */
+/* Stage tiles (admin pipeline) */
 .tile-placed {
-  background: var(--genda-tint);
+  background: var(--scheme-tint);
 }
-
 .tile-confirmed {
-  background: #e1eeec;
+  background: var(--mor-tint);
 }
-
 .tile-packed {
-  background: #fff;
+  background: var(--surface);
 }
-
 .tile-out {
   background: var(--kesar-tint);
 }
-
 .tile-delivered {
-  background: var(--mint-tint);
+  background: var(--success-tint);
 }
 
 /* ───────── App shell (signed-in pages): grouped sidebar, tablet rail, phone tabs ───────── */

@@ -170,7 +170,7 @@ export default function PurchaseOrderPage({ params }: { params: Promise<{ id: st
 function BackLink() {
   return (
     <Link href="/admin/stock/purchase-orders" className="inline-flex items-center gap-1 text-sm font-bold text-[var(--ink-2)]">
-      <Icon name="arrow" className="h-4 w-4 rotate-180" /> Purchase orders
+      <Icon name="back" className="h-4 w-4" /> Purchase orders
     </Link>
   );
 }

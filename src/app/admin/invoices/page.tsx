@@ -249,7 +249,7 @@ function PeriodPicker({
         ) : (
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
             <button type="button" className="btn btn-quiet btn-sm !px-2.5 shrink-0" aria-label="Previous month" onClick={() => step(-1)}>
-              <Icon name="arrow" className="h-4 w-4 rotate-180" />
+              <Icon name="back" className="h-4 w-4" />
             </button>
             <input
               className="input min-w-0 flex-1"
@@ -337,7 +337,7 @@ function InvoiceList({ data, page, setPage }: { data: ListResponse; page: number
       {data.pages > 1 && (
         <div className="flex items-center justify-between gap-2">
           <button type="button" className="btn btn-quiet btn-sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-            <Icon name="arrow" className="h-4 w-4 rotate-180" /> Newer
+            <Icon name="back" className="h-4 w-4" /> Newer
           </button>
           <span className="text-sm text-[var(--muted)]">
             Page {data.page} of {data.pages}

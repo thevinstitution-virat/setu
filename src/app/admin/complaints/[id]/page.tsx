@@ -142,7 +142,7 @@ export default function ComplaintPage({ params }: { params: Promise<{ id: string
 function BackLink() {
   return (
     <Link href="/admin/complaints" className="inline-flex items-center gap-1 text-sm font-bold text-[var(--ink-2)]">
-      <Icon name="arrow" className="h-4 w-4 rotate-180" /> All complaints
+      <Icon name="back" className="h-4 w-4" /> All complaints
     </Link>
   );
 }

@@ -210,7 +210,7 @@ export default function KhataListPage() {
           <p className="page-sub">Who owes what, how old it is, and who has paid ahead.</p>
         </div>
         <button className="btn btn-outline btn-sm" onClick={downloadCsv} disabled={!shown.length}>
-          <Icon name="upload" className="h-4 w-4 rotate-180" /> Download CSV
+          <Icon name="download" className="h-4 w-4" /> Download CSV
         </button>
       </div>
 

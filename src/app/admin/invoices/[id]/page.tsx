@@ -19,7 +19,7 @@ export default function AdminInvoicePage({ params }: { params: Promise<{ id: str
   return (
     <div className="space-y-4 max-w-3xl">
       <Link href="/admin/invoices" className="inline-flex items-center gap-1 text-sm font-bold text-[var(--ink-2)]">
-        <Icon name="arrow" className="h-4 w-4 rotate-180" /> All invoices
+        <Icon name="back" className="h-4 w-4" /> All invoices
       </Link>
       <InvoicePanel
         key={id}

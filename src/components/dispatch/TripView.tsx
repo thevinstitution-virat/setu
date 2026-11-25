@@ -100,7 +100,7 @@ export default function TripView({ id }: { id: string }) {
 function BackLink({ date }: { date: string | null }) {
   return (
     <Link href={date ? `/admin/dispatch?date=${date}` : "/admin/dispatch"} className="inline-flex items-center gap-1 text-sm font-bold text-[var(--ink-2)]">
-      <Icon name="arrow" className="h-4 w-4 rotate-180" /> Dispatch
+      <Icon name="back" className="h-4 w-4" /> Dispatch
     </Link>
   );
 }

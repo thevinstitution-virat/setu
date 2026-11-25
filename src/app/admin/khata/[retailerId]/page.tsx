@@ -347,7 +347,7 @@ export default function RetailerKhataPage({ params }: { params: Promise<{ retail
 function BackLink() {
   return (
     <Link href="/admin/khata" className="inline-flex items-center gap-1 text-sm font-bold text-[var(--ink-2)]">
-      <Icon name="arrow" className="h-4 w-4 rotate-180" /> All retailers
+      <Icon name="back" className="h-4 w-4" /> All retailers
     </Link>
   );
 }

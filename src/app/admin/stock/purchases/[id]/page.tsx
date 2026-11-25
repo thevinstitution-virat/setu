@@ -42,7 +42,7 @@ export default function PurchasePage({ params }: { params: Promise<{ id: string 
 
   const back = (
     <Link href="/admin/stock/purchases" className="inline-flex items-center gap-1 text-sm font-bold text-[var(--ink-2)]">
-      <Icon name="arrow" className="h-4 w-4 rotate-180" /> Goods received
+      <Icon name="back" className="h-4 w-4" /> Goods received
     </Link>
   );
 

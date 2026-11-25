@@ -166,7 +166,7 @@ function Catalogue() {
           <p className="page-sub">What retailers can order, how it is grouped, its GST, and the banners on their home screen.</p>
         </div>
         <Link href="/admin/products/assist" className="btn btn-quiet btn-sm">
-          <Icon name="star" className="h-4 w-4" /> Catalogue assist
+          <Icon name="sparkle" className="h-4 w-4" /> Catalogue assist
         </Link>
       </div>
       <TabBar tabs={TABS} value={tab} onChange={pick} />

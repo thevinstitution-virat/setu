@@ -1,19 +1,20 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Funnel_Display, Funnel_Sans, Anek_Devanagari } from "next/font/google";
+import { Geist_Mono, Poppins, Manrope, Anek_Devanagari } from "next/font/google";
 import "./globals.css";
 import { APP_NAME } from "@/lib/brand";
 import { currentBrand } from "@/lib/branding-server";
-import { appNameOf, themeColour, themeCss } from "@/lib/branding";
+import { appNameOf, themeColour, themeCss, themeVars } from "@/lib/branding";
 import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
 import { getServerLang } from "@/lib/i18n/server";
 
-const funnelDisplay = Funnel_Display({
+/* Poppins: headings, big money figures, banners. Manrope: everything else. */
+const poppins = Poppins({
   variable: "--font-heading",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["500", "600", "700", "800"],
 });
 
-const funnelSans = Funnel_Sans({
+const manrope = Manrope({
   variable: "--font-body",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
@@ -64,11 +65,17 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   const lang = await getServerLang();
   const { brand } = await currentBrand();
   // Only #rrggbb values reach this (lib/branding.ts), so it can't break out of the style tag.
-  const theme = themeCss(brand);
+  const base = themeCss(brand);
+  // The retailer surface is green, but a white-label business colour wins there too
+  // (it has to come after the surface rules, hence the extra specificity).
+  const tenantAccent = themeVars(brand)["--kesar"]
+    ? `html [data-surface="retailer"]{--accent:var(--kesar-mid);--accent-hover:var(--kesar-dark);--accent-text:var(--kesar-text);--accent-tint:var(--kesar-tint);--chrome-highlight:var(--kesar-mid)}`
+    : "";
+  const theme = base + tenantAccent;
   return (
     <html
       lang={lang}
-      className={`${funnelDisplay.variable} ${funnelSans.variable} ${anekDevanagari.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${poppins.variable} ${manrope.variable} ${anekDevanagari.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       {theme && (
