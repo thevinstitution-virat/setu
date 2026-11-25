@@ -27,7 +27,7 @@ export async function createPlatformCookie(s: PlatformSession) {
   const u = await prisma.platformUser.findUnique({ where: { id: s.platformUserId }, select: { sessionVersion: true } });
   const claims: PlatformClaims = { ...s, mfa: true, sv: u?.sessionVersion ?? 0 };
   const token = await new SignJWT({ ...claims }).setProtectedHeader({ alg: "HS256" }).setAudience(AUD).setIssuedAt().setExpirationTime("12h").sign(platformSecret());
-  (await cookies()).set(COOKIE, token, { httpOnly: true, sameSite: "strict", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 12 * 3600 });
+  (await cookies()).set(COOKIE, token, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 12 * 3600 });
 }
 
 export async function clearPlatformCookie() {
