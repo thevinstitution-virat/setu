@@ -9,7 +9,7 @@ import "dotenv/config";
 import { beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/prisma";
 import { tenantDb } from "@/lib/db";
-import { withMoney, type Ctx } from "@/lib/ledger";
+import { issueCreditNote, withMoney, type Ctx } from "@/lib/ledger";
 import { nextRunningNumber } from "@/lib/invoice";
 import { INVOICE_DEFAULTS } from "@/lib/invoice-settings";
 import { templateCsv, validateSales, type Row } from "@/lib/importers";
@@ -147,6 +147,11 @@ describe("sales bills into the books (rolled back)", () => {
       // Found by phone; a number outside our series leaves the counter alone.
       const b = await tx.invoice.findFirstOrThrow({ where: { number: other } });
       expect(b).toMatchObject({ retailerId: shopId, total: 105000 });
+
+      // Cancelling the newer bill with a credit note settles that bill, not the older one first.
+      await issueCreditNote(ctx, { invoiceId: b.id, kind: "cancel", reason: "Test", lines: [] });
+      expect(await tx.bill.findFirstOrThrow({ where: { number: other } })).toMatchObject({ paid: 105000, settled: true });
+      expect(await tx.bill.findFirstOrThrow({ where: { number: ours } })).toMatchObject({ paid: 0, settled: false });
 
       // The same sheet again: both bills are refused, nothing doubles.
       const again = await importSales(ctx, validateSales(sheet.slice(0, 3), new Date("2026-11-25T06:00:00Z")).valid);

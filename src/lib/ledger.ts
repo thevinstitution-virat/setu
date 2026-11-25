@@ -415,10 +415,23 @@ export async function allocateRetailer(ctx: Ctx, retailerId: string) {
   const open = payments.filter((p) => p.allocated < p.amount);
   if (!bills.length || !open.length) return;
 
+  // A credit note on an invoice with no order (a sales bill imported from the
+  // old book) pays that invoice's bill first: found by the note's number.
+  const noteFor = new Map<string, string>();
+  const orderless = open.filter((p) => !p.orderId && p.method === "CREDIT_NOTE");
+  if (orderless.length) {
+    const notes = await ctx.tx.invoice.findMany({
+      where: { type: "CREDIT_NOTE", number: { in: orderless.map((p) => p.number) } },
+      select: { number: true, original: { select: { number: true } } },
+    });
+    for (const n of notes) if (n.original) noteFor.set(n.number, n.original.number);
+  }
+
   const billLeft = new Map(bills.map((b) => [b.id, b.amount - b.paid]));
   for (const p of open) {
     let left = p.amount - p.allocated;
-    const target = p.orderId ? bills.find((b) => b.orderId === p.orderId) : undefined;
+    const forBill = noteFor.get(p.number);
+    const target = p.orderId ? bills.find((b) => b.orderId === p.orderId) : forBill ? bills.find((b) => b.number === forBill) : undefined;
     const order = target ? [target, ...bills.filter((b) => b !== target)] : bills;
     for (const b of order) {
       if (left <= 0) break;
