@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CatalogueProduct, OfferedScheme, Quote } from "@/lib/pricing";
 import { fileUrl } from "./format";
+import Icon from "@/components/Icon";
+import { Icon3D } from "@/components/icons3d/Icon3D";
+import { categoryIcon } from "@/lib/ui/categoryIcons";
+import { flyToCart } from "@/lib/ui/fly";
 
 // ───────────── API shapes (JSON: dates arrive as strings) ─────────────
 
@@ -87,30 +91,36 @@ export function endsLabel(endsAt: string | null): string | null {
   return `till ${d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`;
 }
 
-const TINTS = [
-  "bg-[var(--kesar-tint)] text-[var(--kesar-text)]",
-  "bg-[var(--mint-tint)] text-[var(--mint-text)]",
-  "bg-[var(--genda-tint)] text-[var(--genda-text)]",
-  "bg-[#e1eeec] text-[var(--mor)]",
-];
-function tintFor(s: string) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return TINTS[Math.abs(h) % TINTS.length];
-}
-
 // ───────────── small components ─────────────
 
 /** "Out of stock" / "Few left" chip. Ordering stays open: the business may only warn. */
 export function StockChip({ stock, className = "" }: { stock: StockBadge | undefined; className?: string }) {
   if (stock === "out") {
-    return <span className={`chip !py-0.5 !text-[11.5px] !bg-[#fde4e1] !text-[#a8281e] !border-transparent ${className}`}>Out of stock</span>;
+    return <span className={`chip chip-risk !py-0.5 !text-[11.5px] ${className}`}>Out of stock</span>;
   }
   if (stock === "low") return <span className={`chip chip-genda !py-0.5 !text-[11.5px] ${className}`}>Few left</span>;
   return null;
 }
 
-export function ProductThumb({ name, imageKey, className = "h-16 w-16" }: { name: string; imageKey?: string | null; className?: string }) {
+/**
+ * A product picture. With no photo it shows the 3D icon of the product's
+ * category (matched from the category name, then the product name; sealed box
+ * when nothing matches), never the first letter.
+ */
+export function ProductThumb({
+  name,
+  imageKey,
+  category,
+  className = "h-16 w-16",
+  iconSize = 40,
+}: {
+  name: string;
+  imageKey?: string | null;
+  category?: string | null;
+  className?: string;
+  /** Pixel size of the fallback icon (about 60% of the thumb). */
+  iconSize?: number;
+}) {
   if (imageKey) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
@@ -118,13 +128,13 @@ export function ProductThumb({ name, imageKey, className = "h-16 w-16" }: { name
     );
   }
   return (
-    <span aria-hidden="true" className={`${className} shrink-0 rounded-xl grid place-items-center font-heading font-bold text-xl ${tintFor(name)}`}>
-      {name.trim().charAt(0).toUpperCase() || "?"}
+    <span aria-hidden="true" className={`${className} shrink-0 rounded-xl grid place-items-center bg-[var(--surface-2)]`}>
+      <Icon3D name={categoryIcon(category ? `${category} ${name}` : name)} size={iconSize} />
     </span>
   );
 }
 
-/** Bottom sheet on phones, centred dialog from md up. */
+/** Bottom sheet on phones, centred dialog from md up. Drag handle, blurred backdrop, focus kept inside. */
 export function Sheet({
   open,
   title,
@@ -139,33 +149,86 @@ export function Sheet({
   footer?: React.ReactNode;
 }) {
   const close = useRef(onCloseAction);
+  const panel = useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = useState(0);
+  const startY = useRef<number | null>(null);
   useEffect(() => {
     close.current = onCloseAction;
   }, [onCloseAction]);
 
   useEffect(() => {
     if (!open) return;
+    const before = document.activeElement as HTMLElement | null;
+    const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close.current();
+      if (e.key === "Escape") return close.current();
+      if (e.key !== "Tab" || !panel.current) return;
+      const nodes = [...panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((n) => n.offsetParent !== null);
+      if (!nodes.length) return;
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    panel.current?.querySelector<HTMLElement>("[data-sheet-close]")?.focus();
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
+      before?.focus?.();
     };
   }, [open]);
 
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center md:p-6" role="dialog" aria-modal="true" aria-label={title}>
-      <button type="button" aria-label="Close" className="absolute inset-0 bg-[rgba(8,38,37,0.5)] cursor-default" onClick={onCloseAction} />
-      <div className="relative w-full md:max-w-lg max-h-[90dvh] flex flex-col rounded-t-3xl md:rounded-3xl bg-[var(--background)] shadow-[0_-20px_50px_-20px_rgba(8,38,37,0.6)]">
-        <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-2.5 border-b border-[var(--line)]">
+      <button
+        type="button"
+        aria-label="Close"
+        tabIndex={-1}
+        className="absolute inset-0 bg-[rgba(8,38,37,0.45)] backdrop-blur-[22px] cursor-default"
+        onClick={onCloseAction}
+      />
+      <div
+        ref={panel}
+        style={drag ? { transform: `translateY(${drag}px)`, transition: "none" } : undefined}
+        className="sheet-panel relative w-full md:max-w-lg max-h-[90dvh] flex flex-col rounded-t-[28px] md:rounded-[28px] bg-[var(--surface)] shadow-[var(--e-3)]"
+      >
+        {/* Drag handle: pull down to close on a phone. */}
+        <div
+          className="md:hidden grid place-items-center pt-2.5 pb-1 touch-none cursor-grab"
+          onPointerDown={(e) => {
+            startY.current = e.clientY;
+            e.currentTarget.setPointerCapture(e.pointerId);
+          }}
+          onPointerMove={(e) => {
+            if (startY.current !== null) setDrag(Math.max(0, e.clientY - startY.current));
+          }}
+          onPointerUp={() => {
+            if (drag > 110) onCloseAction();
+            startY.current = null;
+            setDrag(0);
+          }}
+        >
+          <span className="h-1.5 w-10 rounded-full bg-[var(--line-2)]" />
+        </div>
+        <div className="flex items-center justify-between gap-3 px-4 pt-2 md:pt-4 pb-3 border-b border-[var(--line)]">
           <p className="font-heading font-bold text-lg truncate min-w-0">{title}</p>
-          <button type="button" className="btn btn-quiet btn-xs shrink-0" onClick={onCloseAction}>
-            Close
+          <button
+            type="button"
+            data-sheet-close
+            aria-label="Close"
+            className="grid place-items-center h-10 w-10 shrink-0 rounded-full bg-[var(--surface-2)] hover:bg-[var(--line)]"
+            onClick={onCloseAction}
+          >
+            <Icon name="x" className="h-5 w-5" />
           </button>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4">{children}</div>
@@ -175,9 +238,37 @@ export function Sheet({
   );
 }
 
+/** Press and hold to repeat: first after 380ms, then every 110ms. */
+function useHold(fn: () => void) {
+  const latest = useRef(fn);
+  useEffect(() => {
+    latest.current = fn;
+  });
+  const timers = useRef<{ t?: number; i?: number }>({});
+  const stop = useCallback(() => {
+    window.clearTimeout(timers.current.t);
+    window.clearInterval(timers.current.i);
+  }, []);
+  useEffect(() => stop, [stop]);
+  return {
+    onPointerDown: () => {
+      stop();
+      timers.current.t = window.setTimeout(() => {
+        timers.current.i = window.setInterval(() => latest.current(), 110);
+      }, 380);
+    },
+    onPointerUp: stop,
+    onPointerLeave: stop,
+    onPointerCancel: stop,
+    onClick: () => latest.current(),
+  };
+}
+
 /**
- * Add button / stepper. Products sold in cases get a units ↔ cases toggle;
- * switching converts the count. The middle number can be typed.
+ * Add button that morphs into a "− qty +" stepper. Products sold in cases get
+ * a units ↔ cases toggle; switching converts the count. The middle number can
+ * be typed, and − / + repeat while held. Buttons are 48px tall for thumbs.
+ * The first add flies a thumbnail to the cart bar.
  */
 export function QtyControl({
   product: p,
@@ -188,32 +279,50 @@ export function QtyControl({
   product: CatalogueProduct;
   entry: CartEntry | undefined;
   onChangeAction: (e: CartEntry | null) => void;
+  /** Narrow cards: no "+ 1 case" shortcut next to Add. */
   compact?: boolean;
 }) {
   const hasCase = !!p.caseSize && p.caseSize > 1;
   const caseName = p.caseUnit || "case";
 
-  if (!entry) {
-    return (
-      <div className="flex items-center gap-1.5">
-        {hasCase && !compact && (
-          <button type="button" className="btn btn-quiet btn-xs" onClick={() => onChangeAction({ mode: "cases", qty: startQty(p, "cases") })}>
-            + 1 {caseName}
-          </button>
-        )}
-        <button type="button" className="btn btn-soft btn-sm" onClick={() => onChangeAction({ mode: "units", qty: startQty(p, "units") })}>
-          Add
-        </button>
-      </div>
-    );
-  }
-
   const step = (d: number) => {
+    if (!entry) return;
     const next = entry.qty + d;
     const min = entry.mode === "units" ? Math.max(1, p.moq) : 1;
     if (next < min) return onChangeAction(null);
     onChangeAction({ ...entry, qty: Math.min(MAX_QTY, next) });
   };
+  const less = useHold(() => step(-1));
+  const more = useHold(() => step(1));
+
+  if (!entry) {
+    return (
+      <div className="flex items-center gap-1.5">
+        {hasCase && !compact && (
+          <button
+            type="button"
+            className="btn btn-quiet btn-sm"
+            onClick={(e) => {
+              flyToCart(e.currentTarget);
+              onChangeAction({ mode: "cases", qty: startQty(p, "cases") });
+            }}
+          >
+            + 1 {caseName}
+          </button>
+        )}
+        <button
+          type="button"
+          className="add-btn"
+          onClick={(e) => {
+            flyToCart(e.currentTarget);
+            onChangeAction({ mode: "units", qty: startQty(p, "units") });
+          }}
+        >
+          Add
+        </button>
+      </div>
+    );
+  }
 
   function switchMode(mode: CartEntry["mode"]) {
     if (mode === entry!.mode || !p.caseSize) return;
@@ -224,37 +333,27 @@ export function QtyControl({
   return (
     <div className="flex items-center gap-1.5 flex-wrap justify-end">
       {hasCase && (
-        <div className="inline-flex rounded-lg bg-ink/5 p-0.5 text-[11.5px] font-bold" role="group" aria-label="Order in">
+        <div className="inline-flex rounded-lg bg-[var(--surface-2)] p-0.5 text-[11.5px] font-bold" role="group" aria-label="Order in">
           {(["units", "cases"] as const).map((m) => (
             <button
               key={m}
               type="button"
               aria-pressed={entry.mode === m}
               onClick={() => switchMode(m)}
-              className={`px-2 py-1 rounded-md ${entry.mode === m ? "bg-white shadow-sm text-[var(--ink)]" : "text-[var(--muted)]"}`}
+              className={`px-2.5 min-h-8 rounded-md ${entry.mode === m ? "bg-white shadow-sm text-[var(--ink)]" : "text-[var(--muted)]"}`}
             >
               {m === "units" ? p.unit : caseName}
             </button>
           ))}
         </div>
       )}
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          aria-label="One less"
-          onClick={() => step(-1)}
-          className="h-8 w-8 rounded-lg bg-ink/5 hover:bg-ink/10 font-bold"
-        >
-          −
+      <div className="stepper-pop inline-flex items-center rounded-[12px] bg-[var(--accent)] text-[var(--accent-on)]">
+        <button type="button" aria-label="One less" className="step-btn" {...less}>
+          <Icon name="minus" className="h-4 w-4" weight="bold" />
         </button>
         <QtyInput value={entry.qty} onCommitAction={(q) => (q > 0 ? onChangeAction({ ...entry, qty: Math.min(MAX_QTY, q) }) : onChangeAction(null))} />
-        <button
-          type="button"
-          aria-label="One more"
-          onClick={() => step(1)}
-          className="h-8 w-8 rounded-lg bg-[var(--kesar-tint)] text-[var(--kesar-text)] hover:brightness-95 font-bold"
-        >
-          +
+        <button type="button" aria-label="One more" className="step-btn" {...more}>
+          <Icon name="plus" className="h-4 w-4" weight="bold" />
         </button>
       </div>
     </div>
@@ -267,7 +366,7 @@ function QtyInput({ value, onCommitAction }: { value: number; onCommitAction: (q
     <input
       inputMode="numeric"
       aria-label="Quantity"
-      className="h-8 w-11 rounded-lg border border-[var(--line)] bg-white text-center text-sm font-semibold outline-none focus:border-[var(--mor)]"
+      className="h-12 w-10 bg-transparent text-center text-[15px] font-extrabold outline-none num text-inherit"
       value={text ?? String(value)}
       onFocus={(e) => {
         setText(String(value));

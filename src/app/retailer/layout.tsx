@@ -19,7 +19,7 @@ export default async function RetailerLayout({ children }: { children: React.Rea
   const chrome = await layoutChrome(session, nav);
 
   return (
-    <AppShell chrome={chrome} nav={nav} userName={session.name} roleKey="role.retailer">
+    <AppShell chrome={chrome} nav={nav} userName={session.name} roleKey="role.retailer" surface="retailer">
       {children}
     </AppShell>
   );
