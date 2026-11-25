@@ -366,7 +366,7 @@ export async function loadTerms(ctx: Ctx, retailerId: string) {
     ctx.tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { settings: true } }),
     ctx.tx.retailerProfile.findUniqueOrThrow({
       where: { id: retailerId },
-      select: { id: true, outletName: true, paymentMode: true, creditLimit: true, creditDays: true, creditBills: true, tempCreditLimit: true, tempCreditUntil: true },
+      select: { id: true, outletName: true, paymentMode: true, creditLimit: true, creditDays: true, creditBills: true, tempCreditLimit: true, tempCreditUntil: true, receiptsOnAccount: true },
     }),
   ]);
   const settings = moneySettings(tenant.settings);
@@ -435,6 +435,10 @@ export async function allocateRetailer(ctx: Ctx, retailerId: string) {
   });
   const open = payments.filter((p) => p.allocated < p.amount);
   if (!bills.length || !open.length) return;
+  // A shop that pays against named bills only: its receipts wait on account
+  // until they are tagged. Credit notes, wallet and TDS still go to their bills.
+  const shop = await ctx.tx.retailerProfile.findUnique({ where: { id: retailerId }, select: { receiptsOnAccount: true } });
+  const waits = (method: PayMethod) => !!shop?.receiptsOnAccount && method !== "CREDIT_NOTE" && method !== "WALLET" && method !== "TDS";
 
   // A credit note on an invoice with no order (a sales bill imported from the
   // old book) pays that invoice's bill first: found by the note's number.
@@ -455,7 +459,7 @@ export async function allocateRetailer(ctx: Ctx, retailerId: string) {
     const target = p.orderId ? bills.find((b) => b.orderId === p.orderId) : forBill ? bills.find((b) => b.number === forBill) : undefined;
     const chosen = p.forBillIds.map((id) => bills.find((b) => b.id === id)).filter((b): b is (typeof bills)[number] => !!b);
     const first = [...new Set([...chosen, ...(target ? [target] : [])])];
-    const order = first.length ? [...first, ...bills.filter((b) => !first.includes(b))] : bills;
+    const order = waits(p.method) ? first : first.length ? [...first, ...bills.filter((b) => !first.includes(b))] : bills;
     for (const b of order) {
       if (left <= 0) break;
       const room = billLeft.get(b.id)!;

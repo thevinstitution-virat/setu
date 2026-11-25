@@ -34,6 +34,7 @@ type Money = {
   pdcReducesExposure: boolean;
   checkCreditAtBilling: boolean;
   softLimitPct: number | null;
+  chequeReminder: boolean;
   chequeBouncePenalty: number;
   upiVpa: string;
   upiPayeeName: string;
@@ -53,6 +54,7 @@ type Form = {
   pdcReducesExposure: boolean;
   checkCreditAtBilling: boolean;
   softLimitPct: string;
+  chequeReminder: boolean;
   chequeBouncePenalty: string;
   upiVpa: string;
   upiPayeeName: string;
@@ -85,6 +87,7 @@ function toForm(m: Money): Form {
     pdcReducesExposure: !!m.pdcReducesExposure,
     checkCreditAtBilling: !!m.checkCreditAtBilling,
     softLimitPct: m.softLimitPct == null ? "" : String(m.softLimitPct),
+    chequeReminder: m.chequeReminder ?? true,
     chequeBouncePenalty: rupees(m.chequeBouncePenalty),
     upiVpa: m.upiVpa,
     upiPayeeName: m.upiPayeeName,
@@ -142,6 +145,7 @@ function toPatch(f: Form): Money | string {
     pdcReducesExposure: f.pdcReducesExposure,
     checkCreditAtBilling: f.checkCreditAtBilling,
     softLimitPct: soft,
+    chequeReminder: f.chequeReminder,
     chequeBouncePenalty: penalty,
     upiVpa: f.upiVpa.trim(),
     upiPayeeName: f.upiPayeeName.trim(),
@@ -608,6 +612,12 @@ export default function SettingsPage() {
             />
             <span className="block text-xs text-[var(--muted)] mt-1">Added to the retailer&apos;s bill when a cheque bounces. 0 means no charge.</span>
           </label>
+          <Toggle
+            checked={form.chequeReminder}
+            onChange={(v) => set("chequeReminder", v)}
+            label="Remind about post-dated cheques"
+            hint="At 9 in the morning, whoever handles cheques is told which held post-dated cheques can be banked that day. Nothing is sent on a day with none."
+          />
         </section>
 
         <section className="card p-5 space-y-4">

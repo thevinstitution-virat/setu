@@ -733,8 +733,9 @@ function AllTab({ onProof }: { onProof: (src: string) => void }) {
 
 // ───────────────────────────── Cheques ─────────────────────────────
 
-const CHEQUE_FILTERS: { key: ChequeStatus | ""; label: string }[] = [
+const CHEQUE_FILTERS: { key: ChequeStatus | "" | "due"; label: string }[] = [
   { key: "", label: "To act on" },
+  { key: "due", label: "Bank today" },
   { key: "RECEIVED", label: "In hand" },
   { key: "DEPOSITED", label: "Deposited" },
   { key: "CLEARED", label: "Cleared" },
@@ -742,7 +743,9 @@ const CHEQUE_FILTERS: { key: ChequeStatus | ""; label: string }[] = [
 ];
 
 function ChequesTab() {
-  const [status, setStatus] = useState<ChequeStatus | "">("");
+  const params = useSearchParams();
+  const [status, setStatus] = useState<ChequeStatus | "" | "due">(params.get("cheques") === "due" ? "due" : "");
+  const [bankToday, setBankToday] = useState<{ count: number; amount: number } | null>(null);
   const [rows, setRows] = useState<Cheque[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -752,8 +755,9 @@ function ChequesTab() {
 
   const load = useCallback(async () => {
     try {
-      const data = await api<{ cheques: Cheque[] }>(`/api/cheques${status ? `?status=${status}` : ""}`);
+      const data = await api<{ cheques: Cheque[]; bankToday?: { count: number; amount: number } }>(`/api/cheques${status ? `?status=${status}` : ""}`);
       setRows(data.cheques);
+      setBankToday(data.bankToday ?? null);
       setError(null);
     } catch (e) {
       setError(errText(e));
@@ -799,9 +803,19 @@ function ChequesTab() {
             }`}
           >
             {f.label}
+            {f.key === "due" && bankToday && bankToday.count > 0 ? ` (${bankToday.count})` : ""}
           </button>
         ))}
       </div>
+
+      {status !== "due" && bankToday && bankToday.count > 0 && (
+        <button type="button" onClick={() => setStatus("due")} className="w-full text-left rounded-2xl border border-[#e8b27a] bg-[#fff4e6] px-4 py-3 text-sm text-[#7a3d06]">
+          <span className="font-bold">
+            {bankToday.count} cheque{bankToday.count === 1 ? "" : "s"} can be banked today
+          </span>{" "}
+          · {formatINR(bankToday.amount)}. Show them
+        </button>
+      )}
 
       {error && <ErrorBox message={error} onRetry={load} />}
       {!rows && !error && <p className="text-sm text-[var(--muted)]">Loading…</p>}

@@ -24,6 +24,7 @@ import { runBilling } from "@/lib/billing";
 import { runExport, runLifecycle } from "@/lib/tenant-data";
 import { runDailySummaries } from "@/lib/daily-summary";
 import { runAutomations } from "@/lib/automation";
+import { remindChequesDue } from "@/lib/cheques-due";
 import { readDraft } from "@/lib/order-drafts";
 import { sweepAllPhotos, sweepPhotos } from "@/lib/photo-checks";
 import { purgeLoginAttempts } from "@/lib/login-limit";
@@ -109,6 +110,12 @@ export const handlers: Partial<Record<QueueName, Handler>> = {
       if (n) console.log(`[job] dues.reminders ${t}: ${n}`);
     }
   },
+  "cheques.due": async () => {
+    for (const t of await tenants()) {
+      const n = await withMoney(t, null, (ctx) => remindChequesDue(ctx.tx, t));
+      if (n) console.log(`[job] cheques.due ${t}: ${n}`);
+    }
+  },
   "statements.monthly": async () => {
     for (const t of await tenants()) await withMoney(t, null, (ctx) => monthlyStatements(ctx.tx, t));
   },
@@ -191,6 +198,7 @@ export const schedules: { name: QueueName; cron: string }[] = [
   { name: "gateway.sync", cron: "*/10 * * * *" },
   { name: "webhooks.flush", cron: "* * * * *" }, // sweep: retries that are due
   { name: "dues.reminders", cron: "0 10 * * *" }, // 10:00 IST
+  { name: "cheques.due", cron: "0 9 * * *" }, // 09:00 IST
   { name: "statements.monthly", cron: "0 9 1 * *" }, // 09:00 IST on the 1st
   { name: "engage.daily", cron: "15 4 * * *" },
   { name: "otp.cleanup", cron: "30 3 * * *" }, // 03:30 IST daily

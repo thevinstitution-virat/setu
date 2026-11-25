@@ -49,7 +49,7 @@ type Khata = {
   retailer: { id: string; outletName: string; ownerName: string; phone: string | null; areaName: string; address: string };
   hasOpening: boolean;
   terms: { mode: Mode; creditLimit: number | null; creditDays: number; creditBills: number | null; tempLimit: { amount: number; until: string } | null };
-  termsOverride: { paymentMode: Mode | null; creditLimit: number | null; creditDays: number | null; creditBills: number | null; tempCreditLimit: number | null; tempCreditUntil: string | null };
+  termsOverride: { paymentMode: Mode | null; creditLimit: number | null; creditDays: number | null; creditBills: number | null; tempCreditLimit: number | null; tempCreditUntil: string | null; receiptsOnAccount?: boolean };
   balances: { receivable: number; walletAvailable: number; walletReserved: number };
   creditAvailable: number | null;
   overdue: number;
@@ -1013,11 +1013,12 @@ function CreditTerms({
   const untilDay = (s: string | null) => (s ? new Date(new Date(s).getTime() + 5.5 * 3_600_000).toISOString().slice(0, 10) : "");
   const [temp, setTemp] = useState(toRupeeInput(override.tempCreditLimit));
   const [until, setUntil] = useState(untilDay(override.tempCreditUntil));
+  const [onAccount, setOnAccount] = useState(!!override.receiptsOnAccount);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Keep the form in step with the server after a reload.
-  const key = `${override.paymentMode}|${override.creditLimit}|${override.creditDays}|${override.creditBills}|${override.tempCreditLimit}|${override.tempCreditUntil}`;
+  const key = `${override.paymentMode}|${override.creditLimit}|${override.creditDays}|${override.creditBills}|${override.tempCreditLimit}|${override.tempCreditUntil}|${override.receiptsOnAccount}`;
   const [seen, setSeen] = useState(key);
   if (seen !== key) {
     setSeen(key);
@@ -1027,6 +1028,7 @@ function CreditTerms({
     setBills(override.creditBills === null ? "" : String(override.creditBills));
     setTemp(toRupeeInput(override.tempCreditLimit));
     setUntil(untilDay(override.tempCreditUntil));
+    setOnAccount(!!override.receiptsOnAccount);
   }
 
   async function save() {
@@ -1065,6 +1067,7 @@ function CreditTerms({
         creditBills,
         tempCreditLimit,
         tempCreditUntil: tempCreditLimit === null ? null : until,
+        receiptsOnAccount: onAccount,
       });
       await onDone("Credit terms saved");
     } catch (e) {
@@ -1158,6 +1161,15 @@ function CreditTerms({
           </label>
         </div>
         <p className="text-[11px] text-[var(--muted)]">A temporary limit is used in place of the credit limit until that day, when it is higher. Clear it to end it early.</p>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" checked={onAccount} onChange={(e) => setOnAccount(e.target.checked)} />
+          <span>
+            <span className="font-semibold text-[var(--ink-2)]">Keep receipts on account until tagged</span>
+            <span className="block text-[11px] text-[var(--muted)]">
+              For a shop that pays against named bills only. A receipt with no bills chosen waits on account, and the bills stay unpaid (and can go overdue) until you tag it under Payments. Turning this off sends what is waiting to the oldest bills.
+            </span>
+          </span>
+        </label>
         {error && <p className="text-xs text-[#a8281e]">{error}</p>}
         <button className="btn btn-mor btn-sm w-full" disabled={busy} onClick={save}>
           {busy ? "Saving…" : "Save terms"}

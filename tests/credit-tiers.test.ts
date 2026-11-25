@@ -112,9 +112,14 @@ describe("soft and real credit limits", () => {
     await setMoney({ softLimitPct: 80, defaultCreditBills: 1 });
     const shop = await newShop({ creditLimit: 100000 });
     // An unpaid bill already, by an opening bill.
-    await tenantDb(T).bill.create({ data: { retailerId: shop, number: `TIER-OB-${run}`, date: new Date(), dueDate: new Date(), amount: 1000, kind: "OPENING" } });
-    const o = await orderRow((await place(shop, 10)).id);
-    expect(o).toMatchObject({ creditHold: true, creditHoldOwner: true });
+    // (A bare bill row with no ledger entry: removed again so the books check stays clean.)
+    const bill = await tenantDb(T).bill.create({ data: { retailerId: shop, number: `TIER-OB-${run}`, date: new Date(), dueDate: new Date(), amount: 1000, kind: "OPENING" } });
+    try {
+      const o = await orderRow((await place(shop, 10)).id);
+      expect(o).toMatchObject({ creditHold: true, creditHoldOwner: true });
+    } finally {
+      await tenantDb(T).bill.delete({ where: { id: bill.id } });
+    }
   });
 
   it("the check when the order leaves keeps the owner-only mark", async () => {

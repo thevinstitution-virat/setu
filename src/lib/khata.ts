@@ -73,6 +73,7 @@ export async function khataSummary(ctx: Ctx, retailerId: string) {
       creditBills: retailer.creditBills,
       tempCreditLimit: retailer.tempCreditLimit,
       tempCreditUntil: retailer.tempCreditUntil,
+      receiptsOnAccount: retailer.receiptsOnAccount,
     },
     balances,
     /** Credit left before new orders go on hold (null = no limit). */

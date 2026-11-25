@@ -368,6 +368,8 @@ model RetailerProfile {
   /// Most unpaid bills this retailer may have before new orders are held (null = the business default).
   creditBills    Int?
   /// A higher limit for a while (a season, a big order): used instead of the credit limit until tempCreditUntil.
+  /// Receipts stay on account until someone tags them to bills (no oldest-first matching).
+  receiptsOnAccount Boolean @default(false)
   tempCreditLimit Int?
   tempCreditUntil DateTime?
   createdAt      DateTime           @default(now())

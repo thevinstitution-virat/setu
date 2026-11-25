@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { audit, requestIp } from "@/lib/audit";
-import { withMoney, statement } from "@/lib/ledger";
+import { allocateRetailer, withMoney, statement } from "@/lib/ledger";
 import { collectScope, khataSummary } from "@/lib/khata";
 import { parseRange } from "@/lib/money-api";
 
@@ -42,6 +42,7 @@ export async function PATCH(req: Request, { params }: Params) {
     creditBills?: number | null;
     tempCreditLimit?: number | null;
     tempCreditUntil?: Date | null;
+    receiptsOnAccount?: boolean;
   } = {};
   if ("paymentMode" in body) {
     if (body.paymentMode !== null && body.paymentMode !== "PREPAID" && body.paymentMode !== "POSTPAID") {
@@ -75,17 +76,20 @@ export async function PATCH(req: Request, { params }: Params) {
   }
   if (data.tempCreditLimit != null && data.tempCreditUntil == null) return NextResponse.json({ error: "Give the temporary limit a last day" }, { status: 400 });
   if (data.tempCreditLimit === null) data.tempCreditUntil = null;
+  if ("receiptsOnAccount" in body) data.receiptsOnAccount = body.receiptsOnAccount === true;
 
   const before = await db.retailerProfile.findUnique({
     where: { id: retailerId },
-    select: { paymentMode: true, creditLimit: true, creditDays: true, creditBills: true, tempCreditLimit: true, tempCreditUntil: true },
+    select: { paymentMode: true, creditLimit: true, creditDays: true, creditBills: true, tempCreditLimit: true, tempCreditUntil: true, receiptsOnAccount: true },
   });
   if (!before) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const after = await db.retailerProfile.update({
     where: { id: retailerId },
     data,
-    select: { paymentMode: true, creditLimit: true, creditDays: true, creditBills: true, tempCreditLimit: true, tempCreditUntil: true },
+    select: { paymentMode: true, creditLimit: true, creditDays: true, creditBills: true, tempCreditLimit: true, tempCreditUntil: true, receiptsOnAccount: true },
   });
+  // Switched off: the receipts waiting on account go to the oldest bills now.
+  if (before.receiptsOnAccount && !after.receiptsOnAccount) await withMoney(auth.tenant.id, session.userId, (ctx) => allocateRetailer(ctx, retailerId));
   await audit(db, { actorId: session.userId, action: "retailer.terms", entity: "RetailerProfile", entityId: retailerId, before, after, ip: requestIp(req) });
   return NextResponse.json({ terms: after });
 }

@@ -148,6 +148,14 @@ export const EVENTS = {
     en: { title: "Reply on {ticket}", body: "{outlet} answered on complaint {ticket}." },
     hi: { title: "{ticket} पर जवाब", body: "{outlet} ने शिकायत {ticket} पर जवाब दिया।" },
   },
+  "staff.cheques_due": {
+    label: "Post-dated cheques to bank (office)",
+    audience: "staff",
+    channels: ["push"],
+    vars: ["count", "amount", "shops"],
+    en: { title: "{count} post-dated cheques can be banked today", body: "{amount} in all: {shops}. Deposit them under Payments → Cheques → Bank today." },
+    hi: { title: "आज {count} आगे की तारीख वाले चेक जमा हो सकते हैं", body: "कुल {amount}: {shops}। इन्हें Payments → Cheques → Bank today में जमा करें।" },
+  },
   "staff.ticket_sla": {
     label: "Complaint overdue (office)",
     audience: "staff",

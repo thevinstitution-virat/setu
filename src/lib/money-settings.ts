@@ -30,6 +30,8 @@ export type MoneySettings = {
    * held for the owner only.
    */
   softLimitPct: number | null;
+  /** Morning reminder (09:00) to whoever handles cheques when held post-dated cheques can be banked. */
+  chequeReminder: boolean;
   /** Paise charged when a cheque bounces; 0 = none. */
   chequeBouncePenalty: number;
   /** UPI ID shown to retailers for "Pay now" (e.g. agency@okaxis). */
@@ -51,6 +53,7 @@ export const MONEY_DEFAULTS: MoneySettings = {
   pdcReducesExposure: false,
   checkCreditAtBilling: false,
   softLimitPct: null,
+  chequeReminder: true,
   chequeBouncePenalty: 0,
   upiVpa: "",
   upiPayeeName: "",
@@ -130,6 +133,7 @@ export function parseMoneySettings(input: Record<string, unknown>): Partial<Mone
   if ("holdOnBounce" in input) out.holdOnBounce = !!input.holdOnBounce;
   if ("pdcReducesExposure" in input) out.pdcReducesExposure = !!input.pdcReducesExposure;
   if ("checkCreditAtBilling" in input) out.checkCreditAtBilling = !!input.checkCreditAtBilling;
+  if ("chequeReminder" in input) out.chequeReminder = !!input.chequeReminder;
   if ("checkFieldDigital" in input) out.checkFieldDigital = !!input.checkFieldDigital;
   if ("upiVpa" in input) {
     const v = String(input.upiVpa ?? "").trim();
