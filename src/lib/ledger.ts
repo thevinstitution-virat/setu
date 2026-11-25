@@ -492,6 +492,11 @@ function debitAccountFor(method: PayMethod, retailerId: string, collector: { use
   }
 }
 
+/** A cheque is post-dated while its date is a later day (in India) than `on`. */
+export function isPostDated(chequeDate: Date, on = new Date()) {
+  return istDay(chequeDate) > istDay(on);
+}
+
 export type PaymentInput = {
   retailerId: string;
   amount: number;
@@ -529,6 +534,8 @@ export async function recordPayment(ctx: Ctx, p: PaymentInput) {
     throw new MoneyError("Cheque number and bank are required");
   }
   await lockRetailer(ctx, p.retailerId);
+  // A cheque dated after today is held until that day: nothing is posted and no bill is paid yet.
+  const postDated = p.method === "CHEQUE" && isPostDated(p.cheque!.date, p.occurredAt ?? new Date());
 
   if (p.method === "WALLET" && !p.fromHold) {
     const { walletAvailable } = await retailerBalances(ctx, p.retailerId);
@@ -544,7 +551,7 @@ export async function recordPayment(ctx: Ctx, p: PaymentInput) {
       retailerId: p.retailerId,
       purpose,
       method: p.method,
-      state: p.needsVerification ? "PENDING_VERIFICATION" : "CONFIRMED",
+      state: p.needsVerification ? "PENDING_VERIFICATION" : postDated ? "POST_DATED" : "CONFIRMED",
       amount: p.amount,
       reference: p.reference || (p.method === "CHEQUE" ? p.cheque!.number : null),
       tdsSection: p.method === "TDS" ? (p.tdsSection ?? null) : null,
@@ -569,7 +576,7 @@ export async function recordPayment(ctx: Ctx, p: PaymentInput) {
     throw e;
   });
 
-  if (!p.needsVerification) await postPayment(ctx, payment.id, p);
+  if (!p.needsVerification && !postDated) await postPayment(ctx, payment.id, p);
   return ctx.tx.payment.findUniqueOrThrow({ where: { id: payment.id }, include: { cheque: true } });
 }
 
@@ -604,7 +611,7 @@ async function postPayment(ctx: Ctx, paymentId: string, p: PaymentInput) {
 
 /** Staff confirms a retailer-reported payment (e.g. UPI with UTR). */
 export async function verifyPayment(ctx: Ctx, paymentId: string, approve: boolean, reason?: string) {
-  const pay = await ctx.tx.payment.findUnique({ where: { id: paymentId } });
+  const pay = await ctx.tx.payment.findUnique({ where: { id: paymentId }, include: { cheque: true } });
   if (!pay) throw new MoneyError("Payment not found", 404);
   if (pay.state !== "PENDING_VERIFICATION") throw new MoneyError("This payment is not waiting for verification", 409);
   await lockRetailer(ctx, pay.retailerId);
@@ -613,6 +620,10 @@ export async function verifyPayment(ctx: Ctx, paymentId: string, approve: boolea
       where: { id: paymentId },
       data: { state: "REJECTED", rejectReason: reason || "Not received", verifiedById: ctx.actorId, verifiedAt: new Date() },
     });
+  }
+  if (pay.cheque && isPostDated(pay.cheque.chequeDate)) {
+    // Checked, but the cheque can't be banked yet: hold it until its date.
+    return ctx.tx.payment.update({ where: { id: paymentId }, data: { state: "POST_DATED", verifiedById: ctx.actorId, verifiedAt: new Date() } });
   }
   await ctx.tx.payment.update({
     where: { id: paymentId },
@@ -635,6 +646,12 @@ export async function verifyPayment(ctx: Ctx, paymentId: string, approve: boolea
 export async function reversePayment(ctx: Ctx, paymentId: string, reason: string) {
   const pay = await ctx.tx.payment.findUnique({ where: { id: paymentId }, include: { cheque: true } });
   if (!pay) throw new MoneyError("Payment not found", 404);
+  if (pay.state === "POST_DATED") {
+    // A held cheque given back or entered by mistake: it was never in the books, so there is nothing to undo.
+    await lockRetailer(ctx, pay.retailerId);
+    await ctx.tx.payment.update({ where: { id: pay.id }, data: { state: "REVERSED", rejectReason: reason } });
+    return;
+  }
   if (pay.state !== "CONFIRMED" || !pay.entryId) throw new MoneyError("Only a confirmed payment can be reversed", 409);
   if (pay.cheque && pay.cheque.status !== "RECEIVED") throw new MoneyError("Use the cheque actions for a deposited cheque", 409);
   await lockRetailer(ctx, pay.retailerId);
@@ -654,10 +671,30 @@ export async function chequeAction(ctx: Ctx, chequeId: string, action: "deposit"
   const ch = await ctx.tx.cheque.findUnique({ where: { id: chequeId }, include: { payment: true } });
   if (!ch) throw new MoneyError("Cheque not found", 404);
   const pay = ch.payment;
-  if (pay.state !== "CONFIRMED") throw new MoneyError("This cheque's payment is not active", 409);
+  const held = pay.state === "POST_DATED";
+  if (pay.state !== "CONFIRMED" && !(held && action === "deposit")) throw new MoneyError("This cheque's payment is not active", 409);
 
   if (action === "deposit") {
     if (ch.status !== "RECEIVED") throw new MoneyError("Only a received cheque can be deposited", 409);
+    if (held) {
+      // The day a held cheque goes to the bank is the day it counts: book the receipt now.
+      const now = new Date();
+      if (isPostDated(ch.chequeDate, now)) {
+        throw new MoneyError(`This cheque is dated ${ch.chequeDate.toISOString().slice(0, 10).split("-").reverse().join("/")}. It can be banked from that day.`, 409);
+      }
+      await lockRetailer(ctx, pay.retailerId);
+      await ctx.tx.payment.update({ where: { id: pay.id }, data: { state: "CONFIRMED", collectedAt: now } });
+      await postPayment(ctx, pay.id, {
+        retailerId: pay.retailerId,
+        amount: pay.amount,
+        method: "CHEQUE",
+        purpose: pay.purpose,
+        note: pay.note,
+        orderId: pay.orderId,
+        collectorId: pay.collectedById,
+        occurredAt: now,
+      });
+    }
     return ctx.tx.cheque.update({ where: { id: ch.id }, data: { status: "DEPOSITED", depositedAt: new Date() } });
   }
   if (ch.status !== "DEPOSITED") throw new MoneyError("Deposit the cheque first", 409);

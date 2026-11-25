@@ -376,7 +376,8 @@ async function loadPool(tx: Ctx["tx"], from: Date) {
     select: { id: true, number: true, method: true, state: true, amount: true, reference: true, collectedAt: true, retailer: { select: { outletName: true } } },
   });
   const cheques = await tx.cheque.findMany({
-    where: { status: { in: ["RECEIVED", "DEPOSITED"] }, payment: { state: "CONFIRMED" } },
+    // A held post-dated cheque counts once its date has come (matching it banks it).
+    where: { status: { in: ["RECEIVED", "DEPOSITED"] }, OR: [{ payment: { state: "CONFIRMED" } }, { payment: { state: "POST_DATED" }, chequeDate: { lte: new Date() } }] },
     select: { id: true, number: true, bank: true, status: true, depositedAt: true, createdAt: true, payment: { select: { amount: true, retailer: { select: { outletName: true } } } } },
   });
   const settlements = await tx.gatewaySettlement.findMany({ where: { settledAt: { gte: from } }, select: { id: true, providerRef: true, amount: true, utr: true, settledAt: true } });

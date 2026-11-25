@@ -1152,6 +1152,8 @@ enum PayPurpose {
 
 enum PaymentState {
   PENDING_VERIFICATION
+  /// A cheque dated in the future, held until it can be banked: not in the ledger, pays no bills yet.
+  POST_DATED
   CONFIRMED
   REJECTED
   REVERSED

@@ -29,7 +29,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "You don't have access to this" }, { status: 403 });
   }
   const state = sp.get("state") as PaymentState | null;
-  if (state && ["PENDING_VERIFICATION", "CONFIRMED", "REJECTED", "REVERSED"].includes(state)) where.state = state;
+  if (state && ["PENDING_VERIFICATION", "POST_DATED", "CONFIRMED", "REJECTED", "REVERSED"].includes(state)) where.state = state;
   const method = sp.get("method") as PayMethod | null;
   if (method && ["CASH", "UPI", "CHEQUE", "BANK", "ONLINE", "WALLET", "CREDIT_NOTE"].includes(method)) where.method = method;
   const range = parseRange(sp);

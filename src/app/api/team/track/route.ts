@@ -22,7 +22,7 @@ export async function GET(req: Request) {
         select: { id: true, notes: true, checkInAt: true, checkOutAt: true, checkInLat: true, checkInLng: true, outcome: true, noOrderReason: true, distanceM: true, offBeat: true, retailer: { select: { outletName: true, lat: true, lng: true } }, order: { select: { orderNumber: true, totalAmount: true } } },
       }),
       ctx.tx.order.aggregate({ where: { placedById: userId, createdAt: { gte: from, lt: to }, status: { not: "CANCELLED" } }, _sum: { totalAmount: true }, _count: true }),
-      ctx.tx.payment.aggregate({ where: { collectedById: userId, collectedAt: { gte: from, lt: to }, state: { in: ["CONFIRMED", "PENDING_VERIFICATION"] } }, _sum: { amount: true } }),
+      ctx.tx.payment.aggregate({ where: { collectedById: userId, collectedAt: { gte: from, lt: to }, state: { in: ["CONFIRMED", "PENDING_VERIFICATION", "POST_DATED"] } }, _sum: { amount: true } }),
       fieldSettingsOf(ctx.tx, ctx.tenantId),
     ]);
     if (!user) throw new MoneyError("Person not found", 404);

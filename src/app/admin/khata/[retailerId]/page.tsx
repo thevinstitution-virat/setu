@@ -33,7 +33,7 @@ type Payment = {
   number: string;
   purpose: "DUES" | "WALLET";
   method: "CASH" | "UPI" | "CHEQUE" | "BANK" | "ONLINE" | "WALLET" | "CREDIT_NOTE" | "TDS";
-  state: "PENDING_VERIFICATION" | "CONFIRMED" | "REJECTED" | "REVERSED";
+  state: "PENDING_VERIFICATION" | "POST_DATED" | "CONFIRMED" | "REJECTED" | "REVERSED";
   amount: number;
   reference: string | null;
   note: string | null;
@@ -56,6 +56,7 @@ type Khata = {
   ageing: Ageing;
   advance: number;
   pendingVerification: { amount: number; count: number };
+  postDated: { amount: number; count: number };
   openBills: Bill[];
   payments: Payment[];
   upi: { vpa: string; payee: string } | null;
@@ -85,6 +86,7 @@ const METHOD: Record<Payment["method"], string> = {
 const STATE: Record<Payment["state"], { label: string; cls: string }> = {
   CONFIRMED: { label: "Confirmed", cls: "chip-mint" },
   PENDING_VERIFICATION: { label: "To verify", cls: "chip-genda" },
+  POST_DATED: { label: "Post-dated, held", cls: "chip-genda" },
   REJECTED: { label: "Rejected", cls: "!bg-[#fde4e1] !text-[#a8281e] !border-transparent" },
   REVERSED: { label: "Reversed", cls: "!bg-black/5 !text-[var(--muted)]" },
 };
@@ -289,6 +291,21 @@ export default function RetailerKhataPage({ params }: { params: Promise<{ retail
 
         <CreditBar receivable={balances.receivable} limit={terms.creditLimit} available={data.creditAvailable} />
       </div>
+
+      {data.postDated.count > 0 && (
+        <div className="card p-4 flex items-start gap-3 print:hidden">
+          <span className="icon-tile bg-[var(--genda-tint)] text-[var(--genda-text)]">
+            <Icon name="clock" />
+          </span>
+          <p className="text-sm text-[var(--ink-2)]">
+            {plural(data.postDated.count, "post-dated cheque")} worth <b>{formatINR(data.postDated.amount)}</b> {data.postDated.count === 1 ? "is" : "are"} held.{" "}
+            {data.postDated.count === 1 ? "It is" : "They are"} not in the balance until banked on or after the cheque date.{" "}
+            <Link href="/admin/payments" className="font-bold text-[var(--kesar-text)]">
+              See cheques →
+            </Link>
+          </p>
+        </div>
+      )}
 
       {data.pendingVerification.count > 0 && (
         <div className="card p-4 flex items-start gap-3 print:hidden">

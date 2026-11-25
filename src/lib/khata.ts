@@ -8,7 +8,7 @@ import { moneySettings } from "@/lib/money-settings";
 /** Read side of the money engine: what the khata screens show. */
 
 export async function khataSummary(ctx: Ctx, retailerId: string) {
-  const [{ terms, settings, retailer }, balances, openBills, payments, pending] = await Promise.all([
+  const [{ terms, settings, retailer }, balances, openBills, payments, pending, postDated] = await Promise.all([
     loadTerms(ctx, retailerId),
     retailerBalances(ctx, retailerId),
     ctx.tx.bill.findMany({
@@ -24,6 +24,12 @@ export async function khataSummary(ctx: Ctx, retailerId: string) {
     }),
     ctx.tx.payment.aggregate({
       where: { retailerId, state: "PENDING_VERIFICATION" },
+      _sum: { amount: true },
+      _count: true,
+    }),
+    // Post-dated cheques held: not in the balance yet.
+    ctx.tx.payment.aggregate({
+      where: { retailerId, state: "POST_DATED" },
       _sum: { amount: true },
       _count: true,
     }),
@@ -72,6 +78,8 @@ export async function khataSummary(ctx: Ctx, retailerId: string) {
     /** Money paid in advance that no bill has used yet. */
     advance: Number(unallocated._sum.amount ?? 0) - Number(unallocated._sum.allocated ?? 0),
     pendingVerification: { amount: Number(pending._sum.amount ?? 0), count: pending._count },
+    /** Post-dated cheques held: they pay nothing until they are banked on or after their date. */
+    postDated: { amount: Number(postDated._sum.amount ?? 0), count: postDated._count },
     openBills: openBills.map((b) => ({ ...b, due: b.amount - b.paid, overdue: b.dueDate < now })),
     payments,
     upi: settings.upiVpa ? { vpa: settings.upiVpa, payee: settings.upiPayeeName } : null,

@@ -12,7 +12,8 @@ export async function GET(req: Request) {
       status && ["RECEIVED", "DEPOSITED", "CLEARED", "BOUNCED"].includes(status)
         ? { status }
         : // Cheques still to act on; one whose payment was reversed (entered by mistake) is closed.
-          { status: { in: ["RECEIVED", "DEPOSITED"] }, payment: { state: "CONFIRMED" } },
+          // (a post-dated cheque is held, with its payment waiting, until it is banked).
+          { status: { in: ["RECEIVED", "DEPOSITED"] }, payment: { state: { in: ["CONFIRMED", "POST_DATED"] } } },
     orderBy: { chequeDate: "asc" },
     take: 300,
     include: {

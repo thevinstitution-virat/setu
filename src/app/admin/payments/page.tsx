@@ -6,7 +6,7 @@ import Icon from "@/components/Icon";
 import { formatINR } from "@/lib/money";
 
 type Method = "CASH" | "UPI" | "CHEQUE" | "BANK" | "ONLINE" | "WALLET" | "CREDIT_NOTE";
-type State = "PENDING_VERIFICATION" | "CONFIRMED" | "REJECTED" | "REVERSED";
+type State = "PENDING_VERIFICATION" | "POST_DATED" | "CONFIRMED" | "REJECTED" | "REVERSED";
 type ChequeStatus = "RECEIVED" | "DEPOSITED" | "CLEARED" | "BOUNCED";
 
 type Payment = {
@@ -71,6 +71,7 @@ const METHOD_LABEL: Record<Method, string> = {
 
 const STATE_LABEL: Record<State, string> = {
   PENDING_VERIFICATION: "To verify",
+  POST_DATED: "Post-dated, held",
   CONFIRMED: "Confirmed",
   REJECTED: "Rejected",
   REVERSED: "Reversed",
@@ -78,6 +79,7 @@ const STATE_LABEL: Record<State, string> = {
 
 const STATE_CHIP: Record<State, string> = {
   PENDING_VERIFICATION: "chip-genda",
+  POST_DATED: "chip-genda",
   CONFIRMED: "chip-mint",
   REJECTED: "chip-kesar",
   REVERSED: "",
@@ -566,10 +568,10 @@ function AllTab({ onProof }: { onProof: (src: string) => void }) {
         </div>
       );
     }
-    if (p.state === "CONFIRMED" && (!p.cheque || p.cheque.status === "RECEIVED")) {
+    if ((p.state === "CONFIRMED" || p.state === "POST_DATED") && (!p.cheque || p.cheque.status === "RECEIVED")) {
       return (
         <button className="btn btn-quiet btn-xs" disabled={busyId === p.id} onClick={() => setOpen({ id: p.id, kind: "reverse" })}>
-          Reverse
+          {p.state === "POST_DATED" ? "Give back" : "Reverse"}
         </button>
       );
     }
@@ -818,9 +820,11 @@ function ChequesTab() {
 
       <div className="space-y-3">
         {(rows ?? []).map((c) => {
-          const held = daysBetween(c.payment.collectedAt, new Date());
+          const held = daysBetween(c.createdAt, new Date());
           const dueIn = daysBetween(new Date(), c.chequeDate);
-          const active = c.payment.state === "CONFIRMED";
+          // A post-dated cheque's payment waits (it pays no bill) until the cheque is banked on or after its date.
+          const waiting = c.payment.state === "POST_DATED";
+          const active = c.payment.state === "CONFIRMED" || waiting;
           return (
             <div key={c.id} className="card p-4 space-y-3">
               <div className="flex items-start justify-between gap-3">
@@ -846,6 +850,7 @@ function ChequesTab() {
                     Post-dated: deposit in {dueIn} day{dueIn === 1 ? "" : "s"}
                   </span>
                 )}
+                {waiting && <span className="chip">Not in the dues yet</span>}
                 {c.status === "RECEIVED" && held >= 3 && dueIn <= 0 && <span className="chip chip-kesar">Not deposited yet</span>}
                 {c.depositedAt && c.status === "DEPOSITED" && (
                   <span className="text-xs text-[var(--muted)]">Deposited {dateOnly(c.depositedAt)}</span>
@@ -862,10 +867,15 @@ function ChequesTab() {
                 )}
               </div>
 
-              {active && c.status === "RECEIVED" && (
+              {active && c.status === "RECEIVED" && !(waiting && dueIn > 0) && (
                 <button className="btn btn-mor btn-sm" disabled={busyId === c.id} onClick={() => act(c, "deposit")}>
                   {busyId === c.id ? "Saving…" : "Mark deposited"}
                 </button>
+              )}
+              {waiting && dueIn > 0 && (
+                <p className="text-xs text-[var(--muted)]">
+                  It can be banked from {dateOnly(c.chequeDate)}. Until then the retailer&apos;s bills stay unpaid. To hand it back, open Payments and choose Give back.
+                </p>
               )}
 
               {active && c.status === "DEPOSITED" &&
