@@ -16,6 +16,7 @@ import BrandFilter from "@/components/ui/BrandFilter";
 import EmptyState from "@/components/ui/EmptyState";
 import SchemeCarousel, { type SchemeBannerData } from "@/components/ui/SchemeBanner";
 import { ProductCardSkeleton } from "@/components/ui/Skeleton";
+import { toast } from "@/components/ui/Toast";
 import {
   endsLabel,
   isScoped,
@@ -195,6 +196,16 @@ export default function Storefront({
   const quote = items.length ? (quoted?.quote ?? null) : null;
   const fresh = !!quoted && quoted.key === key && items.length > 0;
   const qError = quoteError && quoteError.key === key ? quoteError.message : null;
+
+  // "Scheme applied": once per scheme per visit, when the server prices a scheme into the cart.
+  const seenSchemes = useRef(new Set<string>());
+  useEffect(() => {
+    if (!fresh || !quote) return;
+    const fresh2 = quote.applied.filter((a) => !seenSchemes.current.has(a.schemeId));
+    if (!fresh2.length) return;
+    fresh2.forEach((a) => seenSchemes.current.add(a.schemeId));
+    toast(`Scheme applied: ${fresh2[0].name}`);
+  }, [fresh, quote]);
 
   const setEntry = useCallback((id: string, e: CartEntry | null) => {
     setPlaceError(null);

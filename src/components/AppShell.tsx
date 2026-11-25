@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
@@ -11,6 +11,7 @@ import { BrandLockup, BrandMark, Logo } from "@/components/BrandMark";
 import Icon, { type IconName } from "@/components/Icon";
 import { NOTIFY_EVENT } from "@/components/engage/kit";
 import ShellNotices from "@/components/ShellNotices";
+import { ToastHost } from "@/components/ui/Toast";
 import type { Chrome } from "@/lib/chrome";
 
 export type NavGroup = "overview" | "sell" | "deliver" | "money" | "setup";
@@ -59,6 +60,22 @@ function tabsOf(nav: NavItem[]) {
   return nav.length <= 5 ? nav : nav.slice(0, 4);
 }
 
+/** Browser online / offline, without an effect. */
+function useOnline() {
+  return useSyncExternalStore(
+    (cb) => {
+      window.addEventListener("online", cb);
+      window.addEventListener("offline", cb);
+      return () => {
+        window.removeEventListener("online", cb);
+        window.removeEventListener("offline", cb);
+      };
+    },
+    () => navigator.onLine,
+    () => true,
+  );
+}
+
 const initials = (name: string) =>
   name
     .split(/\s+/)
@@ -93,6 +110,7 @@ export default function AppShell({
   const tabs = useMemo(() => tabsOf(nav), [nav]);
   const hasMore = tabs.length < nav.length;
   const [sheetOpen, setSheetOpen] = useState(false);
+  const online = useOnline();
   const [query, setQuery] = useState("");
 
   const currentItem = nav.find((i) => i.href === current);
@@ -235,6 +253,11 @@ export default function AppShell({
           </div>
         </header>
 
+        {!online && (
+          <p role="status" className="flex items-center justify-center gap-2 bg-[var(--ink)] text-white text-[13px] font-semibold px-4 py-2 text-center">
+            <Icon name="alert" className="h-4 w-4 shrink-0" /> {t("shell.offline")}
+          </p>
+        )}
         <main key={pathname} className="page-in flex-1 w-full max-w-[1360px] mx-auto px-4 md:px-6 lg:px-8 py-5 md:py-7">
           {chrome ? (
             <ShellNotices chrome={chrome} isOffice={roleKey === "role.admin"}>
@@ -265,6 +288,8 @@ export default function AppShell({
           </button>
         )}
       </nav>
+
+      <ToastHost />
 
       {sheetOpen && (
         <MenuSheet

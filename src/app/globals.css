@@ -943,3 +943,27 @@ textarea.input {
   }
 }
 
+
+.order-truck {
+  position: absolute;
+  left: 50%;
+  top: 70px;
+  margin-left: -48px;
+  animation: truck-away 1.1s var(--ease-out) 0.5s both;
+}
+@keyframes truck-away {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(160%);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .order-truck {
+    animation: none;
+    opacity: 0;
+  }
+}

@@ -1,14 +1,15 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Storefront from "@/components/Storefront";
+import Storefront, { type PlacedOrder } from "@/components/Storefront";
+import OrderPlaced from "@/components/ui/OrderPlaced";
 
 export default function CataloguePage() {
   return (
     <div>
       <h1 className="page-title mb-4">Catalogue</h1>
-      <Suspense fallback={<p className="text-sm text-[var(--muted)]">Loading…</p>}>
+      <Suspense fallback={<div className="skeleton h-12" role="status" aria-label="Loading" />}>
         <Catalogue />
       </Suspense>
     </div>
@@ -19,6 +20,7 @@ export default function CataloguePage() {
 function Catalogue() {
   const router = useRouter();
   const params = useSearchParams();
+  const [placed, setPlaced] = useState<PlacedOrder | null>(null);
   const initial = {
     q: params.get("q"),
     category: params.get("category"),
@@ -27,14 +29,20 @@ function Catalogue() {
     product: params.get("product"),
   };
   return (
-    <Storefront
-      key={params.toString()}
-      initial={initial}
-      draftId={params.get("draft")}
-      openVoice={params.get("voice") === "1"}
-      openCart={params.get("cart") === "1"}
-      submitLabel="Place order"
-      onPlacedAction={(order) => router.push(`/retailer/orders/${order.id}`)}
-    />
+    <>
+      <Storefront
+        key={params.toString()}
+        initial={initial}
+        draftId={params.get("draft")}
+        openVoice={params.get("voice") === "1"}
+        openCart={params.get("cart") === "1"}
+        submitLabel="Place order"
+        onPlacedAction={(order) => {
+          setPlaced(order);
+          window.setTimeout(() => router.push(`/retailer/orders/${order.id}`), 1700);
+        }}
+      />
+      {placed && <OrderPlaced orderNumber={placed.orderNumber} />}
+    </>
   );
 }

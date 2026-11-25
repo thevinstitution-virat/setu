@@ -7,6 +7,8 @@ import LanguageToggle from "@/components/LanguageToggle";
 import Link from "next/link";
 import { APP_NAME } from "@/lib/brand";
 import { BrandLockup } from "@/components/BrandMark";
+import { Icon3D } from "@/components/icons3d/Icon3D";
+import OtpInput from "@/components/ui/OtpInput";
 import Icon from "@/components/Icon";
 import GoogleButton from "@/components/auth/GoogleButton";
 
@@ -85,7 +87,8 @@ export default function LoginCard({
           <LanguageToggle />
         </div>
 
-        <div className="card card-deco p-6 sm:p-7">
+        <div className={`card ${brand.business ? "" : "card-deco"} p-6 sm:p-7`}>
+          <Icon3D key={mode} name={mode === "retailer" ? "kirana-shop" : "beat-map"} size={88} animate="pop" priority className="mb-2" />
           <p className="page-kick">{mode === "retailer" ? t("login.retailerTab") : t("login.teamTab")}</p>
           <h1 className="page-title">{t("login.title")}</h1>
           <p className="page-sub mb-6">{brand.tagline || t("brand.tagline")}</p>
@@ -649,17 +652,10 @@ function OtpCodeField({
           {t("login.demoOtp")} <span className="font-semibold">{devCode}</span>.
         </p>
       )}
-      <Field label={`${t("login.otpLabel")} ${phone}`}>
-        <input
-          className="input tracking-[0.3em] text-center"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          maxLength={6}
-          placeholder="••••••"
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-        />
-      </Field>
+      <div>
+        <p className="block text-sm font-medium text-foreground/70 mb-2">{`${t("login.otpLabel")} ${phone}`}</p>
+        <OtpInput value={code} onChangeAction={setCode} autoFocus label={t("login.otpLabel")} />
+      </div>
     </>
   );
 }
