@@ -15,7 +15,7 @@ export default function CreditMeter({
   available: number | null;
   className?: string;
 }) {
-  if (limit === null || available === null) {
+  if (limit === null || limit <= 0 || available === null) {
     return (
       <div className={`rounded-[var(--r-lg)] border border-[var(--line)] bg-[var(--surface)] p-3.5 flex items-center gap-2.5 ${className}`}>
         <Icon3D name="credit-gauge" size={40} />

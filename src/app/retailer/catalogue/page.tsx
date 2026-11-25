@@ -31,6 +31,8 @@ function Catalogue() {
       key={params.toString()}
       initial={initial}
       draftId={params.get("draft")}
+      openVoice={params.get("voice") === "1"}
+      openCart={params.get("cart") === "1"}
       submitLabel="Place order"
       onPlacedAction={(order) => router.push(`/retailer/orders/${order.id}`)}
     />

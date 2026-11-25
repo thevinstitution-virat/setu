@@ -48,6 +48,8 @@ export default function Storefront({
   submitLabel = "Place order",
   initial,
   draftId,
+  openVoice = false,
+  openCart = false,
   onPlacedAction,
 }: {
   retailerId?: string;
@@ -57,6 +59,10 @@ export default function Storefront({
   initial?: StoreFilters;
   /** A WhatsApp order draft to open in "Type or speak your order" (?draft=). */
   draftId?: string | null;
+  /** Start with "Type or speak your order" open (?voice=1). */
+  openVoice?: boolean;
+  /** Start with the cart review open (?cart=1, from the home cart bar). */
+  openCart?: boolean;
   onPlacedAction: (order: PlacedOrder) => void;
 }) {
   const [data, setData] = useState<CatalogueData | null>(null);
@@ -72,10 +78,10 @@ export default function Storefront({
   const [brand, setBrand] = useState<string | null>(initial?.brand ?? null);
   const [scheme, setScheme] = useState<string | null>(initial?.scheme ?? null);
   const [openProduct, setOpenProduct] = useState<string | null>(initial?.product ?? null);
-  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(openCart);
   const [schemeOnly, setSchemeOnly] = useState(false);
   const [inStock, setInStock] = useState(false);
-  const [voiceKey, setVoiceKey] = useState(0);
+  const [voiceKey, setVoiceKey] = useState(openVoice ? 1 : 0);
   const [view, setView] = useState<"grid" | "list">(() => {
     try {
       return localStorage.getItem("vbiz:view") === "list" ? "list" : "grid";

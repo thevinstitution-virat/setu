@@ -4,13 +4,17 @@ import { getSession } from "@/lib/auth";
 import { getDb, requireTenant } from "@/lib/tenant";
 import { withMoney } from "@/lib/ledger";
 import { khataSummary } from "@/lib/khata";
-import { STATUS_COLOR, ORDER_STATUS_FLOW } from "@/lib/orders";
+import { ORDER_STATUS_FLOW } from "@/lib/orders";
 import { getServerLang, tr } from "@/lib/i18n/server";
 import Icon from "@/components/Icon";
 import HomeShelves from "@/components/store/HomeShelves";
 import { formatDay } from "@/components/store/format";
 import AnnouncementCards from "@/components/engage/AnnouncementCards";
 import { referralSettings } from "@/lib/engage-settings";
+import KhataCard from "@/components/ui/KhataCard";
+import CreditMeter from "@/components/ui/CreditMeter";
+import StatusPill from "@/components/ui/StatusPill";
+import EmptyState from "@/components/ui/EmptyState";
 import RatePrompt from "./RatePrompt";
 
 export default async function RetailerHome() {
@@ -36,39 +40,39 @@ export default async function RetailerHome() {
   const referral = referralSettings(tenant.settings);
   const orderCount = profile ? await db.order.count({ where: { retailerId: profile.id } }) : 0;
   const reachedIdx = latestOrder ? ORDER_STATUS_FLOW.indexOf(latestOrder.status) : -1;
+  const prepaid = khata?.terms.mode === "PREPAID";
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <p className="page-kick">Welcome</p>
-        <h1 className="page-title">{profile?.outletName}</h1>
-        <p className="page-sub">
-          {profile?.area.name}, {profile?.area.region.name}
-        </p>
-      </div>
+  const money = khata && (
+    <div className={`grid gap-3 ${prepaid ? "" : "grid-cols-2"}`}>
+      <KhataCard
+        owes={khata.balances.receivable}
+        overdue={khata.overdue}
+        prepaid={prepaid}
+        walletAvailable={khata.balances.walletAvailable}
+        pendingVerification={khata.pendingVerification.amount}
+      />
+      {!prepaid && <CreditMeter limit={khata.terms.creditLimit} available={khata.creditAvailable} />}
+    </div>
+  );
 
+  const below = (
+    <div className="space-y-5">
       <RatePrompt />
 
-      {khata && <KhataCard k={khata} />}
-
-      <AnnouncementCards />
-
       {latestOrder ? (
-        <div className="panel-dark p-5 space-y-4">
+        <section className="card p-4 space-y-4">
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-genda">Latest order</p>
-              <p className="font-heading font-bold text-xl mt-1">{latestOrder.orderNumber}</p>
-              <p className="text-sm text-white/70 mt-0.5">
+            <div className="min-w-0">
+              <p className="page-kick">Latest order</p>
+              <p className="font-heading font-bold text-lg mt-0.5">{latestOrder.orderNumber}</p>
+              <p className="text-sm text-[var(--muted)] mt-0.5 num">
                 {latestOrder.items.length} item{latestOrder.items.length !== 1 ? "s" : ""} · {formatINR(latestOrder.totalAmount)}
               </p>
               {latestOrder.deliveryDate && latestOrder.status !== "DELIVERED" && latestOrder.status !== "CANCELLED" && (
-                <p className="text-xs font-semibold text-genda mt-1">Delivery {formatDay(latestOrder.deliveryDate)}</p>
+                <p className="text-xs font-bold text-[var(--accent-text)] mt-1">Delivery {formatDay(latestOrder.deliveryDate)}</p>
               )}
             </div>
-            <span className={`text-xs px-2.5 py-1 rounded-full ${STATUS_COLOR[latestOrder.status]}`}>
-              {tr(`status.${latestOrder.status}`, lang)}
-            </span>
+            <StatusPill status={latestOrder.status}>{tr(`status.${latestOrder.status}`, lang)}</StatusPill>
           </div>
 
           {latestOrder.status !== "CANCELLED" && (
@@ -78,49 +82,40 @@ export default async function RetailerHome() {
                 const done = latestOrder.status === "DELIVERED";
                 return (
                   <li key={s} className="flex flex-col gap-1.5">
-                    <div
-                      className={`h-1.5 rounded-full ${
-                        reached ? (done ? "bg-[var(--mint)]" : "bg-[var(--kesar)]") : "bg-white/15"
-                      }`}
-                    />
-                    <span className={`text-[10.5px] leading-tight font-semibold ${reached ? "text-white/85" : "text-white/40"}`}>
-                      {tr(`status.${s}`, lang)}
-                    </span>
+                    <div className={`h-1.5 rounded-full ${reached ? (done ? "bg-[var(--success)]" : "bg-[var(--accent)]") : "bg-[var(--surface-2)]"}`} />
+                    <span className={`text-[10.5px] leading-tight font-semibold ${reached ? "text-[var(--ink)]" : "text-[var(--faint)]"}`}>{tr(`status.${s}`, lang)}</span>
                   </li>
                 );
               })}
             </ol>
           )}
 
-          <div className="flex items-center justify-between gap-3 pt-1">
+          <div className="flex items-center justify-between gap-3">
             {latestOrder.delivery?.deliveryAgent ? (
-              <p className="text-xs text-white/70 flex items-center gap-1.5">
-                <Icon name="truck" className="h-4 w-4 text-genda" />
-                Delivery by {latestOrder.delivery.deliveryAgent.user.name}
+              <p className="text-xs text-[var(--muted)] flex items-center gap-1.5 min-w-0">
+                <Icon name="truck" className="h-4 w-4 shrink-0 text-[var(--accent)]" weight="duotone" />
+                <span className="truncate">Delivery by {latestOrder.delivery.deliveryAgent.user.name}</span>
               </p>
             ) : (
               <span />
             )}
-            <Link href={`/retailer/orders/${latestOrder.id}`} className="btn btn-kesar btn-sm">
+            <Link href={`/retailer/orders/${latestOrder.id}`} className="btn btn-primary btn-sm shrink-0">
               View timeline <Icon name="arrow" className="h-4 w-4" />
             </Link>
           </div>
-        </div>
+        </section>
       ) : (
-        <div className="card p-6 text-center space-y-3">
-          <p className="text-[var(--ink-2)]">You haven&apos;t placed an order yet.</p>
-          <Link href="/retailer/catalogue" className="btn btn-kesar btn-sm">
-            Browse the catalogue <Icon name="arrow" className="h-4 w-4" />
-          </Link>
+        <div className="card">
+          <EmptyState icon="empty-orders" title="No order yet" text="Your first order will show here with its delivery timeline." action={{ label: "Browse the catalogue", href: "/retailer/catalogue" }} />
         </div>
       )}
 
-      <HomeShelves />
+      <AnnouncementCards />
 
       <div className="grid grid-cols-2 gap-3">
         <Link href="/retailer/catalogue" className="card p-4 flex flex-col gap-3 hover:-translate-y-0.5 transition">
-          <span className="icon-tile bg-[var(--kesar-tint)] text-[var(--kesar-text)]">
-            <Icon name="cart" />
+          <span className="icon-tile bg-[var(--accent-tint)] text-[var(--accent-text)]">
+            <Icon name="cart" weight="duotone" />
           </span>
           <span>
             <span className="block font-bold text-sm">New order</span>
@@ -128,8 +123,8 @@ export default async function RetailerHome() {
           </span>
         </Link>
         <Link href="/retailer/orders" className="card p-4 flex flex-col gap-3 hover:-translate-y-0.5 transition">
-          <span className="icon-tile bg-[var(--mint-tint)] text-[var(--mint-text)]">
-            <Icon name="box" />
+          <span className="icon-tile bg-[var(--success-tint)] text-[var(--success-text)]">
+            <Icon name="box" weight="duotone" />
           </span>
           <span>
             <span className="block stat-num !text-2xl">{orderCount}</span>
@@ -140,8 +135,8 @@ export default async function RetailerHome() {
 
       {referral.on && (
         <Link href="/retailer/refer" className="card p-4 flex items-center gap-3 hover:-translate-y-0.5 transition">
-          <span className="icon-tile bg-[var(--genda-tint)] text-[var(--genda-text)] shrink-0">
-            <Icon name="gift" />
+          <span className="icon-tile bg-[var(--scheme-tint)] text-[var(--scheme-text)] shrink-0">
+            <Icon name="gift" weight="duotone" />
           </span>
           <span className="flex-1 min-w-0">
             <span className="block font-bold text-sm">Refer a shop, earn {formatINR(referral.referrerReward, { whole: true })}</span>
@@ -152,8 +147,8 @@ export default async function RetailerHome() {
       )}
 
       <Link href="/retailer/help" className="card p-4 flex items-center gap-3 hover:-translate-y-0.5 transition">
-        <span className="icon-tile bg-ink/5 text-[var(--ink-2)] shrink-0">
-          <Icon name="chat" />
+        <span className="icon-tile bg-[var(--surface-2)] text-[var(--ink-2)] shrink-0">
+          <Icon name="chat" weight="duotone" />
         </span>
         <span className="flex-1 min-w-0">
           <span className="block font-bold text-sm">Need help?</span>
@@ -163,40 +158,6 @@ export default async function RetailerHome() {
       </Link>
     </div>
   );
-}
 
-function KhataCard({ k }: { k: Awaited<ReturnType<typeof khataSummary>> }) {
-  const owes = k.balances.receivable;
-  const prepaid = k.terms.mode === "PREPAID";
-  return (
-    <Link href="/retailer/khata" className="card p-4 flex items-center gap-3 hover:-translate-y-0.5 transition">
-      <span
-        className={`icon-tile ${
-          k.overdue > 0 ? "bg-[#fde4e1] text-[#a8281e]" : "bg-[var(--mint-tint)] text-[var(--mint-text)]"
-        }`}
-      >
-        <Icon name={prepaid ? "wallet" : "book"} />
-      </span>
-      <span className="flex-1 min-w-0">
-        <span className="block text-xs text-[var(--muted)]">
-          {prepaid ? "Wallet balance" : owes > 0 ? "You owe" : owes < 0 ? "Advance with us" : "My khata"}
-        </span>
-        <span className="block font-heading font-bold text-xl leading-tight mt-0.5">
-          {prepaid ? formatINR(k.balances.walletAvailable) : owes === 0 ? "All paid" : formatINR(Math.abs(owes))}
-        </span>
-        {k.overdue > 0 ? (
-          <span className="block text-xs font-bold text-[#a8281e] mt-0.5">{formatINR(k.overdue)} overdue</span>
-        ) : prepaid && owes > 0 ? (
-          <span className="block text-xs text-[var(--muted)] mt-0.5">Dues {formatINR(owes)}</span>
-        ) : k.pendingVerification.amount > 0 ? (
-          <span className="block text-xs text-[var(--muted)] mt-0.5">
-            {formatINR(k.pendingVerification.amount)} waiting for confirmation
-          </span>
-        ) : null}
-      </span>
-      <span className="btn btn-kesar btn-xs">
-        {owes > 0 || prepaid ? "Pay now" : "Open"} <Icon name="arrow" className="h-3.5 w-3.5" />
-      </span>
-    </Link>
-  );
+  return <HomeShelves shopName={profile?.outletName ?? ""} area={profile ? `${profile.area.name}, ${profile.area.region.name}` : ""} money={money} below={below} />;
 }
