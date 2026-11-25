@@ -5,6 +5,9 @@ import Icon from "@/components/Icon";
 import { ErrorBox, TabBar, useFetch } from "@/components/admin/AdminKit";
 import { istMonth } from "@/lib/field-math";
 import { METRIC_LABEL, MONEY_METRICS } from "@/lib/field-settings";
+import Ring from "@/components/ui/Ring";
+import EmptyState from "@/components/ui/EmptyState";
+import { Icon3D } from "@/components/icons3d/Icon3D";
 import { addMonth, monthText, rupees } from "./kit";
 
 type Metric = keyof typeof METRIC_LABEL;
@@ -83,11 +86,8 @@ function MyTargets({ period }: { period: string }) {
   if (!data) return <div className="card p-4 text-sm text-[var(--muted)]">Loading targets…</div>;
   if (!data.targets.length) {
     return (
-      <div className="card p-6 text-center space-y-2">
-        <span className="icon-tile mx-auto bg-[var(--scheme-tint)] text-[var(--scheme-text)]">
-          <Icon name="chart" />
-        </span>
-        <p className="text-sm text-[var(--ink-2)]">No targets set for you this month.</p>
+      <div className="card">
+        <EmptyState icon="target" title="No targets this month" text="Your supervisor has not set targets for you yet." />
       </div>
     );
   }
@@ -95,10 +95,22 @@ function MyTargets({ period }: { period: string }) {
   const earned = data.targets.reduce((a, t) => a + t.earned, 0);
   const possible = data.targets.reduce((a, t) => a + t.incentive, 0);
 
+  const avg = Math.round(data.targets.reduce((a, t) => a + Math.min(100, t.pct), 0) / data.targets.length);
+
   return (
     <div className="space-y-3">
+      <div className="card p-4 flex items-center gap-4">
+        <Ring pct={avg}>
+          <span className="font-heading font-bold text-xl num">{avg}%</span>
+        </Ring>
+        <div className="min-w-0">
+          <p className="font-heading font-bold text-base">{avg >= 100 ? "All targets hit" : "This month so far"}</p>
+          <p className="text-sm text-[var(--muted)]">{data.targets.filter((t) => t.pct >= 100).length} of {data.targets.length} targets done</p>
+        </div>
+        <Icon3D name={avg >= 100 ? "trophy" : "target"} size={64} className="ml-auto" />
+      </div>
       {possible > 0 && (
-        <div className="panel-dark p-5">
+        <div className="panel-dark p-5" data-ground="dark">
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-genda">Incentive earned</p>
           <p className="stat-num mt-1">{rupees(earned)}</p>
           <p className="text-xs text-white/70 mt-1">Up to {rupees(possible)} at 100% of every target</p>
@@ -120,7 +132,7 @@ function MyTargets({ period }: { period: string }) {
             </div>
             <div className="h-2.5 rounded-full bg-black/[0.07] overflow-hidden" role="progressbar" aria-valuenow={width} aria-valuemin={0} aria-valuemax={100}>
               <div
-                className={`h-full rounded-full ${done ? "bg-[var(--mint)]" : "bg-[var(--kesar)]"}`}
+                className={`h-full rounded-full ${done ? "bg-[var(--success)]" : "bg-[var(--accent)]"}`}
                 style={{ width: `${width}%` }}
               />
             </div>

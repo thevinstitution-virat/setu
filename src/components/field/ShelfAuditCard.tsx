@@ -133,7 +133,7 @@ export default function ShelfAuditCard({ retailerId, visitId }: { retailerId: st
         </div>
         {!open && (
           <button type="button" className="btn btn-quiet btn-sm shrink-0" onClick={() => (setOpen(true), setDone(null))}>
-            <Icon name="image" className="h-4 w-4" /> Audit shelf
+            <Icon name="camera" className="h-4 w-4" /> Audit shelf
           </button>
         )}
       </div>

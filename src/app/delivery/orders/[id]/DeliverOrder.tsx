@@ -15,6 +15,7 @@ import LinesCard from "./LinesCard";
 import CollectCard from "./CollectCard";
 import QrPayCard, { type OnlinePaid } from "./QrPayCard";
 import ProofCard from "./ProofCard";
+import StepChecklist from "@/components/ui/StepChecklist";
 import ReturnablesCard, { cratesBody, type CrateState } from "./ReturnablesCard";
 import NotDeliveredSheet from "./NotDeliveredSheet";
 import DeliveredView from "./DeliveredView";
@@ -279,6 +280,14 @@ export default function DeliverOrder({
           </Link>
         </div>
       )}
+
+      <StepChecklist
+        steps={[
+          { label: "Items checked", hint: "Count each line below", done: linesError(order.items, lines) === null },
+          { label: "Proof", hint: photoRequired ? "Photo required, signature optional" : "Photo and signature", done: !!photoFile || (!!signature && !photoRequired) },
+          { label: "Payment", hint: "UPI, cash or khata", done: paidOnline || paymentError(shownPay) === null },
+        ]}
+      />
 
       {invoices.length > 0 && <DeliveryInvoiceCard invoices={invoices} />}
 

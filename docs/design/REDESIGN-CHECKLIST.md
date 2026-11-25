@@ -2,7 +2,7 @@
 
 Branch `feat/ui-redesign`. Status: ✅ hand-built or checked in a browser, 🎨 restyled through the shared classes, tokens and icons (not individually checked), ⬜ not started.
 
-Before/after screenshots are not saved in the repo yet (see Open items in the summary).
+Staff pass 2 (delivery checklist, sales targets ring and punch timeline, retailer khata ageing, table keyboard keys) is committed. Before/after screenshots are not saved in the repo yet.
 
 ## Retailer
 

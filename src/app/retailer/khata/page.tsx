@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
+import { Icon3D } from "@/components/icons3d/Icon3D";
 import { formatINR, toPaise } from "@/lib/money";
 import { upiLink } from "@/lib/money-settings";
 import { compressImage, uploadFile } from "@/lib/upload-client";
@@ -46,6 +47,7 @@ type Khata = {
   balances: { receivable: number; walletAvailable: number; walletReserved: number };
   creditAvailable: number | null;
   overdue: number;
+  ageing?: Record<"d0_7" | "d8_15" | "d16_30" | "d30p", number>;
   advance: number;
   pendingVerification: { amount: number; count: number };
   openBills: Bill[];
@@ -208,18 +210,34 @@ export default function KhataPage({
       </div>
 
       {/* ── Balance ── */}
-      <div className="panel-dark p-5 space-y-4 print:hidden">
+      <div className="rounded-[var(--r-xl)] bg-[var(--money)] text-white shadow-[var(--e-2)] p-5 space-y-4 print:hidden">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-genda">
             {owes > 0 ? "You owe" : owes < 0 ? "Advance with us" : "Your dues"}
           </p>
-          <p className="stat-num !text-4xl mt-2">{owes === 0 ? "All paid" : formatINR(Math.abs(owes))}</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="stat-num !text-4xl mt-2">{owes === 0 ? "All paid" : formatINR(Math.abs(owes))}</p>
+            <Icon3D name={owes === 0 ? "all-paid" : "ledger"} size={owes === 0 ? 88 : 64} animate={owes === 0 ? "pop" : "none"} className="shrink-0 bg-white/90 rounded-2xl" />
+          </div>
           {data.overdue > 0 && (
             <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--risk-tint)] text-[var(--risk-text)] px-3 py-1 text-sm font-bold">
               <Icon name="alert" className="h-4 w-4" /> {formatINR(data.overdue)} overdue
             </p>
           )}
         </div>
+
+        {!prepaid && data.ageing && Object.values(data.ageing).some((v) => v > 0) && (
+          <div className="space-y-1.5" aria-label="Bills by age">
+            <div className="flex h-2.5 rounded-full overflow-hidden gap-0.5">
+              {([["d0_7", "var(--success)"], ["d8_15", "var(--scheme)"], ["d16_30", "var(--accent)"], ["d30p", "var(--risk)"]] as const)
+                .filter(([k]) => data.ageing![k] > 0)
+                .map(([k, c]) => (
+                  <div key={k} style={{ flex: data.ageing![k], background: c }} />
+                ))}
+            </div>
+            <p className="text-[11.5px] text-white/75">0 to 7 · 8 to 15 · 16 to 30 · 30+ days old</p>
+          </div>
+        )}
 
         {prepaid ? (
           <div className="grid grid-cols-2 gap-3 border-t border-white/10 pt-4">
@@ -242,7 +260,7 @@ export default function KhataPage({
             </div>
             <div className="h-2 rounded-full bg-white/15 overflow-hidden">
               <div
-                className={`h-full rounded-full ${usedPct >= 90 ? "bg-[#f26b5b]" : "bg-[var(--kesar)]"}`}
+                className={`h-full rounded-full ${usedPct >= 100 ? "bg-[var(--risk)]" : usedPct >= 80 ? "bg-[var(--scheme)]" : "bg-white"}`}
                 style={{ width: `${usedPct}%` }}
               />
             </div>
@@ -261,7 +279,7 @@ export default function KhataPage({
 
         {!paying && !payingOnline && (
           <div className="space-y-2">
-            <button className="btn btn-kesar w-full !min-h-[52px] text-base" onClick={() => { setPaying(true); setThanks(null); }}>
+            <button className="btn btn-scheme w-full !min-h-[52px] text-base" onClick={() => { setPaying(true); setThanks(null); }}>
               <Icon name="wallet" /> Pay now
             </button>
             {canPayOnline && (

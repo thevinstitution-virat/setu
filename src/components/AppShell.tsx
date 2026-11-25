@@ -12,6 +12,7 @@ import Icon, { type IconName } from "@/components/Icon";
 import { NOTIFY_EVENT } from "@/components/engage/kit";
 import ShellNotices from "@/components/ShellNotices";
 import { ToastHost } from "@/components/ui/Toast";
+import TableKeys from "@/components/ui/TableKeys";
 import type { Chrome } from "@/lib/chrome";
 
 export type NavGroup = "overview" | "sell" | "deliver" | "money" | "setup";
@@ -290,6 +291,7 @@ export default function AppShell({
       </nav>
 
       <ToastHost />
+      {surface !== "retailer" && <TableKeys />}
 
       {sheetOpen && (
         <MenuSheet

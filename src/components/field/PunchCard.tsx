@@ -6,6 +6,7 @@ import Icon from "@/components/Icon";
 import { ErrorBox, errText, send, useFetch } from "@/components/admin/AdminKit";
 import { getLocation } from "@/lib/geo";
 import { istMonth } from "@/lib/field-math";
+import { Icon3D } from "@/components/icons3d/Icon3D";
 import SelfieCapture from "./SelfieCapture";
 import { FIELD_EVENT, clock, distanceText, fieldChanged, hoursText, type AttendanceData } from "./kit";
 
@@ -89,8 +90,8 @@ export default function PunchCard() {
   return (
     <div className="card p-4 space-y-3">
       <div className="flex items-start gap-3">
-        <span className={`icon-tile ${tone}`}>
-          <Icon name={checkedOut ? "check" : "clock"} />
+        <span className={`grid place-items-center h-14 w-14 shrink-0 rounded-2xl ${tone}`}>
+          <Icon3D name={checkedOut ? "success-tick" : "attendance"} size={44} />
         </span>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.1em] text-[var(--muted)]">Attendance today</p>
@@ -129,6 +130,20 @@ export default function PunchCard() {
         </div>
       )}
 
+      {/* The day as a short timeline */}
+      <ol className="flex items-center gap-2 text-[11px] font-semibold" aria-label="Today">
+        {[
+          { label: `Starts ${rules.workStart}`, on: true },
+          { label: checkedIn ? `In ${clock(today!.checkInAt!)}` : "In", on: checkedIn },
+          { label: checkedOut ? `Out ${clock(today!.checkOutAt!)}` : "Out", on: checkedOut },
+        ].map((x, i) => (
+          <li key={i} className="flex flex-1 items-center gap-2 min-w-0">
+            <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${x.on ? "bg-[var(--success)]" : "bg-[var(--line-2)]"}`} />
+            <span className={`truncate ${x.on ? "text-[var(--ink)]" : "text-[var(--faint)]"}`}>{x.label}</span>
+          </li>
+        ))}
+      </ol>
+
       {checkedIn && today?.checkInAccuracy != null && (
         <p className="text-xs text-[var(--muted)] flex items-center gap-1">
           <Icon name="pin" className="h-3.5 w-3.5" /> Check-in location saved (±{Math.round(today.checkInAccuracy)} m)
@@ -146,7 +161,7 @@ export default function PunchCard() {
       )}
 
       {!checkedIn && !driver && step !== "in" && (
-        <button type="button" className="btn btn-kesar w-full min-h-[48px]" onClick={() => (rules.selfie ? open("in") : punch("in"))} disabled={busy}>
+        <button type="button" className="btn btn-kesar btn-lg w-full" onClick={() => (rules.selfie ? open("in") : punch("in"))} disabled={busy}>
           {busy ? "Checking in…" : "Check in"}
         </button>
       )}
@@ -156,7 +171,7 @@ export default function PunchCard() {
           {driver && (
             <p className="text-xs text-[var(--muted)]">Go off duty first, then check out at the end of your day.</p>
           )}
-          <button type="button" className="btn btn-quiet w-full min-h-[48px]" onClick={() => (rules.selfie ? open("out") : punch("out"))} disabled={busy}>
+          <button type="button" className="btn btn-quiet btn-lg w-full" onClick={() => (rules.selfie ? open("out") : punch("out"))} disabled={busy}>
             {busy ? "Checking out…" : "Check out"}
           </button>
         </div>

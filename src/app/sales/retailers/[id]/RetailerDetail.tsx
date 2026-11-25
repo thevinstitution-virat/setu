@@ -1,5 +1,6 @@
 "use client";
 
+import Icon from "@/components/Icon";
 import { useEffect, useState } from "react";
 import { formatINR } from "@/lib/money";
 import { useRouter } from "next/navigation";
@@ -193,12 +194,12 @@ export default function RetailerDetail({ id, invoices }: { id: string; invoices?
           Shop {retailer.shopNumber}, {retailer.complexName} · {retailer.area.name}
         </p>
         {retailer.user.phone && (
-          <p className="text-sm text-foreground/50">📞 {retailer.user.phone}</p>
+          <p className="text-sm text-foreground/50 flex items-center gap-1.5"><Icon name="phone" className="h-4 w-4" /> {retailer.user.phone}</p>
         )}
       </div>
 
       {visits && (
-        <div className={`card p-4 space-y-3 ${openVisit ? "border-2 !border-[var(--kesar)]" : ""}`}>
+        <div className={`card p-4 space-y-3 ${openVisit ? "border-2 !border-[var(--accent)]" : ""}`}>
           {openVisit ? (
             <>
               <div>
@@ -230,7 +231,7 @@ export default function RetailerDetail({ id, invoices }: { id: string; invoices?
           ) : (
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm text-[var(--muted)]">Not checked in at this shop</p>
-              <button onClick={checkIn} disabled={visitBusy} className="btn btn-kesar btn-sm min-h-[44px] shrink-0">
+              <button onClick={checkIn} disabled={visitBusy} className="btn btn-kesar min-h-[48px] shrink-0">
                 {visitBusy ? "Checking in…" : "Check in"}
               </button>
             </div>
@@ -258,7 +259,7 @@ export default function RetailerDetail({ id, invoices }: { id: string; invoices?
               <p className="text-xs text-[var(--muted)]">
                 {dues.balances.receivable > 0 ? "Dues" : dues.balances.receivable < 0 ? "Advance" : "Dues"}
               </p>
-              <p className="stat-num !text-2xl mt-1">
+              <p className={`stat-num !text-2xl mt-1 ${dues.overdue > 0 ? "text-[var(--risk-text)]" : "text-[var(--money)]"}`}>
                 {dues.balances.receivable === 0 ? "All paid" : formatINR(Math.abs(dues.balances.receivable))}
               </p>
             </div>
