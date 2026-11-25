@@ -434,6 +434,8 @@ model SalesAgentProfile {
   tenant   Tenant @relation(fields: [tenantId], references: [id])
   userId   String @unique
   user     User   @relation(fields: [userId], references: [id])
+  /// Most (paise) the salesman's shops may owe on the salesman's bills and open orders; past it, new orders are held. null = no limit.
+  creditLimit Int?
 
   beats     Beat[]
   retailers RetailerProfile[]
@@ -613,6 +615,8 @@ model Order {
   /// Placed over the credit limit or with overdue bills: needs approval before it moves on.
   creditHold       Boolean         @default(false)
   creditHoldReason String?
+  /// The hold went past the real credit limit while a soft limit is set: only the owner may let it through.
+  creditHoldOwner  Boolean         @default(false)
   creditApprovedBy String?
   creditApprovedAt DateTime?
   /// Prepaid: amount reserved from the wallet when the order was placed (paise).

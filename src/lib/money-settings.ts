@@ -24,6 +24,12 @@ export type MoneySettings = {
   pdcReducesExposure: boolean;
   /** Check credit again when the order leaves (it may have been fine when placed); a failed check puts it on hold. */
   checkCreditAtBilling: boolean;
+  /**
+   * Soft limit, as a % of each shop's credit limit (50-99); null = off. Past it
+   * an order is held for anyone who manages credit; past the real limit it is
+   * held for the owner only.
+   */
+  softLimitPct: number | null;
   /** Paise charged when a cheque bounces; 0 = none. */
   chequeBouncePenalty: number;
   /** UPI ID shown to retailers for "Pay now" (e.g. agency@okaxis). */
@@ -44,6 +50,7 @@ export const MONEY_DEFAULTS: MoneySettings = {
   bounceHoldDays: 30,
   pdcReducesExposure: false,
   checkCreditAtBilling: false,
+  softLimitPct: null,
   chequeBouncePenalty: 0,
   upiVpa: "",
   upiPayeeName: "",
@@ -115,6 +122,7 @@ export function parseMoneySettings(input: Record<string, unknown>): Partial<Mone
     int("overdueGraceDays", 0, 90),
     int("defaultCreditBills", 1, 999, true),
     int("bounceHoldDays", 1, 365),
+    int("softLimitPct", 50, 99, true),
     int("chequeBouncePenalty", 0, 10_000_000),
   ])
     if (err) return err;

@@ -5,6 +5,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import { ErrorBox, Field, Flash, Sheet, TabBar, errText, send, useFetch } from "@/components/admin/AdminKit";
 import { validMobile } from "@/lib/field-math";
+import { formatINR, toPaise } from "@/lib/money";
 
 type Role = "ADMIN" | "SALES_AGENT" | "DELIVERY_AGENT" | "SUPERVISOR" | "ACCOUNTANT";
 
@@ -22,7 +23,7 @@ type TeamUser = {
   isOwner?: boolean;
   supervisorId: string | null;
   supervisor: { id: string; name: string } | null;
-  salesAgentProfile: { id: string } | null;
+  salesAgentProfile: { id: string; creditLimit?: number | null } | null;
   /** When they set up the authenticator app (null: they will be asked at their next sign-in). */
   totpEnabledAt?: string | null;
 };
@@ -53,7 +54,7 @@ function RoleChip({ role, owner }: { role: Role; owner?: boolean }) {
   return <span className={`chip ${owner ? "chip-kesar" : r.chip} !py-0.5 !px-2 !text-[11.5px]`}>{owner ? "Owner" : r.label}</span>;
 }
 
-type Me = { id: string; isOwner: boolean; managesAdmins: boolean };
+type Me = { id: string; isOwner: boolean; managesAdmins: boolean; canCredit?: boolean };
 
 /** What the signed-in admin may do to this row (the API checks again: lib/team-rules.ts). */
 function rowRights(me: Me | undefined, u: TeamUser) {
@@ -448,6 +449,7 @@ export default function AdminTeamPage() {
         <EditStaff
           key={editing.id}
           user={editing}
+          canCredit={!!me?.canCredit}
           supervisors={supervisors}
           onClose={() => setEditing(null)}
           onSaved={(name) => {
@@ -463,11 +465,13 @@ export default function AdminTeamPage() {
 
 function EditStaff({
   user,
+  canCredit,
   supervisors,
   onClose,
   onSaved,
 }: {
   user: TeamUser;
+  canCredit: boolean;
   supervisors: TeamUser[];
   onClose: () => void;
   onSaved: (name: string) => void;
@@ -476,6 +480,9 @@ function EditStaff({
   const [phone, setPhone] = useState(user.phone ?? "");
   const [email, setEmail] = useState(user.email ?? "");
   const [supervisorId, setSupervisorId] = useState(user.supervisorId ?? "");
+  const oldLimit = user.salesAgentProfile?.creditLimit ?? null;
+  const [limit, setLimit] = useState(oldLimit === null ? "" : String(oldLimit / 100));
+  const showLimit = canCredit && user.role === "SALES_AGENT";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -485,7 +492,7 @@ function EditStaff({
 
   async function save() {
     setError(null);
-    const patch: { name?: string; phone?: string | null; email?: string | null; supervisorId?: string | null } = {};
+    const patch: { name?: string; phone?: string | null; email?: string | null; supervisorId?: string | null; creditLimit?: number | null } = {};
     if (!name.trim()) return setError("Enter a name");
     if (name.trim() !== user.name) patch.name = name.trim();
     if (phone && !validMobile(phone)) return setError("Enter a 10-digit mobile number");
@@ -494,6 +501,18 @@ function EditStaff({
     // Saving an unconfirmed address as is confirms it (the admin vouches for it).
     if (email.trim().toLowerCase() !== (user.email ?? "") || (email.trim() && !user.emailVerifiedAt)) patch.email = email.trim() || null;
     if (user.role !== "SUPERVISOR" && supervisorId !== (user.supervisorId ?? "")) patch.supervisorId = supervisorId || null;
+    if (showLimit) {
+      let p: number | null = null;
+      if (limit.trim()) {
+        try {
+          p = toPaise(limit);
+        } catch {
+          return setError("Credit limit must be an amount in rupees");
+        }
+        if (p < 0) return setError("Credit limit can't be less than ₹0");
+      }
+      if (p !== oldLimit) patch.creditLimit = p;
+    }
     if (!Object.keys(patch).length) return onClose();
     setBusy(true);
     try {
@@ -549,6 +568,14 @@ function EditStaff({
         </Field>
       ) : (
         <p className="text-xs text-[var(--muted)]">To build this supervisor&apos;s team, edit each sales or delivery agent and pick them as supervisor.</p>
+      )}
+      {showLimit && (
+        <Field
+          label="Credit limit for their shops (₹)"
+          hint={`What the shops may owe on this salesman's bills and open orders together. Past it, their new orders wait on credit hold. Leave blank for no limit.${oldLimit !== null ? ` Now ${formatINR(oldLimit)}.` : ""}`}
+        >
+          <input className="input" inputMode="decimal" placeholder="No limit" value={limit} onChange={(e) => setLimit(e.target.value.replace(/[^\d.]/g, ""))} />
+        </Field>
       )}
     </Sheet>
   );

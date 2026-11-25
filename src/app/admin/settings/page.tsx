@@ -33,6 +33,7 @@ type Money = {
   bounceHoldDays: number;
   pdcReducesExposure: boolean;
   checkCreditAtBilling: boolean;
+  softLimitPct: number | null;
   chequeBouncePenalty: number;
   upiVpa: string;
   upiPayeeName: string;
@@ -51,6 +52,7 @@ type Form = {
   bounceHoldDays: string;
   pdcReducesExposure: boolean;
   checkCreditAtBilling: boolean;
+  softLimitPct: string;
   chequeBouncePenalty: string;
   upiVpa: string;
   upiPayeeName: string;
@@ -64,6 +66,7 @@ const FIELD_LABEL: Record<string, string> = {
   overdueGraceDays: "Grace days",
   defaultCreditBills: "Unpaid bills allowed",
   bounceHoldDays: "Days after a bounced cheque",
+  softLimitPct: "Soft limit",
   chequeBouncePenalty: "Cheque bounce charge",
 };
 
@@ -81,6 +84,7 @@ function toForm(m: Money): Form {
     bounceHoldDays: String(m.bounceHoldDays ?? 30),
     pdcReducesExposure: !!m.pdcReducesExposure,
     checkCreditAtBilling: !!m.checkCreditAtBilling,
+    softLimitPct: m.softLimitPct == null ? "" : String(m.softLimitPct),
     chequeBouncePenalty: rupees(m.chequeBouncePenalty),
     upiVpa: m.upiVpa,
     upiPayeeName: m.upiPayeeName,
@@ -120,6 +124,12 @@ function toPatch(f: Form): Money | string {
   const bounceDays = days(f.bounceHoldDays, "Days after a bounced cheque", 365);
   if (typeof bounceDays === "string") return bounceDays;
   if (bounceDays < 1) return "Days after a bounced cheque must be at least 1";
+  let soft: number | null = null;
+  if (f.softLimitPct.trim()) {
+    const n = Number(f.softLimitPct);
+    if (!Number.isInteger(n) || n < 50 || n > 99) return "Soft limit must be a whole number from 50 to 99 (% of the credit limit)";
+    soft = n;
+  }
   return {
     defaultPaymentMode: f.defaultPaymentMode,
     defaultCreditDays: creditDays,
@@ -131,6 +141,7 @@ function toPatch(f: Form): Money | string {
     bounceHoldDays: bounceDays,
     pdcReducesExposure: f.pdcReducesExposure,
     checkCreditAtBilling: f.checkCreditAtBilling,
+    softLimitPct: soft,
     chequeBouncePenalty: penalty,
     upiVpa: f.upiVpa.trim(),
     upiPayeeName: f.upiPayeeName.trim(),
@@ -513,6 +524,19 @@ export default function SettingsPage() {
               onChange={(e) => set("defaultCreditBills", e.target.value.replace(/\D/g, ""))}
             />
             <span className="block text-xs text-[var(--muted)] mt-1">A retailer with this many unpaid bills has new orders held. Leave blank for no limit by bills. Can be set per retailer on their khata.</span>
+          </label>
+          <label className="block max-w-xs">
+            <span className="block text-sm font-medium text-[var(--ink-2)] mb-1">Soft limit (% of the credit limit)</span>
+            <input
+              className="input"
+              inputMode="numeric"
+              placeholder="Off"
+              value={form.softLimitPct}
+              onChange={(e) => set("softLimitPct", e.target.value.replace(/\D/g, "").slice(0, 2))}
+            />
+            <span className="block text-xs text-[var(--muted)] mt-1">
+              For example 80: an order that takes a retailer past 80% of their limit waits for anyone who manages credit, and one past the full limit waits for the owner. Leave blank for one limit only.
+            </span>
           </label>
           <Toggle
             checked={form.holdOnBounce}

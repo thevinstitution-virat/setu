@@ -19,6 +19,8 @@ type Order = OrderTotals & {
   createdAt: string;
   creditHold: boolean;
   creditHoldReason: string | null;
+  /** Past the real limit while a soft limit is set: only the owner may approve. */
+  creditHoldOwner?: boolean;
   creditApprovedAt: string | null;
   /** Paise reserved from the retailer's wallet for this order. */
   walletHold: number;
@@ -59,6 +61,7 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
   const [salesmen, setSalesmen] = useState<Salesman[]>([]);
   /** Can put a scheme or deal on a line (the people who set schemes). */
   const [canScheme, setCanScheme] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>(
     typeof initialStatus === "string" && (FILTERS as string[]).includes(initialStatus) ? (initialStatus as OrderStatus) : "ALL"
   );
@@ -80,6 +83,7 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
       setCounts(o.counts ?? {});
       setSalesmen(o.salesmen ?? []);
       setCanScheme(!!o.canScheme);
+      setIsOwner(!!o.isOwner);
       setAgents(aRes.ok ? (a.agents ?? []) : []);
       setLoadError(null);
       // Opened from a link to one order (dashboard): show it straight away.
@@ -291,6 +295,7 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
             agents={agents}
             salesmen={salesmen}
             canScheme={canScheme}
+            isOwner={isOwner}
             busy={busyId === selected.id}
             error={actionError?.id === selected.id && !actionError.ok ? actionError.message : null}
             note={actionError?.id === selected.id && actionError.ok ? actionError.message : null}
@@ -314,6 +319,7 @@ function OrderPanel({
   agents,
   salesmen,
   canScheme,
+  isOwner,
   busy,
   error,
   note,
@@ -324,6 +330,7 @@ function OrderPanel({
   agents: Agent[];
   salesmen: Salesman[];
   canScheme: boolean;
+  isOwner: boolean;
   busy: boolean;
   error: string | null;
   note: string | null;
@@ -405,9 +412,11 @@ function OrderPanel({
           {open && (
             <div className="space-y-2.5">
               <div className="flex flex-wrap gap-2">
-                {held ? (
+                {held && o.creditHoldOwner && !isOwner ? (
+                  <p className="text-sm font-medium text-[var(--ink-2)]">Past the credit limit: only the owner can let it through</p>
+                ) : held ? (
                   <button disabled={busy} onClick={() => actions.approveCredit(o.id)} className="btn btn-mor btn-sm flex-1">
-                    Approve credit
+                    {o.creditHoldOwner ? "Approve past the limit" : "Approve credit"}
                   </button>
                 ) : o.status === "OUT_FOR_DELIVERY" ? (
                   <p className="text-sm font-medium text-[var(--ink-2)]">With the delivery agent</p>

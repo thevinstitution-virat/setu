@@ -44,10 +44,10 @@ export async function withMoney<T>(tenantId: string, actorId: string | null, fn:
   ).catch(async (e: unknown) => {
     // A credit check failed when an order was about to leave: everything was
     // undone, but the order must stay marked as held so it can be approved.
-    const hold = e instanceof MoneyError ? (e.extra?.creditHold as { orderId: string; reason: string } | undefined) : undefined;
+    const hold = e instanceof MoneyError ? (e.extra?.creditHold as { orderId: string; reason: string; owner?: boolean } | undefined) : undefined;
     if (hold) {
       await withTenantTx(tenantId, (tx) =>
-        tx.order.updateMany({ where: { id: hold.orderId, creditApprovedAt: null }, data: { creditHold: true, creditHoldReason: hold.reason } })
+        tx.order.updateMany({ where: { id: hold.orderId, creditApprovedAt: null }, data: { creditHold: true, creditHoldReason: hold.reason, creditHoldOwner: !!hold.owner } })
       ).catch(() => undefined);
     }
     throw e;
@@ -1012,19 +1012,68 @@ export async function onOrderPlaced(ctx: Ctx, order: { id: string; retailerId: s
     return { hold: false as const, reason: null };
   }
 
-  const reason = await creditHoldReason(ctx, settings, terms, order);
-  if (reason) {
-    await ctx.tx.order.update({ where: { id: order.id }, data: { creditHold: true, creditHoldReason: reason } });
+  const hold = await creditHoldReason(ctx, settings, terms, order);
+  if (hold) {
+    await ctx.tx.order.update({ where: { id: order.id }, data: { creditHold: true, creditHoldReason: hold.reason, creditHoldOwner: hold.owner } });
   }
-  return { hold: !!reason, reason };
+  return { hold: !!hold, reason: hold?.reason ?? null };
 }
 
+/**
+ * Why an order should wait for credit approval, or null. Every reason found is
+ * given; `owner` is set when one of them is past the real limit while a soft
+ * limit is in use (only the owner may let that through).
+ */
 async function creditHoldReason(
   ctx: Ctx,
   settings: MoneySettings,
   terms: { mode: PaymentMode; creditLimit: number | null; creditDays: number; creditBills?: number | null },
   order: { id: string; retailerId: string; totalAmount: number }
-): Promise<string | null> {
+): Promise<{ reason: string; owner: boolean } | null> {
+  const found: string[] = [];
+  let owner = false;
+  const shopReason = await shopHoldReason(ctx, settings, terms, order);
+  if (shopReason) {
+    found.push(shopReason.reason);
+    owner = shopReason.owner;
+  }
+  const salesman = await salesmanHoldReason(ctx, order);
+  if (salesman) found.push(salesman);
+  return found.length ? { reason: found.join("; "), owner } : null;
+}
+
+/** The salesman's own limit: what the salesman's shops owe on their bills and open orders, with this one. */
+async function salesmanHoldReason(ctx: Ctx, order: { id: string; totalAmount: number }): Promise<string | null> {
+  const o = await ctx.tx.order.findUnique({ where: { id: order.id }, select: { salesmanId: true } });
+  if (!o?.salesmanId) return null;
+  const prof = await ctx.tx.salesAgentProfile.findUnique({ where: { userId: o.salesmanId }, select: { creditLimit: true, user: { select: { name: true } } } });
+  if (!prof || prof.creditLimit === null) return null;
+  const [bills, open] = await Promise.all([
+    ctx.tx.bill.aggregate({ where: { salesmanId: o.salesmanId, settled: false }, _sum: { amount: true, paid: true } }),
+    ctx.tx.order.aggregate({
+      where: {
+        salesmanId: o.salesmanId,
+        id: { not: order.id },
+        status: { notIn: ["DELIVERED", "CANCELLED"] },
+        invoices: { none: { type: { in: ["TAX_INVOICE", "BILL_OF_SUPPLY"] } } },
+      },
+      _sum: { totalAmount: true },
+    }),
+  ]);
+  const use = Number(bills._sum.amount ?? 0) - Number(bills._sum.paid ?? 0) + Number(open._sum.totalAmount ?? 0) + order.totalAmount;
+  if (use <= prof.creditLimit) return null;
+  return `Salesman ${prof.user.name}'s shops would owe ${formatINR(use)} (salesman's limit ${formatINR(prof.creditLimit)})`;
+}
+
+async function shopHoldReason(
+  ctx: Ctx,
+  settings: MoneySettings,
+  terms: { mode: PaymentMode; creditLimit: number | null; creditDays: number; creditBills?: number | null },
+  order: { id: string; retailerId: string; totalAmount: number }
+): Promise<{ reason: string; owner: boolean } | null> {
+  // Past the real limit while a soft limit is set: the owner decides, whatever else is wrong.
+  const limit = await limitHoldReason(ctx, settings, terms, order);
+  if (limit?.owner) return limit;
   if (settings.holdOnBounce) {
     const since = addDays(new Date(), -settings.bounceHoldDays);
     const bounced = await ctx.tx.cheque.findFirst({
@@ -1032,11 +1081,11 @@ async function creditHoldReason(
       orderBy: { bouncedAt: "desc" },
       select: { number: true, bouncedAt: true },
     });
-    if (bounced) return `Cheque ${bounced.number} bounced on ${bounced.bouncedAt!.toISOString().slice(0, 10)}`;
+    if (bounced) return { reason: `Cheque ${bounced.number} bounced on ${bounced.bouncedAt!.toISOString().slice(0, 10)}`, owner: false };
   }
   if (terms.creditBills != null) {
     const unpaid = await ctx.tx.bill.count({ where: { retailerId: order.retailerId, settled: false } });
-    if (unpaid >= terms.creditBills) return `${unpaid} unpaid bill${unpaid === 1 ? "" : "s"} (limit ${terms.creditBills})`;
+    if (unpaid >= terms.creditBills) return { reason: `${unpaid} unpaid bill${unpaid === 1 ? "" : "s"} (limit ${terms.creditBills})`, owner: false };
   }
   if (settings.holdOnOverdue) {
     const cutoff = addDays(new Date(), -settings.overdueGraceDays);
@@ -1045,9 +1094,19 @@ async function creditHoldReason(
       orderBy: { dueDate: "asc" },
     });
     if (overdue) {
-      return `Overdue bill ${overdue.number} (${formatINR(overdue.amount - overdue.paid)} due ${overdue.dueDate.toISOString().slice(0, 10)})`;
+      return { reason: `Overdue bill ${overdue.number} (${formatINR(overdue.amount - overdue.paid)} due ${overdue.dueDate.toISOString().slice(0, 10)})`, owner: false };
     }
   }
+  return limit;
+}
+
+/** The shop's credit limit, and the soft limit below it when one is set. */
+async function limitHoldReason(
+  ctx: Ctx,
+  settings: MoneySettings,
+  terms: { creditLimit: number | null },
+  order: { id: string; retailerId: string; totalAmount: number }
+): Promise<{ reason: string; owner: boolean } | null> {
   if (terms.creditLimit !== null) {
     const { receivable } = await retailerBalances(ctx, order.retailerId);
     const open = await ctx.tx.order.aggregate({
@@ -1066,7 +1125,14 @@ async function creditHoldReason(
       : 0;
     const exposure = receivable + Number(open._sum.totalAmount ?? 0) + order.totalAmount - held;
     if (exposure > terms.creditLimit) {
-      return `Over credit limit by ${formatINR(exposure - terms.creditLimit)} (limit ${formatINR(terms.creditLimit)})`;
+      const soft = settings.softLimitPct !== null;
+      return { reason: `Over credit limit by ${formatINR(exposure - terms.creditLimit)} (limit ${formatINR(terms.creditLimit)})${soft ? "; only the owner can let it through" : ""}`, owner: soft };
+    }
+    if (settings.softLimitPct !== null) {
+      const softAt = Math.floor((terms.creditLimit * settings.softLimitPct) / 100);
+      if (exposure > softAt) {
+        return { reason: `Past ${settings.softLimitPct}% of the credit limit: ${formatINR(exposure)} of ${formatINR(terms.creditLimit)}`, owner: false };
+      }
     }
   }
   return null;
@@ -1089,8 +1155,12 @@ export async function recheckCreditAtDispatch(ctx: Ctx, orderId: string) {
   const { settings, terms } = await loadTerms(ctx, order.retailerId);
   if (!settings.checkCreditAtBilling || terms.mode === "PREPAID") return;
   await lockRetailer(ctx, order.retailerId);
-  const reason = await creditHoldReason(ctx, settings, terms, order);
-  if (reason) throw new MoneyError(`${order.orderNumber} is on credit hold: ${reason}. Someone who manages credit must approve it.`, 409, { creditHold: { orderId: order.id, reason } });
+  const hold = await creditHoldReason(ctx, settings, terms, order);
+  if (hold) {
+    throw new MoneyError(`${order.orderNumber} is on credit hold: ${hold.reason}. ${hold.owner ? "The owner" : "Someone who manages credit"} must approve it.`, 409, {
+      creditHold: { orderId: order.id, reason: hold.reason, owner: hold.owner },
+    });
+  }
 }
 
 /** Order cancelled before delivery: give back any wallet reservation. */

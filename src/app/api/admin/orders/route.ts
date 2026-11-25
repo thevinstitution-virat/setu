@@ -38,5 +38,6 @@ export async function GET(req: Request) {
 
   const counts = Object.fromEntries(STATUSES.map((s) => [s, byStatus.find((g) => g.status === s)?._count ?? 0]));
   // Schemes and deals typed on a line are for the people who set schemes.
-  return NextResponse.json({ orders, counts, salesmen, canScheme: can(auth.session.role, "pricing.manage") });
+  const me = await db.user.findUnique({ where: { id: auth.session.userId }, select: { isOwner: true } });
+  return NextResponse.json({ orders, counts, salesmen, canScheme: can(auth.session.role, "pricing.manage"), isOwner: !!me?.isOwner });
 }

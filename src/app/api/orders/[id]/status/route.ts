@@ -36,6 +36,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
       if (action === "approve_credit") {
         if (!order.creditHold || order.creditApprovedAt) throw new MoneyError("This order is not on credit hold", 409);
+        if (order.creditHoldOwner) {
+          const me = await ctx.tx.user.findUnique({ where: { id: session.userId }, select: { isOwner: true } });
+          if (!me?.isOwner) throw new MoneyError("This order is past the shop's credit limit. Only the owner can let it through.", 403);
+        }
         const updated = await ctx.tx.order.update({
           where: { id },
           data: { creditApprovedBy: session.userId, creditApprovedAt: new Date() },

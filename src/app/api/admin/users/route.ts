@@ -6,6 +6,7 @@ import { checkStaffFields } from "@/lib/staff";
 import { checkLimit, entitlements, LimitError } from "@/lib/plans";
 import { addProblem, managesAdmins } from "@/lib/team-rules";
 import { passwordProblem } from "@/lib/email-auth";
+import { can } from "@/lib/permissions";
 
 const STAFF_ROLES = ["ADMIN", "SALES_AGENT", "DELIVERY_AGENT", "SUPERVISOR", "ACCOUNTANT"] as const;
 
@@ -29,7 +30,7 @@ export async function GET() {
     },
     orderBy: { outletName: "asc" },
   });
-  return NextResponse.json({ users, retailers, me: { id: me.id, isOwner: me.isOwner, managesAdmins: managesAdmins({ userId: me.id, isOwner: me.isOwner, isSupport: me.isSupport }) } });
+  return NextResponse.json({ users, retailers, me: { id: me.id, isOwner: me.isOwner, managesAdmins: managesAdmins({ userId: me.id, isOwner: me.isOwner, isSupport: me.isSupport }), canCredit: can(session.role, "credit.manage") } });
 }
 
 export async function POST(req: Request) {

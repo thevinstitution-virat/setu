@@ -6,9 +6,11 @@ import { checkLimit, LimitError } from "@/lib/plans";
 import { hashPassword } from "@/lib/password";
 import { passwordProblem } from "@/lib/email-auth";
 import { changeProblem, type TeamAction } from "@/lib/team-rules";
+import { can } from "@/lib/permissions";
 
 /**
- * Body: { active?, name?, phone?, supervisorId?, signOut?, resetMfa?, password? } — only the keys sent change.
+ * Body: { active?, name?, phone?, supervisorId?, signOut?, resetMfa?, password?, creditLimit? } — only the keys sent change.
+ * creditLimit: a sales agent's limit in paise on what their shops owe (null = none); needs credit.manage.
  * password: sets a new password (they forgot theirs) and signs them out everywhere.
  * Who may change whom: lib/team-rules.ts (the owner's login is off limits; other admins need the owner).
  * signOut: true ends their sessions on every device. resetMfa: true clears their authenticator app and
@@ -44,6 +46,15 @@ export async function PATCH(
     newHash = hashPassword(body.password);
   }
 
+  let creditLimit: number | null | undefined;
+  if ("creditLimit" in body) {
+    if (!can(session.role, "credit.manage")) return NextResponse.json({ error: "Only someone who manages credit can set a salesman's limit" }, { status: 403 });
+    if (target.role !== "SALES_AGENT") return NextResponse.json({ error: "Only a sales agent has a credit limit" }, { status: 400 });
+    const v = body.creditLimit;
+    if (v !== null && !(Number.isInteger(v) && v >= 0 && v <= 100_000_000_000)) return NextResponse.json({ error: "Credit limit must be an amount in rupees" }, { status: 400 });
+    creditLimit = v;
+  }
+
   const extra = await checkStaffFields(db, id, body);
   if ("error" in extra) return NextResponse.json({ error: extra.error }, { status: 400 });
   const data: StaffFields & { active?: boolean; name?: string } = { ...extra.data };
@@ -69,10 +80,11 @@ export async function PATCH(
       ...(resetMfa ? { totpSecret: null, totpEnabledAt: null, totpLastStep: null, recoveryCodes: [] } : {}),
     },
   });
+  if (creditLimit !== undefined) await db.salesAgentProfile.updateMany({ where: { userId: id }, data: { creditLimit } });
   // A supervisor who is switched off leaves their team without a supervisor.
   if (target.role === "SUPERVISOR" && data.active === false) await db.user.updateMany({ where: { supervisorId: id }, data: { supervisorId: null } });
 
-  await audit(db, { actorId: session.userId, action: "user.update", entity: "User", entityId: id, after: { ...data, ...(body.signOut === true ? { signedOut: true } : {}), ...(resetMfa ? { mfaReset: true } : {}), ...(newHash ? { passwordSet: true } : {}) }, ip: requestIp(req) });
+  await audit(db, { actorId: session.userId, action: "user.update", entity: "User", entityId: id, after: { ...data, ...(creditLimit !== undefined ? { creditLimit } : {}), ...(body.signOut === true ? { signedOut: true } : {}), ...(resetMfa ? { mfaReset: true } : {}), ...(newHash ? { passwordSet: true } : {}) }, ip: requestIp(req) });
 
   return NextResponse.json({ user: { id: user.id, active: user.active, name: user.name, phone: user.phone, email: user.email, supervisorId: user.supervisorId } });
 }
