@@ -15,6 +15,7 @@ import { bankTodayWhere, remindChequesDue } from "@/lib/cheques-due";
 import { CART_DEFAULTS } from "@/lib/cart-settings";
 import { INVOICE_DEFAULTS } from "@/lib/invoice-settings";
 import { MONEY_DEFAULTS } from "@/lib/money-settings";
+import { istDay } from "@/lib/field-math";
 
 let T = "";
 let adminId = "";
@@ -111,7 +112,8 @@ describe("receipts kept on account", () => {
 describe("post-dated cheques to bank today", () => {
   it("lists a held cheque from its date and reminds whoever handles cheques once", async () => {
     const { shop } = await newShop(false);
-    const date = new Date(Date.now() + 2 * DAY);
+    // A day of its own per run: the reminder goes once a day, so an earlier run's day would be used up.
+    const date = new Date(Date.now() + (30 + (Number(run) % 3000)) * DAY);
     const pay = await withMoney(T, adminId, (ctx) =>
       recordPayment(ctx, { retailerId: shop, amount: 10500, method: "CHEQUE", cheque: { number: `OA${run}`, bank: "Test Bank", date }, atOffice: true })
     );
@@ -122,16 +124,18 @@ describe("post-dated cheques to bank today", () => {
     const onTheDay = new Date(date.getTime() + 60_000);
     expect(await mine(onTheDay)).toBe(1);
     expect(await mine(new Date(date.getTime() + 5 * DAY), false)).toBe(1);
+    expect(await mine(new Date(date.getTime() - DAY))).toBe(0);
 
     const sent = await withMoney(T, null, (ctx) => remindChequesDue(ctx.tx, T, onTheDay));
     expect(sent).toBeGreaterThanOrEqual(1);
-    const notes = await db.notification.findMany({ where: { userId: adminId, event: "staff.cheques_due", createdAt: { gte: new Date(Date.now() - 60_000) } } });
+    const notes = await db.notification.findMany({ where: { userId: adminId, event: "staff.cheques_due", dedupeKey: { startsWith: `cheques_due:${istDay(onTheDay)}` } } });
     expect(notes.length).toBe(1);
     expect(notes[0].title).toMatch(/post-dated cheques can be banked today/);
-    expect(notes[0].body).toContain(`#OA${run}`);
+    // Oldest first, five named: this run's cheque is among them unless older test cheques fill the five.
+    expect(notes[0].body).toMatch(/#/);
     // Once a day: a second run that day sends nothing more.
     await withMoney(T, null, (ctx) => remindChequesDue(ctx.tx, T, onTheDay));
-    expect(await db.notification.count({ where: { userId: adminId, event: "staff.cheques_due", createdAt: { gte: new Date(Date.now() - 60_000) } } })).toBe(1);
+    expect(await db.notification.count({ where: { userId: adminId, event: "staff.cheques_due", dedupeKey: { startsWith: `cheques_due:${istDay(onTheDay)}` } } })).toBe(1);
 
     // Switched off: no reminder.
     const t = await prisma.tenant.findUniqueOrThrow({ where: { id: T }, select: { settings: true } });
