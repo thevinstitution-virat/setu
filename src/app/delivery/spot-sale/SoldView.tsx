@@ -48,7 +48,7 @@ export default function SoldView({ sale, onNewAction }: { sale: SoldSale; onNewA
       )}
 
       <div className="space-y-3">
-        <button type="button" className="btn btn-kesar w-full !min-h-[52px]" onClick={onNewAction}>
+        <button type="button" className="btn btn-kesar w-full !min-h-[56px]" onClick={onNewAction}>
           <Icon name="plus" className="h-4 w-4" /> New spot sale
         </button>
         <Link href="/delivery" className="btn btn-outline w-full">

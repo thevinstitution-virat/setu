@@ -8,6 +8,7 @@ import { tripStops } from "@/lib/trip-api";
 import { deliverySettings, slotLabel } from "@/lib/delivery-settings";
 import { inventorySettings } from "@/lib/inventory-settings";
 import Icon from "@/components/Icon";
+import EmptyState from "@/components/ui/EmptyState";
 import WorkspaceSwitcher from "@/components/field/WorkspaceSwitcher";
 import AnnouncementCards from "@/components/engage/AnnouncementCards";
 import DutySwitch from "./DutySwitch";
@@ -91,14 +92,14 @@ export default async function DeliveryHome() {
 
       <AnnouncementCards />
 
-      <div className="panel-dark p-5 grid grid-cols-2 gap-4">
+      <div className="panel-dark p-5 grid grid-cols-2 gap-4" data-ground="dark">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-genda">Drops left</p>
           <p className="stat-num mt-2">{dropsLeft}</p>
         </div>
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-genda">Cash collected</p>
-          <p className="stat-num mt-2">{formatINR(cash, { whole: true })}</p>
+          <p className="stat-num mt-2 num">{formatINR(cash, { whole: true })}</p>
           <p className="text-xs text-white/60 mt-1">{running ? "On this trip" : "No trip running"}</p>
         </div>
       </div>
@@ -146,13 +147,8 @@ export default async function DeliveryHome() {
       )}
 
       {active.length === 0 && loose.length === 0 && (
-        <div className="card p-6 text-center">
-          <span className="icon-tile mx-auto mb-3 bg-[var(--success-tint)] text-[var(--success-text)]">
-            <Icon name="check" />
-          </span>
-          <p className="text-sm text-[var(--ink-2)]">
-            {closed.length ? "All of today's trips are done." : "No deliveries assigned right now."}
-          </p>
+        <div className="card">
+          <EmptyState icon={closed.length ? "success-tick" : "van"} title={closed.length ? "All done for today" : "No deliveries right now"} text={closed.length ? "Today's trips are finished." : "Orders assigned to you will show up here."} />
         </div>
       )}
     </div>

@@ -44,7 +44,7 @@ export default function DeliveredView({ order, invoices }: { order: OrderDetail;
       ) : (
         <p className="text-sm text-[var(--muted)]">The invoice will show here once it is ready.</p>
       )}
-      <Link href="/delivery" className="btn btn-kesar w-full !min-h-[52px]">
+      <Link href="/delivery" className="btn btn-kesar w-full !min-h-[56px]">
         Back to my stops <Icon name="arrow" className="h-4 w-4" />
       </Link>
     </div>

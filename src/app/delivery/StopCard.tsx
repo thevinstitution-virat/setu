@@ -100,7 +100,7 @@ export default function StopCard({ stop }: { stop: TripStop }) {
           </span>
         )}
       </div>
-      <Link href={href} className="btn btn-kesar w-full !min-h-[52px]">
+      <Link href={href} className="btn btn-kesar w-full !min-h-[56px]">
         Deliver <Icon name="arrow" className="h-4 w-4" />
       </Link>
     </div>
