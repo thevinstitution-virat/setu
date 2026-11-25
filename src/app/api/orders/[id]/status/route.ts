@@ -4,7 +4,7 @@ import { emit } from "@/lib/jobs";
 import { audit, requestIp } from "@/lib/audit";
 import { nextStatus } from "@/lib/orders";
 import { can } from "@/lib/permissions";
-import { creditCancelledOrder, MoneyError, onOrderCancelled, onOrderDispatched, withMoney } from "@/lib/ledger";
+import { creditCancelledOrder, MoneyError, onOrderCancelled, onOrderDispatched, recheckCreditAtDispatch, withMoney } from "@/lib/ledger";
 import { queueEInvoice } from "@/lib/einvoice-queue";
 import { moneyFail } from "@/lib/money-api";
 import { releaseRedemptions } from "@/lib/order-place";
@@ -72,6 +72,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         }
       }
       if (to === "OUT_FOR_DELIVERY") {
+        await recheckCreditAtDispatch(ctx, order.id);
         const inv = await onOrderDispatched(ctx, order.id);
         if (inv) docs.push(inv);
       }

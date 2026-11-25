@@ -365,6 +365,11 @@ model RetailerProfile {
   creditLimit    Int?
   /// Days a bill may stay unpaid before it is overdue. null = tenant default.
   creditDays     Int?
+  /// Most unpaid bills this retailer may have before new orders are held (null = the business default).
+  creditBills    Int?
+  /// A higher limit for a while (a season, a big order): used instead of the credit limit until tempCreditUntil.
+  tempCreditLimit Int?
+  tempCreditUntil DateTime?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @default(now()) @updatedAt
   /// Where the map pin came from: gps (on site), address (looked up), manual.

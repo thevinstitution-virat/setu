@@ -48,8 +48,8 @@ type StatementRow = { date: string; kind: string; memo: string | null; debit: nu
 type Khata = {
   retailer: { id: string; outletName: string; ownerName: string; phone: string | null; areaName: string; address: string };
   hasOpening: boolean;
-  terms: { mode: Mode; creditLimit: number | null; creditDays: number };
-  termsOverride: { paymentMode: Mode | null; creditLimit: number | null; creditDays: number | null };
+  terms: { mode: Mode; creditLimit: number | null; creditDays: number; creditBills: number | null; tempLimit: { amount: number; until: string } | null };
+  termsOverride: { paymentMode: Mode | null; creditLimit: number | null; creditDays: number | null; creditBills: number | null; tempCreditLimit: number | null; tempCreditUntil: string | null };
   balances: { receivable: number; walletAvailable: number; walletReserved: number };
   creditAvailable: number | null;
   overdue: number;
@@ -1008,17 +1008,25 @@ function CreditTerms({
   const [mode, setMode] = useState<"DEFAULT" | Mode>(override.paymentMode ?? "DEFAULT");
   const [limit, setLimit] = useState(toRupeeInput(override.creditLimit));
   const [days, setDays] = useState(override.creditDays === null ? "" : String(override.creditDays));
+  const [bills, setBills] = useState(override.creditBills === null ? "" : String(override.creditBills));
+  // The temporary limit's last day as YYYY-MM-DD in India.
+  const untilDay = (s: string | null) => (s ? new Date(new Date(s).getTime() + 5.5 * 3_600_000).toISOString().slice(0, 10) : "");
+  const [temp, setTemp] = useState(toRupeeInput(override.tempCreditLimit));
+  const [until, setUntil] = useState(untilDay(override.tempCreditUntil));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Keep the form in step with the server after a reload.
-  const key = `${override.paymentMode}|${override.creditLimit}|${override.creditDays}`;
+  const key = `${override.paymentMode}|${override.creditLimit}|${override.creditDays}|${override.creditBills}|${override.tempCreditLimit}|${override.tempCreditUntil}`;
   const [seen, setSeen] = useState(key);
   if (seen !== key) {
     setSeen(key);
     setMode(override.paymentMode ?? "DEFAULT");
     setLimit(toRupeeInput(override.creditLimit));
     setDays(override.creditDays === null ? "" : String(override.creditDays));
+    setBills(override.creditBills === null ? "" : String(override.creditBills));
+    setTemp(toRupeeInput(override.tempCreditLimit));
+    setUntil(untilDay(override.tempCreditUntil));
   }
 
   async function save() {
@@ -1034,10 +1042,30 @@ function CreditTerms({
       if (!Number.isInteger(n) || n < 0 || n > 365) return setError("Credit days must be 0 to 365");
       creditDays = n;
     }
+    let creditBills: number | null = null;
+    if (bills.trim()) {
+      const n = Number(bills);
+      if (!Number.isInteger(n) || n < 1 || n > 999) return setError("Unpaid bills allowed must be 1 to 999");
+      creditBills = n;
+    }
+    let tempCreditLimit: number | null = null;
+    if (temp.trim()) {
+      const p = parsePaise(temp);
+      if (p === null || p < 0) return setError("Temporary limit must be ₹0 or more");
+      if (!until) return setError("Give the temporary limit a last day");
+      tempCreditLimit = p;
+    }
     setBusy(true);
     setError(null);
     try {
-      await send(`/api/admin/khata/${retailerId}`, "PATCH", { paymentMode: mode === "DEFAULT" ? null : mode, creditLimit, creditDays });
+      await send(`/api/admin/khata/${retailerId}`, "PATCH", {
+        paymentMode: mode === "DEFAULT" ? null : mode,
+        creditLimit,
+        creditDays,
+        creditBills,
+        tempCreditLimit,
+        tempCreditUntil: tempCreditLimit === null ? null : until,
+      });
       await onDone("Credit terms saved");
     } catch (e) {
       setError(errText(e));
@@ -1065,6 +1093,17 @@ function CreditTerms({
             Pay within: <b>{plural(terms.creditDays, "day")}</b>
             {defaultTag(override.creditDays === null)}
           </p>
+          {terms.creditBills !== null && (
+            <p>
+              Unpaid bills allowed: <b>{terms.creditBills}</b>
+              {defaultTag(override.creditBills === null)}
+            </p>
+          )}
+          {terms.tempLimit && (
+            <p>
+              The limit above is temporary, until <b>{fmtDate(terms.tempLimit.until)}</b>.
+            </p>
+          )}
         </div>
 
         <div>
@@ -1104,6 +1143,21 @@ function CreditTerms({
           </label>
         </div>
         <p className="text-[11px] text-[var(--muted)]">Leave blank to use the business default. A limit of 0 means no credit.</p>
+        <label className="block">
+          <span className="text-xs font-semibold text-[var(--ink-2)]">Unpaid bills allowed</span>
+          <input className="input mt-1" inputMode="numeric" placeholder="Default" value={bills} onChange={(e) => setBills(e.target.value.replace(/\D/g, ""))} />
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block">
+            <span className="text-xs font-semibold text-[var(--ink-2)]">Temporary limit (₹)</span>
+            <input className="input mt-1" inputMode="decimal" placeholder="None" value={temp} onChange={(e) => setTemp(e.target.value.replace(/[^\d.]/g, ""))} />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-[var(--ink-2)]">Until</span>
+            <input className="input mt-1" type="date" value={until} onChange={(e) => setUntil(e.target.value)} />
+          </label>
+        </div>
+        <p className="text-[11px] text-[var(--muted)]">A temporary limit is used in place of the credit limit until that day, when it is higher. Clear it to end it early.</p>
         {error && <p className="text-xs text-[#a8281e]">{error}</p>}
         <button className="btn btn-mor btn-sm w-full" disabled={busy} onClick={save}>
           {busy ? "Saving…" : "Save terms"}

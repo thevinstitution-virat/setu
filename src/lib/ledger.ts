@@ -41,7 +41,17 @@ export async function withMoney<T>(tenantId: string, actorId: string | null, fn:
       return fn({ tx, tenantId, actorId });
     },
     { timeout: 20_000 }
-  );
+  ).catch(async (e: unknown) => {
+    // A credit check failed when an order was about to leave: everything was
+    // undone, but the order must stay marked as held so it can be approved.
+    const hold = e instanceof MoneyError ? (e.extra?.creditHold as { orderId: string; reason: string } | undefined) : undefined;
+    if (hold) {
+      await withTenantTx(tenantId, (tx) =>
+        tx.order.updateMany({ where: { id: hold.orderId, creditApprovedAt: null }, data: { creditHold: true, creditHoldReason: hold.reason } })
+      ).catch(() => undefined);
+    }
+    throw e;
+  });
   // Messages queued in this transaction are now committed: send them soon.
   if (used && queuedMessages(used)) void kickMessages(tenantId);
   return out;
@@ -346,7 +356,7 @@ export async function loadTerms(ctx: Ctx, retailerId: string) {
     ctx.tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { settings: true } }),
     ctx.tx.retailerProfile.findUniqueOrThrow({
       where: { id: retailerId },
-      select: { id: true, outletName: true, paymentMode: true, creditLimit: true, creditDays: true },
+      select: { id: true, outletName: true, paymentMode: true, creditLimit: true, creditDays: true, creditBills: true, tempCreditLimit: true, tempCreditUntil: true },
     }),
   ]);
   const settings = moneySettings(tenant.settings);
@@ -1002,9 +1012,22 @@ export async function onOrderPlaced(ctx: Ctx, order: { id: string; retailerId: s
 async function creditHoldReason(
   ctx: Ctx,
   settings: MoneySettings,
-  terms: { mode: PaymentMode; creditLimit: number | null; creditDays: number },
+  terms: { mode: PaymentMode; creditLimit: number | null; creditDays: number; creditBills?: number | null },
   order: { id: string; retailerId: string; totalAmount: number }
 ): Promise<string | null> {
+  if (settings.holdOnBounce) {
+    const since = addDays(new Date(), -settings.bounceHoldDays);
+    const bounced = await ctx.tx.cheque.findFirst({
+      where: { status: "BOUNCED", bouncedAt: { gte: since }, payment: { retailerId: order.retailerId } },
+      orderBy: { bouncedAt: "desc" },
+      select: { number: true, bouncedAt: true },
+    });
+    if (bounced) return `Cheque ${bounced.number} bounced on ${bounced.bouncedAt!.toISOString().slice(0, 10)}`;
+  }
+  if (terms.creditBills != null) {
+    const unpaid = await ctx.tx.bill.count({ where: { retailerId: order.retailerId, settled: false } });
+    if (unpaid >= terms.creditBills) return `${unpaid} unpaid bill${unpaid === 1 ? "" : "s"} (limit ${terms.creditBills})`;
+  }
   if (settings.holdOnOverdue) {
     const cutoff = addDays(new Date(), -settings.overdueGraceDays);
     const overdue = await ctx.tx.bill.findFirst({
@@ -1027,12 +1050,37 @@ async function creditHoldReason(
       },
       _sum: { totalAmount: true },
     });
-    const exposure = receivable + Number(open._sum.totalAmount ?? 0) + order.totalAmount;
+    // Post-dated cheques held are money on its way, when the business counts them.
+    const held = settings.pdcReducesExposure
+      ? Number((await ctx.tx.payment.aggregate({ where: { retailerId: order.retailerId, state: "POST_DATED", purpose: "DUES" }, _sum: { amount: true } }))._sum.amount ?? 0)
+      : 0;
+    const exposure = receivable + Number(open._sum.totalAmount ?? 0) + order.totalAmount - held;
     if (exposure > terms.creditLimit) {
       return `Over credit limit by ${formatINR(exposure - terms.creditLimit)} (limit ${formatINR(terms.creditLimit)})`;
     }
   }
   return null;
+}
+
+/**
+ * The order is about to leave: check credit again (it may have been fine when
+ * placed, and a bill has gone overdue or a cheque bounced since). Only when
+ * the business asks for it, for credit shops, and not for an order someone
+ * with credit rights already let through. A failed check refuses the dispatch
+ * and leaves the order on credit hold (see withMoney) for approval.
+ */
+export async function recheckCreditAtDispatch(ctx: Ctx, orderId: string) {
+  const order = await ctx.tx.order.findUniqueOrThrow({
+    where: { id: orderId },
+    select: { id: true, orderNumber: true, retailerId: true, totalAmount: true, creditApprovedAt: true, invoices: { where: { type: { in: ["TAX_INVOICE", "BILL_OF_SUPPLY"] } }, select: { id: true } } },
+  });
+  // Approved by hand, or already billed: nothing left to decide.
+  if (order.creditApprovedAt || order.invoices.length) return;
+  const { settings, terms } = await loadTerms(ctx, order.retailerId);
+  if (!settings.checkCreditAtBilling || terms.mode === "PREPAID") return;
+  await lockRetailer(ctx, order.retailerId);
+  const reason = await creditHoldReason(ctx, settings, terms, order);
+  if (reason) throw new MoneyError(`${order.orderNumber} is on credit hold: ${reason}. Someone who manages credit must approve it.`, 409, { creditHold: { orderId: order.id, reason } });
 }
 
 /** Order cancelled before delivery: give back any wallet reservation. */

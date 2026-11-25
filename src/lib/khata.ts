@@ -66,7 +66,14 @@ export async function khataSummary(ctx: Ctx, retailerId: string) {
     /** An opening balance can be entered only once. */
     hasOpening: hasOpening > 0,
     terms,
-    termsOverride: { paymentMode: retailer.paymentMode, creditLimit: retailer.creditLimit, creditDays: retailer.creditDays },
+    termsOverride: {
+      paymentMode: retailer.paymentMode,
+      creditLimit: retailer.creditLimit,
+      creditDays: retailer.creditDays,
+      creditBills: retailer.creditBills,
+      tempCreditLimit: retailer.tempCreditLimit,
+      tempCreditUntil: retailer.tempCreditUntil,
+    },
     balances,
     /** Credit left before new orders go on hold (null = no limit). */
     creditAvailable:

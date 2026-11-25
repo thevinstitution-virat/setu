@@ -28,6 +28,11 @@ type Money = {
   defaultCreditLimit: number | null;
   holdOnOverdue: boolean;
   overdueGraceDays: number;
+  defaultCreditBills: number | null;
+  holdOnBounce: boolean;
+  bounceHoldDays: number;
+  pdcReducesExposure: boolean;
+  checkCreditAtBilling: boolean;
   chequeBouncePenalty: number;
   upiVpa: string;
   upiPayeeName: string;
@@ -41,6 +46,11 @@ type Form = {
   defaultCreditLimit: string;
   holdOnOverdue: boolean;
   overdueGraceDays: string;
+  defaultCreditBills: string;
+  holdOnBounce: boolean;
+  bounceHoldDays: string;
+  pdcReducesExposure: boolean;
+  checkCreditAtBilling: boolean;
   chequeBouncePenalty: string;
   upiVpa: string;
   upiPayeeName: string;
@@ -52,6 +62,8 @@ const FIELD_LABEL: Record<string, string> = {
   defaultCreditDays: "Credit days",
   defaultCreditLimit: "Credit limit",
   overdueGraceDays: "Grace days",
+  defaultCreditBills: "Unpaid bills allowed",
+  bounceHoldDays: "Days after a bounced cheque",
   chequeBouncePenalty: "Cheque bounce charge",
 };
 
@@ -64,6 +76,11 @@ function toForm(m: Money): Form {
     defaultCreditLimit: m.defaultCreditLimit === null ? "" : rupees(m.defaultCreditLimit),
     holdOnOverdue: m.holdOnOverdue,
     overdueGraceDays: String(m.overdueGraceDays),
+    defaultCreditBills: m.defaultCreditBills == null ? "" : String(m.defaultCreditBills),
+    holdOnBounce: !!m.holdOnBounce,
+    bounceHoldDays: String(m.bounceHoldDays ?? 30),
+    pdcReducesExposure: !!m.pdcReducesExposure,
+    checkCreditAtBilling: !!m.checkCreditAtBilling,
     chequeBouncePenalty: rupees(m.chequeBouncePenalty),
     upiVpa: m.upiVpa,
     upiPayeeName: m.upiPayeeName,
@@ -94,12 +111,26 @@ function toPatch(f: Form): Money | string {
   if (typeof limit === "string") return limit;
   const penalty = f.chequeBouncePenalty.trim() ? money(f.chequeBouncePenalty, "Cheque bounce charge") : 0;
   if (typeof penalty === "string") return penalty;
+  let bills: number | null = null;
+  if (f.defaultCreditBills.trim()) {
+    const n = Number(f.defaultCreditBills);
+    if (!Number.isInteger(n) || n < 1 || n > 999) return "Unpaid bills allowed must be a whole number from 1 to 999";
+    bills = n;
+  }
+  const bounceDays = days(f.bounceHoldDays, "Days after a bounced cheque", 365);
+  if (typeof bounceDays === "string") return bounceDays;
+  if (bounceDays < 1) return "Days after a bounced cheque must be at least 1";
   return {
     defaultPaymentMode: f.defaultPaymentMode,
     defaultCreditDays: creditDays,
     defaultCreditLimit: limit,
     holdOnOverdue: f.holdOnOverdue,
     overdueGraceDays: grace,
+    defaultCreditBills: bills,
+    holdOnBounce: f.holdOnBounce,
+    bounceHoldDays: bounceDays,
+    pdcReducesExposure: f.pdcReducesExposure,
+    checkCreditAtBilling: f.checkCreditAtBilling,
     chequeBouncePenalty: penalty,
     upiVpa: f.upiVpa.trim(),
     upiPayeeName: f.upiPayeeName.trim(),
@@ -468,6 +499,49 @@ export default function SettingsPage() {
             />
             <span className="block text-xs text-[var(--muted)] mt-1">Extra days after the due date before the hold starts.</span>
           </label>
+        </section>
+
+        <section className="card p-5 space-y-4">
+          <p className="font-heading font-bold">More credit checks</p>
+          <label className="block max-w-xs">
+            <span className="block text-sm font-medium text-[var(--ink-2)] mb-1">Unpaid bills allowed</span>
+            <input
+              className="input"
+              inputMode="numeric"
+              placeholder="No limit"
+              value={form.defaultCreditBills}
+              onChange={(e) => set("defaultCreditBills", e.target.value.replace(/\D/g, ""))}
+            />
+            <span className="block text-xs text-[var(--muted)] mt-1">A retailer with this many unpaid bills has new orders held. Leave blank for no limit by bills. Can be set per retailer on their khata.</span>
+          </label>
+          <Toggle
+            checked={form.holdOnBounce}
+            onChange={(v) => set("holdOnBounce", v)}
+            label="Hold orders after a bounced cheque"
+            hint="A retailer whose cheque bounced has new orders held until you approve them."
+          />
+          <label className={`block max-w-xs ${form.holdOnBounce ? "" : "opacity-50"}`}>
+            <span className="block text-sm font-medium text-[var(--ink-2)] mb-1">For how many days</span>
+            <input
+              className="input"
+              inputMode="numeric"
+              disabled={!form.holdOnBounce}
+              value={form.bounceHoldDays}
+              onChange={(e) => set("bounceHoldDays", e.target.value.replace(/\D/g, ""))}
+            />
+          </label>
+          <Toggle
+            checked={form.pdcReducesExposure}
+            onChange={(v) => set("pdcReducesExposure", v)}
+            label="Count post-dated cheques as money on its way"
+            hint="Post-dated cheques you are holding from a retailer are taken off what they owe when checking the credit limit. The bills still stay unpaid until the cheque is banked."
+          />
+          <Toggle
+            checked={form.checkCreditAtBilling}
+            onChange={(v) => set("checkCreditAtBilling", v)}
+            label="Check credit again when the order leaves"
+            hint="An order that was fine when placed is checked once more before it goes out. If the retailer has since crossed a limit, it is put on credit hold for approval on the Orders screen. Prepaid retailers and orders already approved are not checked."
+          />
         </section>
 
         <section className="card p-5 space-y-4">
