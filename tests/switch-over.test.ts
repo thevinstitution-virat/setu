@@ -122,6 +122,34 @@ describe("purchase bills: MRP and discounts one after another", () => {
   });
 });
 
+describe("purchase bills: scheme and free-goods deals", () => {
+  it("reads scheme_amount and a deal like 10+1, and refuses what doesn't fit", () => {
+    const r = validatePurchases(
+      rows(
+        ["supplier", "bill_no", "date", "sku", "head", "qty", "rate", "scheme_amount", "deal"],
+        ["Acme", "S-1", "21/11/2026", "SKU1", "", "25", "10", "12.50", "10+1"],
+        ["Acme", "S-1", "21/11/2026", "SKU2", "", "5", "10", "", ""],
+        ["Acme", "S-2", "21/11/2026", "SKU1", "", "1", "10", "", "10"],
+        ["Acme", "S-3", "21/11/2026", "", "Freight", "1", "10", "5", ""],
+        ["Acme", "S-4", "21/11/2026", "SKU1", "", "1", "10", "five", ""],
+        ["Acme", "S-5", "21/11/2026", "SKU1", "", "1", "10", "", "0+1"],
+      ),
+      new Date("2026-11-25T06:00:00Z"),
+    );
+    expect(r.valid.map((b) => b.number)).toEqual(["S-1"]);
+    expect(r.valid[0].lines[0]).toMatchObject({ schemeAmount: 12_50, deal: { buy: 10, get: 1 } });
+    expect(r.valid[0].lines[1]).toMatchObject({ schemeAmount: 0 });
+    expect(r.valid[0].lines[1].deal).toBeUndefined();
+    expect(r.errors.map((e) => e.message)).toEqual([
+      expect.stringMatching(/should look like 10\+1/),
+      expect.stringMatching(/only on a product/),
+      expect.stringMatching(/scheme_amount must be a number/),
+      expect.stringMatching(/should look like 10\+1/),
+    ]);
+    expect(templateCsv("purchases").split("\r\n")[0]).toContain("mrp,discount_pct,scheme_amount,deal,gst_rate");
+  });
+});
+
 describe("purchase bills by the case", () => {
   const head = ["supplier", "bill_no", "date", "sku", "head", "qty", "rate", "cases", "loose", "case_size", "case_rate"];
   const day = new Date("2026-11-25T06:00:00Z");
@@ -156,7 +184,7 @@ describe("purchase bills by the case", () => {
       expect.stringMatching(/case_rate/),
     ]);
     const tpl = templateCsv("purchases", { purchaseCases: true }).split("\r\n");
-    expect(tpl[0]).toContain("rate,cases,loose,case_size,case_rate,mrp,discount_pct");
+    expect(tpl[0]).toContain("rate,cases,loose,case_size,case_rate,mrp,discount_pct,scheme_amount,deal");
     expect(tpl[2]).toContain("1680.50");
   });
 });
@@ -220,6 +248,21 @@ describe("books imports (rolled back)", () => {
       expect(m1).toMatchObject({ created: 1, errors: [] });
       const mb = await ctx.tx.purchaseBill.findFirstOrThrow({ where: { supplierId: sup.id, supplierRef: "PB-M" }, include: { lines: true } });
       expect(mb.lines[0]).toMatchObject({ discountPct: 10, discount2Pct: 5, discount3Pct: 0, mrp: 12_50, taxable: 855_00 });
+
+      // Scheme and deals: 25 billed on 10+1 = 2 free; 10 cases of 144 on 5+1 = 2 cases (288) free; a free_qty that disagrees is refused.
+      const dr = rows(
+        ["supplier", "bill_no", "date", "sku", "qty", "rate", "free_qty", "scheme_amount", "deal", "cases", "case_rate", "gst_rate"],
+        [name, "PB-S", "19/06/2002", cased.sku, "25", "10", "", "20", "10+1", "", "", "18"],
+        [name, "PB-T", "19/06/2002", cased.sku, "", "", "", "", "5+1", "10", "2391.55", "18"],
+        [name, "PB-U", "19/06/2002", cased.sku, "25", "10", "3", "", "10+1", "", "", "18"],
+      );
+      const dl = await importPurchases(ctx, validatePurchases(dr, new Date(), { purchaseCases: true }).valid);
+      expect(dl.created).toBe(2);
+      expect(dl.errors.map((e) => e.message)).toEqual([expect.stringMatching(/free_qty 3 doesn't match deal 10\+1 \(that gives 2\)/)]);
+      const sb = await ctx.tx.purchaseBill.findFirstOrThrow({ where: { supplierId: sup.id, supplierRef: "PB-S" }, include: { lines: true } });
+      expect(sb.lines[0]).toMatchObject({ quantity: 25, freeQty: 2, schemeAmount: 20_00, taxable: 250_00 - 20_00 });
+      const tb = await ctx.tx.purchaseBill.findFirstOrThrow({ where: { supplierId: sup.id, supplierRef: "PB-T" }, include: { lines: true } });
+      expect(tb.lines[0]).toMatchObject({ quantity: 1440, freeQty: 288, taxable: 23915_50 });
     });
   }, 30_000);
 });

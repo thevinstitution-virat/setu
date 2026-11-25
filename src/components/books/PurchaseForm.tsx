@@ -44,6 +44,8 @@ type LineForm = {
   loose: string;
   caseRate: string;
   mrp: string;
+  /** The company's scheme discount on the line, ₹. */
+  scheme: string;
   gstRate: string;
   itc: boolean;
   batch: string;
@@ -72,6 +74,7 @@ const blankLine = (target: LineForm["target"] = "GOODS"): LineForm => ({
   loose: "",
   caseRate: "",
   mrp: "",
+  scheme: "",
   gstRate: target === "CLAIM" ? "0" : "18",
   itc: true,
   batch: "",
@@ -91,18 +94,20 @@ const casesLabel = (unit?: string | null) => {
 function lineMoney(l: LineForm, inclusive: boolean, interState: boolean) {
   const ds = parseDiscounts(l.discountPct);
   const g = Number(l.gstRate);
-  if (!ds) return null;
+  const sc = l.target === "GOODS" ? readRupees(l.scheme) : null;
+  if (!ds || sc === "bad") return null;
+  const scheme = sc ?? 0;
   if (l.byCase && l.caseSize) {
     const cr = readRupees(l.caseRate);
     const q = int(l.cases) * l.caseSize + int(l.loose);
     if (cr === "bad" || cr === null || !Number.isInteger(q) || q < 1) return null;
     const rate = Math.round(cr / l.caseSize);
-    return { quantity: q, rate, ds, caseRate: cr, m: purchaseLineMoney(rate, q, ds[0] ?? 0, g, inclusive, interState, { caseRate: cr, caseSize: l.caseSize, more: ds.slice(1) }) };
+    return { quantity: q, rate, ds, scheme, caseRate: cr, m: purchaseLineMoney(rate, q, ds[0] ?? 0, g, inclusive, interState, { caseRate: cr, caseSize: l.caseSize, more: ds.slice(1), scheme }) };
   }
   const rate = readRupees(l.rate);
   const q = int(l.quantity);
   if (rate === "bad" || rate === null || !Number.isInteger(q) || q < 1) return null;
-  return { quantity: q, rate, ds, caseRate: null, m: purchaseLineMoney(rate, q, ds[0] ?? 0, g, inclusive, interState, { more: ds.slice(1) }) };
+  return { quantity: q, rate, ds, scheme, caseRate: null, m: purchaseLineMoney(rate, q, ds[0] ?? 0, g, inclusive, interState, { more: ds.slice(1), scheme }) };
 }
 
 /**
@@ -236,6 +241,8 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
       const x = lineMoney(l, inclusive, interState);
       if (!parseDiscounts(l.discountPct)) return setErr(`Line ${i + 1}: write the discount like 10 or 10+5 (up to three)`);
       if (!x) return setErr(l.byCase ? `Line ${i + 1}: enter the cases (or loose units) and the rate per case` : `Line ${i + 1}: enter the quantity and the rate in rupees`);
+      if (readRupees(l.scheme) === "bad") return setErr(`Line ${i + 1}: write the scheme in rupees`);
+      if (x.m.taxable < 0) return setErr(`Line ${i + 1}: the scheme is more than the line after its discounts`);
       const mrp = readRupees(l.mrp);
       if (mrp === "bad") return setErr(`Line ${i + 1}: write the MRP in rupees`);
       body.lines.push({
@@ -252,6 +259,7 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
         discountPct: x.ds[0] ?? 0,
         discount2Pct: x.ds[1] ?? 0,
         discount3Pct: x.ds[2] ?? 0,
+        schemeAmount: x.scheme,
         gstRate: Number(l.gstRate),
         itc: l.itc,
         batch: l.batch || null,
@@ -549,6 +557,11 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
                     <input className="input" inputMode="decimal" value={l.mrp} onChange={(e) => setLine(l.key, { mrp: e.target.value })} />
                   </Field>
                 )}
+                {l.target === "GOODS" && (
+                  <Field label="Scheme (₹)" hint="Off the line, after the %">
+                    <input className="input" inputMode="decimal" value={l.scheme} onChange={(e) => setLine(l.key, { scheme: e.target.value })} />
+                  </Field>
+                )}
                 <Field label="GST %">
                   <select className="input" value={l.gstRate} onChange={(e) => setLine(l.key, { gstRate: e.target.value })}>
                     {o.gstRates.map((g) => (
@@ -578,7 +591,7 @@ export default function PurchaseForm({ initial }: { initial: { type: PurchaseDoc
                 <p className="text-xs text-[var(--muted)] tabular-nums">
                   {l.byCase && l.caseSize ? `${int(l.cases)} × ${l.caseSize}${int(l.loose) ? ` + ${int(l.loose)} loose` : ""} = ${int(l.cases) * l.caseSize + int(l.loose)} ${product?.unit ?? "units"} · ` : ""}
                   Taxable {formatINR(m.taxable)}
-                  {m.discount ? ` after ${formatINR(m.discount)} discount` : ""} · {interState ? `IGST ${formatINR(m.igst)}` : `CGST ${formatINR(m.cgst)} + SGST ${formatINR(m.sgst)}`}
+                  {m.discount || m.scheme ? ` after ${[m.discount ? `${formatINR(m.discount)} discount` : "", m.scheme ? `${formatINR(m.scheme)} scheme` : ""].filter(Boolean).join(" and ")}` : ""} · {interState ? `IGST ${formatINR(m.igst)}` : `CGST ${formatINR(m.cgst)} + SGST ${formatINR(m.sgst)}`}
                   {!l.itc && m.tax ? " · tax added to the cost" : ""}
                 </p>
               )}

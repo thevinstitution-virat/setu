@@ -10,15 +10,16 @@ export const GST_RATES = [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 7.5, 12, 18, 28, 40];
 export const DOC_LABEL: Record<PurchaseDocType, string> = { BILL: "Purchase bill", DEBIT_NOTE: "Debit note to supplier", CREDIT_NOTE: "Credit note from supplier" };
 export const SUPPLIER_KINDS: Record<SupplierKind, string> = { GOODS: "Company (goods we sell)", SERVICES: "Services (transport, rent, repairs …)", OTHER: "Other" };
 
-export type LineMoney = { gross: number; discount: number; taxable: number; tax: number; cgst: number; sgst: number; igst: number; total: number };
+export type LineMoney = { gross: number; discount: number; scheme: number; taxable: number; tax: number; cgst: number; sgst: number; igst: number; total: number };
 
-/** Billed by the case (rate per case, units in a case) and further discounts after the first. */
-export type LineExtra = { caseRate?: number | null; caseSize?: number | null; more?: number[] };
+/** Billed by the case (rate per case, units in a case), further discounts after the first, and the company's scheme amount (paise). */
+export type LineExtra = { caseRate?: number | null; caseSize?: number | null; more?: number[]; scheme?: number };
 
 /**
  * One line: rate × qty (or, by the case, case rate × qty ÷ units in a case, so
  * the amount is the bill's to the paisa), less each discount % in turn on what
- * is left, GST on top (or taken out when rates include it). Paise.
+ * is left, then the scheme amount, GST on top (or taken out when rates
+ * include it). Paise.
  */
 export function purchaseLineMoney(rate: number, quantity: number, discountPct: number, gstRate: number, inclusive: boolean, interState: boolean, x: LineExtra = {}): LineMoney {
   const gross = x.caseRate != null && x.caseSize ? Math.round((x.caseRate * quantity) / x.caseSize) : rate * quantity;
@@ -30,9 +31,11 @@ export function purchaseLineMoney(rate: number, quantity: number, discountPct: n
     discount += cut;
     net -= cut;
   }
+  const scheme = x.scheme ?? 0;
+  net -= scheme;
   const tax = inclusive ? gstInside(net, gstRate) : gstOn(net, gstRate);
   const taxable = inclusive ? net - tax : net;
-  return { gross, discount, taxable, tax, ...splitTax(tax, interState), total: taxable + tax };
+  return { gross, discount, scheme, taxable, tax, ...splitTax(tax, interState), total: taxable + tax };
 }
 
 /** "10 + 5 + 2" (or "10,5") → [10, 5, 2]: up to three discounts, each 0 to 100. Blank → []. null = not readable. */

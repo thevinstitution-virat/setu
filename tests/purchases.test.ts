@@ -314,6 +314,16 @@ describe("by the case, several discounts, bill details", () => {
     expect(await code(as((ctx) => recordPurchase(ctx, bill({ lines: [{ productId: ids.p1, quantity: 1, rate: 100, discount2Pct: 120, gstRate: 18 }] }))))).toBe(400);
   });
 
+  it("takes the scheme off after the % discounts, before GST", async () => {
+    // 100 × ₹10 = 100000; 10% → 90000; scheme ₹50 → 85000; GST 18% on 85000.
+    expect(purchaseLineMoney(1000, 100, 10, 18, false, false, { scheme: 5000 })).toMatchObject({ discount: 10000, scheme: 5000, taxable: 85000, tax: 15300 });
+    const doc = await as((ctx) => recordPurchase(ctx, bill({ lines: [{ productId: ids.p1, quantity: 100, rate: 1000, discountPct: 10, schemeAmount: 5000, gstRate: 18 }] })));
+    const d = await as((ctx) => purchaseDetail(ctx, doc.id));
+    expect(d.lines[0]).toMatchObject({ schemeAmount: 5000, taxable: 85000 });
+    expect(await code(as((ctx) => recordPurchase(ctx, bill({ lines: [{ productId: ids.p1, quantity: 1, rate: 1000, schemeAmount: 2000, gstRate: 18 }] }))))).toBe(400);
+    expect(await code(as((ctx) => recordPurchase(ctx, bill({ supplierId: ids.transport, lines: [{ target: "HEAD", headId: ids.headRepairs, quantity: 1, rate: 1000, schemeAmount: 100, gstRate: 18 }] }))))).toBe(400);
+  });
+
   it("keeps the e-invoice, e-way bill, transport, PO and scans, and checks them", async () => {
     const irn = "a".repeat(64);
     const scan = `t/${T}/purchase-bill/2026/11/x.pdf`;

@@ -49,6 +49,8 @@ export type PurchaseLineInput = {
   caseSize?: number | null;
   /** MRP per unit printed on the bill, paise. */
   mrp?: number | null;
+  /** The company's scheme discount on the line, paise (goods only). */
+  schemeAmount?: number;
   gstRate?: number;
   itc?: boolean;
   /** Line of the goods received note being billed. */
@@ -201,13 +203,17 @@ export async function recordPurchase(ctx: Ctx, input: PurchaseInput) {
     const gstRate = Number(raw.gstRate ?? 0);
     const mrp = raw.mrp === undefined || raw.mrp === null ? null : Number(raw.mrp);
     if (mrp !== null && (!isInt(mrp, 0, 10_000_000_000) || target !== "GOODS")) throw new MoneyError(`${n}: MRP must be in rupees and paise`);
+    const schemeAmount = Number(raw.schemeAmount ?? 0);
+    if (!isInt(schemeAmount, 0, 100_000_000_000)) throw new MoneyError(`${n}: scheme must be in rupees and paise`);
+    if (schemeAmount && target !== "GOODS") throw new MoneyError(`${n}: a scheme discount goes on goods`);
     if (!isInt(quantity, 1, 10_000_000)) throw new MoneyError(`${n}: quantity must be a whole number, 1 or more`);
     if (!isInt(freeQty, 0, 10_000_000)) throw new MoneyError(`${n}: free quantity must be a whole number`);
     if (freeQty && target !== "GOODS") throw new MoneyError(`${n}: only goods come free`);
     if (!isInt(rate, 0, 10_000_000_000)) throw new MoneyError(`${n}: rate must be in rupees and paise`);
     if (![discountPct, discount2Pct, discount3Pct].every((d) => d >= 0 && d <= 100)) throw new MoneyError(`${n}: discount must be 0 to 100%`);
     if (!GST_RATES.includes(gstRate)) throw new MoneyError(`${n}: GST rate ${gstRate}% is not a GST rate`);
-    const m = purchaseLineMoney(rate, quantity, discountPct, gstRate, inclusive, interState, { caseRate, caseSize, more: [discount2Pct, discount3Pct] });
+    const m = purchaseLineMoney(rate, quantity, discountPct, gstRate, inclusive, interState, { caseRate, caseSize, more: [discount2Pct, discount3Pct], scheme: schemeAmount });
+    if (m.taxable < 0 || m.total < 0) throw new MoneyError(`${n}: the scheme is more than the line after its discounts`);
     if (m.total <= 0) throw new MoneyError(`${n}: the amount is ₹0`);
     let purchaseLineId: string | null = null;
     if (raw.purchaseLineId) {
@@ -218,7 +224,7 @@ export async function recordPurchase(ctx: Ctx, input: PurchaseInput) {
     }
     const expiry = raw.expiry ? (isDay(raw.expiry) ? raw.expiry : null) : null;
     if (raw.expiry && !expiry) throw new MoneyError(`${n}: expiry must be a date`);
-    lines.push({ target, productId, headId, description, hsnCode, quantity, freeQty, rate, discountPct, discount2Pct, discount3Pct, cases, caseSize, caseRate, mrp, gstRate, itc: raw.itc !== false, purchaseLineId, batch: text(raw.batch, 40) || null, expiry, claimId, m });
+    lines.push({ target, productId, headId, description, hsnCode, quantity, freeQty, rate, discountPct, discount2Pct, discount3Pct, cases, caseSize, caseRate, mrp, schemeAmount, gstRate, itc: raw.itc !== false, purchaseLineId, batch: text(raw.batch, 40) || null, expiry, claimId, m });
   }
   // Claim lines against raised claims: each claim must have room for them.
   const claimWants = lines.filter((l) => l.claimId).map((l) => ({ claimId: l.claimId!, amount: l.m.taxable + (l.itc ? 0 : l.m.tax) }));
@@ -291,6 +297,7 @@ export async function recordPurchase(ctx: Ctx, input: PurchaseInput) {
             caseSize: l.caseSize,
             caseRate: l.caseRate,
             mrp: l.mrp,
+            schemeAmount: l.schemeAmount,
             gstRate: l.gstRate,
             itc: l.itc,
             taxable: l.m.taxable,

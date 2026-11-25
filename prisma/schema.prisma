@@ -3389,6 +3389,8 @@ model PurchaseBillLine {
   caseRate       Int?
   /// MRP per unit as printed on the bill, paise.
   mrp            Int?
+  /// The company's scheme discount on the line, in paise: taken off after the % discounts, before GST.
+  schemeAmount   Int                @default(0)
   gstRate        Float              @default(0)
   /// Input credit can be claimed on this line's tax.
   itc            Boolean            @default(true)

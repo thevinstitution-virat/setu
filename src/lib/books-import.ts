@@ -129,6 +129,12 @@ export async function importPurchases(ctx: Ctx, bills: PurchaseImportBill[]): Pr
           bad = `Row ${l.row}: no product with SKU ${l.sku}`;
           break;
         }
+        // A deal like 10+1 gives the free quantity: per 10 billed (per 10 cases by the case).
+        const freeFrom = (billed: number, perCase = 1) => (l.deal ? Math.floor(billed / l.deal.buy) * l.deal.get * perCase : l.freeQty);
+        const dealOk = (free: number) => {
+          if (l.deal && l.freeQty && l.freeQty !== free) bad = `Row ${l.row}: free_qty ${l.freeQty} doesn't match deal ${l.deal.buy}+${l.deal.get} (that gives ${free})`;
+          return !bad;
+        };
         if (l.byCase) {
           const size = l.byCase.caseSize ?? p.caseSize;
           if (!size || size < 1) {
@@ -139,10 +145,14 @@ export async function importPurchases(ctx: Ctx, bills: PurchaseImportBill[]): Pr
             bad = `Row ${l.row}: qty ${l.quantity} isn't ${l.byCase.cases} × ${size} + ${l.byCase.loose}`;
             break;
           }
-          lines.push({ target: "GOODS", productId: p.id, description: l.item, quantity: 0, rate: 0, cases: l.byCase.cases, loose: l.byCase.loose, caseSize: size, caseRate: l.byCase.caseRate, freeQty: l.freeQty, discountPct: l.discountPct, discount2Pct: l.discount2Pct, discount3Pct: l.discount3Pct, mrp: l.mrp, gstRate: l.gstRate ?? p.gstRate });
+          const free = freeFrom(l.byCase.cases, size);
+          if (!dealOk(free)) break;
+          lines.push({ target: "GOODS", productId: p.id, description: l.item, quantity: 0, rate: 0, cases: l.byCase.cases, loose: l.byCase.loose, caseSize: size, caseRate: l.byCase.caseRate, freeQty: free, discountPct: l.discountPct, discount2Pct: l.discount2Pct, discount3Pct: l.discount3Pct, mrp: l.mrp, schemeAmount: l.schemeAmount, gstRate: l.gstRate ?? p.gstRate });
           continue;
         }
-        lines.push({ target: "GOODS", productId: p.id, description: l.item, quantity: l.quantity, freeQty: l.freeQty, rate: l.rate, discountPct: l.discountPct, discount2Pct: l.discount2Pct, discount3Pct: l.discount3Pct, mrp: l.mrp, gstRate: l.gstRate ?? p.gstRate });
+        const free = freeFrom(l.quantity);
+        if (!dealOk(free)) break;
+        lines.push({ target: "GOODS", productId: p.id, description: l.item, quantity: l.quantity, freeQty: free, rate: l.rate, discountPct: l.discountPct, discount2Pct: l.discount2Pct, discount3Pct: l.discount3Pct, mrp: l.mrp, schemeAmount: l.schemeAmount, gstRate: l.gstRate ?? p.gstRate });
       } else {
         const h = heads.get(norm(l.head!));
         if (!h) {

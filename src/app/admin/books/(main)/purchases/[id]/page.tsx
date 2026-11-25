@@ -208,7 +208,10 @@ export default async function PurchaseDocPage({ params }: { params: Promise<{ id
                   )}
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums">{l.mrp !== null ? formatINR(l.mrp) : ""}</td>
-                <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">{discountText([l.discountPct, l.discount2Pct, l.discount3Pct])}</td>
+                <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
+                  {discountText([l.discountPct, l.discount2Pct, l.discount3Pct])}
+                  {l.schemeAmount > 0 && <span className="block text-xs text-[var(--muted)]">Scheme {formatINR(l.schemeAmount)}</span>}
+                </td>
                 <td className="px-4 py-2 text-right tabular-nums">{formatINR(l.taxable)}</td>
                 <td className="px-4 py-2 text-right tabular-nums whitespace-nowrap">
                   {formatINR(l.cgst + l.sgst + l.igst)} <span className="text-xs text-[var(--muted)]">{l.gstRate}%</span>
