@@ -22,6 +22,7 @@ export const QUEUES = {
   "trip.started": "A trip left (retailers are told through order.status)",
   "messages.flush": "Send queued SMS / WhatsApp / push messages (after a change, and every minute)",
   "dues.reminders": "Payment reminders for overdue bills (daily 10:00)",
+  "cheques.due": "Tell the office which held post-dated cheques can be banked today (daily 09:00)",
   "statements.monthly": "Monthly statements on the 1st (when turned on)",
   "tickets.sla": "Tell the office about complaints past their time (every 15 minutes)",
   "engage.daily": "Close resolved complaints, lapse old referrals, trim old notifications (daily)",

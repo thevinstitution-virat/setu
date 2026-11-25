@@ -13,6 +13,8 @@ export type InventorySettings = {
   bufferPct: number;
   /** Batches expiring within this many days are flagged. */
   expiryAlertDays: number;
+  /** The purchase bill import also reads cases, loose units and the rate per case. */
+  purchaseCases: boolean;
 };
 
 export const INVENTORY_DEFAULTS: InventorySettings = {
@@ -20,6 +22,7 @@ export const INVENTORY_DEFAULTS: InventorySettings = {
   orderCheck: "warn",
   bufferPct: 10,
   expiryAlertDays: 7,
+  purchaseCases: false,
 };
 
 export function inventorySettings(settings: unknown): InventorySettings {
@@ -32,6 +35,7 @@ export function inventorySettings(settings: unknown): InventorySettings {
 export function parseInventorySettings(input: Record<string, unknown>): Partial<InventorySettings> | string {
   const out: Partial<InventorySettings> = {};
   if ("enabled" in input) out.enabled = input.enabled === true;
+  if ("purchaseCases" in input) out.purchaseCases = input.purchaseCases === true;
   if ("orderCheck" in input) {
     if (input.orderCheck !== "off" && input.orderCheck !== "warn" && input.orderCheck !== "block") return "Pick what happens when stock is short";
     out.orderCheck = input.orderCheck;

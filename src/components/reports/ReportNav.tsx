@@ -10,6 +10,8 @@ const TABS = [
   { href: "/admin/reports", label: "Overview", kind: "dashboard" },
   { href: "/admin/reports/sales", label: "Sales", kind: "sales" },
   { href: "/admin/reports/shops", label: "Shops", kind: "retailers" },
+  { href: "/admin/reports/outstanding", label: "Outstanding", kind: "outstanding" },
+  { href: "/admin/reports/collections", label: "Collections", kind: "collections" },
   { href: "/admin/reports/team", label: "Team", kind: "team" },
   { href: "/admin/reports/schemes", label: "Schemes", kind: "schemes" },
   { href: "/admin/reports/routes", label: "Routes", kind: "routes" },
@@ -39,8 +41,10 @@ export default function ReportNav() {
     } else if (preset && preset !== "30d") q.set("preset", preset);
     return q;
   })();
-  const qs = query.toString() ? `?${query}` : "";
   const tab = TABS.find((t) => (t.href === "/admin/reports" ? path === t.href : path.startsWith(t.href))) ?? TABS[0];
+  // Outstanding and collections have their own dates and filters (DuesToolbar).
+  const own = tab.kind === "ask" || tab.kind === "outstanding" || tab.kind === "collections";
+  const qs = query.toString() && !own ? `?${query}` : "";
   const onShop = path.startsWith("/admin/reports/shops/");
   const csv = `/api/admin/reports/${tab.kind}?${new URLSearchParams([...query.entries(), ["format", "csv"]])}`;
 
@@ -63,7 +67,7 @@ export default function ReportNav() {
           );
         })}
       </nav>
-      {tab.kind !== "ask" && (
+      {!own && (
       <div className="flex flex-wrap items-center gap-1.5">
         {SHOWN.map((p) => (
           <button
@@ -87,7 +91,7 @@ export default function ReportNav() {
         )}
       </div>
       )}
-      {open && tab.kind !== "ask" && (
+      {open && !own && (
         <form
           className="flex flex-wrap items-end gap-2"
           onSubmit={(e) => {

@@ -10,7 +10,24 @@ export type InvoiceSettings = {
   scheme: "regular" | "composition";
   /** When the invoice is issued and the sale booked: when the order leaves ("dispatch") or when it is delivered. */
   issueAt: "dispatch" | "delivery";
+  /**
+   * Product rates, price lists and special rates include GST (MRP-style trade rates).
+   * GST is then taken out of each line instead of added on top. Applies to orders placed after the switch.
+   */
+  ratesIncludeGst: boolean;
+  /**
+   * "rupee": every bill total is rounded to the whole rupee and the paise go to the Round off account.
+   * "none": totals stay exact to the paisa. Applies to orders placed after the switch.
+   */
+  roundOff: "none" | "rupee";
   prefixes: { tax: string; bos: string; credit: string; debit: string };
+  /**
+   * "fy": <prefix><FY>-00001, starting again each April (INV2627-00042).
+   * "running": <prefix> + a number that keeps counting across years, padded to `digits` (A004262).
+   */
+  numbering: { style: "fy" | "running"; digits: number };
+  /** Bill layout: "standard", or "trade" (cases/pieces, MRP, rate with GST, salesman, GST class table). */
+  layout: "standard" | "trade";
   /** Seller's city and PIN code (e-invoice and the invoice header). */
   city: string;
   pinCode: string;
@@ -38,6 +55,7 @@ export type InvoiceSettings = {
     cgst: string;
     sgst: string;
     igst: string;
+    roundOff: string;
     cash: string;
     bank: string;
     debtorsGroup: string;
@@ -47,7 +65,11 @@ export type InvoiceSettings = {
 export const INVOICE_DEFAULTS: InvoiceSettings = {
   scheme: "regular",
   issueAt: "dispatch",
+  ratesIncludeGst: false,
+  roundOff: "none",
   prefixes: { tax: "INV", bos: "BOS", credit: "CN", debit: "DN" },
+  numbering: { style: "fy", digits: 6 },
+  layout: "standard",
   city: "",
   pinCode: "",
   terms: "Goods once sold will be taken back only as per our return policy. Subject to local jurisdiction.",
@@ -64,6 +86,7 @@ export const INVOICE_DEFAULTS: InvoiceSettings = {
     cgst: "Output CGST",
     sgst: "Output SGST",
     igst: "Output IGST",
+    roundOff: "Round Off",
     cash: "Cash",
     bank: "Bank",
     debtorsGroup: "Sundry Debtors",
@@ -77,9 +100,13 @@ export function invoiceSettings(settings: unknown): InvoiceSettings {
     ...s,
     prefixes: { ...INVOICE_DEFAULTS.prefixes, ...(s.prefixes ?? {}) },
     einvoice: { ...INVOICE_DEFAULTS.einvoice, ...(s.einvoice ?? {}) },
+    numbering: { ...INVOICE_DEFAULTS.numbering, ...(s.numbering ?? {}) },
     tally: { ...INVOICE_DEFAULTS.tally, ...(s.tally ?? {}) },
   };
 }
+
+/** Largest number a running series may start at (keeps numbers within GST's 16 characters). */
+export const MAX_START_NUMBER = 99_999_999;
 
 const str = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
 
@@ -93,6 +120,29 @@ export function parseInvoiceSettings(input: Record<string, unknown>, current: In
   if ("issueAt" in input) {
     if (input.issueAt !== "dispatch" && input.issueAt !== "delivery") return "Issue the invoice at dispatch or at delivery";
     out.issueAt = input.issueAt;
+  }
+  if ("ratesIncludeGst" in input) out.ratesIncludeGst = !!input.ratesIncludeGst;
+  if ("roundOff" in input) {
+    if (input.roundOff !== "none" && input.roundOff !== "rupee") return "Round off must be none or rupee";
+    out.roundOff = input.roundOff;
+  }
+  if ("layout" in input) {
+    if (input.layout !== "standard" && input.layout !== "trade") return "Bill layout must be standard or trade";
+    out.layout = input.layout;
+  }
+  if ("numbering" in input) {
+    const n = (input.numbering ?? {}) as Record<string, unknown>;
+    const next = { ...current.numbering };
+    if ("style" in n) {
+      if (n.style !== "fy" && n.style !== "running") return "Numbering must restart each year (fy) or keep running";
+      next.style = n.style;
+    }
+    if ("digits" in n) {
+      const d = Number(n.digits);
+      if (!Number.isInteger(d) || d < 3 || d > 8) return "Number width must be 3 to 8 digits";
+      next.digits = d;
+    }
+    out.numbering = next;
   }
   if ("prefixes" in input) {
     const p = (input.prefixes ?? {}) as Record<string, unknown>;

@@ -7,7 +7,9 @@ import { parseSupplier } from "@/lib/supplier-api";
 export async function GET() {
   const auth = await guard("stock.view");
   if (!auth.ok) return auth.res;
+  // Companies whose goods we stock; service suppliers live in Books, Suppliers.
   const suppliers = await auth.db.supplier.findMany({
+    where: { kind: "GOODS" },
     orderBy: [{ active: "desc" }, { name: "asc" }],
     include: { _count: { select: { products: true, purchaseOrders: { where: { status: { in: ["DRAFT", "SENT", "PARTLY_RECEIVED"] } } } } } },
   });

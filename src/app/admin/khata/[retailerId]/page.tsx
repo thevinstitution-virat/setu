@@ -32,8 +32,8 @@ type Payment = {
   id: string;
   number: string;
   purpose: "DUES" | "WALLET";
-  method: "CASH" | "UPI" | "CHEQUE" | "BANK" | "ONLINE" | "WALLET" | "CREDIT_NOTE";
-  state: "PENDING_VERIFICATION" | "CONFIRMED" | "REJECTED" | "REVERSED";
+  method: "CASH" | "UPI" | "CHEQUE" | "BANK" | "ONLINE" | "WALLET" | "CREDIT_NOTE" | "TDS";
+  state: "PENDING_VERIFICATION" | "POST_DATED" | "CONFIRMED" | "REJECTED" | "REVERSED";
   amount: number;
   reference: string | null;
   note: string | null;
@@ -48,14 +48,15 @@ type StatementRow = { date: string; kind: string; memo: string | null; debit: nu
 type Khata = {
   retailer: { id: string; outletName: string; ownerName: string; phone: string | null; areaName: string; address: string };
   hasOpening: boolean;
-  terms: { mode: Mode; creditLimit: number | null; creditDays: number };
-  termsOverride: { paymentMode: Mode | null; creditLimit: number | null; creditDays: number | null };
+  terms: { mode: Mode; creditLimit: number | null; creditDays: number; creditBills: number | null; tempLimit: { amount: number; until: string } | null };
+  termsOverride: { paymentMode: Mode | null; creditLimit: number | null; creditDays: number | null; creditBills: number | null; tempCreditLimit: number | null; tempCreditUntil: string | null; receiptsOnAccount?: boolean };
   balances: { receivable: number; walletAvailable: number; walletReserved: number };
   creditAvailable: number | null;
   overdue: number;
   ageing: Ageing;
   advance: number;
   pendingVerification: { amount: number; count: number };
+  postDated: { amount: number; count: number };
   openBills: Bill[];
   payments: Payment[];
   upi: { vpa: string; payee: string } | null;
@@ -79,11 +80,13 @@ const METHOD: Record<Payment["method"], string> = {
   ONLINE: "Online",
   WALLET: "Wallet",
   CREDIT_NOTE: "Credit note",
+  TDS: "TDS kept back",
 };
 
 const STATE: Record<Payment["state"], { label: string; cls: string }> = {
   CONFIRMED: { label: "Confirmed", cls: "chip-mint" },
   PENDING_VERIFICATION: { label: "To verify", cls: "chip-genda" },
+  POST_DATED: { label: "Post-dated, held", cls: "chip-genda" },
   REJECTED: { label: "Rejected", cls: "!bg-[#fde4e1] !text-[#a8281e] !border-transparent" },
   REVERSED: { label: "Reversed", cls: "!bg-black/5 !text-[var(--muted)]" },
 };
@@ -108,6 +111,7 @@ const ENTRY_KIND: Record<string, string> = {
   PENALTY: "Penalty",
   DEBIT_NOTE: "Debit note",
   CREDIT_NOTE: "Credit note",
+  TDS: "TDS kept back",
   HANDOVER: "Cash handover",
   SHORTAGE_WRITEOFF: "Shortage write-off",
   REVERSAL: "Reversal",
@@ -288,6 +292,21 @@ export default function RetailerKhataPage({ params }: { params: Promise<{ retail
         <CreditBar receivable={balances.receivable} limit={terms.creditLimit} available={data.creditAvailable} />
       </div>
 
+      {data.postDated.count > 0 && (
+        <div className="card p-4 flex items-start gap-3 print:hidden">
+          <span className="icon-tile bg-[var(--genda-tint)] text-[var(--genda-text)]">
+            <Icon name="clock" />
+          </span>
+          <p className="text-sm text-[var(--ink-2)]">
+            {plural(data.postDated.count, "post-dated cheque")} worth <b>{formatINR(data.postDated.amount)}</b> {data.postDated.count === 1 ? "is" : "are"} held.{" "}
+            {data.postDated.count === 1 ? "It is" : "They are"} not in the balance until banked on or after the cheque date.{" "}
+            <Link href="/admin/payments" className="font-bold text-[var(--kesar-text)]">
+              See cheques →
+            </Link>
+          </p>
+        </div>
+      )}
+
       {data.pendingVerification.count > 0 && (
         <div className="card p-4 flex items-start gap-3 print:hidden">
           <span className="icon-tile bg-[var(--genda-tint)] text-[var(--genda-text)]">
@@ -332,7 +351,7 @@ export default function RetailerKhataPage({ params }: { params: Promise<{ retail
         </div>
 
         <div className="space-y-5 print:hidden">
-          <RecordPayment retailerId={retailerId} receivable={balances.receivable} onDone={reload} />
+          <RecordPayment retailerId={retailerId} receivable={balances.receivable} bills={data.openBills} onDone={reload} />
           <PaymentLinkCard retailerId={retailerId} outletName={data.retailer.outletName} receivable={balances.receivable} onDone={reload} />
           <CreditTerms retailerId={retailerId} terms={terms} override={data.termsOverride} onDone={reload} />
           <GstDetails retailerId={retailerId} onDone={reload} />
@@ -842,8 +861,14 @@ function Toggle<T extends string>({ value, options, onChange }: { value: T; opti
   );
 }
 
-function RecordPayment({ retailerId, receivable, onDone }: { retailerId: string; receivable: number; onDone: (msg?: string) => Promise<void> }) {
+function RecordPayment({ retailerId, receivable, bills, onDone }: { retailerId: string; receivable: number; bills: Bill[]; onDone: (msg?: string) => Promise<void> }) {
   const [purpose, setPurpose] = useState<"DUES" | "WALLET">("DUES");
+  // Bills this payment is against, in the order picked. Empty = oldest bills first.
+  const [choose, setChoose] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  const canChoose = purpose === "DUES" && bills.length > 1;
+  const pickedIds = canChoose && choose ? picked.filter((id) => bills.some((b) => b.id === id)) : [];
+  const pickedDue = bills.filter((b) => pickedIds.includes(b.id)).reduce((a, b) => a + b.due, 0);
   const [value, setValue] = useState<PaymentValue>(() => emptyPayment());
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -857,9 +882,10 @@ function RecordPayment({ retailerId, receivable, onDone }: { retailerId: string;
     try {
       const collect = await toCollectBody(value);
       if (!collect) throw new Error("Pick a payment method");
-      const { payment } = await send("/api/payments", "POST", { retailerId, ...collect, purpose, note: note.trim() || undefined });
+      const { payment } = await send("/api/payments", "POST", { retailerId, ...collect, purpose, note: note.trim() || undefined, billIds: pickedIds.length ? pickedIds : undefined });
       setValue(emptyPayment(undefined, value.method));
       setNote("");
+      setPicked([]);
       await onDone(`${payment?.number ?? "Payment"} recorded: ${formatINR(collect.amount)}`);
     } catch (e) {
       setError(errText(e));
@@ -900,6 +926,58 @@ function RecordPayment({ retailerId, receivable, onDone }: { retailerId: string;
             ) : null
           }
         />
+        {canChoose && (
+          <div className="space-y-2">
+            <Toggle
+              value={choose ? "PICK" : "OLDEST"}
+              onChange={(v) => setChoose(v === "PICK")}
+              options={[
+                { key: "OLDEST", label: "Oldest bills first" },
+                { key: "PICK", label: "Choose bills" },
+              ]}
+            />
+            {choose && (
+              <>
+                <div className="rounded-xl border border-[var(--line)] divide-y divide-[var(--line)] max-h-60 overflow-y-auto">
+                  {bills.map((b) => {
+                    const at = pickedIds.indexOf(b.id);
+                    return (
+                      <label key={b.id} className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={at >= 0}
+                          onChange={() => setPicked(at >= 0 ? pickedIds.filter((x) => x !== b.id) : [...pickedIds, b.id])}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="font-mono">{b.number}</span>{" "}
+                          <span className="text-xs text-[var(--muted)]">
+                            {fmtDate(b.date)}
+                            {b.overdue && " · overdue"}
+                          </span>
+                        </span>
+                        {at >= 0 && <span className="chip">{at + 1}</span>}
+                        <span className="font-medium shrink-0">{formatINR(b.due)}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-[var(--muted)]">
+                  {pickedIds.length ? (
+                    <>
+                      Picked {formatINR(pickedDue)}.{" "}
+                      <button type="button" className="font-bold text-[var(--kesar-text)]" onClick={() => setValue({ ...value, amount: toRupeeInput(pickedDue) })}>
+                        Fill this amount
+                      </button>{" "}
+                      Bills are paid in the order picked; anything more goes to the oldest bills.
+                    </>
+                  ) : (
+                    "Tick the bills this payment is for, in the order to pay them."
+                  )}
+                </p>
+              </>
+            )}
+          </div>
+        )}
         <label className="block">
           <span className="text-xs font-semibold text-[var(--ink-2)]">Note (optional)</span>
           <input className="input mt-1" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} />
@@ -930,17 +1008,27 @@ function CreditTerms({
   const [mode, setMode] = useState<"DEFAULT" | Mode>(override.paymentMode ?? "DEFAULT");
   const [limit, setLimit] = useState(toRupeeInput(override.creditLimit));
   const [days, setDays] = useState(override.creditDays === null ? "" : String(override.creditDays));
+  const [bills, setBills] = useState(override.creditBills === null ? "" : String(override.creditBills));
+  // The temporary limit's last day as YYYY-MM-DD in India.
+  const untilDay = (s: string | null) => (s ? new Date(new Date(s).getTime() + 5.5 * 3_600_000).toISOString().slice(0, 10) : "");
+  const [temp, setTemp] = useState(toRupeeInput(override.tempCreditLimit));
+  const [until, setUntil] = useState(untilDay(override.tempCreditUntil));
+  const [onAccount, setOnAccount] = useState(!!override.receiptsOnAccount);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Keep the form in step with the server after a reload.
-  const key = `${override.paymentMode}|${override.creditLimit}|${override.creditDays}`;
+  const key = `${override.paymentMode}|${override.creditLimit}|${override.creditDays}|${override.creditBills}|${override.tempCreditLimit}|${override.tempCreditUntil}|${override.receiptsOnAccount}`;
   const [seen, setSeen] = useState(key);
   if (seen !== key) {
     setSeen(key);
     setMode(override.paymentMode ?? "DEFAULT");
     setLimit(toRupeeInput(override.creditLimit));
     setDays(override.creditDays === null ? "" : String(override.creditDays));
+    setBills(override.creditBills === null ? "" : String(override.creditBills));
+    setTemp(toRupeeInput(override.tempCreditLimit));
+    setUntil(untilDay(override.tempCreditUntil));
+    setOnAccount(!!override.receiptsOnAccount);
   }
 
   async function save() {
@@ -956,10 +1044,31 @@ function CreditTerms({
       if (!Number.isInteger(n) || n < 0 || n > 365) return setError("Credit days must be 0 to 365");
       creditDays = n;
     }
+    let creditBills: number | null = null;
+    if (bills.trim()) {
+      const n = Number(bills);
+      if (!Number.isInteger(n) || n < 1 || n > 999) return setError("Unpaid bills allowed must be 1 to 999");
+      creditBills = n;
+    }
+    let tempCreditLimit: number | null = null;
+    if (temp.trim()) {
+      const p = parsePaise(temp);
+      if (p === null || p < 0) return setError("Temporary limit must be ₹0 or more");
+      if (!until) return setError("Give the temporary limit a last day");
+      tempCreditLimit = p;
+    }
     setBusy(true);
     setError(null);
     try {
-      await send(`/api/admin/khata/${retailerId}`, "PATCH", { paymentMode: mode === "DEFAULT" ? null : mode, creditLimit, creditDays });
+      await send(`/api/admin/khata/${retailerId}`, "PATCH", {
+        paymentMode: mode === "DEFAULT" ? null : mode,
+        creditLimit,
+        creditDays,
+        creditBills,
+        tempCreditLimit,
+        tempCreditUntil: tempCreditLimit === null ? null : until,
+        receiptsOnAccount: onAccount,
+      });
       await onDone("Credit terms saved");
     } catch (e) {
       setError(errText(e));
@@ -987,6 +1096,17 @@ function CreditTerms({
             Pay within: <b>{plural(terms.creditDays, "day")}</b>
             {defaultTag(override.creditDays === null)}
           </p>
+          {terms.creditBills !== null && (
+            <p>
+              Unpaid bills allowed: <b>{terms.creditBills}</b>
+              {defaultTag(override.creditBills === null)}
+            </p>
+          )}
+          {terms.tempLimit && (
+            <p>
+              The limit above is temporary, until <b>{fmtDate(terms.tempLimit.until)}</b>.
+            </p>
+          )}
         </div>
 
         <div>
@@ -1026,6 +1146,30 @@ function CreditTerms({
           </label>
         </div>
         <p className="text-[11px] text-[var(--muted)]">Leave blank to use the business default. A limit of 0 means no credit.</p>
+        <label className="block">
+          <span className="text-xs font-semibold text-[var(--ink-2)]">Unpaid bills allowed</span>
+          <input className="input mt-1" inputMode="numeric" placeholder="Default" value={bills} onChange={(e) => setBills(e.target.value.replace(/\D/g, ""))} />
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block">
+            <span className="text-xs font-semibold text-[var(--ink-2)]">Temporary limit (₹)</span>
+            <input className="input mt-1" inputMode="decimal" placeholder="None" value={temp} onChange={(e) => setTemp(e.target.value.replace(/[^\d.]/g, ""))} />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-[var(--ink-2)]">Until</span>
+            <input className="input mt-1" type="date" value={until} onChange={(e) => setUntil(e.target.value)} />
+          </label>
+        </div>
+        <p className="text-[11px] text-[var(--muted)]">A temporary limit is used in place of the credit limit until that day, when it is higher. Clear it to end it early.</p>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" checked={onAccount} onChange={(e) => setOnAccount(e.target.checked)} />
+          <span>
+            <span className="font-semibold text-[var(--ink-2)]">Keep receipts on account until tagged</span>
+            <span className="block text-[11px] text-[var(--muted)]">
+              For a shop that pays against named bills only. A receipt with no bills chosen waits on account, and the bills stay unpaid (and can go overdue) until you tag it under Payments. Turning this off sends what is waiting to the oldest bills.
+            </span>
+          </span>
+        </label>
         {error && <p className="text-xs text-[#a8281e]">{error}</p>}
         <button className="btn btn-mor btn-sm w-full" disabled={busy} onClick={save}>
           {busy ? "Saving…" : "Save terms"}

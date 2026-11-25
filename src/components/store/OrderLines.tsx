@@ -1,4 +1,4 @@
-import { formatINR, gstOn } from "@/lib/money";
+import { formatINR, lineMoney } from "@/lib/money";
 import { formatDay, qtyLabel } from "./format";
 
 /**
@@ -18,6 +18,13 @@ export type OrderLineItem = {
   cases?: number | null;
   caseSize?: number | null;
   freeSchemeId?: string | null;
+  /** Scheme the office typed on this line, paise (already in discount). */
+  extraScheme?: number | null;
+  /** Deal the office typed on this line (dealGet free for every dealBuy). */
+  dealBuy?: number | null;
+  dealGet?: number | null;
+  /** Free goods from the office's deal on that line. */
+  dealForItemId?: string | null;
   product: { name: string; unit?: string | null; caseUnit?: string | null };
 };
 
@@ -27,17 +34,21 @@ export type OrderTotals = {
   deliveryCharge?: number | null;
   subtotal?: number | null;
   gstAmount: number;
+  /** Paise added (+) or taken off (−) to round the total to the rupee. */
+  roundOff?: number | null;
   totalAmount: number;
   couponCode?: string | null;
   deliveryDate?: string | Date | null;
+  /** Item rates include GST. */
+  taxInclusive?: boolean | null;
 };
 
-export const isFreeLine = (i: Pick<OrderLineItem, "price" | "freeSchemeId">) => i.price === 0 && !!i.freeSchemeId;
+/** Free goods: a scheme's gift or the office's deal (price 0). */
+export const isFreeLine = (i: Pick<OrderLineItem, "price" | "freeSchemeId" | "dealForItemId">) => i.price === 0 && (!!i.freeSchemeId || !!i.dealForItemId);
 
-/** Line value after scheme discount, with GST. */
-export function lineTotal(i: OrderLineItem): number {
-  const taxable = i.price * i.quantity - (i.discount ?? 0);
-  return taxable + gstOn(taxable, i.gstRate);
+/** Line value after scheme discount, with GST. inclusive: the rate already includes GST. */
+export function lineTotal(i: OrderLineItem, inclusive = false): number {
+  return lineMoney(i.price, i.quantity, i.discount ?? 0, i.gstRate, inclusive).total;
 }
 
 export function OrderMeta({ order }: { order: Pick<OrderTotals, "couponCode" | "deliveryDate"> }) {
@@ -93,13 +104,22 @@ export default function OrderLines({
               <p className="text-xs text-[var(--muted)] mt-0.5">
                 {qtyLabel(i.quantity, i.product.unit, i.cases, i.caseSize, i.product.caseUnit)} · {formatINR(i.price)}
                 {i.product.unit ? ` / ${i.product.unit}` : ""}
-                {i.gstRate > 0 && ` · GST ${i.gstRate}%`}
+                {i.gstRate > 0 && (order.taxInclusive ? ` · incl. GST ${i.gstRate}%` : ` · GST ${i.gstRate}%`)}
               </p>
               {(i.discount ?? 0) > 0 && (
-                <p className="text-xs font-semibold text-[var(--mint-text)] mt-0.5">Scheme discount −{formatINR(i.discount!)}</p>
+                <p className="text-xs font-semibold text-[var(--mint-text)] mt-0.5">
+                  Scheme discount −{formatINR(i.discount!)}
+                  {(i.extraScheme ?? 0) > 0 && (i.extraScheme ?? 0) < i.discount! ? ` (incl. ${formatINR(i.extraScheme!)} added by the office)` : ""}
+                </p>
               )}
+              {i.dealBuy && i.dealGet ? (
+                <p className="text-xs font-semibold text-[var(--mint-text)] mt-0.5">
+                  Deal {i.dealBuy}+{i.dealGet}
+                  {i.cases ? " (cases)" : ""}
+                </p>
+              ) : null}
             </div>
-            <span className="shrink-0 font-semibold">{formatINR(lineTotal(i))}</span>
+            <span className="shrink-0 font-semibold">{formatINR(lineTotal(i, !!order.taxInclusive))}</span>
           </div>
         ))}
         {!freeCallout &&
@@ -107,7 +127,9 @@ export default function OrderLines({
             <div key={i.id} className="py-2 flex items-start justify-between gap-3 text-sm">
               <div className="min-w-0">
                 <p className="font-medium break-words">{i.product.name}</p>
-                <p className="text-xs text-[var(--muted)] mt-0.5">{qtyLabel(i.quantity, i.product.unit)} · scheme gift</p>
+                <p className="text-xs text-[var(--muted)] mt-0.5">
+                  {qtyLabel(i.quantity, i.product.unit)} · {i.dealForItemId ? "deal" : "scheme gift"}
+                </p>
               </div>
               <span className="chip chip-mint shrink-0">FREE</span>
             </div>
@@ -123,6 +145,7 @@ export default function OrderLines({
         {discount > 0 && <Row label="Scheme discount" value={`−${formatINR(discount)}`} tone="mint" />}
         {delivery > 0 && <Row label="Delivery charge" value={formatINR(delivery)} />}
         {order.gstAmount > 0 && <Row label="GST" value={formatINR(order.gstAmount)} />}
+        {!!order.roundOff && <Row label="Round off" value={`${order.roundOff > 0 ? "+" : "−"}${formatINR(Math.abs(order.roundOff))}`} />}
         <div className="flex justify-between font-bold pt-1">
           <span>Total</span>
           <span>{formatINR(order.totalAmount)}</span>

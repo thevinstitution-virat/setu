@@ -28,6 +28,8 @@ enum Role {
   DELIVERY_AGENT
   /// Leads a team of field staff (sales agents, drivers): attendance, beats, leave, targets, reports.
   SUPERVISOR
+  /// Keeps the books: accounts, banks, purchases, suppliers, GST, TDS, final accounts.
+  ACCOUNTANT
 }
 
 enum OrderStatus {
@@ -76,6 +78,14 @@ model Tenant {
   brand             Json         @default("{}")
   /// Business rules: { orderCutoff, slots, minOrderPaise, ... }
   settings          Json         @default("{}")
+  /// Books closed up to this day (inclusive): nothing may be posted on or before it.
+  booksLockedUntil  DateTime?    @db.Date
+  /// The first day kept in these books (the switch date); opening balances are dated the day before.
+  booksStartOn      DateTime?    @db.Date
+  /// Stock at cost at the start of the first year in these books (the opening trial balance's stock line), paise.
+  openingStock      BigInt?
+  /// The opening balances entry (heads, banks, cash, taxes) made on the Opening page.
+  openingEntryId    String?
   /// Platform overrides of the plan: { features: { inventory: true }, limits: { staff: 80 } }
   overrides         Json         @default("{}")
   /// Set-up checklist steps the owner ticked off or skipped.
@@ -112,6 +122,7 @@ model Tenant {
   journalEntries     JournalEntry[]
   ledgerLines        LedgerLine[]
   bills              Bill[]
+  billShares         BillShare[]
   payments           Payment[]
   allocations        PaymentAllocation[]
   cheques            Cheque[]
@@ -179,6 +190,27 @@ model Tenant {
   platformInvoices   PlatformInvoice[]
   supportSessions    SupportSession[]
   exports            TenantExport[]
+  ledgerHeads        LedgerHead[]
+  bankAccounts       BankAccount[]
+  purchaseBills      PurchaseBill[]
+  purchaseBillLines  PurchaseBillLine[]
+  supplierBills      SupplierBill[]
+  supplierCredits    SupplierCredit[]
+  supplierPayments   SupplierPayment[]
+  issuedCheques      IssuedCheque[]
+  claims             Claim[]
+  claimLines         ClaimLine[]
+  claimSettlements   ClaimSettlement[]
+  supplierAllocs     SupplierAllocation[]
+  vouchers           Voucher[]
+  voucherLines       VoucherLine[]
+  stockCounts        StockCount[]
+  stockCountLines    StockCountLine[]
+  gstSettlements     GstSettlement[]
+  gstr2bImports      Gstr2bImport[]
+  gstr2bRows         Gstr2bRow[]
+  tdsSections        TdsSection[]
+  tdsChallans        TdsChallan[]
 }
 
 /// Custom domains a tenant has verified (e.g. order.agencyname.in).
@@ -333,6 +365,13 @@ model RetailerProfile {
   creditLimit    Int?
   /// Days a bill may stay unpaid before it is overdue. null = tenant default.
   creditDays     Int?
+  /// Most unpaid bills this retailer may have before new orders are held (null = the business default).
+  creditBills    Int?
+  /// A higher limit for a while (a season, a big order): used instead of the credit limit until tempCreditUntil.
+  /// Receipts stay on account until someone tags them to bills (no oldest-first matching).
+  receiptsOnAccount Boolean @default(false)
+  tempCreditLimit Int?
+  tempCreditUntil DateTime?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @default(now()) @updatedAt
   /// Where the map pin came from: gps (on site), address (looked up), manual.
@@ -359,6 +398,10 @@ model RetailerProfile {
   fssai        String?
   /// Shop front photo (storage key), e.g. from the field store form.
   photoKey     String?
+  /// Person to ask for at the shop when it isn't the owner (printed on outstanding reports).
+  contactName  String?
+  /// Second number (landline or another mobile). Not a sign-in number.
+  altPhone     String?
 
   orders          Order[]
   invoices        Invoice[]
@@ -393,6 +436,8 @@ model SalesAgentProfile {
   tenant   Tenant @relation(fields: [tenantId], references: [id])
   userId   String @unique
   user     User   @relation(fields: [userId], references: [id])
+  /// Most (paise) the salesman's shops may owe on the salesman's bills and open orders; past it, new orders are held. null = no limit.
+  creditLimit Int?
 
   beats     Beat[]
   retailers RetailerProfile[]
@@ -534,6 +579,7 @@ model Product {
   stockMoves     StockMove[]
   poLines        PurchaseOrderLine[]
   purchaseLines  PurchaseLine[]
+  countLines     StockCountLine[]
 
   @@unique([tenantId, sku])
   @@index([tenantId, active])
@@ -563,10 +609,16 @@ model Order {
   subtotal         Int             @default(0)
   gstAmount        Int             @default(0)
   totalAmount      Int
+  /// Bill totals are rounded to the rupee (frozen at order time, like taxInclusive).
+  roundTotal       Boolean         @default(false)
+  /// Paise added (+) or taken off (-) to reach the rounded total: totalAmount = subtotal + gstAmount + roundOff.
+  roundOff         Int             @default(0)
   notes            String?
   /// Placed over the credit limit or with overdue bills: needs approval before it moves on.
   creditHold       Boolean         @default(false)
   creditHoldReason String?
+  /// The hold went past the real credit limit while a soft limit is set: only the owner may let it through.
+  creditHoldOwner  Boolean         @default(false)
   creditApprovedBy String?
   creditApprovedAt DateTime?
   /// Prepaid: amount reserved from the wallet when the order was placed (paise).
@@ -575,6 +627,10 @@ model Order {
   spot             Boolean         @default(false)
   /// Total as ordered, kept when delivery cut the order short before invoicing (invoice at delivery).
   orderedTotal     Int?
+  /// Item rates and discounts on this order include GST (settings.invoice.ratesIncludeGst at order time).
+  taxInclusive     Boolean         @default(false)
+  /// Salesman (User id) credited with this order; printed on the bill and used by agent-wise reports.
+  salesmanId       String?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
@@ -620,6 +676,13 @@ model OrderItem {
   deliveredQty Int?
   /// Why less than ordered was delivered.
   shortReason  String?
+  /// Scheme the office typed on this line, paise (already in `discount`, against the rate as charged).
+  extraScheme   Int     @default(0)
+  /// Deal the office typed on this line: dealGet free for every dealBuy (cases when ordered in cases).
+  dealBuy       Int?
+  dealGet       Int?
+  /// Free goods line made by the office's deal on that line (price 0).
+  dealForItemId String?
 
   @@index([tenantId, orderId])
 }
@@ -1002,6 +1065,47 @@ enum AccountType {
   PROMOTIONS // rewards we give away (refer and earn)
   GATEWAY_CLEARING // paid online, not yet settled to our bank by the gateway
   GATEWAY_FEES // the gateway's fee and its GST
+  PAYABLE // per supplier: what we owe them
+  PURCHASES
+  PURCHASE_RETURNS
+  GST_INPUT
+  TDS_PAYABLE // TDS we deducted, to pay to the government
+  TDS_RECEIVABLE // TDS customers deducted from what they paid us
+  CLAIMS_RECEIVABLE // per supplier: claims raised on the company, not yet settled
+  CLAIM_INCOME
+  ROUND_OFF
+  STOCK_LOSS // shortage found in a physical count
+  ISSUED_CHEQUES // cheques we wrote, not yet cleared by our bank
+  HEAD // the business's own account head (LedgerHead), code HEAD:<id>
+}
+
+/// Where an account sits in the trial balance, P&L and balance sheet.
+enum AccountGroup {
+  CAPITAL
+  DRAWINGS
+  LOANS
+  CURRENT_LIABILITIES
+  CREDITORS
+  DUTIES_TAXES
+  FIXED_ASSETS
+  DEBTORS
+  CLAIMS
+  CASH
+  BANK
+  IN_TRANSIT
+  CURRENT_ASSETS
+  SALES
+  PURCHASES
+  DIRECT_EXPENSES
+  INDIRECT_EXPENSES
+  OTHER_INCOME
+}
+
+enum BankKind {
+  CURRENT
+  SAVINGS
+  OD
+  CC
 }
 
 enum EntryKind {
@@ -1023,6 +1127,23 @@ enum EntryKind {
   REWARD
   BANK_MATCH // money seen in the bank statement (UPI or cash deposit moved to Bank)
   GATEWAY_SETTLEMENT
+  PURCHASE // a supplier's bill
+  PURCHASE_DEBIT_NOTE // our debit note to a supplier
+  PURCHASE_CREDIT_NOTE // a supplier's credit note to us
+  SUPPLIER_PAYMENT // we paid a supplier (bank, cash or our cheque)
+  ISSUED_CHEQUE_CLEAR // a cheque we wrote was paid by our bank
+  CLAIM_RAISE // a claim raised on a company
+  CLAIM_RECEIPT // money from a company against a claim
+  CLAIM_WRITE_OFF // the part of a claim we won't get
+  VOUCHER_PAYMENT // a payment voucher: an expense or anything paid that is not a supplier's bill
+  VOUCHER_RECEIPT // a receipt voucher: money in that is not from a shop
+  CONTRA // money moved between our own cash and banks
+  JOURNAL // a journal voucher: any balanced lines, with a reason
+  STOCK_COUNT // a physical stock count accepted: the net shortage moved from purchases to stock shortage
+  STOCK_MOVE // goods damaged, expired, written off or adjusted (or damaged goods back to the company): their cost between purchases and stock loss
+  GST_PAYMENT // a month's GST set off: output tax paid from input credit and from the bank
+  TDS_DEDUCTION // TDS kept back on a supplier's bill: Dr supplier, Cr TDS payable
+  TDS_PAYMENT // a TDS challan: Dr TDS payable (+ interest / late fee), Cr bank
 }
 
 enum PayMethod {
@@ -1033,6 +1154,7 @@ enum PayMethod {
   WALLET
   CREDIT_NOTE
   ONLINE // paid through the payment gateway (link or QR)
+  TDS // TDS the shop deducted and paid to the government for us (A9): Dr TDS deducted by customers
 }
 
 enum PayPurpose {
@@ -1042,6 +1164,8 @@ enum PayPurpose {
 
 enum PaymentState {
   PENDING_VERIFICATION
+  /// A cheque dated in the future, held until it can be banked: not in the ledger, pays no bills yet.
+  POST_DATED
   CONFIRMED
   REJECTED
   REVERSED
@@ -1062,22 +1186,84 @@ enum BillKind {
 }
 
 model LedgerAccount {
-  id         String           @id @default(cuid())
-  tenantId   String           @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant     Tenant           @relation(fields: [tenantId], references: [id])
-  type       AccountType
+  id            String           @id @default(cuid())
+  tenantId      String           @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant           @relation(fields: [tenantId], references: [id])
+  type          AccountType
   /// e.g. "RECEIVABLE:<retailerId>", "STAFF_CASH:<userId>", "BANK"
-  code       String
-  name       String
-  retailerId String?
-  retailer   RetailerProfile? @relation(fields: [retailerId], references: [id])
-  userId     String?
-  createdAt  DateTime         @default(now())
+  code          String
+  name          String
+  retailerId    String?
+  retailer      RetailerProfile? @relation(fields: [retailerId], references: [id])
+  userId        String?
+  group         AccountGroup
+  headId        String?
+  head          LedgerHead?      @relation(fields: [headId], references: [id])
+  bankAccountId String?
+  bankAccount   BankAccount?     @relation(fields: [bankAccountId], references: [id])
+  /// PAYABLE / CLAIMS_RECEIVABLE: the supplier (company) it is with.
+  supplierId    String?
+  supplier      Supplier?        @relation(fields: [supplierId], references: [id])
+  createdAt     DateTime         @default(now())
 
   lines LedgerLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId, type])
+  @@index([tenantId, group])
+}
+
+/// The business's own accounts: rent, salaries, capital, loans, vehicles ...
+model LedgerHead {
+  id        String       @id @default(cuid())
+  tenantId  String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant       @relation(fields: [tenantId], references: [id])
+  name      String
+  group     AccountGroup
+  /// Hidden heads keep their entries but take no new ones.
+  active    Boolean      @default(true)
+  /// Starter heads carry a key (e.g. "rent") so they are created once.
+  key       String?
+  note      String?
+  createdAt DateTime     @default(now())
+
+  accounts LedgerAccount[]
+
+  @@unique([tenantId, name])
+  @@unique([tenantId, key])
+}
+
+/// A bank account of the business (any number; OD / CC may run below zero).
+model BankAccount {
+  id         String   @id @default(cuid())
+  tenantId   String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  name       String
+  kind       BankKind @default(CURRENT)
+  bankName   String?
+  last4      String?
+  ifsc       String?
+  branch     String?
+  /// OD / CC limit, paise.
+  odLimit    Int?
+  /// Ledger account code: "BANK" for the first one (older entries), else "BANK:<id>".
+  ledgerCode String
+  /// Money with no bank chosen goes here.
+  isDefault  Boolean  @default(false)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  accounts         LedgerAccount[]
+  statements       BankStatement[]
+  supplierPayments SupplierPayment[]
+  issuedCheques    IssuedCheque[]
+  claimSettlements ClaimSettlement[]
+  vouchers         Voucher[]
+  gstSettlements   GstSettlement[]
+  tdsChallans      TdsChallan[]
+
+  @@unique([tenantId, name])
+  @@unique([tenantId, ledgerCode])
 }
 
 model JournalEntry {
@@ -1092,6 +1278,8 @@ model JournalEntry {
   retailerId  String?
   orderId     String?
   paymentId   String?
+  /// Purchase side: the supplier the entry is with.
+  supplierId  String?
   /// Set on a REVERSAL entry: the entry it cancels (at most one reversal each).
   reversesId  String?       @unique
   reverses    JournalEntry? @relation("Reversal", fields: [reversesId], references: [id])
@@ -1101,6 +1289,7 @@ model JournalEntry {
 
   @@index([tenantId, retailerId, occurredAt])
   @@index([tenantId, kind, occurredAt])
+  @@index([tenantId, supplierId, occurredAt])
 }
 
 model LedgerLine {
@@ -1138,12 +1327,17 @@ model Bill {
   settled    Boolean         @default(false)
   note       String?
   entryId    String?
+  /// Salesman (User id) on this bill: from the order, or given when bills were imported.
+  salesmanId String?
   createdAt  DateTime        @default(now())
 
   allocations PaymentAllocation[]
+  /// Company split, for bills that have no invoice lines (imported from the old book).
+  shares      BillShare[]
 
   @@unique([tenantId, number])
   @@index([tenantId, retailerId, settled, date])
+  @@index([tenantId, salesmanId, settled])
 }
 
 model Payment {
@@ -1158,8 +1352,10 @@ model Payment {
   state         PaymentState
   /// Paise.
   amount        Int
-  /// UPI reference (UTR), bank reference or cheque number.
+  /// UPI reference (UTR), bank reference or cheque number; method TDS: the TDS certificate (Form 16A) number.
   reference     String?
+  /// Method TDS: the section the shop deducted under (usually 194Q).
+  tdsSection    String?
   proofKey      String?
   note          String?
   /// Collected against this order at delivery (allocated to its bill first).
@@ -1173,6 +1369,8 @@ model Payment {
   entryId       String?
   /// Paise of this payment already allocated to bills.
   allocated     Int             @default(0)
+  /// Bills this receipt was taken against, in order: they are paid first, anything left goes oldest first.
+  forBillIds    String[]        @default([])
   createdAt     DateTime        @default(now())
 
   /// Paid through the gateway: our request and the gateway's payment id (never posted twice).
@@ -1207,6 +1405,26 @@ model PaymentAllocation {
   @@index([tenantId, paymentId])
 }
 
+/// A bill's value by company (principal supplier), for the company-wise
+/// outstanding. Only for bills without invoice lines (opening bills from the
+/// old book); bills raised here are split from their invoice lines.
+model BillShare {
+  id         String    @id @default(cuid())
+  tenantId   String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  billId     String
+  bill       Bill      @relation(fields: [billId], references: [id], onDelete: Cascade)
+  /// null = no company (e.g. charges that belong to no principal).
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  /// Paise of the bill's value that is this company's.
+  amount     Int
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId, billId])
+  @@index([tenantId, supplierId])
+}
+
 model Cheque {
   id           String       @id @default(cuid())
   tenantId     String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
@@ -1239,6 +1457,8 @@ model CashHandover {
   counted      Int
   /// expected − counted; positive = short.
   variance     Int
+  /// Expenses paid from this cash (fuel, toll, loading), entered at the handover as a payment voucher.
+  expenses     Int      @default(0)
   note         String?
   entryId      String?
   createdAt    DateTime @default(now())
@@ -1276,7 +1496,8 @@ model Category {
   active    Boolean    @default(true)
   createdAt DateTime   @default(now())
 
-  products Product[]
+  products    Product[]
+  stockCounts StockCount[]
 
   @@unique([tenantId, name])
 }
@@ -1510,9 +1731,13 @@ model Invoice {
   cgst          Int
   sgst          Int
   igst          Int
+  /// Paise added (+) or taken off (-) to round the document: total = taxable + cgst + sgst + igst + roundOff.
+  roundOff      Int             @default(0)
   total         Int
   /// The ledger entry this document posted.
   entryId       String?
+  /// Salesman's name at issue time (printed on the bill).
+  salesman      String?
   createdById   String?
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
@@ -1572,6 +1797,12 @@ model InvoiceLine {
   sgst           Int
   igst           Int
   total          Int
+  /// Rate per unit including GST, when the order's rates included GST (printed as the bill rate).
+  inclRate       Int?
+  /// MRP per unit at sale time, paise.
+  mrp            Int?
+  /// Units per case at sale time (prints cases + loose pieces).
+  caseSize       Int?
 
   @@index([tenantId, invoiceId])
   @@index([tenantId, originalLineId])
@@ -1765,6 +1996,7 @@ model StockLocation {
 
   lots      StockLot[]
   purchases Purchase[]
+  counts    StockCount[]
 
   @@unique([tenantId, name])
   @@index([tenantId, kind])
@@ -1796,6 +2028,96 @@ model StockLot {
   @@index([tenantId, locationId])
 }
 
+enum StockCountMode {
+  /// Stock tracking on: one place, per batch, against the app's stock; accepting adjusts the stock.
+  TRACKED
+  /// Stock tracking off: quantities × rates.
+  QUANTITY
+  /// Stock tracking off: a total value per company.
+  VALUE
+}
+
+enum StockCountStatus {
+  DRAFT
+  ACCEPTED
+  CANCELLED
+}
+
+/// A physical stock count (A6). Accepted, it is the closing stock for its date.
+model StockCount {
+  id           String           @id @default(cuid())
+  tenantId     String           @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant           @relation(fields: [tenantId], references: [id])
+  /// SC<fy>-NNNNN.
+  number       String
+  /// The day counted; quantities are as at the end of that day.
+  date         DateTime         @db.Date
+  mode         StockCountMode
+  status       StockCountStatus @default(DRAFT)
+  /// TRACKED: the place counted.
+  locationId   String?
+  location     StockLocation?   @relation(fields: [locationId], references: [id])
+  /// TRACKED: only this company's products (blank = all).
+  supplierId   String?
+  supplier     Supplier?        @relation(fields: [supplierId], references: [id])
+  /// TRACKED: only this category (blank = all).
+  categoryId   String?
+  category     Category?        @relation(fields: [categoryId], references: [id])
+  note         String?
+  /// Set when accepted, in paise: the app's stock value, the counted value, and the shortage and excess at cost.
+  bookValue    BigInt           @default(0)
+  countedValue BigInt           @default(0)
+  shortage     BigInt           @default(0)
+  excess       BigInt           @default(0)
+  /// The ledger entry for the net shortage or excess (TRACKED, when not zero).
+  entryId      String?          @unique
+  createdById  String?
+  createdAt    DateTime         @default(now())
+  acceptedById String?
+  acceptedAt   DateTime?
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  lines StockCountLine[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, date])
+  @@index([tenantId, status])
+}
+
+/// One line of a count: a batch at the place (TRACKED), a product (QUANTITY) or a company (VALUE).
+model StockCountLine {
+  id         String     @id @default(cuid())
+  tenantId   String     @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant     Tenant     @relation(fields: [tenantId], references: [id])
+  countId    String
+  count      StockCount @relation(fields: [countId], references: [id], onDelete: Cascade)
+  sl         Int
+  productId  String?
+  product    Product?   @relation(fields: [productId], references: [id])
+  /// VALUE: the company (blank = other goods).
+  supplierId String?
+  supplier   Supplier?  @relation(fields: [supplierId], references: [id])
+  /// TRACKED: the batch as found in the app; blank = a product or batch found that the app had none of.
+  lotId      String?
+  batch      String     @default("")
+  expiry     DateTime?  @db.Date
+  /// TRACKED: the app's quantity as at the end of the count day (fixed when accepted).
+  bookQty    Int        @default(0)
+  /// Base units counted; blank = not counted yet.
+  countedQty Int?
+  /// Paise per base unit; blank = the batch's cost, else the product's last cost.
+  rate       Int?
+  /// VALUE: the company's stock value in paise; blank = not entered yet.
+  value      BigInt?
+  /// Added by hand while counting (not on the sheet as made).
+  added      Boolean    @default(false)
+  note       String?
+
+  @@index([countId])
+  @@index([tenantId, productId])
+}
+
 /// Append-only stock history (a trigger refuses edits and deletes).
 model StockMove {
   id          String        @id @default(cuid())
@@ -1824,33 +2146,60 @@ model StockMove {
   /// Credit note (RETURN) or purchase order.
   docId       String?
   actorId     String?
+  /// The books entry that moved this move's cost between purchases and stock loss (lib/stock-loss.ts).
+  entryId     String?
+  /// Its signed value in that entry: + a loss, − a surplus or a loss taken back.
+  bookValue   Int?
   createdAt   DateTime      @default(now())
 
   @@index([tenantId, productId, createdAt])
   @@index([tenantId, createdAt])
   @@index([tenantId, orderId])
   @@index([tenantId, tripId])
+  @@index([tenantId, entryId])
 }
 
 /// Principal company / supplier we buy from.
 model Supplier {
-  id          String   @id @default(cuid())
-  tenantId    String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  name        String
-  contactName String?
-  phone       String?
-  email       String?
-  gstin       String?
-  address     String?
+  id            String       @id @default(cuid())
+  tenantId      String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  name          String
+  contactName   String?
+  phone         String?
+  email         String?
+  gstin         String?
+  address       String?
   /// Days from sending a purchase order to the goods arriving (A6 reorder suggestions plan for this). 0–90.
-  leadDays    Int      @default(3)
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
+  leadDays      Int          @default(3)
+  /// GOODS = a company whose products we sell; SERVICES / OTHER = landlord, transporter, electricity ...
+  kind          SupplierKind @default(GOODS)
+  /// GST state code (place of supply); from the GSTIN when blank.
+  stateCode     String?
+  pan           String?
+  /// Days we get to pay their bills.
+  creditDays    Int          @default(30)
+  bankName      String?
+  bankIfsc      String?
+  bankAccountNo String?
+  /// TDS section that applies to payments to them (A9), e.g. "194C".
+  tdsSection    String?
+  active        Boolean      @default(true)
+  createdAt     DateTime     @default(now())
 
-  products       Product[]
-  purchaseOrders PurchaseOrder[]
-  purchases      Purchase[]
+  products        Product[]
+  purchaseOrders  PurchaseOrder[]
+  purchases       Purchase[]
+  billShares      BillShare[]
+  ledgerAccounts  LedgerAccount[]
+  purchaseBills   PurchaseBill[]
+  supplierBills   SupplierBill[]
+  supplierCredits SupplierCredit[]
+  payments        SupplierPayment[]
+  issuedCheques   IssuedCheque[]
+  claims          Claim[]
+  stockCounts     StockCount[]
+  stockCountLines StockCountLine[]
 
   @@unique([tenantId, name])
 }
@@ -1918,6 +2267,7 @@ model Purchase {
   createdAt   DateTime       @default(now())
 
   lines PurchaseLine[]
+  bill  PurchaseBill?
 
   @@unique([tenantId, number])
   @@index([tenantId, createdAt])
@@ -2301,19 +2651,21 @@ model GatewaySettlement {
 }
 
 model BankStatement {
-  id           String    @id @default(cuid())
-  tenantId     String    @default(dbgenerated("current_setting('app.tenant_id'::text)"))
-  tenant       Tenant    @relation(fields: [tenantId], references: [id])
-  fileName     String
+  id            String       @id @default(cuid())
+  tenantId      String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  fileName      String
   /// Which bank account (a label the office types, e.g. "HDFC current").
-  account      String
-  fromDate     DateTime?
-  toDate       DateTime?
-  lineCount    Int       @default(0)
-  skipped      Int       @default(0)
-  uploadedById String
-  uploadedBy   User      @relation(fields: [uploadedById], references: [id])
-  createdAt    DateTime  @default(now())
+  account       String
+  bankAccountId String?
+  bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id])
+  fromDate      DateTime?
+  toDate        DateTime?
+  lineCount     Int          @default(0)
+  skipped       Int          @default(0)
+  uploadedById  String
+  uploadedBy    User         @relation(fields: [uploadedById], references: [id])
+  createdAt     DateTime     @default(now())
 
   lines BankLine[]
 
@@ -2337,7 +2689,8 @@ model BankLine {
   /// The same line in two uploads is imported once.
   fingerprint String
   status      BankLineStatus @default(UNMATCHED)
-  /// VERIFY | UPI_CLEAR | CHEQUE_CLEAR | SETTLEMENT | CASH_DEPOSIT | NEW_PAYMENT
+  /// VERIFY | UPI_CLEAR | CHEQUE_CLEAR | SETTLEMENT | CASH_DEPOSIT | NEW_PAYMENT | SUPPLIER_PAY | ISSUED_CHEQUE
+  /// | NEW_SUPPLIER_PAYMENT | VOUCHER_OUT | VOUCHER_IN | NEW_EXPENSE | NEW_RECEIPT | NEW_CONTRA
   matchKind   String?
   /// Id of the payment / cheque / settlement it matched (one line per thing).
   matchRef    String?
@@ -2943,4 +3296,670 @@ model PlatformPasswordReset {
   createdAt      DateTime     @default(now())
 
   @@index([platformUserId, createdAt])
+}
+
+enum SupplierKind {
+  GOODS
+  SERVICES
+  OTHER
+}
+
+enum PurchaseDocType {
+  /// A supplier's bill to us.
+  BILL
+  /// Our debit note to the supplier: goods returned, short or damaged, rate charged too high.
+  DEBIT_NOTE
+  /// The supplier's credit note to us: scheme, claim settled, rate difference.
+  CREDIT_NOTE
+}
+
+enum PurchaseLineTarget {
+  /// Goods for resale: Purchases (or Purchase returns on a debit note).
+  GOODS
+  /// One of the business's heads: freight, rent, a vehicle ...
+  HEAD
+  /// Scheme / claim money from the company (credit notes): Claims on companies.
+  CLAIM
+}
+
+enum SupplierBillKind {
+  PURCHASE
+  OPENING
+}
+
+enum SupplierCreditKind {
+  DEBIT_NOTE
+  CREDIT_NOTE
+  OPENING_ADVANCE
+  PAYMENT
+  TDS // TDS kept back on one of their bills (A9)
+}
+
+/// A purchase bill, or a debit / credit note with a supplier. Posted once; cancelled by reversal.
+model PurchaseBill {
+  id              String          @id @default(cuid())
+  tenantId        String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant          Tenant          @relation(fields: [tenantId], references: [id])
+  type            PurchaseDocType @default(BILL)
+  /// Ours: PB2627-00001 / PDN2627-00001 / PCN2627-00001.
+  number          String
+  supplierId      String
+  supplier        Supplier        @relation(fields: [supplierId], references: [id])
+  /// The supplier's bill or note number (ours for a debit note).
+  supplierRef     String
+  date            DateTime        @db.Date
+  dueDate         DateTime?       @db.Date
+  /// Place of supply (GST state code).
+  stateCode       String?
+  interState      Boolean         @default(false)
+  reverseCharge   Boolean         @default(false)
+  ratesIncludeGst Boolean         @default(false)
+  /// A note against one bill: that bill.
+  againstId       String?
+  against         PurchaseBill?   @relation("NoteAgainst", fields: [againstId], references: [id])
+  notes           PurchaseBill[]  @relation("NoteAgainst")
+  /// The goods received note this bill is for (each GRN billed once).
+  purchaseId      String?         @unique
+  purchase        Purchase?       @relation(fields: [purchaseId], references: [id])
+  /// The bill itself received the goods (stock in) / the debit note sent them back (stock out).
+  movedStock      Boolean         @default(false)
+  reason          String?
+  /// Paise.
+  taxable         Int             @default(0)
+  cgst            Int             @default(0)
+  sgst            Int             @default(0)
+  igst            Int             @default(0)
+  /// The part of the tax we can claim as input credit.
+  itcTax          Int             @default(0)
+  roundOff        Int             @default(0)
+  total           Int             @default(0)
+  note            String?
+  /// Storage keys of the supplier's bill: photos or a PDF.
+  scans           String[]        @default([])
+  /// e-invoice number (64 characters), e-way bill (12 digits), transporter, vehicle and our PO number, as printed.
+  irn             String?
+  ewayBill        String?
+  transporter     String?
+  vehicleNo       String?
+  poNumber        String?
+  entryId         String?         @unique
+  cancelledAt     DateTime?
+  cancelReason    String?
+  createdById     String?
+  createdAt       DateTime        @default(now())
+
+  lines PurchaseBillLine[]
+
+  @@unique([tenantId, number])
+  @@unique([tenantId, supplierId, type, supplierRef])
+  @@index([tenantId, date])
+  @@index([tenantId, supplierId, date])
+}
+
+model PurchaseBillLine {
+  id             String             @id @default(cuid())
+  tenantId       String             @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant         Tenant             @relation(fields: [tenantId], references: [id])
+  billId         String
+  bill           PurchaseBill       @relation(fields: [billId], references: [id], onDelete: Cascade)
+  target         PurchaseLineTarget @default(GOODS)
+  productId      String?
+  headId         String?
+  description    String
+  hsnCode        String?
+  /// Base units billed, and free units on top.
+  quantity       Int
+  freeQty        Int                @default(0)
+  /// Per unit, paise, as on the bill (with GST when the bill's rates include it).
+  rate           Int
+  discountPct    Float              @default(0)
+  /// More discounts taken one after another on what is left (a bill printing 10% + 5% + 2%).
+  discount2Pct   Float              @default(0)
+  discount3Pct   Float              @default(0)
+  /// Billed by the case: whole cases, units in a case, and the rate per case (paise). quantity = cases × caseSize + loose units;
+  /// the line amount is caseRate × quantity / caseSize, so it matches the bill to the paisa; rate is per unit, rounded.
+  cases          Int?
+  caseSize       Int?
+  caseRate       Int?
+  /// MRP per unit as printed on the bill, paise.
+  mrp            Int?
+  /// The company's scheme discount on the line, in paise: taken off after the % discounts, before GST.
+  schemeAmount   Int                @default(0)
+  gstRate        Float              @default(0)
+  /// Input credit can be claimed on this line's tax.
+  itc            Boolean            @default(true)
+  taxable        Int
+  cgst           Int                @default(0)
+  sgst           Int                @default(0)
+  igst           Int                @default(0)
+  total          Int
+  /// Line of the goods received note it bills.
+  purchaseLineId String?
+  batch          String?
+  expiry         DateTime?          @db.Date
+  /// Credit note, CLAIM line: the claim it settles.
+  claimId        String?
+
+  @@index([tenantId, billId])
+  @@index([tenantId, productId])
+}
+
+/// What we owe a supplier, bill by bill (like a shop's Bill, the other way round).
+model SupplierBill {
+  id             String           @id @default(cuid())
+  tenantId       String           @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant         Tenant           @relation(fields: [tenantId], references: [id])
+  supplierId     String
+  supplier       Supplier         @relation(fields: [supplierId], references: [id])
+  kind           SupplierBillKind @default(PURCHASE)
+  /// The supplier's bill number.
+  number         String
+  date           DateTime         @db.Date
+  dueDate        DateTime         @db.Date
+  amount         Int
+  paid           Int              @default(0)
+  settled        Boolean          @default(false)
+  purchaseBillId String?          @unique
+  entryId        String?
+  note           String?
+  createdAt      DateTime         @default(now())
+
+  allocations SupplierAllocation[]
+
+  @@index([tenantId, supplierId, settled])
+}
+
+/// Money or notes that pay a supplier's bills: debit / credit notes, opening advance, payments (A3).
+model SupplierCredit {
+  id             String             @id @default(cuid())
+  tenantId       String             @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant         Tenant             @relation(fields: [tenantId], references: [id])
+  supplierId     String
+  supplier       Supplier           @relation(fields: [supplierId], references: [id])
+  kind           SupplierCreditKind
+  number         String
+  date           DateTime
+  amount         Int
+  allocated      Int                @default(0)
+  /// The note it came from.
+  purchaseBillId String?            @unique
+  /// Pay this bill first.
+  againstBillId  String?
+  entryId        String?
+  note           String?
+  /// Kind TDS: the section, and the amount the TDS was worked out on (paise).
+  tdsSection     String?
+  tdsBase        Int?
+  createdById    String?
+  createdAt      DateTime           @default(now())
+
+  allocations SupplierAllocation[]
+
+  @@index([tenantId, supplierId])
+}
+
+model SupplierAllocation {
+  id        String         @id @default(cuid())
+  tenantId  String         @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant         @relation(fields: [tenantId], references: [id])
+  creditId  String
+  credit    SupplierCredit @relation(fields: [creditId], references: [id])
+  billId    String
+  bill      SupplierBill   @relation(fields: [billId], references: [id])
+  amount    Int
+  createdAt DateTime       @default(now())
+
+  @@index([tenantId, creditId])
+  @@index([tenantId, billId])
+}
+
+enum SupplierPayMethod {
+  BANK // NEFT / RTGS / IMPS / UPI from one of our bank accounts
+  CASH // from office cash
+  CHEQUE // a cheque we wrote (IssuedCheque)
+}
+
+enum IssuedChequeStatus {
+  ISSUED // handed over, not yet paid by our bank
+  CLEARED
+  BOUNCED // our bank did not pay it: the payment is reversed
+  CANCELLED // torn up / stopped before clearing: the payment is reversed
+}
+
+/// Money we paid a supplier. Posted once (Dr supplier, Cr bank / cash / issued cheques, Cr TDS); cancelled by reversal.
+model SupplierPayment {
+  id            String            @id @default(cuid())
+  tenantId      String            @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant            @relation(fields: [tenantId], references: [id])
+  /// Ours: SP2627-00001.
+  number        String
+  supplierId    String
+  supplier      Supplier          @relation(fields: [supplierId], references: [id])
+  date          DateTime          @db.Date
+  method        SupplierPayMethod
+  bankAccountId String?
+  bankAccount   BankAccount?      @relation(fields: [bankAccountId], references: [id])
+  /// Money that left us, paise.
+  amount        Int
+  /// TDS kept back and owed to the government; the supplier's bills are settled by amount + tds.
+  tds           Int               @default(0)
+  tdsSection    String?
+  /// Why the TDS differs from what the app worked out (A9).
+  tdsNote       String?
+  /// UTR / transaction reference.
+  reference     String?
+  note          String?
+  /// The SupplierCredit (kind PAYMENT) that settles bills.
+  creditId      String?           @unique
+  entryId       String?           @unique
+  chequeId      String?           @unique
+  cheque        IssuedCheque?     @relation(fields: [chequeId], references: [id])
+  cancelledAt   DateTime?
+  cancelReason  String?
+  createdById   String?
+  createdAt     DateTime          @default(now())
+
+  @@unique([tenantId, number])
+  @@index([tenantId, supplierId])
+  @@index([tenantId, date])
+}
+
+/// A cheque we wrote. Clearing moves it from "issued cheques" to the bank.
+model IssuedCheque {
+  id            String             @id @default(cuid())
+  tenantId      String             @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant             @relation(fields: [tenantId], references: [id])
+  number        String
+  bankAccountId String
+  bankAccount   BankAccount        @relation(fields: [bankAccountId], references: [id])
+  /// The date written on the cheque.
+  date          DateTime           @db.Date
+  amount        Int
+  payee         String
+  supplierId    String?
+  supplier      Supplier?          @relation(fields: [supplierId], references: [id])
+  status        IssuedChequeStatus @default(ISSUED)
+  clearedAt     DateTime?
+  clearEntryId  String?
+  reason        String?
+  createdAt     DateTime           @default(now())
+
+  payment SupplierPayment?
+  voucher Voucher?
+
+  @@unique([tenantId, bankAccountId, number])
+  @@index([tenantId, status])
+}
+
+// ───────────────────────────── Claims on companies (A4) ─────────────────────────────
+
+enum ClaimType {
+  /// Free goods and scheme discounts we gave shops on the company's products.
+  SCHEME
+  /// Goods that came back damaged or expired, or went bad with us.
+  DAMAGE
+  /// The company cut its rate: our stock on that day × the difference.
+  RATE_DIFF
+  OTHER
+}
+
+/// Kept from the amounts: open > 0 → RAISED / PART_SETTLED; nothing open →
+/// SETTLED (all received), REJECTED (nothing received) or WRITTEN_OFF (part received).
+enum ClaimStatus {
+  RAISED
+  PART_SETTLED
+  SETTLED
+  REJECTED
+  WRITTEN_OFF
+}
+
+enum ClaimSettlementKind {
+  /// The company's credit note: a CLAIM line on a purchase credit note.
+  CREDIT_NOTE
+  /// Money from the company into a bank account or office cash.
+  RECEIPT
+  /// The part we won't get.
+  WRITE_OFF
+}
+
+/// A claim on a company (CL2627-00001). Raising it posts Dr Claims receivable (that company), Cr Claims income.
+model Claim {
+  id           String      @id @default(cuid())
+  tenantId     String      @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+  number       String
+  supplierId   String
+  supplier     Supplier    @relation(fields: [supplierId], references: [id])
+  type         ClaimType
+  /// The day it was raised.
+  date         DateTime    @db.Date
+  /// What it covers. Rate difference: both are the day the rate was cut.
+  periodFrom   DateTime?   @db.Date
+  periodTo     DateTime?   @db.Date
+  /// The company's scheme name or reference.
+  reference    String?
+  note         String?
+  /// Paise.
+  amount       Int
+  /// Credit notes and money received.
+  settled      Int         @default(0)
+  writtenOff   Int         @default(0)
+  status       ClaimStatus @default(RAISED)
+  /// Why the rest was written off / rejected.
+  closeReason  String?
+  entryId      String?     @unique
+  cancelledAt  DateTime?
+  cancelReason String?
+  createdById  String?
+  createdAt    DateTime    @default(now())
+
+  lines       ClaimLine[]
+  settlements ClaimSettlement[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, supplierId])
+  @@index([tenantId, status])
+  @@index([tenantId, date])
+}
+
+model ClaimLine {
+  id          String  @id @default(cuid())
+  tenantId    String  @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant  @relation(fields: [tenantId], references: [id])
+  claimId     String
+  claim       Claim   @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  sl          Int
+  productId   String?
+  description String
+  quantity    Int
+  /// Paise per unit.
+  rate        Int
+  amount      Int
+  /// Where it comes from: invoice / note numbers, photo or document reference.
+  evidence    String?
+
+  @@index([tenantId, claimId])
+}
+
+/// Money in against a claim (a credit note or a receipt), or the part written off. Reversed, never edited.
+model ClaimSettlement {
+  id             String              @id @default(cuid())
+  tenantId       String              @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant         Tenant              @relation(fields: [tenantId], references: [id])
+  claimId        String
+  claim          Claim               @relation(fields: [claimId], references: [id])
+  kind           ClaimSettlementKind
+  date           DateTime            @db.Date
+  amount         Int
+  /// Credit note: the purchase credit note (its own entry carries the money).
+  purchaseBillId String?
+  /// Receipt: the bank account, or office cash when cash is set.
+  bankAccountId  String?
+  bankAccount    BankAccount?        @relation(fields: [bankAccountId], references: [id])
+  cash           Boolean             @default(false)
+  reference      String?
+  note           String?
+  entryId        String?             @unique
+  reversedAt     DateTime?
+  createdById    String?
+  createdAt      DateTime            @default(now())
+
+  @@index([tenantId, claimId])
+  @@index([tenantId, date])
+  @@index([tenantId, purchaseBillId])
+}
+
+// ───────────────────────────── Vouchers (A5) ─────────────────────────────
+
+enum VoucherType {
+  /// Money paid for an expense, an asset, drawings, a loan repaid … (not a supplier's bill).
+  PAYMENT
+  /// Money in that is not from a shop: capital, a loan, interest, scrap sold.
+  RECEIPT
+  /// Money moved between our own cash and banks.
+  CONTRA
+  /// Any balanced lines, with a reason: depreciation, provisions, corrections.
+  JOURNAL
+}
+
+enum VoucherMethod {
+  CASH // office cash, or a cash head such as petty cash
+  BANK // transfer / UPI / card from one of our bank accounts
+  CHEQUE // a cheque we wrote (payment only)
+  STAFF // paid by a staff member from cash they collected (payment only)
+}
+
+enum VoucherLineRole {
+  ACCOUNT // the head (or, in a journal, any account) the voucher is for
+  MONEY // the cash, bank, cheque or staff cash the money moved through
+  GST // GST input credit on a payment
+  TDS // TDS kept back (payment) or deducted by the payer (receipt)
+}
+
+/// A numbered voucher (PV / RV / CV / JV + FY). Posted once from its own lines; cancelled by reversal.
+model Voucher {
+  id            String         @id @default(cuid())
+  tenantId      String         @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  /// PV2627-00001, RV…, CV…, JV….
+  number        String
+  type          VoucherType
+  date          DateTime       @db.Date
+  /// Payment / receipt: how the money moved.
+  method        VoucherMethod?
+  bankAccountId String?
+  bankAccount   BankAccount?   @relation(fields: [bankAccountId], references: [id])
+  /// Payment by a staff member from collected cash.
+  staffUserId   String?
+  /// The handover it was entered with, if any.
+  handoverId    String?
+  /// Paise. Payment / receipt: the money that moved; contra: the amount moved; journal: total debits.
+  amount        Int
+  /// Paid to / received from.
+  party         String?
+  partyGstin    String?
+  /// GST input credit on a payment (paise).
+  gst           Int            @default(0)
+  /// TDS kept back (payment) or deducted by the payer (receipt), paise.
+  tds           Int            @default(0)
+  tdsSection    String?
+  /// Why the TDS differs from what the app worked out (A9).
+  tdsNote       String?
+  /// The party's PAN, for the TDS return.
+  partyPan      String?
+  /// UTR / bill number / slip number.
+  reference     String?
+  narration     String?
+  /// Storage keys of slip photos.
+  photos        String[]       @default([])
+  entryId       String?        @unique
+  chequeId      String?        @unique
+  cheque        IssuedCheque?  @relation(fields: [chequeId], references: [id])
+  cancelledAt   DateTime?
+  cancelReason  String?
+  createdById   String?
+  createdAt     DateTime       @default(now())
+
+  lines VoucherLine[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, type, date])
+  @@index([tenantId, date])
+  @@index([tenantId, staffUserId])
+}
+
+/// One line of a voucher, exactly as posted (debit positive).
+model VoucherLine {
+  id        String          @id @default(cuid())
+  tenantId  String          @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant          @relation(fields: [tenantId], references: [id])
+  voucherId String
+  voucher   Voucher         @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  sl        Int
+  role      VoucherLineRole
+  /// Ledger account code (HEAD:<id>, BANK:<id>, OFFICE_CASH, STAFF_CASH:<user> …).
+  code      String
+  /// The account's name when posted.
+  name      String
+  amount    Int
+  note      String?
+
+  @@index([tenantId, voucherId])
+  @@index([tenantId, code])
+}
+
+/// A month's GST set off (GSTR-3B table 6.1): output tax and reverse charge paid from input credit (in the legal order) and from a bank.
+/// One live settlement per month (a partial unique index); cancelled by reversal. Months are settled in order.
+model GstSettlement {
+  id            String       @id @default(cuid())
+  tenantId      String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  /// "2026-10".
+  period        String
+  /// Paise, by head: output tax less notes (liability), reverse charge (paid in cash only), credit brought forward and credit of the month.
+  liabIgst      Int
+  liabCgst      Int
+  liabSgst      Int
+  rcmIgst       Int
+  rcmCgst       Int
+  rcmSgst       Int
+  openIgst      Int
+  openCgst      Int
+  openSgst      Int
+  itcIgst       Int
+  itcCgst       Int
+  itcSgst       Int
+  /// Credit used: from head (first) against head (second).
+  useIgstIgst   Int
+  useIgstCgst   Int
+  useIgstSgst   Int
+  useCgstCgst   Int
+  useCgstIgst   Int
+  useSgstSgst   Int
+  useSgstIgst   Int
+  cashIgst      Int
+  cashCgst      Int
+  cashSgst      Int
+  closeIgst     Int
+  closeCgst     Int
+  closeSgst     Int
+  bankAccountId String?
+  bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id])
+  /// Challan identification number (CIN) or CPIN of the payment.
+  challan       String?
+  paidOn        DateTime     @db.Date
+  /// ARN of the filed return.
+  arn           String?
+  /// The GSTR-3B working as it was when settled.
+  working       Json
+  entryId       String?      @unique
+  cancelledAt   DateTime?
+  cancelReason  String?
+  createdById   String?
+  createdAt     DateTime     @default(now())
+
+  @@index([tenantId, period])
+}
+
+/// A GSTR-2B file from the GST portal, one per month (a new upload replaces it).
+model Gstr2bImport {
+  id          String   @id @default(cuid())
+  tenantId    String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  /// "2026-10".
+  period      String
+  fileName    String
+  /// GSTIN the file is for (JSON files say so).
+  gstin       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  rows Gstr2bRow[]
+
+  @@unique([tenantId, period])
+}
+
+/// One supplier document in a GSTR-2B file.
+model Gstr2bRow {
+  id            String       @id @default(cuid())
+  tenantId      String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  importId      String
+  import        Gstr2bImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+  /// INV (a bill), CN (their credit note), DN (their debit note).
+  kind          String
+  gstin         String
+  name          String?
+  number        String
+  /// The number reduced for matching: capitals and digits, no leading zeros.
+  numberKey     String
+  date          DateTime?    @db.Date
+  /// Paise.
+  taxable       Int
+  igst          Int
+  cgst          Int
+  sgst          Int
+  cess          Int          @default(0)
+  total         Int
+  reverseCharge Boolean      @default(false)
+  /// The portal says the credit is available.
+  itcAvailable  Boolean      @default(true)
+
+  @@index([tenantId, gstin, numberKey])
+  @@index([importId])
+}
+
+/// A TDS section with its rates and limits (A9). Starter rows are added on first use; the CA should check them.
+model TdsSection {
+  id        String   @id @default(cuid())
+  tenantId  String   @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  /// "194C", "194J(B)" ...
+  code      String
+  name      String
+  /// Rates in hundredths of a per cent (1% = 100): individual / HUF, others, no PAN.
+  rateInd   Int
+  rateOther Int
+  rateNoPan Int
+  /// Paise. Deduct when one payment or bill is above `single`, or the year's total to the party is above `yearly`.
+  single    Int?
+  yearly    Int?
+  /// 194Q: only the part of the year's total above `yearly` is taxed.
+  overOnly  Boolean  @default(false)
+  active    Boolean  @default(true)
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, code])
+}
+
+/// TDS paid to the government: one challan for one section and one month's deductions.
+model TdsChallan {
+  id            String       @id @default(cuid())
+  tenantId      String       @default(dbgenerated("current_setting('app.tenant_id'::text)"))
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  /// Ours: TC2627-00001.
+  number        String
+  section       String
+  /// The month the TDS was deducted in, "YYYY-MM".
+  period        String
+  /// Paise.
+  tax           Int
+  interest      Int          @default(0)
+  lateFee       Int          @default(0)
+  bankAccountId String?
+  bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id])
+  paidOn        DateTime     @db.Date
+  /// From the challan counterfoil: BSR code (7 digits) and challan serial number (5 digits).
+  bsrCode       String
+  serial        String
+  note          String?
+  entryId       String?      @unique
+  cancelledAt   DateTime?
+  cancelReason  String?
+  createdById   String?
+  createdAt     DateTime     @default(now())
+
+  @@unique([tenantId, number])
+  @@index([tenantId, period, section])
 }

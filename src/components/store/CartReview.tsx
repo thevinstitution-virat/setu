@@ -306,6 +306,7 @@ export default function CartReview({
               {quote.discountAmount > 0 && <Row label="Scheme discount" value={`−${formatINR(quote.discountAmount)}`} mint />}
               <Row label="Delivery charge" value={quote.deliveryCharge > 0 ? formatINR(quote.deliveryCharge) : "Free"} />
               {quote.gstAmount > 0 && <Row label="GST" value={formatINR(quote.gstAmount)} />}
+              {!!quote.roundOff && <Row label="Round off" value={`${quote.roundOff > 0 ? "+" : "−"}${formatINR(Math.abs(quote.roundOff))}`} />}
               <div className="flex justify-between font-bold pt-1 border-t border-[var(--line)] mt-1">
                 <span>Total</span>
                 <span>{formatINR(quote.totalAmount)}</span>

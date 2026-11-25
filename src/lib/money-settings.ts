@@ -15,6 +15,23 @@ export type MoneySettings = {
   holdOnOverdue: boolean;
   /** Extra days after the due date before the overdue hold applies. */
   overdueGraceDays: number;
+  /** Most unpaid bills a retailer may have before new orders are held; null = no limit by bills. */
+  defaultCreditBills: number | null;
+  /** Hold orders from a retailer whose cheque bounced in the last `bounceHoldDays` days. */
+  holdOnBounce: boolean;
+  bounceHoldDays: number;
+  /** Count post-dated cheques held from a retailer as money on its way when working out how much credit is in use. */
+  pdcReducesExposure: boolean;
+  /** Check credit again when the order leaves (it may have been fine when placed); a failed check puts it on hold. */
+  checkCreditAtBilling: boolean;
+  /**
+   * Soft limit, as a % of each shop's credit limit (50-99); null = off. Past it
+   * an order is held for anyone who manages credit; past the real limit it is
+   * held for the owner only.
+   */
+  softLimitPct: number | null;
+  /** Morning reminder (09:00) to whoever handles cheques when held post-dated cheques can be banked. */
+  chequeReminder: boolean;
   /** Paise charged when a cheque bounces; 0 = none. */
   chequeBouncePenalty: number;
   /** UPI ID shown to retailers for "Pay now" (e.g. agency@okaxis). */
@@ -30,6 +47,13 @@ export const MONEY_DEFAULTS: MoneySettings = {
   defaultCreditLimit: null,
   holdOnOverdue: true,
   overdueGraceDays: 0,
+  defaultCreditBills: null,
+  holdOnBounce: false,
+  bounceHoldDays: 30,
+  pdcReducesExposure: false,
+  checkCreditAtBilling: false,
+  softLimitPct: null,
+  chequeReminder: true,
   chequeBouncePenalty: 0,
   upiVpa: "",
   upiPayeeName: "",
@@ -41,16 +65,38 @@ export function moneySettings(settings: unknown): MoneySettings {
   return { ...MONEY_DEFAULTS, ...m };
 }
 
-export type RetailerTerms = { mode: PaymentMode; creditLimit: number | null; creditDays: number };
+export type RetailerTerms = {
+  mode: PaymentMode;
+  /** The limit in force now: the temporary one while it runs (when higher), else the usual one. */
+  creditLimit: number | null;
+  creditDays: number;
+  /** Most unpaid bills; null = no limit by bills. */
+  creditBills: number | null;
+  /** The temporary limit when it is the one in force, with its last day. */
+  tempLimit: { amount: number; until: Date } | null;
+};
 
 export function termsFor(
   s: MoneySettings,
-  r: { paymentMode: PaymentMode | null; creditLimit: number | null; creditDays: number | null }
+  r: {
+    paymentMode: PaymentMode | null;
+    creditLimit: number | null;
+    creditDays: number | null;
+    creditBills?: number | null;
+    tempCreditLimit?: number | null;
+    tempCreditUntil?: Date | null;
+  },
+  now = new Date()
 ): RetailerTerms {
+  const usual = r.creditLimit ?? s.defaultCreditLimit;
+  // A temporary limit only ever raises a limit, and only until its last day.
+  const temp = r.tempCreditLimit != null && r.tempCreditUntil && r.tempCreditUntil.getTime() >= now.getTime() && usual !== null && r.tempCreditLimit > usual ? { amount: r.tempCreditLimit, until: r.tempCreditUntil } : null;
   return {
     mode: r.paymentMode ?? s.defaultPaymentMode,
-    creditLimit: r.creditLimit ?? s.defaultCreditLimit,
+    creditLimit: temp ? temp.amount : usual,
     creditDays: r.creditDays ?? s.defaultCreditDays,
+    creditBills: r.creditBills ?? s.defaultCreditBills,
+    tempLimit: temp,
   };
 }
 
@@ -77,10 +123,17 @@ export function parseMoneySettings(input: Record<string, unknown>): Partial<Mone
     int("defaultCreditDays", 0, 365),
     int("defaultCreditLimit", 0, 1_000_000_000, true),
     int("overdueGraceDays", 0, 90),
+    int("defaultCreditBills", 1, 999, true),
+    int("bounceHoldDays", 1, 365),
+    int("softLimitPct", 50, 99, true),
     int("chequeBouncePenalty", 0, 10_000_000),
   ])
     if (err) return err;
   if ("holdOnOverdue" in input) out.holdOnOverdue = !!input.holdOnOverdue;
+  if ("holdOnBounce" in input) out.holdOnBounce = !!input.holdOnBounce;
+  if ("pdcReducesExposure" in input) out.pdcReducesExposure = !!input.pdcReducesExposure;
+  if ("checkCreditAtBilling" in input) out.checkCreditAtBilling = !!input.checkCreditAtBilling;
+  if ("chequeReminder" in input) out.chequeReminder = !!input.chequeReminder;
   if ("checkFieldDigital" in input) out.checkFieldDigital = !!input.checkFieldDigital;
   if ("upiVpa" in input) {
     const v = String(input.upiVpa ?? "").trim();

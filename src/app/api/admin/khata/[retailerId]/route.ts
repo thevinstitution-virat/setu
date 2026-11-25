@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { audit, requestIp } from "@/lib/audit";
-import { withMoney, statement } from "@/lib/ledger";
+import { allocateRetailer, withMoney, statement } from "@/lib/ledger";
 import { collectScope, khataSummary } from "@/lib/khata";
 import { parseRange } from "@/lib/money-api";
 
@@ -35,14 +35,23 @@ export async function PATCH(req: Request, { params }: Params) {
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ error: "Missing terms" }, { status: 400 });
 
-  const data: { paymentMode?: "PREPAID" | "POSTPAID" | null; creditLimit?: number | null; creditDays?: number | null } = {};
+  const data: {
+    paymentMode?: "PREPAID" | "POSTPAID" | null;
+    creditLimit?: number | null;
+    creditDays?: number | null;
+    creditBills?: number | null;
+    tempCreditLimit?: number | null;
+    tempCreditUntil?: Date | null;
+    receiptsOnAccount?: boolean;
+  } = {};
   if ("paymentMode" in body) {
     if (body.paymentMode !== null && body.paymentMode !== "PREPAID" && body.paymentMode !== "POSTPAID") {
       return NextResponse.json({ error: "Payment mode must be PREPAID, POSTPAID or default" }, { status: 400 });
     }
     data.paymentMode = body.paymentMode as typeof data.paymentMode;
   }
-  for (const [k, max] of [["creditLimit", 1_000_000_000], ["creditDays", 365]] as const) {
+  const LABEL = { creditLimit: "Credit limit", creditDays: "Credit days", creditBills: "Unpaid bills allowed", tempCreditLimit: "Temporary limit" } as const;
+  for (const [k, max] of [["creditLimit", 1_000_000_000], ["creditDays", 365], ["creditBills", 999], ["tempCreditLimit", 1_000_000_000]] as const) {
     if (!(k in body)) continue;
     const v = body[k];
     if (v === null) {
@@ -50,22 +59,37 @@ export async function PATCH(req: Request, { params }: Params) {
       continue;
     }
     const n = Number(v);
-    if (!Number.isInteger(n) || n < 0 || n > max) {
-      return NextResponse.json({ error: `${k === "creditLimit" ? "Credit limit" : "Credit days"} must be 0 or more` }, { status: 400 });
+    if (!Number.isInteger(n) || n < (k === "creditBills" ? 1 : 0) || n > max) {
+      return NextResponse.json({ error: `${LABEL[k]} must be ${k === "creditBills" ? "1" : "0"} or more` }, { status: 400 });
     }
     data[k] = n;
   }
+  // A temporary limit needs its last day (YYYY-MM-DD, counted to the end of that day in India), today or later.
+  if ("tempCreditUntil" in body) {
+    const v = body.tempCreditUntil;
+    if (v === null) data.tempCreditUntil = null;
+    else {
+      const until = typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T23:59:59.999+05:30`) : null;
+      if (!until || Number.isNaN(until.getTime()) || until.getTime() < Date.now()) return NextResponse.json({ error: "The temporary limit's last day must be today or later" }, { status: 400 });
+      data.tempCreditUntil = until;
+    }
+  }
+  if (data.tempCreditLimit != null && data.tempCreditUntil == null) return NextResponse.json({ error: "Give the temporary limit a last day" }, { status: 400 });
+  if (data.tempCreditLimit === null) data.tempCreditUntil = null;
+  if ("receiptsOnAccount" in body) data.receiptsOnAccount = body.receiptsOnAccount === true;
 
   const before = await db.retailerProfile.findUnique({
     where: { id: retailerId },
-    select: { paymentMode: true, creditLimit: true, creditDays: true },
+    select: { paymentMode: true, creditLimit: true, creditDays: true, creditBills: true, tempCreditLimit: true, tempCreditUntil: true, receiptsOnAccount: true },
   });
   if (!before) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const after = await db.retailerProfile.update({
     where: { id: retailerId },
     data,
-    select: { paymentMode: true, creditLimit: true, creditDays: true },
+    select: { paymentMode: true, creditLimit: true, creditDays: true, creditBills: true, tempCreditLimit: true, tempCreditUntil: true, receiptsOnAccount: true },
   });
+  // Switched off: the receipts waiting on account go to the oldest bills now.
+  if (before.receiptsOnAccount && !after.receiptsOnAccount) await withMoney(auth.tenant.id, session.userId, (ctx) => allocateRetailer(ctx, retailerId));
   await audit(db, { actorId: session.userId, action: "retailer.terms", entity: "RetailerProfile", entityId: retailerId, before, after, ip: requestIp(req) });
   return NextResponse.json({ terms: after });
 }

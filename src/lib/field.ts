@@ -696,7 +696,7 @@ export async function achievements(tx: Tx, userIds: string[], period: string) {
       select: { quantity: true, productId: true, product: { select: { brandId: true } }, order: { select: { placedById: true } } },
     }),
     tx.storeLead.groupBy({ by: ["createdById"], where: { createdById: { in: userIds }, status: "APPROVED", decidedAt: { gte: from, lt: to } }, _count: true }),
-    tx.payment.groupBy({ by: ["collectedById"], where: { collectedById: { in: userIds }, collectedAt: { gte: from, lt: to }, state: { in: ["CONFIRMED", "PENDING_VERIFICATION"] } }, _sum: { amount: true } }),
+    tx.payment.groupBy({ by: ["collectedById"], where: { collectedById: { in: userIds }, collectedAt: { gte: from, lt: to }, state: { in: ["CONFIRMED", "PENDING_VERIFICATION", "POST_DATED"] } }, _sum: { amount: true } }),
   ]);
   return {
     value: new Map(orders.map((o) => [o.placedById!, o._sum.totalAmount ?? 0])),
@@ -787,7 +787,7 @@ export async function teamDay(tx: Tx, tenantId: string, scope: string[] | null, 
     tx.locationPing.findMany({ where: { userId: { in: ids }, at: { gte: from, lt: to } }, orderBy: { at: "asc" }, select: { userId: true, at: true, lat: true, lng: true, accuracy: true } }),
     tx.visit.findMany({ where: { salesAgent: { userId: { in: ids } }, checkInAt: { gte: from, lt: to } }, select: { salesAgent: { select: { userId: true } }, outcome: true, orderId: true, distanceM: true, checkOutAt: true } }),
     tx.order.groupBy({ by: ["placedById"], where: { placedById: { in: ids }, createdAt: { gte: from, lt: to }, status: { not: "CANCELLED" } }, _sum: { totalAmount: true }, _count: true }),
-    tx.payment.groupBy({ by: ["collectedById"], where: { collectedById: { in: ids }, collectedAt: { gte: from, lt: to }, state: { in: ["CONFIRMED", "PENDING_VERIFICATION"] } }, _sum: { amount: true } }),
+    tx.payment.groupBy({ by: ["collectedById"], where: { collectedById: { in: ids }, collectedAt: { gte: from, lt: to }, state: { in: ["CONFIRMED", "PENDING_VERIFICATION", "POST_DATED"] } }, _sum: { amount: true } }),
   ]);
   const dayOf = new Map(days.map((d) => [d.userId, d]));
   const orderOf = new Map(orders.map((o) => [o.placedById!, o]));

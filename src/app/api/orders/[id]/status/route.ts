@@ -4,7 +4,7 @@ import { emit } from "@/lib/jobs";
 import { audit, requestIp } from "@/lib/audit";
 import { nextStatus } from "@/lib/orders";
 import { can } from "@/lib/permissions";
-import { creditCancelledOrder, MoneyError, onOrderCancelled, onOrderDispatched, withMoney } from "@/lib/ledger";
+import { creditCancelledOrder, MoneyError, onOrderCancelled, onOrderDispatched, recheckCreditAtDispatch, withMoney } from "@/lib/ledger";
 import { queueEInvoice } from "@/lib/einvoice-queue";
 import { moneyFail } from "@/lib/money-api";
 import { releaseRedemptions } from "@/lib/order-place";
@@ -36,6 +36,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
       if (action === "approve_credit") {
         if (!order.creditHold || order.creditApprovedAt) throw new MoneyError("This order is not on credit hold", 409);
+        if (order.creditHoldOwner) {
+          const me = await ctx.tx.user.findUnique({ where: { id: session.userId }, select: { isOwner: true } });
+          if (!me?.isOwner) throw new MoneyError("This order is past the shop's credit limit. Only the owner can let it through.", 403);
+        }
         const updated = await ctx.tx.order.update({
           where: { id },
           data: { creditApprovedBy: session.userId, creditApprovedAt: new Date() },
@@ -72,6 +76,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         }
       }
       if (to === "OUT_FOR_DELIVERY") {
+        await recheckCreditAtDispatch(ctx, order.id);
         const inv = await onOrderDispatched(ctx, order.id);
         if (inv) docs.push(inv);
       }

@@ -12,6 +12,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       supplier: true,
       location: { select: { id: true, name: true } },
       po: { select: { id: true, number: true } },
+      bill: { select: { id: true, number: true, cancelledAt: true } },
       lines: { include: { product: { select: { id: true, name: true, sku: true, unit: true } } } },
     },
   });

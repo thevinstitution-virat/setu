@@ -72,6 +72,7 @@ export default function BillCard({
         {quote.discountAmount > 0 && <Row label="Scheme discount" value={`−${formatINR(quote.discountAmount)}`} mint />}
         {quote.deliveryCharge > 0 && <Row label="Delivery charge" value={formatINR(quote.deliveryCharge)} />}
         {quote.gstAmount > 0 && <Row label="GST" value={formatINR(quote.gstAmount)} />}
+        {!!quote.roundOff && <Row label="Round off" value={`${quote.roundOff > 0 ? "+" : "−"}${formatINR(Math.abs(quote.roundOff))}`} />}
         <div className="flex items-end justify-between gap-3 pt-1">
           <span className="text-xs text-[var(--muted)]">Total</span>
           <span className="font-heading font-bold text-xl">{formatINR(quote.totalAmount)}</span>

@@ -45,6 +45,7 @@ export const dictionary = {
   "nav.payments": { en: "Payments", hi: "भुगतान" },
   "nav.cash": { en: "Cash", hi: "नकद" },
   "nav.bank": { en: "Bank", hi: "बैंक" },
+  "nav.books": { en: "Books", hi: "बही-खाते" },
   "nav.settings": { en: "Settings", hi: "सेटिंग्स" },
   "nav.field": { en: "Field team", hi: "फ़ील्ड टीम" },
   "nav.teamToday": { en: "Team today", hi: "टीम आज" },
@@ -97,6 +98,7 @@ export const dictionary = {
   "role.deliveryAgent": { en: "Delivery Agent", hi: "डिलीवरी एजेंट" },
   "role.admin": { en: "Admin", hi: "एडमिन" },
   "role.supervisor": { en: "Supervisor", hi: "सुपरवाइज़र" },
+  "role.accountant": { en: "Accountant", hi: "अकाउंटेंट" },
 
   // Common
   "common.logout": { en: "Log out", hi: "लॉग आउट" },

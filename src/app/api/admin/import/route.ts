@@ -1,15 +1,28 @@
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
 import { withTenantTx } from "@/lib/db";
-import { countRetailers, entitlements } from "@/lib/plans";
+import { countRetailers, entitlements, FEATURES, hasFeature } from "@/lib/plans";
 import { audit, requestIp } from "@/lib/audit";
 import { emit } from "@/lib/jobs";
-import { MoneyError, openingBalance } from "@/lib/ledger";
+import { MoneyError, openingBalance, openingBills, type OpeningBill } from "@/lib/ledger";
+import { can } from "@/lib/permissions";
+import type { Role } from "@/generated/prisma/client";
+import { importPurchases, importSupplierBills, importSuppliers } from "@/lib/books-import";
+import { importSales } from "@/lib/sales-import";
+import { invoiceSettings } from "@/lib/invoice-settings";
+import { inventorySettings } from "@/lib/inventory-settings";
 import {
+  BOOKS_IMPORTS,
+  IMPORT_TYPES,
   MAX_ROWS,
   parseSheet,
+  shopKey,
   templateCsv,
   validateBalances,
+  validateBills,
+  validateBillShares,
+  type BillRow,
+  type BillShareRow,
   validatePrices,
   validateProducts,
   type PriceRow,
@@ -19,7 +32,16 @@ import {
   type ProductRow,
   type RetailerRow,
   type RowError,
+  validatePurchases,
+  validateSales,
+  type SalesImportBill,
+  validateSupplierBills,
+  validateSuppliers,
+  type PurchaseImportBill,
+  type SupplierBillImportRow,
+  type SupplierImportRow,
 } from "@/lib/importers";
+import { applyBillShares } from "@/lib/bill-shares";
 import { tidyProductRows, type TidyChange, type TidyDuplicate } from "@/lib/catalogue-rules";
 
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -34,8 +56,14 @@ class Rollback extends Error {
   }
 }
 
-async function importRetailers(tx: Tx, rows: RetailerRow[], tenantId: string): Promise<Summary> {
+async function importRetailers(tx: Tx, rows: RetailerRow[], tenantId: string, defaultPin: string): Promise<Summary> {
   const s: Summary = { created: 0, updated: 0, newRegions: 0, newAreas: 0, errors: [] };
+  // Shops without a phone are found by outlet name + area.
+  const byName = new Map<string, { userId: string }[]>();
+  for (const p of await tx.retailerProfile.findMany({ select: { userId: true, outletName: true, area: { select: { name: true } } } })) {
+    const k = shopKey(p.outletName, p.area.name);
+    byName.set(k, [...(byName.get(k) ?? []), { userId: p.userId }]);
+  }
 
   const regions = new Map(
     (await tx.region.findMany({ include: { areas: true } })).map((r) => [
@@ -56,13 +84,18 @@ async function importRetailers(tx: Tx, rows: RetailerRow[], tenantId: string): P
   const existing = new Map(
     (
       await tx.user.findMany({
-        where: { phone: { in: rows.map((r) => r.phone) } },
+        where: { phone: { in: rows.map((r) => r.phone).filter((p): p is string => !!p) } },
         select: { id: true, phone: true, role: true, retailerProfile: { select: { id: true } } },
       })
     ).map((u) => [u.phone!, u])
   );
 
   for (const r of rows) {
+    const pinCode = r.pinCode || defaultPin;
+    if (!pinCode) {
+      s.errors.push({ row: r.row, message: "No pin_code, and the business has no PIN code in Settings → GST & invoices to use instead" });
+      continue;
+    }
     let salesAgentId: string | null | undefined = undefined;
     if (r.salesAgent) {
       salesAgentId = agents.get(r.salesAgent.toLowerCase());
@@ -71,10 +104,20 @@ async function importRetailers(tx: Tx, rows: RetailerRow[], tenantId: string): P
         continue;
       }
     }
-    const found = existing.get(r.phone);
-    if (found && (found.role !== "RETAILER" || !found.retailerProfile)) {
-      s.errors.push({ row: r.row, message: `Phone ${r.phone} belongs to a staff account` });
-      continue;
+    let found: { id: string; role: string; retailerProfile: { id: string } | null } | undefined;
+    if (r.phone) {
+      found = existing.get(r.phone);
+      if (found && (found.role !== "RETAILER" || !found.retailerProfile)) {
+        s.errors.push({ row: r.row, message: `Phone ${r.phone} belongs to a staff account` });
+        continue;
+      }
+    } else {
+      const same = byName.get(shopKey(r.outletName, r.area)) ?? [];
+      if (same.length > 1) {
+        s.errors.push({ row: r.row, message: `${same.length} shops are already called ${r.outletName} in ${r.area}; give this row a phone` });
+        continue;
+      }
+      if (same.length === 1) found = { id: same[0].userId, role: "RETAILER", retailerProfile: { id: "" } };
     }
 
     let region = regions.get(r.region.toLowerCase());
@@ -95,9 +138,11 @@ async function importRetailers(tx: Tx, rows: RetailerRow[], tenantId: string): P
       outletName: r.outletName,
       shopNumber: r.shopNumber,
       complexName: r.complexName,
-      pinCode: r.pinCode,
+      pinCode,
       areaId,
       ...(salesAgentId !== undefined ? { salesAgentId } : {}),
+      ...(r.contactName ? { contactName: r.contactName } : {}),
+      ...(r.altPhone ? { altPhone: r.altPhone } : {}),
     };
     if (found) {
       await tx.user.update({
@@ -106,9 +151,11 @@ async function importRetailers(tx: Tx, rows: RetailerRow[], tenantId: string): P
       });
       s.updated++;
     } else {
-      await tx.user.create({
+      const user = await tx.user.create({
         data: { name: r.outletName, phone: r.phone, role: "RETAILER", retailerProfile: { create: profile } },
+        select: { id: true },
       });
+      if (!r.phone) byName.set(shopKey(r.outletName, r.area), [{ userId: user.id }]);
       s.created++;
     }
   }
@@ -129,6 +176,7 @@ async function importProducts(tx: Tx, rows: ProductRow[]): Promise<Summary> {
   // Categories, brands and HSN rates by name / code; new names are created.
   const cats = new Map((await tx.category.findMany({ select: { id: true, name: true } })).map((c) => [c.name.toLowerCase(), c.id]));
   const brands = new Map((await tx.brand.findMany({ select: { id: true, name: true } })).map((c) => [c.name.toLowerCase(), c.id]));
+  const companies = new Map((await tx.supplier.findMany({ select: { id: true, name: true } })).map((c) => [c.name.toLowerCase(), c.id]));
   const hsn = new Map((await tx.hsnCode.findMany({ select: { code: true, gstRate: true } })).map((h) => [h.code, h.gstRate]));
   const idFor = async (map: Map<string, string>, name: string, create: (name: string) => Promise<{ id: string }>) => {
     let id = map.get(name.toLowerCase());
@@ -143,6 +191,8 @@ async function importProducts(tx: Tx, rows: ProductRow[]): Promise<Summary> {
       name: p.name,
       categoryId: await idFor(cats, p.category, (name) => tx.category.create({ data: { name } })),
       brandId: p.brand ? await idFor(brands, p.brand, (name) => tx.brand.create({ data: { name } })) : null,
+      // A blank company leaves the product's company as it is.
+      ...(p.company ? { supplierId: await idFor(companies, p.company, (name) => tx.supplier.create({ data: { name } })) } : {}),
       hsnCode: p.hsnCode,
       nameHi: p.nameHi,
       caseUnit: p.caseUnit,
@@ -242,14 +292,104 @@ async function importBalances(tx: Tx, rows: BalanceRow[], tenantId: string, acto
   return s;
 }
 
+/**
+ * Open bills from the old book: the shop by phone, else by party name (+ area
+ * when names repeat); the salesman by name or login. All of a shop's rows go
+ * in together (openingBills), once per shop.
+ */
+async function importBills(tx: Tx, rows: BillRow[], tenantId: string, actorId: string): Promise<Summary> {
+  const s: Summary = { created: 0, updated: 0, newRegions: 0, newAreas: 0, errors: [] };
+  const shops = await tx.retailerProfile.findMany({
+    select: { id: true, outletName: true, area: { select: { name: true } }, user: { select: { phone: true } } },
+  });
+  const byPhone = new Map(shops.filter((p) => p.user.phone).map((p) => [p.user.phone!, p.id]));
+  const norm = (v: string) => v.trim().replace(/\s+/g, " ").toLowerCase();
+  const staff = await tx.user.findMany({
+    where: { role: { in: ["SALES_AGENT", "SUPERVISOR", "ADMIN", "DELIVERY_AGENT"] } },
+    select: { id: true, name: true, loginId: true },
+  });
+  const findShop = (r: BillRow): string | { error: string } => {
+    if (r.phone) return byPhone.get(r.phone) ?? { error: `No shop with phone ${r.phone} (import shops first)` };
+    let same = shops.filter((p) => norm(p.outletName) === norm(r.party));
+    if (same.length > 1 && r.area) same = same.filter((p) => norm(p.area.name) === norm(r.area));
+    if (!same.length) return { error: `No shop called ${r.party}${r.area ? ` in ${r.area}` : ""} (import shops first)` };
+    if (same.length > 1) return { error: `${same.length} shops are called ${r.party}; add the area or phone` };
+    return same[0].id;
+  };
+  const findSalesman = (name: string): string | null | { error: string } => {
+    if (!name) return null;
+    const hits = staff.filter((u) => norm(u.name) === norm(name) || (u.loginId && norm(u.loginId) === norm(name)));
+    if (hits.length === 1) return hits[0].id;
+    return { error: hits.length ? `${hits.length} staff are called ${name}` : `No staff member called ${name} (add them under Team first)` };
+  };
+
+  const byShop = new Map<string, { bills: OpeningBill[]; advance: number; rows: number[] }>();
+  for (const r of rows) {
+    const shopId = findShop(r);
+    if (typeof shopId !== "string") {
+      s.errors.push({ row: r.row, message: shopId.error });
+      continue;
+    }
+    const salesmanId = findSalesman(r.salesman);
+    if (salesmanId !== null && typeof salesmanId !== "string") {
+      s.errors.push({ row: r.row, message: salesmanId.error });
+      continue;
+    }
+    const g = byShop.get(shopId) ?? { bills: [], advance: 0, rows: [] };
+    g.rows.push(r.row);
+    if (r.number === null) g.advance += -r.amount;
+    else g.bills.push({ number: r.number, date: r.date!, dueDate: r.dueDate, amount: r.amount, paid: r.paid, salesmanId });
+    byShop.set(shopId, g);
+  }
+  const ctx = { tx, tenantId, actorId };
+  for (const [shopId, g] of byShop) {
+    try {
+      await openingBills(ctx, shopId, g.bills, g.advance);
+      s.created += g.bills.length + (g.advance > 0 ? 1 : 0);
+    } catch (e) {
+      // openingBills checks before it writes, so a refused shop leaves nothing behind.
+      if (!(e instanceof MoneyError)) throw e;
+      for (const row of g.rows) s.errors.push({ row, message: e.message });
+    }
+  }
+  return s;
+}
+
+async function importBillShares(tx: Tx, rows: BillShareRow[]): Promise<Summary> {
+  return { ...(await applyBillShares(tx, rows)), newRegions: 0, newAreas: 0 };
+}
+
+async function importBooks(tx: Tx, type: ImportType, valid: unknown[], tenantId: string, actorId: string): Promise<Summary> {
+  const ctx = { tx, tenantId, actorId };
+  const r =
+    type === "suppliers"
+      ? await importSuppliers(ctx, valid as SupplierImportRow[])
+      : type === "supplier_bills"
+        ? await importSupplierBills(ctx, valid as SupplierBillImportRow[])
+        : await importPurchases(ctx, valid as PurchaseImportBill[]);
+  return { ...r, newRegions: 0, newAreas: 0 };
+}
+
+/** The owner imports anything; whoever enters purchases may import the suppliers' and purchase sheets. */
+const mayImport = (role: Role, type: ImportType) => can(role, "import.run") || (BOOKS_IMPORTS.includes(type) && can(role, "purchases.manage"));
+
+/** The suppliers' and purchase sheets belong to the accounts module. */
+async function booksLocked(tenantId: string, type: ImportType) {
+  if (!BOOKS_IMPORTS.includes(type) || (await hasFeature(tenantId, "books"))) return null;
+  return NextResponse.json({ error: `Not in your plan: ${FEATURES.books}. Move to a plan that has it under Billing.`, code: "upgrade", feature: "books" }, { status: 402 });
+}
+
 export async function GET(req: Request) {
-  const auth = await guard("import.run");
+  const auth = await guard();
   if (!auth.ok) return auth.res;
   const type = new URL(req.url).searchParams.get("type") as ImportType;
-  if (!["retailers", "products", "balances", "prices"].includes(type)) {
-    return NextResponse.json({ error: "type must be retailers, products, balances or prices" }, { status: 400 });
+  if (!IMPORT_TYPES.includes(type)) {
+    return NextResponse.json({ error: `type must be one of ${IMPORT_TYPES.join(", ")}` }, { status: 400 });
   }
-  return new NextResponse("﻿" + templateCsv(type), {
+  if (!mayImport(auth.session.role, type)) return NextResponse.json({ error: "You don't have access to this" }, { status: 403 });
+  const lockedGet = await booksLocked(auth.tenant.id, type);
+  if (lockedGet) return lockedGet;
+  return new NextResponse("﻿" + templateCsv(type, { purchaseCases: inventorySettings(auth.tenant.settings).purchaseCases }), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="setu-${type}-template.csv"`,
@@ -259,7 +399,7 @@ export async function GET(req: Request) {
 
 /** multipart: file, type (retailers|products), mode (preview|commit) */
 export async function POST(req: Request) {
-  const auth = await guard("import.run");
+  const auth = await guard();
   if (!auth.ok) return auth.res;
   const { session, tenant, db } = auth;
 
@@ -270,9 +410,14 @@ export async function POST(req: Request) {
   const type = String(form?.get("type") ?? "") as ImportType;
   const mode = String(form?.get("mode") ?? "preview");
   if (!(file instanceof File)) return NextResponse.json({ error: "Attach a CSV or Excel file" }, { status: 400 });
-  if (!["retailers", "products", "balances", "prices"].includes(type)) {
-    return NextResponse.json({ error: "Choose retailers, products, balances or prices" }, { status: 400 });
+  if (!IMPORT_TYPES.includes(type)) {
+    return NextResponse.json({ error: `Choose one of ${IMPORT_TYPES.join(", ")}` }, { status: 400 });
   }
+  if (!mayImport(session.role, type)) {
+    return NextResponse.json({ error: BOOKS_IMPORTS.includes(type) ? "Only someone who enters purchases can import suppliers and their bills" : "You don't have access to this" }, { status: 403 });
+  }
+  const locked = await booksLocked(tenant.id, type);
+  if (locked) return locked;
   if (!/\.(csv|xlsx)$/i.test(file.name)) {
     return NextResponse.json({ error: "Use a .csv or .xlsx file (old .xls: save as .xlsx first)" }, { status: 415 });
   }
@@ -308,7 +453,19 @@ export async function POST(req: Request) {
         ? validateProducts(rows)
         : type === "prices"
           ? validatePrices(rows)
-          : validateBalances(rows);
+          : type === "bills"
+            ? validateBills(rows)
+            : type === "bill_shares"
+              ? validateBillShares(rows)
+              : type === "sales"
+                ? validateSales(rows, new Date(), { ratesIncludeGst: invoiceSettings(tenant.settings).ratesIncludeGst })
+              : type === "suppliers"
+                ? validateSuppliers(rows)
+                : type === "supplier_bills"
+                  ? validateSupplierBills(rows)
+                  : type === "purchases"
+                    ? validatePurchases(rows, new Date(), { purchaseCases: inventorySettings(tenant.settings).purchaseCases })
+                    : validateBalances(rows);
 
   // Preview runs the exact same writes inside a transaction and rolls it back,
   // so what it reports is exactly what commit will do.
@@ -319,12 +476,20 @@ export async function POST(req: Request) {
       async (tx) => {
         const s =
           type === "retailers"
-            ? await importRetailers(tx, checked.valid as RetailerRow[], tenant.id)
+            ? await importRetailers(tx, checked.valid as RetailerRow[], tenant.id, invoiceSettings(tenant.settings).pinCode)
             : type === "products"
               ? await importProducts(tx, checked.valid as ProductRow[])
               : type === "prices"
                 ? await importPrices(tx, checked.valid as PriceRow[])
-                : await importBalances(tx, checked.valid as BalanceRow[], tenant.id, session.userId);
+                : type === "bills"
+                  ? await importBills(tx, checked.valid as BillRow[], tenant.id, session.userId)
+                  : type === "bill_shares"
+                    ? await importBillShares(tx, checked.valid as BillShareRow[])
+                    : type === "sales"
+                      ? { ...(await importSales({ tx, tenantId: tenant.id, actorId: session.userId }, checked.valid as SalesImportBill[])), newRegions: 0, newAreas: 0 }
+                    : BOOKS_IMPORTS.includes(type)
+                      ? await importBooks(tx, type, checked.valid, tenant.id, session.userId)
+                      : await importBalances(tx, checked.valid as BalanceRow[], tenant.id, session.userId);
         s.errors = [...checked.errors, ...s.errors].sort((a, b) => a.row - b.row);
         if (mode !== "commit" || s.errors.length) throw new Rollback(s);
         return s;

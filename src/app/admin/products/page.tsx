@@ -22,6 +22,7 @@ import {
   groupOptions,
   isoToLocal,
   localToIso,
+  landedPrice,
   margin,
   readInt,
   readRupees,
@@ -182,7 +183,8 @@ function Catalogue() {
 // ───────────────────────────── Products ─────────────────────────────
 
 function ProductsTab() {
-  const products = useFetch<{ products: Product[] }>("/api/products");
+  const products = useFetch<{ products: Product[]; ratesIncludeGst?: boolean }>("/api/products");
+  const inclusive = !!products.data?.ratesIncludeGst;
   const cats = useFetch<{ categories: Category[] }>("/api/admin/categories");
   const brands = useFetch<{ brands: Brand[] }>("/api/admin/brands");
   const hsn = useFetch<{ codes: Hsn[] }>("/api/admin/hsn");
@@ -316,7 +318,7 @@ function ProductsTab() {
                   <td className="px-2 py-2.5 text-right whitespace-nowrap">{formatINR(p.mrp)}</td>
                   <td className="px-2 py-2.5 text-right">{p.gstRate}%</td>
                   <td className="px-2 py-2.5 text-right">
-                    <MarginText value={margin(p.price, p.gstRate, p.mrp)} />
+                    <MarginText value={margin(p.price, p.gstRate, p.mrp, inclusive)} />
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     <ActiveChip active={p.active} off="Inactive" />
@@ -342,7 +344,7 @@ function ProductsTab() {
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                     <span className="text-[var(--ink-2)]">MRP {formatINR(p.mrp)}</span>
                     <span className="text-[var(--ink-2)]">GST {p.gstRate}%</span>
-                    <MarginText value={margin(p.price, p.gstRate, p.mrp)} />
+                    <MarginText value={margin(p.price, p.gstRate, p.mrp, inclusive)} />
                     {!p.active && <ActiveChip active={false} off="Inactive" />}
                   </div>
                 </div>
@@ -364,6 +366,7 @@ function ProductsTab() {
           hsn={hsn.data?.codes ?? []}
           areaOpts={areaOptions(regions.data?.regions)}
           groupOpts={groupOptions(groups.data?.groups)}
+          inclusive={inclusive}
           onClose={() => setEditing(null)}
           onSaved={(name, isNew) => {
             setEditing(null);
@@ -442,9 +445,11 @@ function ProductForm({
   hsn,
   areaOpts,
   groupOpts,
+  inclusive = false,
   onClose,
   onSaved,
 }: {
+  inclusive?: boolean;
   product: Product | null;
   categories: Category[];
   labels: Map<string, string>;
@@ -467,8 +472,8 @@ function ProductForm({
   const gst = hsnRow ? hsnRow.gstRate : Number(f.gstRate);
   const rate = readRupees(f.price);
   const mrp = readRupees(f.mrp);
-  const hint = typeof rate === "number" && typeof mrp === "number" && mrp > 0 ? margin(rate, gst, mrp) : null;
-  const landed = typeof rate === "number" ? Math.round(rate * (1 + gst / 100)) : null;
+  const hint = typeof rate === "number" && typeof mrp === "number" && mrp > 0 ? margin(rate, gst, mrp, inclusive) : null;
+  const landed = typeof rate === "number" ? landedPrice(rate, gst, inclusive) : null;
   const gstOptions = GST_RATES.includes(Number(f.gstRate)) ? GST_RATES : [...GST_RATES, Number(f.gstRate)].sort((a, b) => a - b);
 
   function body(): Record<string, unknown> | string {

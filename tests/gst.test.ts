@@ -3,6 +3,7 @@
  * sections and Tally XML built from in-memory documents.
  */
 import { describe, expect, it } from "vitest";
+import { splitHeads } from "@/lib/gst-math";
 import {
   amountInWords,
   creditNoteDeadline,
@@ -41,6 +42,15 @@ describe("tax split, years, numbers", () => {
   it("splits intra-state tax into CGST + SGST that always add up", () => {
     expect(splitTax(101, false)).toEqual({ cgst: 51, sgst: 50, igst: 0 });
     expect(splitTax(100, true)).toEqual({ cgst: 0, sgst: 0, igst: 100 });
+  });
+  it("gives the odd paisa to CGST in the books as on the bill", () => {
+    for (const tax of [101, 7, 1, 0, 2000, -101, -7]) {
+      const h = splitHeads(tax, false);
+      expect(h.cgst + h.sgst).toBe(tax);
+      if (tax >= 0) expect({ cgst: h.cgst, sgst: h.sgst }).toEqual({ cgst: splitTax(tax, false).cgst, sgst: splitTax(tax, false).sgst });
+    }
+    expect(splitHeads(-101, false)).toEqual({ igst: 0, cgst: -51, sgst: -50 });
+    expect(splitHeads(55, true)).toEqual({ igst: 55, cgst: 0, sgst: 0 });
   });
   it("uses Indian time for the financial year", () => {
     // 31 March 2027 20:00 UTC is 1 April 01:30 IST → new year.
@@ -129,9 +139,9 @@ function doc(type: ExportDoc["type"], number: string, lines: ReturnType<typeof l
   return {
     id: number, tenantId: "t", type, number, fy: "2627", date: new Date("2026-11-19T06:00:00Z"), orderId: null, retailerId: "r1",
     originalId: null, noteKind: null, reason: null, seller: sellerParty as never, buyer: party() as never, b2b: true, placeOfSupply: inter ? "24" : "27",
-    interState: inter, taxable: sum("taxable"), cgst: sum("cgst"), sgst: sum("sgst"), igst: sum("igst"), total: sum("total"), entryId: null, createdById: null,
+    interState: inter, taxable: sum("taxable"), cgst: sum("cgst"), sgst: sum("sgst"), igst: sum("igst"), roundOff: 0, total: sum("total"), entryId: null, createdById: null,
     createdAt: new Date(), updatedAt: new Date(), einvStatus: "NOT_REQUIRED", irn: null, ackNo: null, ackDate: null, signedQr: null, einvError: null,
-    einvAttempts: 0, shareVersion: 0, einvCancelledAt: null, ewbNo: null, ewbDate: null, ewbValidUntil: null, ewbVehicle: null, ewbDistanceKm: null,
+    einvAttempts: 0, shareVersion: 0, einvCancelledAt: null, ewbNo: null, ewbDate: null, ewbValidUntil: null, ewbVehicle: null, ewbDistanceKm: null, salesman: null,
     lines: lines as never, original: null, order: { orderNumber: "SO-1" }, ...over,
   };
 }

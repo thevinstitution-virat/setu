@@ -94,6 +94,8 @@ export function roleHome(role: Role): string {
       return "/delivery";
     case "SUPERVISOR":
       return "/team";
+    case "ACCOUNTANT":
+      return "/admin/books";
     default:
       return "/login";
   }

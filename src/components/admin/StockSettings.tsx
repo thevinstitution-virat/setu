@@ -6,13 +6,14 @@ import Icon from "@/components/Icon";
 import type { InventorySettings, OrderCheck } from "@/lib/inventory-settings";
 import { Field, Toggle } from "@/components/admin/AdminKit";
 
-type Form = { enabled: boolean; orderCheck: OrderCheck; bufferPct: string; expiryAlertDays: string };
+type Form = { enabled: boolean; orderCheck: OrderCheck; bufferPct: string; expiryAlertDays: string; purchaseCases: boolean };
 
 const toForm = (s: InventorySettings): Form => ({
   enabled: s.enabled,
   orderCheck: s.orderCheck,
   bufferPct: String(s.bufferPct),
   expiryAlertDays: String(s.expiryAlertDays),
+  purchaseCases: s.purchaseCases,
 });
 
 const CHECKS: readonly (readonly [OrderCheck, string, string])[] = [
@@ -34,6 +35,7 @@ function toPatch(f: Form, was: Form): Partial<InventorySettings> | string {
   const out: Partial<InventorySettings> = {};
   if (f.enabled !== was.enabled) out.enabled = f.enabled;
   if (f.orderCheck !== was.orderCheck) out.orderCheck = f.orderCheck;
+  if (f.purchaseCases !== was.purchaseCases) out.purchaseCases = f.purchaseCases;
   if (f.bufferPct.trim() !== was.bufferPct) {
     const v = wholeIn(f.bufferPct, 0, 200, "Van extra");
     if (typeof v === "string") return v;
@@ -146,6 +148,15 @@ export default function StockSettings({ inventory }: { inventory: InventorySetti
               .
             </span>
           </p>
+        </div>
+
+        <div className="border-t border-[var(--line)] pt-5">
+          <Toggle
+            checked={f.purchaseCases}
+            onChange={(v) => set("purchaseCases", v)}
+            label="Purchase bill sheets by the case"
+            hint="The purchase bill import also reads cases, loose and case_rate (the rate per case), and works each line out as the company's bill does. The case size comes from the product, or a case_size column."
+          />
         </div>
       </section>
 

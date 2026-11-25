@@ -1,4 +1,5 @@
 import type {
+  AccountGroup,
   AccountType,
   BillKind,
   EntryKind,
@@ -8,7 +9,7 @@ import type {
 } from "@/generated/prisma/client";
 import { withTenantTx, type Tx } from "@/lib/db";
 import { MoneyError } from "@/lib/money-error";
-import { issueNoteDoc, issueSaleInvoice, type NoteInput } from "@/lib/invoice";
+import { issueImportedInvoice, issueNoteDoc, issueSaleInvoice, type Draft, type NoteInput } from "@/lib/invoice";
 import { fyLabel, nextSequence } from "@/lib/orders";
 import { formatINR } from "@/lib/money";
 import { moneySettings, termsFor, type MoneySettings } from "@/lib/money-settings";
@@ -40,7 +41,17 @@ export async function withMoney<T>(tenantId: string, actorId: string | null, fn:
       return fn({ tx, tenantId, actorId });
     },
     { timeout: 20_000 }
-  );
+  ).catch(async (e: unknown) => {
+    // A credit check failed when an order was about to leave: everything was
+    // undone, but the order must stay marked as held so it can be approved.
+    const hold = e instanceof MoneyError ? (e.extra?.creditHold as { orderId: string; reason: string; owner?: boolean } | undefined) : undefined;
+    if (hold) {
+      await withTenantTx(tenantId, (tx) =>
+        tx.order.updateMany({ where: { id: hold.orderId, creditApprovedAt: null }, data: { creditHold: true, creditHoldReason: hold.reason, creditHoldOwner: !!hold.owner } })
+      ).catch(() => undefined);
+    }
+    throw e;
+  });
   // Messages queued in this transaction are now committed: send them soon.
   if (used && queuedMessages(used)) void kickMessages(tenantId);
   return out;
@@ -50,23 +61,71 @@ export { MoneyError };
 
 // ───────────────────────────── accounts & entries ─────────────────────────────
 
-export type AccountRef = { type: AccountType; retailerId?: string; userId?: string };
+/**
+ * Which account. BANK with no bankAccountId is the business's default bank;
+ * HEAD is one of the business's own heads (rent, salaries, capital …).
+ */
+export type AccountRef = { type: AccountType; retailerId?: string; userId?: string; headId?: string; bankAccountId?: string; supplierId?: string };
 
 const PER_RETAILER: AccountType[] = ["RECEIVABLE", "WALLET", "WALLET_HOLD"];
+/** One account per supplier: what we owe them, and what they owe us on claims. */
+export const PER_SUPPLIER: AccountType[] = ["PAYABLE", "CLAIMS_RECEIVABLE"];
 
+/** The account code, for every account whose code needs no lookup (not a chosen bank). */
 export function accountCode(ref: AccountRef): string {
   if (PER_RETAILER.includes(ref.type)) {
     if (!ref.retailerId) throw new Error(`${ref.type} needs a retailerId`);
     return `${ref.type}:${ref.retailerId}`;
   }
+  if (PER_SUPPLIER.includes(ref.type)) {
+    if (!ref.supplierId) throw new Error(`${ref.type} needs a supplierId`);
+    return `${ref.type}:${ref.supplierId}`;
+  }
   if (ref.type === "STAFF_CASH") {
     if (!ref.userId) throw new Error("STAFF_CASH needs a userId");
     return `STAFF_CASH:${ref.userId}`;
   }
+  if (ref.type === "HEAD") {
+    if (!ref.headId) throw new Error("HEAD needs a headId");
+    return `HEAD:${ref.headId}`;
+  }
+  if (ref.type === "BANK" && ref.bankAccountId) throw new Error("A chosen bank's code comes from its bank account");
   return ref.type;
 }
 
-const NAMES: Record<AccountType, string> = {
+/** Where each built-in account sits in the trial balance, P&L and balance sheet. */
+export const GROUP_OF: Record<Exclude<AccountType, "HEAD">, AccountGroup> = {
+  RECEIVABLE: "DEBTORS",
+  WALLET: "CURRENT_LIABILITIES",
+  WALLET_HOLD: "CURRENT_LIABILITIES",
+  STAFF_CASH: "CASH",
+  OFFICE_CASH: "CASH",
+  BANK: "BANK",
+  UPI_CLEARING: "IN_TRANSIT",
+  CHEQUES_IN_HAND: "IN_TRANSIT",
+  GATEWAY_CLEARING: "IN_TRANSIT",
+  ISSUED_CHEQUES: "IN_TRANSIT",
+  SALES: "SALES",
+  GST_OUTPUT: "DUTIES_TAXES",
+  GST_INPUT: "DUTIES_TAXES",
+  TDS_PAYABLE: "DUTIES_TAXES",
+  TDS_RECEIVABLE: "DUTIES_TAXES",
+  OPENING_EQUITY: "CAPITAL",
+  DISCOUNT: "INDIRECT_EXPENSES",
+  CASH_SHORTAGE: "INDIRECT_EXPENSES",
+  PROMOTIONS: "INDIRECT_EXPENSES",
+  GATEWAY_FEES: "INDIRECT_EXPENSES",
+  ROUND_OFF: "INDIRECT_EXPENSES",
+  STOCK_LOSS: "INDIRECT_EXPENSES",
+  PENALTY_INCOME: "OTHER_INCOME",
+  CLAIM_INCOME: "OTHER_INCOME",
+  PAYABLE: "CREDITORS",
+  CLAIMS_RECEIVABLE: "CLAIMS",
+  PURCHASES: "PURCHASES",
+  PURCHASE_RETURNS: "PURCHASES",
+};
+
+export const NAMES: Record<AccountType, string> = {
   RECEIVABLE: "Receivable",
   WALLET: "Wallet",
   WALLET_HOLD: "Wallet (reserved)",
@@ -84,33 +143,106 @@ const NAMES: Record<AccountType, string> = {
   PROMOTIONS: "Promotions and rewards",
   GATEWAY_CLEARING: "Online payments to be settled",
   GATEWAY_FEES: "Payment gateway fees",
+  PAYABLE: "Payable",
+  PURCHASES: "Purchases",
+  PURCHASE_RETURNS: "Purchase returns",
+  GST_INPUT: "GST input credit",
+  TDS_PAYABLE: "TDS payable",
+  TDS_RECEIVABLE: "TDS deducted by customers",
+  CLAIMS_RECEIVABLE: "Claims receivable",
+  CLAIM_INCOME: "Claims on companies",
+  ROUND_OFF: "Rounding off",
+  STOCK_LOSS: "Stock loss and shortage",
+  ISSUED_CHEQUES: "Cheques issued, not cleared",
+  HEAD: "Account head",
 };
+
+type Resolved = { code: string; name: string; group: AccountGroup; headId: string | null; bankAccountId: string | null };
+
+/**
+ * The code, name and group of an account. For posting (`posting`), a hidden
+ * head or a closed bank is refused; for reading balances it is not.
+ */
+async function resolveAccount(ctx: Ctx, ref: AccountRef, posting: boolean): Promise<Resolved> {
+  if (ref.type === "HEAD") {
+    const h = ref.headId ? await ctx.tx.ledgerHead.findUnique({ where: { id: ref.headId } }) : null;
+    if (!h) throw new MoneyError("Account head not found", 404);
+    if (posting && !h.active) throw new MoneyError(`${h.name} is hidden. Show it again under Books → Accounts to post to it.`);
+    return { code: `HEAD:${h.id}`, name: h.name, group: h.group, headId: h.id, bankAccountId: null };
+  }
+  if (ref.type === "BANK") {
+    const b = ref.bankAccountId
+      ? await ctx.tx.bankAccount.findUnique({ where: { id: ref.bankAccountId } })
+      : await ctx.tx.bankAccount.findFirst({ where: { isDefault: true } });
+    if (ref.bankAccountId && !b) throw new MoneyError("Bank account not found", 404);
+    if (b) {
+      if (posting && !b.active) throw new MoneyError(`${b.name} is closed. Open it again under Books → Bank accounts to post to it.`);
+      return { code: b.ledgerCode, name: b.name, group: "BANK", headId: null, bankAccountId: b.id };
+    }
+    // No bank accounts set up yet: the business's one bank, as before.
+    return { code: "BANK", name: NAMES.BANK, group: "BANK", headId: null, bankAccountId: null };
+  }
+  return { code: accountCode(ref), name: NAMES[ref.type], group: GROUP_OF[ref.type], headId: null, bankAccountId: null };
+}
+
+const refKey = (ref: AccountRef) =>
+  ref.type === "HEAD" ? `HEAD:${ref.headId}` : ref.type === "BANK" ? `BANK#${ref.bankAccountId ?? "default"}` : accountCode(ref);
 
 // Per-transaction cache: an account created in a transaction that rolls back
 // must not be remembered, so the cache lives and dies with the tx object.
 const accountCache = new WeakMap<object, Map<string, string>>();
 
 export async function accountId(ctx: Ctx, ref: AccountRef): Promise<string> {
-  const code = accountCode(ref);
+  const key = refKey(ref);
   let cache = accountCache.get(ctx.tx);
   if (!cache) accountCache.set(ctx.tx, (cache = new Map()));
-  const hit = cache.get(code);
+  const hit = cache.get(key);
   if (hit) return hit;
+  const r = await resolveAccount(ctx, ref, true);
   const acc = await ctx.tx.ledgerAccount.upsert({
-    where: { tenantId_code: { tenantId: ctx.tenantId, code } },
+    where: { tenantId_code: { tenantId: ctx.tenantId, code: r.code } },
     create: {
       tenantId: ctx.tenantId,
       type: ref.type,
-      code,
-      name: NAMES[ref.type],
+      code: r.code,
+      name: r.name,
+      group: r.group,
       retailerId: ref.retailerId ?? null,
       userId: ref.userId ?? null,
+      supplierId: ref.supplierId ?? null,
+      headId: r.headId,
+      bankAccountId: r.bankAccountId,
     },
-    update: {},
+    // The first bank account takes over the old "BANK" ledger account.
+    update: r.bankAccountId ? { bankAccountId: r.bankAccountId, name: r.name } : {},
     select: { id: true },
   });
-  cache.set(code, acc.id);
+  cache.set(key, acc.id);
   return acc.id;
+}
+
+// ───────────────────────────── books lock ─────────────────────────────
+
+const lockCache = new WeakMap<object, number | null>();
+const dayOfDate = (d: Date) => Math.floor(d.getTime() / DAY_MS);
+const ddmmyyyy = (day: number) => new Date(day * DAY_MS).toISOString().slice(0, 10).split("-").reverse().join("/");
+
+/**
+ * Refuses a posting dated on or before the day the books are closed up to.
+ * It is checked against the date of the new entry: a document from closed
+ * days can still be cancelled, because its reversal is dated today (an open
+ * day), so the closed days' figures never change.
+ */
+export async function assertBooksOpen(ctx: Ctx, when: Date) {
+  let locked = lockCache.get(ctx.tx);
+  if (locked === undefined) {
+    const t = await ctx.tx.tenant.findUnique({ where: { id: ctx.tenantId }, select: { booksLockedUntil: true } });
+    locked = t?.booksLockedUntil ? dayOfDate(t.booksLockedUntil) : null;
+    lockCache.set(ctx.tx, locked);
+  }
+  if (locked !== null && istDay(when) <= locked) {
+    throw new MoneyError(`The books are closed up to ${ddmmyyyy(locked)}. Ask the owner to open them to post on ${ddmmyyyy(istDay(when))}.`, 409);
+  }
 }
 
 export type Line = { account: AccountRef; amount: number };
@@ -123,6 +255,7 @@ export async function post(
     retailerId?: string | null;
     orderId?: string | null;
     paymentId?: string | null;
+    supplierId?: string | null;
     occurredAt?: Date;
     lines: Line[];
   }
@@ -134,6 +267,7 @@ export async function post(
   const total = lines.reduce((s, l) => s + l.amount, 0);
   if (total !== 0) throw new Error(`Unbalanced entry (${total} paise)`);
   if (lines.length < 2) throw new Error("An entry needs at least two non-zero lines");
+  await assertBooksOpen(ctx, e.occurredAt ?? new Date());
 
   const resolved = [];
   for (const l of lines) resolved.push({ accountId: await accountId(ctx, l.account), amount: l.amount });
@@ -145,6 +279,7 @@ export async function post(
       retailerId: e.retailerId ?? null,
       orderId: e.orderId ?? null,
       paymentId: e.paymentId ?? null,
+      supplierId: e.supplierId ?? null,
       occurredAt: e.occurredAt ?? new Date(),
       createdById: ctx.actorId,
       lines: { create: resolved },
@@ -153,14 +288,20 @@ export async function post(
   });
 }
 
-/** Cancel an entry with an equal and opposite one. Each entry can be reversed once. */
-export async function reverseEntry(ctx: Ctx, entryId: string, memo: string) {
+/**
+ * Cancel an entry with an equal and opposite one. Each entry can be reversed
+ * once. `at` dates the reversal (default now); the books lock is checked
+ * against that date, not the original's, so an entry from closed days is
+ * cancelled in an open day and the closed days stay as they were.
+ */
+export async function reverseEntry(ctx: Ctx, entryId: string, memo: string, at?: Date) {
   const orig = await ctx.tx.journalEntry.findUnique({
     where: { id: entryId },
     include: { lines: true, reversedBy: { select: { id: true } } },
   });
   if (!orig) throw new MoneyError("Entry not found", 404);
   if (orig.reversedBy) throw new MoneyError("This entry was already reversed", 409);
+  await assertBooksOpen(ctx, at ?? new Date());
   return ctx.tx.journalEntry.create({
     data: {
       kind: "REVERSAL",
@@ -168,8 +309,10 @@ export async function reverseEntry(ctx: Ctx, entryId: string, memo: string) {
       retailerId: orig.retailerId,
       orderId: orig.orderId,
       paymentId: orig.paymentId,
+      supplierId: orig.supplierId,
       reversesId: orig.id,
       createdById: ctx.actorId,
+      ...(at ? { occurredAt: at } : {}),
       lines: { create: orig.lines.map((l) => ({ accountId: l.accountId, amount: -l.amount })) },
     },
     select: { id: true },
@@ -177,8 +320,9 @@ export async function reverseEntry(ctx: Ctx, entryId: string, memo: string) {
 }
 
 export async function balanceOf(ctx: Ctx, ref: AccountRef): Promise<number> {
+  const code = ref.type === "HEAD" || ref.type === "BANK" ? (await resolveAccount(ctx, ref, false)).code : accountCode(ref);
   const acc = await ctx.tx.ledgerAccount.findUnique({
-    where: { tenantId_code: { tenantId: ctx.tenantId, code: accountCode(ref) } },
+    where: { tenantId_code: { tenantId: ctx.tenantId, code } },
     select: { id: true },
   });
   if (!acc) return 0;
@@ -222,7 +366,7 @@ export async function loadTerms(ctx: Ctx, retailerId: string) {
     ctx.tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { settings: true } }),
     ctx.tx.retailerProfile.findUniqueOrThrow({
       where: { id: retailerId },
-      select: { id: true, outletName: true, paymentMode: true, creditLimit: true, creditDays: true },
+      select: { id: true, outletName: true, paymentMode: true, creditLimit: true, creditDays: true, creditBills: true, tempCreditLimit: true, tempCreditUntil: true, receiptsOnAccount: true },
     }),
   ]);
   const settings = moneySettings(tenant.settings);
@@ -249,6 +393,10 @@ async function createBill(
     creditDays: number;
     entryId: string;
     note?: string;
+    salesmanId?: string | null;
+    /** Imported bills: the old book's due date and what was already received on it. */
+    dueDate?: Date;
+    paid?: number;
   }
 ) {
   const date = b.date ?? new Date();
@@ -260,18 +408,21 @@ async function createBill(
       number: b.number ?? (await nextNumber(ctx, prefix)),
       orderId: b.orderId ?? null,
       date,
-      dueDate: addDays(date, b.creditDays),
+      dueDate: b.dueDate ?? addDays(date, b.creditDays),
       amount: b.amount,
+      paid: b.paid ?? 0,
       entryId: b.entryId,
       note: b.note,
+      salesmanId: b.salesmanId ?? null,
     },
   });
 }
 
 /**
  * Match confirmed DUES payments' unallocated money to open bills, oldest
- * first. A payment collected against an order goes to that order's bill first.
- * Idempotent: run it after any bill or payment change.
+ * first. A receipt taken against chosen bills pays those first, in the order
+ * chosen; a payment collected against an order goes to that order's bill
+ * first. Idempotent: run it after any bill or payment change.
  */
 export async function allocateRetailer(ctx: Ctx, retailerId: string) {
   const bills = await ctx.tx.bill.findMany({
@@ -284,12 +435,31 @@ export async function allocateRetailer(ctx: Ctx, retailerId: string) {
   });
   const open = payments.filter((p) => p.allocated < p.amount);
   if (!bills.length || !open.length) return;
+  // A shop that pays against named bills only: its receipts wait on account
+  // until they are tagged. Credit notes, wallet and TDS still go to their bills.
+  const shop = await ctx.tx.retailerProfile.findUnique({ where: { id: retailerId }, select: { receiptsOnAccount: true } });
+  const waits = (method: PayMethod) => !!shop?.receiptsOnAccount && method !== "CREDIT_NOTE" && method !== "WALLET" && method !== "TDS";
+
+  // A credit note on an invoice with no order (a sales bill imported from the
+  // old book) pays that invoice's bill first: found by the note's number.
+  const noteFor = new Map<string, string>();
+  const orderless = open.filter((p) => !p.orderId && p.method === "CREDIT_NOTE");
+  if (orderless.length) {
+    const notes = await ctx.tx.invoice.findMany({
+      where: { type: "CREDIT_NOTE", number: { in: orderless.map((p) => p.number) } },
+      select: { number: true, original: { select: { number: true } } },
+    });
+    for (const n of notes) if (n.original) noteFor.set(n.number, n.original.number);
+  }
 
   const billLeft = new Map(bills.map((b) => [b.id, b.amount - b.paid]));
   for (const p of open) {
     let left = p.amount - p.allocated;
-    const target = p.orderId ? bills.find((b) => b.orderId === p.orderId) : undefined;
-    const order = target ? [target, ...bills.filter((b) => b !== target)] : bills;
+    const forBill = noteFor.get(p.number);
+    const target = p.orderId ? bills.find((b) => b.orderId === p.orderId) : forBill ? bills.find((b) => b.number === forBill) : undefined;
+    const chosen = p.forBillIds.map((id) => bills.find((b) => b.id === id)).filter((b): b is (typeof bills)[number] => !!b);
+    const first = [...new Set([...chosen, ...(target ? [target] : [])])];
+    const order = waits(p.method) ? first : first.length ? [...first, ...bills.filter((b) => !first.includes(b))] : bills;
     for (const b of order) {
       if (left <= 0) break;
       const room = billLeft.get(b.id)!;
@@ -343,7 +513,15 @@ function debitAccountFor(method: PayMethod, retailerId: string, collector: { use
     case "ONLINE":
       // Held by the gateway until it settles to our bank (lib/gateway.ts).
       return { type: "GATEWAY_CLEARING" };
+    case "TDS":
+      // The shop paid this to the government for us (A9): we claim it against our income tax.
+      return { type: "TDS_RECEIVABLE" };
   }
+}
+
+/** A cheque is post-dated while its date is a later day (in India) than `on`. */
+export function isPostDated(chequeDate: Date, on = new Date()) {
+  return istDay(chequeDate) > istDay(on);
 }
 
 export type PaymentInput = {
@@ -367,19 +545,43 @@ export type PaymentInput = {
   occurredAt?: Date;
   /** Paid through the gateway: our request and the gateway's payment id (unique, so never posted twice). */
   gateway?: { intentId: string | null; paymentId: string } | null;
+  /** Method TDS: the section the shop kept it back under. */
+  tdsSection?: string | null;
+  /** Bills this receipt is against, in order (dues only). Anything left over goes oldest first. */
+  billIds?: string[] | null;
 };
+
+/** The retailer's open bills named by a receipt, checked and in the order given. */
+async function chosenBills(ctx: Ctx, retailerId: string, billIds: string[] | null | undefined, alsoPaidBy?: string) {
+  const ids = [...new Set((billIds ?? []).filter((x) => typeof x === "string" && x))];
+  if (!ids.length) return [];
+  if (ids.length > 50) throw new MoneyError("Pick up to 50 bills");
+  const bills = await ctx.tx.bill.findMany({ where: { id: { in: ids }, retailerId }, select: { id: true, number: true, settled: true, allocations: { select: { paymentId: true } } } });
+  for (const id of ids) {
+    const b = bills.find((x) => x.id === id);
+    if (!b) throw new MoneyError("One of the bills picked isn't this retailer's", 400);
+    // A bill already paid in full can only be named by the receipt that is paying it (when its bills are changed).
+    if (b.settled && !b.allocations.some((a) => a.paymentId === alsoPaidBy)) throw new MoneyError(`Bill ${b.number} is already paid in full`, 409);
+  }
+  return ids;
+}
 
 export async function recordPayment(ctx: Ctx, p: PaymentInput) {
   const purpose = p.purpose ?? "DUES";
   if (!Number.isInteger(p.amount) || p.amount <= 0) throw new MoneyError("Amount must be more than ₹0");
   if (p.amount > 1_000_000_000) throw new MoneyError("Amount is too large");
-  if (purpose === "WALLET" && (p.method === "WALLET" || p.method === "CREDIT_NOTE")) {
+  if (purpose === "WALLET" && (p.method === "WALLET" || p.method === "CREDIT_NOTE" || p.method === "TDS")) {
     throw new MoneyError("A wallet recharge must be cash, UPI, cheque or bank");
   }
+  if (p.method === "TDS" && p.needsVerification) throw new MoneyError("TDS kept back by a shop is entered by the office");
   if (p.method === "CHEQUE" && (!p.cheque?.number || !p.cheque.bank)) {
     throw new MoneyError("Cheque number and bank are required");
   }
   await lockRetailer(ctx, p.retailerId);
+  if (p.billIds?.length && (purpose !== "DUES" || p.method === "CREDIT_NOTE")) throw new MoneyError("Only a payment of dues can be taken against chosen bills");
+  const forBillIds = await chosenBills(ctx, p.retailerId, p.billIds);
+  // A cheque dated after today is held until that day: nothing is posted and no bill is paid yet.
+  const postDated = p.method === "CHEQUE" && isPostDated(p.cheque!.date, p.occurredAt ?? new Date());
 
   if (p.method === "WALLET" && !p.fromHold) {
     const { walletAvailable } = await retailerBalances(ctx, p.retailerId);
@@ -388,19 +590,21 @@ export async function recordPayment(ctx: Ctx, p: PaymentInput) {
     }
   }
 
-  const prefix = p.method === "CREDIT_NOTE" ? "CN" : purpose === "WALLET" ? "RC" : "PAY";
+  const prefix = p.method === "CREDIT_NOTE" ? "CN" : p.method === "TDS" ? "TDS" : purpose === "WALLET" ? "RC" : "PAY";
   const payment = await ctx.tx.payment.create({
     data: {
       number: await nextNumber(ctx, prefix),
       retailerId: p.retailerId,
       purpose,
       method: p.method,
-      state: p.needsVerification ? "PENDING_VERIFICATION" : "CONFIRMED",
+      state: p.needsVerification ? "PENDING_VERIFICATION" : postDated ? "POST_DATED" : "CONFIRMED",
       amount: p.amount,
       reference: p.reference || (p.method === "CHEQUE" ? p.cheque!.number : null),
+      tdsSection: p.method === "TDS" ? (p.tdsSection ?? null) : null,
       proofKey: p.proofKey ?? null,
       note: p.note ?? null,
       orderId: p.orderId ?? null,
+      forBillIds,
       collectedById: p.collectorId !== undefined ? p.collectorId : ctx.actorId,
       collectedAt: p.occurredAt ?? new Date(),
       ...(p.gateway ? { intentId: p.gateway.intentId, gatewayPaymentId: p.gateway.paymentId } : {}),
@@ -419,7 +623,7 @@ export async function recordPayment(ctx: Ctx, p: PaymentInput) {
     throw e;
   });
 
-  if (!p.needsVerification) await postPayment(ctx, payment.id, p);
+  if (!p.needsVerification && !postDated) await postPayment(ctx, payment.id, p);
   return ctx.tx.payment.findUniqueOrThrow({ where: { id: payment.id }, include: { cheque: true } });
 }
 
@@ -445,8 +649,8 @@ async function postPayment(ctx: Ctx, paymentId: string, p: PaymentInput) {
   });
   await ctx.tx.payment.update({ where: { id: paymentId }, data: { entryId: entry.id } });
   if (purpose === "DUES") await allocateRetailer(ctx, p.retailerId);
-  // Receipt to the retailer (skips wallet settlements and credit notes).
-  if (!p.fromHold) {
+  // Receipt to the retailer (skips wallet settlements and TDS they kept back).
+  if (!p.fromHold && p.method !== "TDS") {
     await paymentReceivedNotify(ctx.tx, ctx.tenantId, paymentId);
     await paymentWebhook(ctx.tx, ctx.tenantId, paymentId);
   }
@@ -454,7 +658,7 @@ async function postPayment(ctx: Ctx, paymentId: string, p: PaymentInput) {
 
 /** Staff confirms a retailer-reported payment (e.g. UPI with UTR). */
 export async function verifyPayment(ctx: Ctx, paymentId: string, approve: boolean, reason?: string) {
-  const pay = await ctx.tx.payment.findUnique({ where: { id: paymentId } });
+  const pay = await ctx.tx.payment.findUnique({ where: { id: paymentId }, include: { cheque: true } });
   if (!pay) throw new MoneyError("Payment not found", 404);
   if (pay.state !== "PENDING_VERIFICATION") throw new MoneyError("This payment is not waiting for verification", 409);
   await lockRetailer(ctx, pay.retailerId);
@@ -463,6 +667,10 @@ export async function verifyPayment(ctx: Ctx, paymentId: string, approve: boolea
       where: { id: paymentId },
       data: { state: "REJECTED", rejectReason: reason || "Not received", verifiedById: ctx.actorId, verifiedAt: new Date() },
     });
+  }
+  if (pay.cheque && isPostDated(pay.cheque.chequeDate)) {
+    // Checked, but the cheque can't be banked yet: hold it until its date.
+    return ctx.tx.payment.update({ where: { id: paymentId }, data: { state: "POST_DATED", verifiedById: ctx.actorId, verifiedAt: new Date() } });
   }
   await ctx.tx.payment.update({
     where: { id: paymentId },
@@ -481,10 +689,35 @@ export async function verifyPayment(ctx: Ctx, paymentId: string, approve: boolea
   return ctx.tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
 }
 
+/**
+ * Change which bills a receipt is against. A counted receipt is taken off the
+ * bills it paid and put on the chosen ones (in order), the rest going oldest
+ * first; one still waiting (to verify, or a held post-dated cheque) just
+ * remembers the choice for when it counts. An empty list = oldest first.
+ */
+export async function tagPayment(ctx: Ctx, paymentId: string, billIds: string[]) {
+  const pay = await ctx.tx.payment.findUnique({ where: { id: paymentId } });
+  if (!pay) throw new MoneyError("Payment not found", 404);
+  if (pay.purpose !== "DUES" || pay.method === "CREDIT_NOTE" || pay.method === "WALLET") throw new MoneyError("Only a payment of dues can be moved between bills", 409);
+  if (pay.state !== "CONFIRMED" && pay.state !== "PENDING_VERIFICATION" && pay.state !== "POST_DATED") throw new MoneyError("This payment is not active", 409);
+  await lockRetailer(ctx, pay.retailerId);
+  const forBillIds = await chosenBills(ctx, pay.retailerId, billIds, pay.id);
+  if (pay.state === "CONFIRMED") await deallocatePayment(ctx, pay.id);
+  await ctx.tx.payment.update({ where: { id: pay.id }, data: { forBillIds } });
+  if (pay.state === "CONFIRMED") await allocateRetailer(ctx, pay.retailerId);
+  return ctx.tx.payment.findUniqueOrThrow({ where: { id: pay.id }, include: { allocations: { select: { amount: true, bill: { select: { id: true, number: true } } } } } });
+}
+
 /** Cancel a confirmed payment entered by mistake. */
 export async function reversePayment(ctx: Ctx, paymentId: string, reason: string) {
   const pay = await ctx.tx.payment.findUnique({ where: { id: paymentId }, include: { cheque: true } });
   if (!pay) throw new MoneyError("Payment not found", 404);
+  if (pay.state === "POST_DATED") {
+    // A held cheque given back or entered by mistake: it was never in the books, so there is nothing to undo.
+    await lockRetailer(ctx, pay.retailerId);
+    await ctx.tx.payment.update({ where: { id: pay.id }, data: { state: "REVERSED", rejectReason: reason } });
+    return;
+  }
   if (pay.state !== "CONFIRMED" || !pay.entryId) throw new MoneyError("Only a confirmed payment can be reversed", 409);
   if (pay.cheque && pay.cheque.status !== "RECEIVED") throw new MoneyError("Use the cheque actions for a deposited cheque", 409);
   await lockRetailer(ctx, pay.retailerId);
@@ -504,10 +737,30 @@ export async function chequeAction(ctx: Ctx, chequeId: string, action: "deposit"
   const ch = await ctx.tx.cheque.findUnique({ where: { id: chequeId }, include: { payment: true } });
   if (!ch) throw new MoneyError("Cheque not found", 404);
   const pay = ch.payment;
-  if (pay.state !== "CONFIRMED") throw new MoneyError("This cheque's payment is not active", 409);
+  const held = pay.state === "POST_DATED";
+  if (pay.state !== "CONFIRMED" && !(held && action === "deposit")) throw new MoneyError("This cheque's payment is not active", 409);
 
   if (action === "deposit") {
     if (ch.status !== "RECEIVED") throw new MoneyError("Only a received cheque can be deposited", 409);
+    if (held) {
+      // The day a held cheque goes to the bank is the day it counts: book the receipt now.
+      const now = new Date();
+      if (isPostDated(ch.chequeDate, now)) {
+        throw new MoneyError(`This cheque is dated ${ch.chequeDate.toISOString().slice(0, 10).split("-").reverse().join("/")}. It can be banked from that day.`, 409);
+      }
+      await lockRetailer(ctx, pay.retailerId);
+      await ctx.tx.payment.update({ where: { id: pay.id }, data: { state: "CONFIRMED", collectedAt: now } });
+      await postPayment(ctx, pay.id, {
+        retailerId: pay.retailerId,
+        amount: pay.amount,
+        method: "CHEQUE",
+        purpose: pay.purpose,
+        note: pay.note,
+        orderId: pay.orderId,
+        collectorId: pay.collectedById,
+        occurredAt: now,
+      });
+    }
     return ctx.tx.cheque.update({ where: { id: ch.id }, data: { status: "DEPOSITED", depositedAt: new Date() } });
   }
   if (ch.status !== "DEPOSITED") throw new MoneyError("Deposit the cheque first", 409);
@@ -633,6 +886,103 @@ export async function openingBalance(ctx: Ctx, retailerId: string, amount: numbe
   await allocateRetailer(ctx, retailerId);
 }
 
+export type OpeningBill = {
+  /** The old book's invoice number, kept as the bill number (A004081). */
+  number: string;
+  date: Date;
+  /** null = date + the shop's credit days. */
+  dueDate: Date | null;
+  /** Bill value and what was already received on it in the old book, paise. */
+  amount: number;
+  paid: number;
+  salesmanId: string | null;
+};
+
+/**
+ * Opening balance bill by bill, when moving a shop from another book: each
+ * open bill keeps its number, date, due date, value and part payment, so
+ * ageing, days overdue and the outstanding reports are right from day one.
+ * `advance` (paise) = money the shop paid that no bill has used yet.
+ * Same rule as openingBalance: once per shop, refused rows write nothing.
+ */
+export async function openingBills(ctx: Ctx, retailerId: string, bills: OpeningBill[], advance = 0, asOf = new Date()) {
+  if (!bills.length && advance <= 0) throw new MoneyError("Nothing to import for this shop");
+  if (!Number.isInteger(advance) || advance < 0) throw new MoneyError("Advance must be whole paise, 0 or more");
+  const numbers = new Set<string>();
+  for (const b of bills) {
+    if (!b.number.trim()) throw new MoneyError("Every bill needs its number");
+    if (numbers.has(b.number)) throw new MoneyError(`Bill ${b.number} is repeated`);
+    numbers.add(b.number);
+    if (!Number.isInteger(b.amount) || b.amount <= 0) throw new MoneyError(`Bill ${b.number}: value must be more than ₹0`);
+    if (!Number.isInteger(b.paid) || b.paid < 0 || b.paid >= b.amount) throw new MoneyError(`Bill ${b.number}: received must be less than the bill value`);
+    if (b.dueDate && b.dueDate < b.date) throw new MoneyError(`Bill ${b.number}: due date is before the bill date`);
+  }
+  await lockRetailer(ctx, retailerId);
+  const existing = await ctx.tx.journalEntry.count({ where: { retailerId, kind: "OPENING", reversedBy: null } });
+  if (existing) throw new MoneyError("This shop already has an opening balance", 409);
+  if (numbers.size) {
+    const taken = await ctx.tx.bill.findFirst({ where: { number: { in: [...numbers] } }, select: { number: true } });
+    if (taken) throw new MoneyError(`Bill number ${taken.number} is already in VBiz Pro`, 409);
+  }
+  const { terms } = await loadTerms(ctx, retailerId);
+
+  const dues = bills.reduce((a, b) => a + b.amount - b.paid, 0);
+  if (dues > 0) {
+    const entry = await post(ctx, {
+      kind: "OPENING",
+      memo: `Opening balance: ${bills.length} bill${bills.length === 1 ? "" : "s"} from the old book`,
+      retailerId,
+      occurredAt: asOf,
+      lines: [
+        { account: { type: "RECEIVABLE", retailerId }, amount: dues },
+        { account: { type: "OPENING_EQUITY" }, amount: -dues },
+      ],
+    });
+    for (const b of [...bills].sort((x, y) => x.date.getTime() - y.date.getTime())) {
+      await createBill(ctx, {
+        retailerId,
+        kind: "OPENING",
+        number: b.number,
+        date: b.date,
+        dueDate: b.dueDate ?? undefined,
+        creditDays: terms.creditDays,
+        amount: b.amount,
+        paid: b.paid,
+        entryId: entry.id,
+        note: b.paid ? `Opening bill (₹${(b.paid / 100).toFixed(2)} received in the old book)` : "Opening bill",
+        salesmanId: b.salesmanId,
+      });
+    }
+  }
+  if (advance > 0) {
+    const entry = await post(ctx, {
+      kind: "OPENING",
+      memo: "Opening advance from the old book",
+      retailerId,
+      occurredAt: asOf,
+      lines: [
+        { account: { type: "RECEIVABLE", retailerId }, amount: -advance },
+        { account: { type: "OPENING_EQUITY" }, amount: advance },
+      ],
+    });
+    await ctx.tx.payment.create({
+      data: {
+        number: await nextNumber(ctx, "CN"),
+        retailerId,
+        method: "CREDIT_NOTE",
+        state: "CONFIRMED",
+        amount: advance,
+        note: "Opening advance (old book)",
+        collectedById: ctx.actorId,
+        collectedAt: asOf,
+        entryId: entry.id,
+      },
+    });
+  }
+  await allocateRetailer(ctx, retailerId);
+  return { bills: bills.length, dues, advance };
+}
+
 // ───────────────────────────── orders ─────────────────────────────
 
 /**
@@ -666,19 +1016,81 @@ export async function onOrderPlaced(ctx: Ctx, order: { id: string; retailerId: s
     return { hold: false as const, reason: null };
   }
 
-  const reason = await creditHoldReason(ctx, settings, terms, order);
-  if (reason) {
-    await ctx.tx.order.update({ where: { id: order.id }, data: { creditHold: true, creditHoldReason: reason } });
+  const hold = await creditHoldReason(ctx, settings, terms, order);
+  if (hold) {
+    await ctx.tx.order.update({ where: { id: order.id }, data: { creditHold: true, creditHoldReason: hold.reason, creditHoldOwner: hold.owner } });
   }
-  return { hold: !!reason, reason };
+  return { hold: !!hold, reason: hold?.reason ?? null };
 }
 
+/**
+ * Why an order should wait for credit approval, or null. Every reason found is
+ * given; `owner` is set when one of them is past the real limit while a soft
+ * limit is in use (only the owner may let that through).
+ */
 async function creditHoldReason(
   ctx: Ctx,
   settings: MoneySettings,
-  terms: { mode: PaymentMode; creditLimit: number | null; creditDays: number },
+  terms: { mode: PaymentMode; creditLimit: number | null; creditDays: number; creditBills?: number | null },
   order: { id: string; retailerId: string; totalAmount: number }
-): Promise<string | null> {
+): Promise<{ reason: string; owner: boolean } | null> {
+  const found: string[] = [];
+  let owner = false;
+  const shopReason = await shopHoldReason(ctx, settings, terms, order);
+  if (shopReason) {
+    found.push(shopReason.reason);
+    owner = shopReason.owner;
+  }
+  const salesman = await salesmanHoldReason(ctx, order);
+  if (salesman) found.push(salesman);
+  return found.length ? { reason: found.join("; "), owner } : null;
+}
+
+/** The salesman's own limit: what the salesman's shops owe on their bills and open orders, with this one. */
+async function salesmanHoldReason(ctx: Ctx, order: { id: string; totalAmount: number }): Promise<string | null> {
+  const o = await ctx.tx.order.findUnique({ where: { id: order.id }, select: { salesmanId: true } });
+  if (!o?.salesmanId) return null;
+  const prof = await ctx.tx.salesAgentProfile.findUnique({ where: { userId: o.salesmanId }, select: { creditLimit: true, user: { select: { name: true } } } });
+  if (!prof || prof.creditLimit === null) return null;
+  const [bills, open] = await Promise.all([
+    ctx.tx.bill.aggregate({ where: { salesmanId: o.salesmanId, settled: false }, _sum: { amount: true, paid: true } }),
+    ctx.tx.order.aggregate({
+      where: {
+        salesmanId: o.salesmanId,
+        id: { not: order.id },
+        status: { notIn: ["DELIVERED", "CANCELLED"] },
+        invoices: { none: { type: { in: ["TAX_INVOICE", "BILL_OF_SUPPLY"] } } },
+      },
+      _sum: { totalAmount: true },
+    }),
+  ]);
+  const use = Number(bills._sum.amount ?? 0) - Number(bills._sum.paid ?? 0) + Number(open._sum.totalAmount ?? 0) + order.totalAmount;
+  if (use <= prof.creditLimit) return null;
+  return `Salesman ${prof.user.name}'s shops would owe ${formatINR(use)} (salesman's limit ${formatINR(prof.creditLimit)})`;
+}
+
+async function shopHoldReason(
+  ctx: Ctx,
+  settings: MoneySettings,
+  terms: { mode: PaymentMode; creditLimit: number | null; creditDays: number; creditBills?: number | null },
+  order: { id: string; retailerId: string; totalAmount: number }
+): Promise<{ reason: string; owner: boolean } | null> {
+  // Past the real limit while a soft limit is set: the owner decides, whatever else is wrong.
+  const limit = await limitHoldReason(ctx, settings, terms, order);
+  if (limit?.owner) return limit;
+  if (settings.holdOnBounce) {
+    const since = addDays(new Date(), -settings.bounceHoldDays);
+    const bounced = await ctx.tx.cheque.findFirst({
+      where: { status: "BOUNCED", bouncedAt: { gte: since }, payment: { retailerId: order.retailerId } },
+      orderBy: { bouncedAt: "desc" },
+      select: { number: true, bouncedAt: true },
+    });
+    if (bounced) return { reason: `Cheque ${bounced.number} bounced on ${bounced.bouncedAt!.toISOString().slice(0, 10)}`, owner: false };
+  }
+  if (terms.creditBills != null) {
+    const unpaid = await ctx.tx.bill.count({ where: { retailerId: order.retailerId, settled: false } });
+    if (unpaid >= terms.creditBills) return { reason: `${unpaid} unpaid bill${unpaid === 1 ? "" : "s"} (limit ${terms.creditBills})`, owner: false };
+  }
   if (settings.holdOnOverdue) {
     const cutoff = addDays(new Date(), -settings.overdueGraceDays);
     const overdue = await ctx.tx.bill.findFirst({
@@ -686,9 +1098,19 @@ async function creditHoldReason(
       orderBy: { dueDate: "asc" },
     });
     if (overdue) {
-      return `Overdue bill ${overdue.number} (${formatINR(overdue.amount - overdue.paid)} due ${overdue.dueDate.toISOString().slice(0, 10)})`;
+      return { reason: `Overdue bill ${overdue.number} (${formatINR(overdue.amount - overdue.paid)} due ${overdue.dueDate.toISOString().slice(0, 10)})`, owner: false };
     }
   }
+  return limit;
+}
+
+/** The shop's credit limit, and the soft limit below it when one is set. */
+async function limitHoldReason(
+  ctx: Ctx,
+  settings: MoneySettings,
+  terms: { creditLimit: number | null },
+  order: { id: string; retailerId: string; totalAmount: number }
+): Promise<{ reason: string; owner: boolean } | null> {
   if (terms.creditLimit !== null) {
     const { receivable } = await retailerBalances(ctx, order.retailerId);
     const open = await ctx.tx.order.aggregate({
@@ -701,12 +1123,48 @@ async function creditHoldReason(
       },
       _sum: { totalAmount: true },
     });
-    const exposure = receivable + Number(open._sum.totalAmount ?? 0) + order.totalAmount;
+    // Post-dated cheques held are money on its way, when the business counts them.
+    const held = settings.pdcReducesExposure
+      ? Number((await ctx.tx.payment.aggregate({ where: { retailerId: order.retailerId, state: "POST_DATED", purpose: "DUES" }, _sum: { amount: true } }))._sum.amount ?? 0)
+      : 0;
+    const exposure = receivable + Number(open._sum.totalAmount ?? 0) + order.totalAmount - held;
     if (exposure > terms.creditLimit) {
-      return `Over credit limit by ${formatINR(exposure - terms.creditLimit)} (limit ${formatINR(terms.creditLimit)})`;
+      const soft = settings.softLimitPct !== null;
+      return { reason: `Over credit limit by ${formatINR(exposure - terms.creditLimit)} (limit ${formatINR(terms.creditLimit)})${soft ? "; only the owner can let it through" : ""}`, owner: soft };
+    }
+    if (settings.softLimitPct !== null) {
+      const softAt = Math.floor((terms.creditLimit * settings.softLimitPct) / 100);
+      if (exposure > softAt) {
+        return { reason: `Past ${settings.softLimitPct}% of the credit limit: ${formatINR(exposure)} of ${formatINR(terms.creditLimit)}`, owner: false };
+      }
     }
   }
   return null;
+}
+
+/**
+ * The order is about to leave: check credit again (it may have been fine when
+ * placed, and a bill has gone overdue or a cheque bounced since). Only when
+ * the business asks for it, for credit shops, and not for an order someone
+ * with credit rights already let through. A failed check refuses the dispatch
+ * and leaves the order on credit hold (see withMoney) for approval.
+ */
+export async function recheckCreditAtDispatch(ctx: Ctx, orderId: string) {
+  const order = await ctx.tx.order.findUniqueOrThrow({
+    where: { id: orderId },
+    select: { id: true, orderNumber: true, retailerId: true, totalAmount: true, creditApprovedAt: true, invoices: { where: { type: { in: ["TAX_INVOICE", "BILL_OF_SUPPLY"] } }, select: { id: true } } },
+  });
+  // Approved by hand, or already billed: nothing left to decide.
+  if (order.creditApprovedAt || order.invoices.length) return;
+  const { settings, terms } = await loadTerms(ctx, order.retailerId);
+  if (!settings.checkCreditAtBilling || terms.mode === "PREPAID") return;
+  await lockRetailer(ctx, order.retailerId);
+  const hold = await creditHoldReason(ctx, settings, terms, order);
+  if (hold) {
+    throw new MoneyError(`${order.orderNumber} is on credit hold: ${hold.reason}. ${hold.owner ? "The owner" : "Someone who manages credit"} must approve it.`, 409, {
+      creditHold: { orderId: order.id, reason: hold.reason, owner: hold.owner },
+    });
+  }
 }
 
 /** Order cancelled before delivery: give back any wallet reservation. */
@@ -781,7 +1239,7 @@ export async function onOrderDelivered(
  * Idempotent: an order that is already billed is left alone.
  */
 export async function bookSale(ctx: Ctx, orderId: string, now = new Date()) {
-  const order = await ctx.tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { id: true, retailerId: true, orderNumber: true } });
+  const order = await ctx.tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { id: true, retailerId: true, orderNumber: true, salesmanId: true } });
   await lockRetailer(ctx, order.retailerId);
   const billed = await ctx.tx.bill.findUnique({ where: { orderId } });
   if (billed) {
@@ -800,6 +1258,8 @@ export async function bookSale(ctx: Ctx, orderId: string, now = new Date()) {
       { account: { type: "RECEIVABLE", retailerId: order.retailerId }, amount: invoice.total },
       { account: { type: "SALES" }, amount: -invoice.taxable },
       { account: { type: "GST_OUTPUT" }, amount: -(invoice.cgst + invoice.sgst + invoice.igst) },
+      // Rounded up = a small gain, rounded down = a small loss (post() drops a zero line).
+      { account: { type: "ROUND_OFF" }, amount: -invoice.roundOff },
     ],
   });
   await createBill(ctx, {
@@ -811,6 +1271,7 @@ export async function bookSale(ctx: Ctx, orderId: string, now = new Date()) {
     amount: invoice.total,
     creditDays: terms.mode === "PREPAID" ? 0 : terms.creditDays,
     entryId: sale.id,
+    salesmanId: order.salesmanId,
   });
   const linked = await ctx.tx.invoice.update({ where: { id: invoice.id }, data: { entryId: sale.id } });
   return { invoice: linked, booked: true };
@@ -835,6 +1296,7 @@ export async function issueCreditNote(ctx: Ctx, input: Omit<NoteInput, "type">, 
     lines: [
       { account: { type: "SALES" }, amount: note.taxable },
       { account: { type: "GST_OUTPUT" }, amount: note.cgst + note.sgst + note.igst },
+      { account: { type: "ROUND_OFF" }, amount: note.roundOff },
       { account: { type: "RECEIVABLE", retailerId: note.retailerId }, amount: -note.total },
     ],
   });
@@ -876,6 +1338,7 @@ export async function issueDebitNote(ctx: Ctx, input: Omit<NoteInput, "type" | "
       { account: { type: "RECEIVABLE", retailerId: note.retailerId }, amount: note.total },
       { account: { type: "SALES" }, amount: -note.taxable },
       { account: { type: "GST_OUTPUT" }, amount: -(note.cgst + note.sgst + note.igst) },
+      { account: { type: "ROUND_OFF" }, amount: -note.roundOff },
     ],
   });
   await createBill(ctx, {
@@ -890,6 +1353,50 @@ export async function issueDebitNote(ctx: Ctx, input: Omit<NoteInput, "type" | "
   });
   const linked = await ctx.tx.invoice.update({ where: { id: note.id }, data: { entryId: entry.id } });
   await allocateRetailer(ctx, note.retailerId);
+  return linked;
+}
+
+/**
+ * A sales bill from the old book (sales bill import): its invoice with the
+ * old number and date, the sale booked on that date (Receivable = Sales +
+ * GST output) and a bill for the outstanding. Stock doesn't move (count it).
+ */
+export async function bookImportedSale(
+  ctx: Ctx,
+  p: { retailerId: string; number: string; date: Date; dueDate: Date | null; salesmanId: string | null; salesman: string | null; drafts: Draft[]; roundOff?: number }
+) {
+  await lockRetailer(ctx, p.retailerId);
+  const taken = await ctx.tx.bill.findFirst({ where: { number: p.number }, select: { kind: true } });
+  if (taken) throw new MoneyError(`Bill ${p.number} is already in VBiz Pro${taken.kind === "OPENING" ? " as an open bill from the old book" : ""}`, 409);
+  const invoice = await issueImportedInvoice(ctx, p);
+  const { terms } = await loadTerms(ctx, p.retailerId);
+  const sale = await post(ctx, {
+    kind: "SALE",
+    memo: `Invoice ${invoice.number} (imported from a sheet)`,
+    retailerId: p.retailerId,
+    occurredAt: p.date,
+    lines: [
+      { account: { type: "RECEIVABLE", retailerId: p.retailerId }, amount: invoice.total },
+      { account: { type: "SALES" }, amount: -invoice.taxable },
+      { account: { type: "GST_OUTPUT" }, amount: -(invoice.cgst + invoice.sgst + invoice.igst) },
+      // Rounded up = a small gain, rounded down = a small loss (post() drops a zero line).
+      { account: { type: "ROUND_OFF" }, amount: -invoice.roundOff },
+    ],
+  });
+  await createBill(ctx, {
+    retailerId: p.retailerId,
+    kind: "ORDER",
+    number: invoice.number,
+    date: p.date,
+    dueDate: p.dueDate ?? undefined,
+    amount: invoice.total,
+    creditDays: terms.mode === "PREPAID" ? 0 : terms.creditDays,
+    entryId: sale.id,
+    note: "Imported from a sheet",
+    salesmanId: p.salesmanId,
+  });
+  const linked = await ctx.tx.invoice.update({ where: { id: invoice.id }, data: { entryId: sale.id } });
+  await allocateRetailer(ctx, p.retailerId);
   return linked;
 }
 

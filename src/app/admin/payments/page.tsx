@@ -6,7 +6,7 @@ import Icon from "@/components/Icon";
 import { formatINR } from "@/lib/money";
 
 type Method = "CASH" | "UPI" | "CHEQUE" | "BANK" | "ONLINE" | "WALLET" | "CREDIT_NOTE";
-type State = "PENDING_VERIFICATION" | "CONFIRMED" | "REJECTED" | "REVERSED";
+type State = "PENDING_VERIFICATION" | "POST_DATED" | "CONFIRMED" | "REJECTED" | "REVERSED";
 type ChequeStatus = "RECEIVED" | "DEPOSITED" | "CLEARED" | "BOUNCED";
 
 type Payment = {
@@ -71,6 +71,7 @@ const METHOD_LABEL: Record<Method, string> = {
 
 const STATE_LABEL: Record<State, string> = {
   PENDING_VERIFICATION: "To verify",
+  POST_DATED: "Post-dated, held",
   CONFIRMED: "Confirmed",
   REJECTED: "Rejected",
   REVERSED: "Reversed",
@@ -78,6 +79,7 @@ const STATE_LABEL: Record<State, string> = {
 
 const STATE_CHIP: Record<State, string> = {
   PENDING_VERIFICATION: "chip-genda",
+  POST_DATED: "chip-genda",
   CONFIRMED: "chip-mint",
   REJECTED: "chip-kesar",
   REVERSED: "",
@@ -566,10 +568,10 @@ function AllTab({ onProof }: { onProof: (src: string) => void }) {
         </div>
       );
     }
-    if (p.state === "CONFIRMED" && (!p.cheque || p.cheque.status === "RECEIVED")) {
+    if ((p.state === "CONFIRMED" || p.state === "POST_DATED") && (!p.cheque || p.cheque.status === "RECEIVED")) {
       return (
         <button className="btn btn-quiet btn-xs" disabled={busyId === p.id} onClick={() => setOpen({ id: p.id, kind: "reverse" })}>
-          Reverse
+          {p.state === "POST_DATED" ? "Give back" : "Reverse"}
         </button>
       );
     }
@@ -731,8 +733,9 @@ function AllTab({ onProof }: { onProof: (src: string) => void }) {
 
 // ───────────────────────────── Cheques ─────────────────────────────
 
-const CHEQUE_FILTERS: { key: ChequeStatus | ""; label: string }[] = [
+const CHEQUE_FILTERS: { key: ChequeStatus | "" | "due"; label: string }[] = [
   { key: "", label: "To act on" },
+  { key: "due", label: "Bank today" },
   { key: "RECEIVED", label: "In hand" },
   { key: "DEPOSITED", label: "Deposited" },
   { key: "CLEARED", label: "Cleared" },
@@ -740,7 +743,9 @@ const CHEQUE_FILTERS: { key: ChequeStatus | ""; label: string }[] = [
 ];
 
 function ChequesTab() {
-  const [status, setStatus] = useState<ChequeStatus | "">("");
+  const params = useSearchParams();
+  const [status, setStatus] = useState<ChequeStatus | "" | "due">(params.get("cheques") === "due" ? "due" : "");
+  const [bankToday, setBankToday] = useState<{ count: number; amount: number } | null>(null);
   const [rows, setRows] = useState<Cheque[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -750,8 +755,9 @@ function ChequesTab() {
 
   const load = useCallback(async () => {
     try {
-      const data = await api<{ cheques: Cheque[] }>(`/api/cheques${status ? `?status=${status}` : ""}`);
+      const data = await api<{ cheques: Cheque[]; bankToday?: { count: number; amount: number } }>(`/api/cheques${status ? `?status=${status}` : ""}`);
       setRows(data.cheques);
+      setBankToday(data.bankToday ?? null);
       setError(null);
     } catch (e) {
       setError(errText(e));
@@ -797,9 +803,19 @@ function ChequesTab() {
             }`}
           >
             {f.label}
+            {f.key === "due" && bankToday && bankToday.count > 0 ? ` (${bankToday.count})` : ""}
           </button>
         ))}
       </div>
+
+      {status !== "due" && bankToday && bankToday.count > 0 && (
+        <button type="button" onClick={() => setStatus("due")} className="w-full text-left rounded-2xl border border-[#e8b27a] bg-[#fff4e6] px-4 py-3 text-sm text-[#7a3d06]">
+          <span className="font-bold">
+            {bankToday.count} cheque{bankToday.count === 1 ? "" : "s"} can be banked today
+          </span>{" "}
+          · {formatINR(bankToday.amount)}. Show them
+        </button>
+      )}
 
       {error && <ErrorBox message={error} onRetry={load} />}
       {!rows && !error && <p className="text-sm text-[var(--muted)]">Loading…</p>}
@@ -818,9 +834,11 @@ function ChequesTab() {
 
       <div className="space-y-3">
         {(rows ?? []).map((c) => {
-          const held = daysBetween(c.payment.collectedAt, new Date());
+          const held = daysBetween(c.createdAt, new Date());
           const dueIn = daysBetween(new Date(), c.chequeDate);
-          const active = c.payment.state === "CONFIRMED";
+          // A post-dated cheque's payment waits (it pays no bill) until the cheque is banked on or after its date.
+          const waiting = c.payment.state === "POST_DATED";
+          const active = c.payment.state === "CONFIRMED" || waiting;
           return (
             <div key={c.id} className="card p-4 space-y-3">
               <div className="flex items-start justify-between gap-3">
@@ -846,6 +864,7 @@ function ChequesTab() {
                     Post-dated: deposit in {dueIn} day{dueIn === 1 ? "" : "s"}
                   </span>
                 )}
+                {waiting && <span className="chip">Not in the dues yet</span>}
                 {c.status === "RECEIVED" && held >= 3 && dueIn <= 0 && <span className="chip chip-kesar">Not deposited yet</span>}
                 {c.depositedAt && c.status === "DEPOSITED" && (
                   <span className="text-xs text-[var(--muted)]">Deposited {dateOnly(c.depositedAt)}</span>
@@ -862,10 +881,15 @@ function ChequesTab() {
                 )}
               </div>
 
-              {active && c.status === "RECEIVED" && (
+              {active && c.status === "RECEIVED" && !(waiting && dueIn > 0) && (
                 <button className="btn btn-mor btn-sm" disabled={busyId === c.id} onClick={() => act(c, "deposit")}>
                   {busyId === c.id ? "Saving…" : "Mark deposited"}
                 </button>
+              )}
+              {waiting && dueIn > 0 && (
+                <p className="text-xs text-[var(--muted)]">
+                  It can be banked from {dateOnly(c.chequeDate)}. Until then the retailer&apos;s bills stay unpaid. To hand it back, open Payments and choose Give back.
+                </p>
               )}
 
               {active && c.status === "DEPOSITED" &&

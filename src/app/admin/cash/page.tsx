@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Icon from "@/components/Icon";
 import { formatINR, toPaise } from "@/lib/money";
+import { Thumb, uploadImage } from "@/components/admin/AdminKit";
 
 type Row = {
   id: string;
@@ -23,9 +24,14 @@ type Handover = {
   counted: number;
   /** expected − counted; positive = short. */
   variance: number;
+  /** Expenses paid from the cash, entered at the handover. */
+  expenses: number;
   note: string | null;
   createdAt: string;
 };
+
+type Head = { code: string; name: string; groupLabel: string };
+type Expense = { code: string; amount: string; note: string };
 
 type Data = { rows: Row[]; handovers: Handover[]; officeCash: number; totalWithStaff: number };
 
@@ -246,7 +252,12 @@ export default function CashPage() {
                     {h.note && ` · ${h.note}`}
                   </p>
                 </div>
-                <div className="flex items-center gap-3 text-sm">
+                <div className="flex flex-wrap items-center gap-3 text-sm">
+                  {h.expenses > 0 && (
+                    <span className="text-[var(--muted)]">
+                      Expenses <span className="text-[var(--ink-2)] font-bold">{formatINR(h.expenses)}</span>
+                    </span>
+                  )}
                   <span className="text-[var(--muted)]">
                     Expected <span className="text-[var(--ink-2)] font-bold">{formatINR(h.expected)}</span>
                   </span>
@@ -269,10 +280,44 @@ function HandoverForm({ row, onCancel, onDone }: { row: Row; onCancel: () => voi
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [heads, setHeads] = useState<Head[] | null>(null);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
 
-  const expected = row.cashInHand;
+  // Expenses paid from this cash: fuel and loading first, as the usual ones.
+  async function addExpense() {
+    if (!heads) {
+      try {
+        const o = await api<{ heads: (Head & { key: string | null })[] }>("/api/admin/books/vouchers?options=1");
+        const usual = ["fuel", "loading", "vehicle_repairs"];
+        setHeads([...o.heads].sort((a, b) => Number(usual.includes(b.key ?? "")) - Number(usual.includes(a.key ?? ""))));
+      } catch (err) {
+        return setError(errText(err));
+      }
+    }
+    setExpenses((x) => [...x, { code: "", amount: "", note: "" }]);
+  }
+  const setExp = (i: number, patch: Partial<Expense>) => setExpenses((x) => x.map((e, k) => (k === i ? { ...e, ...patch } : e)));
+  async function addPhotos(files: FileList | null) {
+    if (!files?.length) return;
+    setUploading(true);
+    try {
+      const keys: string[] = [];
+      for (const f of [...files].slice(0, 6 - photos.length)) keys.push(await uploadImage(f, "voucher-slip"));
+      setPhotos((p) => [...p, ...keys].slice(0, 6));
+    } catch (err) {
+      setError(errText(err));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const spent = expenses.reduce((a, e) => a + (parseRupees(e.amount) ?? 0), 0);
+  const badExpense = expenses.some((e) => (e.code || e.amount) && (!e.code || !(parseRupees(e.amount) ?? 0)));
+  const expected = row.cashInHand - spent;
   const c = parseRupees(counted);
-  const valid = c !== null && c >= 0;
+  const valid = c !== null && c >= 0 && !badExpense && expected >= 0;
   const variance = valid ? expected - c : 0;
   const over = valid && variance < 0;
 
@@ -282,15 +327,17 @@ function HandoverForm({ row, onCancel, onDone }: { row: Row; onCancel: () => voi
     setBusy(true);
     setError(null);
     try {
+      const lines = expenses.filter((x) => x.code && parseRupees(x.amount)).map((x) => ({ headId: x.code.replace(/^HEAD:/, ""), amount: parseRupees(x.amount), note: x.note.trim() || null }));
       await api("/api/admin/cash", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "handover", staffUserId: row.id, counted: c, note: note.trim() || undefined }),
+        body: JSON.stringify({ action: "handover", staffUserId: row.id, counted: c, note: note.trim() || undefined, expenses: lines, photos }),
       });
+      const paid = spent > 0 ? ` Expenses of ${formatINR(spent)} entered as a payment voucher.` : "";
       onDone(
         variance > 0
-          ? `Received ${formatINR(c)} from ${row.name}. ${formatINR(variance)} short stays on their cash in hand.`
-          : `Received ${formatINR(c)} from ${row.name}.`
+          ? `Received ${formatINR(c)} from ${row.name}.${paid} ${formatINR(variance)} short stays on their cash in hand.`
+          : `Received ${formatINR(c)} from ${row.name}.${paid}`
       );
     } catch (err) {
       setError(errText(err));
@@ -300,9 +347,53 @@ function HandoverForm({ row, onCancel, onDone }: { row: Row; onCancel: () => voi
 
   return (
     <form onSubmit={submit} className="rounded-xl bg-ink/5 p-3 space-y-3 max-w-lg">
+      <div className="space-y-2">
+        {expenses.length > 0 && <p className="text-xs font-bold text-[var(--ink-2)]">Paid from this cash</p>}
+        {expenses.map((x, i) => (
+          <div key={i} className="grid grid-cols-[1fr_5rem_auto] gap-2 items-center">
+            <select className="input" value={x.code} onChange={(e) => setExp(i, { code: e.target.value })} aria-label="Expense head">
+              <option value="">What for</option>
+              {(heads ?? []).map((h) => (
+                <option key={h.code} value={h.code}>
+                  {h.name}
+                </option>
+              ))}
+            </select>
+            <input className="input" inputMode="decimal" placeholder="₹" value={x.amount} onChange={(e) => setExp(i, { amount: e.target.value })} aria-label="Amount" />
+            <button type="button" className="btn btn-quiet btn-xs" aria-label="Remove expense" onClick={() => setExpenses((xs) => xs.filter((_, k) => k !== i))}>
+              <Icon name="x" className="h-3.5 w-3.5" />
+            </button>
+            <input className="input col-span-3 !py-1.5 text-sm" placeholder="Note, e.g. Diesel, UP32 AB 1234 (optional)" maxLength={120} value={x.note} onChange={(e) => setExp(i, { note: e.target.value })} />
+          </div>
+        ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className="btn btn-outline btn-xs" onClick={addExpense}>
+            <Icon name="plus" className="h-3.5 w-3.5" /> {expenses.length ? "Another expense" : "Expenses paid from this cash"}
+          </button>
+          {expenses.length > 0 && (
+            <>
+              {photos.map((k) => (
+                <span key={k} className="relative">
+                  <Thumb imageKey={k} className="h-10 w-10" alt="Slip" />
+                  <button type="button" aria-label="Remove photo" className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-ink text-white grid place-items-center" onClick={() => setPhotos((p) => p.filter((y) => y !== k))}>
+                    <Icon name="x" className="h-2.5 w-2.5" />
+                  </button>
+                </span>
+              ))}
+              {photos.length < 6 && (
+                <label className="btn btn-quiet btn-xs cursor-pointer">
+                  <Icon name="image" className="h-3.5 w-3.5" /> {uploading ? "Uploading…" : "Slip photo"}
+                  <input type="file" accept="image/*" capture="environment" multiple className="sr-only" disabled={uploading} onChange={(e) => addPhotos(e.target.files)} />
+                </label>
+              )}
+            </>
+          )}
+        </div>
+        {expected < 0 && <p className="text-xs text-[#a8281e]">The expenses are more than the {formatINR(row.cashInHand)} they hold.</p>}
+      </div>
       <div className="flex items-baseline justify-between gap-2">
-        <p className="text-sm text-[var(--ink-2)]">Should have</p>
-        <p className="font-heading font-bold text-lg">{formatINR(expected)}</p>
+        <p className="text-sm text-[var(--ink-2)]">Should have{spent > 0 ? ` (after ${formatINR(spent)} expenses)` : ""}</p>
+        <p className="font-heading font-bold text-lg">{formatINR(Math.max(0, expected))}</p>
       </div>
       <label className="block">
         <span className="block text-xs font-bold text-[var(--ink-2)] mb-1">Cash counted (₹)</span>
@@ -337,7 +428,7 @@ function HandoverForm({ row, onCancel, onDone }: { row: Row; onCancel: () => voi
       </label>
       {error && <p className="text-sm text-[#a8281e]">{error}</p>}
       <div className="flex gap-2">
-        <button type="submit" className="btn btn-kesar btn-sm" disabled={!valid || over || busy}>
+        <button type="submit" className="btn btn-kesar btn-sm" disabled={!valid || over || busy || uploading}>
           {busy ? "Saving…" : valid ? `Receive ${formatINR(c)}` : "Receive"}
         </button>
         <button type="button" className="btn btn-quiet btn-sm" onClick={onCancel} disabled={busy}>

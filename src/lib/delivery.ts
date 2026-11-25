@@ -7,6 +7,7 @@ import {
   issueCreditNote,
   onOrderDelivered,
   onOrderDispatched,
+  recheckCreditAtDispatch,
   type Ctx,
   type PaymentInput,
 } from "@/lib/ledger";
@@ -75,6 +76,7 @@ export async function dispatchOrder(ctx: Ctx, orderId: string, note = "Out for d
   if (order.status === "DELIVERED" || order.status === "CANCELLED") throw new MoneyError(`${order.orderNumber} can no longer be dispatched`);
   if (order.creditHold && !order.creditApprovedAt) throw new MoneyError(`${order.orderNumber} is on credit hold`, 409);
   if (order.status !== "OUT_FOR_DELIVERY") {
+    await recheckCreditAtDispatch(ctx, orderId);
     await ctx.tx.order.update({
       where: { id: orderId },
       data: { status: "OUT_FOR_DELIVERY", statusEvents: { create: { status: "OUT_FOR_DELIVERY", actorId: ctx.actorId, note } } },
@@ -172,7 +174,7 @@ export async function deliverOrder(ctx: Ctx, input: DeliverInput, now = new Date
       }
       await ctx.tx.order.update({
         where: { id: order.id },
-        data: { grossAmount: r.grossAmount, discountAmount: r.discountAmount, subtotal: r.subtotal, gstAmount: r.gstAmount, totalAmount: r.totalAmount, orderedTotal: order.totalAmount },
+        data: { grossAmount: r.grossAmount, discountAmount: r.discountAmount, subtotal: r.subtotal, gstAmount: r.gstAmount, roundOff: r.roundOff, totalAmount: r.totalAmount, orderedTotal: order.totalAmount },
       });
       totalAmount = r.totalAmount;
     } else {

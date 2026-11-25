@@ -19,7 +19,7 @@ type Row = {
   listPrice: number | null;
   margin: number | null;
 };
-type Data = { list: { id: string; name: string; description: string | null; active: boolean; retailers: number }; products: Row[] };
+type Data = { list: { id: string; name: string; description: string | null; active: boolean; retailers: number }; products: Row[]; ratesIncludeGst?: boolean };
 
 const PAGE = 150;
 
@@ -232,13 +232,13 @@ function Editor({
           </thead>
           <tbody className="divide-y divide-[var(--line)]">
             {shown.slice(0, limit).map((p) => (
-              <RateRow key={p.id} p={p} value={draft[p.id] ?? ""} onChange={(v) => setRate(p.id, v)} layout="table" />
+              <RateRow key={p.id} p={p} value={draft[p.id] ?? ""} onChange={(v) => setRate(p.id, v)} layout="table" inclusive={!!data.ratesIncludeGst} />
             ))}
           </tbody>
         </table>
         <div className="md:hidden divide-y divide-[var(--line)]">
           {shown.slice(0, limit).map((p) => (
-            <RateRow key={p.id} p={p} value={draft[p.id] ?? ""} onChange={(v) => setRate(p.id, v)} layout="card" />
+            <RateRow key={p.id} p={p} value={draft[p.id] ?? ""} onChange={(v) => setRate(p.id, v)} layout="card" inclusive={!!data.ratesIncludeGst} />
           ))}
         </div>
         {shown.length === 0 && <p className="px-4 py-6 text-sm text-[var(--muted)]">No product matches.</p>}
@@ -285,10 +285,10 @@ function Editor({
   );
 }
 
-function RateRow({ p, value, onChange, layout }: { p: Row; value: string; onChange: (v: string) => void; layout: "table" | "card" }) {
+function RateRow({ p, value, onChange, layout, inclusive }: { p: Row; value: string; onChange: (v: string) => void; layout: "table" | "card"; inclusive: boolean }) {
   const v = readRupees(value);
   const effective = typeof v === "number" ? v : p.price;
-  const m = margin(effective, p.gstRate, p.mrp);
+  const m = margin(effective, p.gstRate, p.mrp, inclusive);
   const diff = typeof v === "number" && p.price > 0 ? Math.round(((v - p.price) / p.price) * 1000) / 10 : null;
   const changed = (typeof v === "number" ? v : v === null ? null : "bad") !== p.listPrice;
   const input = (

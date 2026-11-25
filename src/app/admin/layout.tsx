@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { pageSession } from "@/lib/guard";
 import AppShell, { type NavItem } from "@/components/AppShell";
 import { layoutChrome } from "@/lib/chrome";
+import { headers } from "next/headers";
+import { officeAllows } from "@/lib/permissions";
 
 // The office menu in five sections (sidebar on PC, rail on tablet, More sheet on
 // phone). The first entry stays /admin: the shell uses it as home and for /notifications.
@@ -22,6 +24,7 @@ const nav: NavItem[] = [
   { href: "/team", labelKey: "nav.field", icon: "pin", group: "deliver" },
   { href: "/admin/regions", labelKey: "nav.regions", icon: "map", group: "deliver" },
 
+  { href: "/admin/books", labelKey: "nav.books", icon: "layers", group: "money" },
   { href: "/admin/khata", labelKey: "nav.khata", icon: "book", group: "money", tab: true },
   { href: "/admin/invoices", labelKey: "nav.invoices", icon: "receipt", group: "money" },
   { href: "/admin/payments", labelKey: "nav.payments", icon: "card", group: "money" },
@@ -37,14 +40,24 @@ const nav: NavItem[] = [
   { href: "/admin/settings", labelKey: "nav.settings", icon: "settings", group: "setup" },
 ];
 
+// The accountant's office: the books first (their home), then the money pages they may open.
+const accountantNav: NavItem[] = [
+  { href: "/admin/books", labelKey: "nav.books", icon: "layers", group: "money", tab: true },
+  ...nav.filter((n) => n.href !== "/admin" && n.href !== "/admin/books" && officeAllows("ACCOUNTANT", n.href)),
+];
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await pageSession();
-  if (!session || session.role !== "ADMIN") redirect("/login");
+  if (!session || (session.role !== "ADMIN" && session.role !== "ACCOUNTANT")) redirect("/login");
+  // The proxy already keeps the accountant to their pages; this is the second lock.
+  const path = (await headers()).get("x-setu-path") ?? "";
+  if (session.role === "ACCOUNTANT" && path && !officeAllows("ACCOUNTANT", path)) redirect("/admin/books");
 
-  const chrome = await layoutChrome(session, nav);
+  const menu = session.role === "ACCOUNTANT" ? accountantNav : nav;
+  const chrome = await layoutChrome(session, menu);
 
   return (
-    <AppShell chrome={chrome} nav={nav} userName={session.name} roleKey="role.admin">
+    <AppShell chrome={chrome} nav={menu} userName={session.name} roleKey={session.role === "ACCOUNTANT" ? "role.accountant" : "role.admin"}>
       {children}
     </AppShell>
   );

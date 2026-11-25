@@ -12,6 +12,7 @@ import {
   type ReturnCondition,
 } from "@/lib/inventory-settings";
 import { addDays, isExpired, istToday, loadLine, pickFefo, reorderSuggestion } from "@/lib/stock-math";
+import { bookStockLoss } from "@/lib/stock-loss";
 
 /**
  * Inventory (Phase 5). Stock sits in lots (product + batch + expiry at a
@@ -38,6 +39,8 @@ export type StockRefs = {
   docId?: string | null;
   reason?: string | null;
   note?: string | null;
+  /** When the move happened, if not now (a stock count dated an earlier day: the end of that day). */
+  at?: Date | null;
 };
 type Pick = { lotId: string; qty: number; batch: string; expiry: Date | null; mfgDate: Date | null; unitCost: number | null };
 
@@ -135,6 +138,7 @@ const refData = (r: StockRefs) => ({
   docId: r.docId ?? null,
   reason: r.reason ?? null,
   note: r.note?.trim().slice(0, 300) || null,
+  ...(r.at ? { createdAt: r.at } : {}),
 });
 
 /** Stock in at one place (purchase, opening, return, adjustment). The caller need not lock. */
@@ -145,8 +149,9 @@ export async function stockIn(
   assertQty(p.qty);
   await lock(ctx, [[p.locationId, p.productId]]);
   const lot = await putIntoLot(ctx, p.locationId, p.productId, p.lot ?? {}, p.qty);
+  const b = await bookStockLoss(ctx, { kind: p.kind, reason: p.reason, productId: p.productId, at: p.at ?? undefined, rows: [{ qty: p.qty, unitCost: lot.unitCost, toId: p.locationId }] });
   await ctx.tx.stockMove.create({
-    data: { kind: p.kind, productId: p.productId, lotId: lot.id, toId: p.locationId, qty: p.qty, unitCost: lot.unitCost, actorId: ctx.actorId, ...refData(p) },
+    data: { kind: p.kind, productId: p.productId, lotId: lot.id, toId: p.locationId, qty: p.qty, unitCost: lot.unitCost, actorId: ctx.actorId, entryId: b.entryId, bookValue: b.values[0], ...refData(p) },
   });
   return lot;
 }
@@ -213,9 +218,10 @@ export async function stockOut(
   assertQty(p.qty);
   await lock(ctx, p.sources.map((s) => [s, p.productId] as [string, string]));
   const picks = await take(ctx, p.sources, p.productId, p.qty, p, p);
-  for (const x of picks) {
+  const b = await bookStockLoss(ctx, { kind: p.kind, reason: p.reason, productId: p.productId, at: p.at ?? undefined, rows: picks.map((x) => ({ qty: x.qty, unitCost: x.unitCost, fromId: x.from })) });
+  for (const [i, x] of picks.entries()) {
     await ctx.tx.stockMove.create({
-      data: { kind: p.kind, productId: p.productId, lotId: x.lotId, fromId: x.from, qty: x.qty, unitCost: x.unitCost, actorId: ctx.actorId, ...refData(p) },
+      data: { kind: p.kind, productId: p.productId, lotId: x.lotId, fromId: x.from, qty: x.qty, unitCost: x.unitCost, actorId: ctx.actorId, entryId: b.entryId, bookValue: b.values[i], ...refData(p) },
     });
   }
   return picks;
@@ -230,10 +236,11 @@ export async function stockTransfer(
   if (p.fromId === p.toId) throw new MoneyError("Pick two different places");
   await lock(ctx, [[p.fromId, p.productId], [p.toId, p.productId]]);
   const picks = await take(ctx, [p.fromId], p.productId, p.qty, p, p);
-  for (const x of picks) {
+  const b = await bookStockLoss(ctx, { kind: p.kind, reason: p.reason, productId: p.productId, at: p.at ?? undefined, rows: picks.map((x) => ({ qty: x.qty, unitCost: x.unitCost, fromId: p.fromId, toId: p.toId })) });
+  for (const [i, x] of picks.entries()) {
     const into = await putIntoLot(ctx, p.toId, p.productId, x, x.qty);
     await ctx.tx.stockMove.create({
-      data: { kind: p.kind, productId: p.productId, lotId: x.lotId, toLotId: into.id, fromId: p.fromId, toId: p.toId, qty: x.qty, unitCost: x.unitCost, actorId: ctx.actorId, ...refData(p) },
+      data: { kind: p.kind, productId: p.productId, lotId: x.lotId, toLotId: into.id, fromId: p.fromId, toId: p.toId, qty: x.qty, unitCost: x.unitCost, actorId: ctx.actorId, entryId: b.entryId, bookValue: b.values[i], ...refData(p) },
     });
   }
   return picks;

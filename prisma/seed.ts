@@ -58,7 +58,7 @@ async function wipe() {
       "SchemeRedemption", "Scheme", "Banner", "RetailerPrice", "PriceListItem", "PriceList",
       "RetailerGroupMember", "RetailerGroup", "HsnCode", "Brand", "Category",
       "WebhookDelivery", "WebhookEndpoint", "ApiKey", "BankLine", "BankStatement", "GatewaySettlement", "GatewayEvent", "PaymentIntent", "GeoCache",
-      "PaymentAllocation", "Cheque", "CashHandover", "Payment", "Bill", "LedgerLine", "JournalEntry", "LedgerAccount",
+      "PaymentAllocation", "Cheque", "CashHandover", "Payment", "BillShare", "Bill", "LedgerLine", "JournalEntry", "LedgerAccount",
       "DeliveryFeedback", "TicketMessage", "Ticket", "Referral", "Announcement", "MessageTemplate", "PushSubscription", "MessageLog", "Notification",
       "HandoffUse", "Target", "StoreLead", "LeaveRequest", "LocationPing", "BeatPlan", "BeatRetailer",
       "AuditLog", "Counter", "OtpChallenge", "Delivery", "Visit", "Attendance",

@@ -31,7 +31,7 @@ type Payment = {
   number: string;
   purpose: "DUES" | "WALLET";
   method: string;
-  state: "PENDING_VERIFICATION" | "CONFIRMED" | "REJECTED" | "REVERSED";
+  state: "PENDING_VERIFICATION" | "POST_DATED" | "CONFIRMED" | "REJECTED" | "REVERSED";
   amount: number;
   reference: string | null;
   collectedAt: string;
@@ -48,6 +48,7 @@ type Khata = {
   overdue: number;
   advance: number;
   pendingVerification: { amount: number; count: number };
+  postDated?: { amount: number; count: number };
   openBills: Bill[];
   payments: Payment[];
   upi: { vpa: string; payee: string } | null;
@@ -96,6 +97,7 @@ const ENTRY: Record<string, string> = {
 function PaymentChip({ p }: { p: Payment }) {
   if (p.cheque?.status === "BOUNCED") return <span className="chip bg-[#fde4e1] text-[#a8281e] border-transparent">Cheque bounced</span>;
   if (p.state === "PENDING_VERIFICATION") return <span className="chip chip-genda">Waiting</span>;
+  if (p.state === "POST_DATED") return <span className="chip chip-genda">Post-dated cheque</span>;
   if (p.state === "REJECTED") return <span className="chip bg-[#fde4e1] text-[#a8281e] border-transparent">Rejected</span>;
   if (p.state === "REVERSED") return <span className="chip">Reversed</span>;
   if (p.cheque && p.cheque.status !== "CLEARED") return <span className="chip chip-kesar">Cheque in bank</span>;
@@ -251,6 +253,13 @@ export default function KhataPage({
             </p>
           </div>
         ) : null}
+
+        {!!data.postDated?.amount && (
+          <p className="flex items-center gap-2 text-sm text-genda">
+            <Icon name="clock" className="h-4 w-4" />
+            {formatINR(data.postDated.amount)} in post-dated cheques, counted on the cheque date
+          </p>
+        )}
 
         {data.pendingVerification.amount > 0 && (
           <p className="flex items-center gap-2 text-sm text-genda">

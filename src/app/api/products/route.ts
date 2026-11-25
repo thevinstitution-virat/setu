@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/guard";
+import { invoiceSettings } from "@/lib/invoice-settings";
 import { audit, requestIp } from "@/lib/audit";
 import { bad, parseProduct } from "@/lib/catalogue-api";
 
@@ -15,7 +16,8 @@ export async function GET() {
     orderBy: [{ active: "desc" }, { sort: "asc" }, { name: "asc" }],
     include: { category: { select: { id: true, name: true } }, brand: { select: { id: true, name: true } } },
   });
-  return NextResponse.json({ products });
+  // Rates with GST in them change how the retailer's margin is worked out.
+  return NextResponse.json({ products, ratesIncludeGst: invoiceSettings(auth.tenant.settings).ratesIncludeGst });
 }
 
 export async function POST(req: Request) {

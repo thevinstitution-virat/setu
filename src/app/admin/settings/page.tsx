@@ -28,6 +28,13 @@ type Money = {
   defaultCreditLimit: number | null;
   holdOnOverdue: boolean;
   overdueGraceDays: number;
+  defaultCreditBills: number | null;
+  holdOnBounce: boolean;
+  bounceHoldDays: number;
+  pdcReducesExposure: boolean;
+  checkCreditAtBilling: boolean;
+  softLimitPct: number | null;
+  chequeReminder: boolean;
   chequeBouncePenalty: number;
   upiVpa: string;
   upiPayeeName: string;
@@ -41,6 +48,13 @@ type Form = {
   defaultCreditLimit: string;
   holdOnOverdue: boolean;
   overdueGraceDays: string;
+  defaultCreditBills: string;
+  holdOnBounce: boolean;
+  bounceHoldDays: string;
+  pdcReducesExposure: boolean;
+  checkCreditAtBilling: boolean;
+  softLimitPct: string;
+  chequeReminder: boolean;
   chequeBouncePenalty: string;
   upiVpa: string;
   upiPayeeName: string;
@@ -52,6 +66,9 @@ const FIELD_LABEL: Record<string, string> = {
   defaultCreditDays: "Credit days",
   defaultCreditLimit: "Credit limit",
   overdueGraceDays: "Grace days",
+  defaultCreditBills: "Unpaid bills allowed",
+  bounceHoldDays: "Days after a bounced cheque",
+  softLimitPct: "Soft limit",
   chequeBouncePenalty: "Cheque bounce charge",
 };
 
@@ -64,6 +81,13 @@ function toForm(m: Money): Form {
     defaultCreditLimit: m.defaultCreditLimit === null ? "" : rupees(m.defaultCreditLimit),
     holdOnOverdue: m.holdOnOverdue,
     overdueGraceDays: String(m.overdueGraceDays),
+    defaultCreditBills: m.defaultCreditBills == null ? "" : String(m.defaultCreditBills),
+    holdOnBounce: !!m.holdOnBounce,
+    bounceHoldDays: String(m.bounceHoldDays ?? 30),
+    pdcReducesExposure: !!m.pdcReducesExposure,
+    checkCreditAtBilling: !!m.checkCreditAtBilling,
+    softLimitPct: m.softLimitPct == null ? "" : String(m.softLimitPct),
+    chequeReminder: m.chequeReminder ?? true,
     chequeBouncePenalty: rupees(m.chequeBouncePenalty),
     upiVpa: m.upiVpa,
     upiPayeeName: m.upiPayeeName,
@@ -94,12 +118,34 @@ function toPatch(f: Form): Money | string {
   if (typeof limit === "string") return limit;
   const penalty = f.chequeBouncePenalty.trim() ? money(f.chequeBouncePenalty, "Cheque bounce charge") : 0;
   if (typeof penalty === "string") return penalty;
+  let bills: number | null = null;
+  if (f.defaultCreditBills.trim()) {
+    const n = Number(f.defaultCreditBills);
+    if (!Number.isInteger(n) || n < 1 || n > 999) return "Unpaid bills allowed must be a whole number from 1 to 999";
+    bills = n;
+  }
+  const bounceDays = days(f.bounceHoldDays, "Days after a bounced cheque", 365);
+  if (typeof bounceDays === "string") return bounceDays;
+  if (bounceDays < 1) return "Days after a bounced cheque must be at least 1";
+  let soft: number | null = null;
+  if (f.softLimitPct.trim()) {
+    const n = Number(f.softLimitPct);
+    if (!Number.isInteger(n) || n < 50 || n > 99) return "Soft limit must be a whole number from 50 to 99 (% of the credit limit)";
+    soft = n;
+  }
   return {
     defaultPaymentMode: f.defaultPaymentMode,
     defaultCreditDays: creditDays,
     defaultCreditLimit: limit,
     holdOnOverdue: f.holdOnOverdue,
     overdueGraceDays: grace,
+    defaultCreditBills: bills,
+    holdOnBounce: f.holdOnBounce,
+    bounceHoldDays: bounceDays,
+    pdcReducesExposure: f.pdcReducesExposure,
+    checkCreditAtBilling: f.checkCreditAtBilling,
+    softLimitPct: soft,
+    chequeReminder: f.chequeReminder,
     chequeBouncePenalty: penalty,
     upiVpa: f.upiVpa.trim(),
     upiPayeeName: f.upiPayeeName.trim(),
@@ -471,6 +517,62 @@ export default function SettingsPage() {
         </section>
 
         <section className="card p-5 space-y-4">
+          <p className="font-heading font-bold">More credit checks</p>
+          <label className="block max-w-xs">
+            <span className="block text-sm font-medium text-[var(--ink-2)] mb-1">Unpaid bills allowed</span>
+            <input
+              className="input"
+              inputMode="numeric"
+              placeholder="No limit"
+              value={form.defaultCreditBills}
+              onChange={(e) => set("defaultCreditBills", e.target.value.replace(/\D/g, ""))}
+            />
+            <span className="block text-xs text-[var(--muted)] mt-1">A retailer with this many unpaid bills has new orders held. Leave blank for no limit by bills. Can be set per retailer on their khata.</span>
+          </label>
+          <label className="block max-w-xs">
+            <span className="block text-sm font-medium text-[var(--ink-2)] mb-1">Soft limit (% of the credit limit)</span>
+            <input
+              className="input"
+              inputMode="numeric"
+              placeholder="Off"
+              value={form.softLimitPct}
+              onChange={(e) => set("softLimitPct", e.target.value.replace(/\D/g, "").slice(0, 2))}
+            />
+            <span className="block text-xs text-[var(--muted)] mt-1">
+              For example 80: an order that takes a retailer past 80% of their limit waits for anyone who manages credit, and one past the full limit waits for the owner. Leave blank for one limit only.
+            </span>
+          </label>
+          <Toggle
+            checked={form.holdOnBounce}
+            onChange={(v) => set("holdOnBounce", v)}
+            label="Hold orders after a bounced cheque"
+            hint="A retailer whose cheque bounced has new orders held until you approve them."
+          />
+          <label className={`block max-w-xs ${form.holdOnBounce ? "" : "opacity-50"}`}>
+            <span className="block text-sm font-medium text-[var(--ink-2)] mb-1">For how many days</span>
+            <input
+              className="input"
+              inputMode="numeric"
+              disabled={!form.holdOnBounce}
+              value={form.bounceHoldDays}
+              onChange={(e) => set("bounceHoldDays", e.target.value.replace(/\D/g, ""))}
+            />
+          </label>
+          <Toggle
+            checked={form.pdcReducesExposure}
+            onChange={(v) => set("pdcReducesExposure", v)}
+            label="Count post-dated cheques as money on its way"
+            hint="Post-dated cheques you are holding from a retailer are taken off what they owe when checking the credit limit. The bills still stay unpaid until the cheque is banked."
+          />
+          <Toggle
+            checked={form.checkCreditAtBilling}
+            onChange={(v) => set("checkCreditAtBilling", v)}
+            label="Check credit again when the order leaves"
+            hint="An order that was fine when placed is checked once more before it goes out. If the retailer has since crossed a limit, it is put on credit hold for approval on the Orders screen. Prepaid retailers and orders already approved are not checked."
+          />
+        </section>
+
+        <section className="card p-5 space-y-4">
           <p className="font-heading font-bold">UPI and bank taken in the field</p>
           <label className="flex items-start gap-3 cursor-pointer">
             <input
@@ -510,6 +612,12 @@ export default function SettingsPage() {
             />
             <span className="block text-xs text-[var(--muted)] mt-1">Added to the retailer&apos;s bill when a cheque bounces. 0 means no charge.</span>
           </label>
+          <Toggle
+            checked={form.chequeReminder}
+            onChange={(v) => set("chequeReminder", v)}
+            label="Remind about post-dated cheques"
+            hint="At 9 in the morning, whoever handles cheques is told which held post-dated cheques can be banked that day. Nothing is sent on a day with none."
+          />
         </section>
 
         <section className="card p-5 space-y-4">
@@ -757,6 +865,11 @@ type GstForm = {
   scheme: InvoiceSettings["scheme"];
   issueAt: InvoiceSettings["issueAt"];
   prefixes: InvoiceSettings["prefixes"];
+  ratesIncludeGst: boolean;
+  roundOff: InvoiceSettings["roundOff"];
+  layout: InvoiceSettings["layout"];
+  numberingStyle: InvoiceSettings["numbering"]["style"];
+  numberingDigits: string;
   city: string;
   pinCode: string;
   terms: string;
@@ -772,7 +885,7 @@ type GstForm = {
 };
 
 const BUSINESS_KEYS = ["legalName", "gstin", "stateCode", "address", "phone"] as const;
-const INVOICE_KEYS = ["scheme", "issueAt", "city", "pinCode", "terms", "bankName", "bankAccount", "bankIfsc", "upiQr", "deliverySac"] as const;
+const INVOICE_KEYS = ["scheme", "issueAt", "ratesIncludeGst", "roundOff", "layout", "city", "pinCode", "terms", "bankName", "bankAccount", "bankIfsc", "upiQr", "deliverySac"] as const;
 const STATE_OPTIONS = Object.entries(STATE_NAMES).sort((a, b) => a[1].localeCompare(b[1]));
 const TALLY_FIELDS: { key: keyof InvoiceSettings["tally"]; label: string; hint?: string }[] = [
   { key: "sales", label: "Sales", hint: "Put {rate} in the name for one ledger per GST rate, e.g. “Sales @{rate}%” becomes Sales @18%." },
@@ -780,6 +893,7 @@ const TALLY_FIELDS: { key: keyof InvoiceSettings["tally"]; label: string; hint?:
   { key: "cgst", label: "CGST" },
   { key: "sgst", label: "SGST" },
   { key: "igst", label: "IGST" },
+  { key: "roundOff", label: "Round off", hint: "Paise added or taken off when bills are rounded to the rupee." },
   { key: "cash", label: "Cash" },
   { key: "bank", label: "Bank", hint: "UPI, bank transfer and cheque receipts." },
   { key: "debtorsGroup", label: "Retailers' group", hint: "Group for retailer ledgers, usually Sundry Debtors." },
@@ -795,6 +909,11 @@ function toGstForm(inv: InvoiceSettings, b: Business): GstForm {
     scheme: inv.scheme,
     issueAt: inv.issueAt,
     prefixes: { ...inv.prefixes },
+    ratesIncludeGst: inv.ratesIncludeGst,
+    roundOff: inv.roundOff,
+    layout: inv.layout,
+    numberingStyle: inv.numbering.style,
+    numberingDigits: String(inv.numbering.digits),
     city: inv.city,
     pinCode: inv.pinCode,
     terms: inv.terms,
@@ -829,6 +948,11 @@ function toGstPatch(f: GstForm, was: GstForm): GstPatch | string {
   }
   if (JSON.stringify(f.tally) !== JSON.stringify(was.tally)) {
     invoice.tally = Object.fromEntries(Object.entries(f.tally).map(([k, v]) => [k, v.trim()]));
+  }
+  if (f.numberingStyle !== was.numberingStyle || f.numberingDigits.trim() !== was.numberingDigits) {
+    const digits = Number(f.numberingDigits.trim());
+    if (!Number.isInteger(digits) || digits < 3 || digits > 8) return "Number width must be 3 to 8 digits";
+    invoice.numbering = { style: f.numberingStyle, digits };
   }
   if (f.einvEnabled !== was.einvEnabled || f.einvProvider !== was.einvProvider) {
     invoice.einvoice = { enabled: f.einvEnabled, provider: f.einvProvider };
@@ -874,6 +998,105 @@ function Choice<T extends string>({
           <span className={`block text-[11px] font-normal ${value === v ? "text-white/75" : "text-[var(--muted)]"}`}>{hint}</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+const NUMBER_TYPES = [
+  ["TAX_INVOICE", "Tax invoice"],
+  ["BILL_OF_SUPPLY", "Bill of supply"],
+  ["CREDIT_NOTE", "Credit note"],
+  ["DEBIT_NOTE", "Debit note"],
+] as const;
+type NumberType = (typeof NUMBER_TYPES)[number][0];
+type NextInfo = Record<NumberType, { next: number; printed: string }>;
+
+/**
+ * Carry on the old book's series: the next number per document type. Saved on
+ * its own (not with the form) because it moves a counter, and only forward.
+ */
+function NextNumbers() {
+  const [info, setInfo] = useState<NextInfo | null>(null);
+  const [typed, setTyped] = useState<Partial<Record<NumberType, string>>>({});
+  const [busy, setBusy] = useState<NumberType | null>(null);
+  const [msg, setMsg] = useState<{ type: NumberType; text: string; ok: boolean } | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    fetch("/api/admin/settings/numbering")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => live && d && setInfo(d.next))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  async function apply(type: NumberType) {
+    const next = Number((typed[type] ?? "").trim());
+    if (!Number.isInteger(next) || next < 1) return setMsg({ type, text: "Type the number only, e.g. 4262 for A004262", ok: false });
+    setBusy(type);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/admin/settings/numbering", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Could not set the number");
+      setInfo((prev) => (prev ? { ...prev, [type]: { next: data.next, printed: data.printed } } : prev));
+      setTyped((prev) => ({ ...prev, [type]: "" }));
+      setMsg({ type, text: `Next one will be ${data.printed}`, ok: true });
+    } catch (err) {
+      setMsg({ type, text: err instanceof Error ? err.message : "Could not set the number", ok: false });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (!info) return null;
+  return (
+    <div className="mt-4 rounded-2xl bg-ink/5 p-4 space-y-3">
+      <div>
+        <p className="text-sm font-semibold text-[var(--ink)]">Carry on from your old software</p>
+        <p className="text-xs text-[var(--muted)] mt-0.5">
+          If the last bill in your old software was A004261, set the tax invoice&apos;s next number to 4262. Numbers can only move forward, never back.
+        </p>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        {NUMBER_TYPES.map(([type, label]) => (
+          <div key={type} className="min-w-0">
+            <p className="text-xs font-medium text-[var(--ink-2)]">
+              {label}: next is <span className="font-bold text-[var(--ink)]">{info[type].printed}</span>
+            </p>
+            <div className="flex gap-2 mt-1">
+              <input
+                className="input !py-1.5 min-w-0"
+                inputMode="numeric"
+                maxLength={8}
+                placeholder={String(info[type].next)}
+                aria-label={`${label} next number`}
+                value={typed[type] ?? ""}
+                onChange={(e) => setTyped((prev) => ({ ...prev, [type]: e.target.value.replace(/\D/g, "") }))}
+                onKeyDown={(e) => {
+                  // Enter sets this number; it must not submit the settings form around it.
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (typed[type] && busy === null) apply(type);
+                  }
+                }}
+              />
+              <button type="button" className="btn btn-quiet btn-sm shrink-0" disabled={busy !== null || !typed[type]} onClick={() => apply(type)}>
+                {busy === type ? "Setting…" : "Set"}
+              </button>
+            </div>
+            {msg?.type === type && (
+              <p className={`text-xs mt-1 ${msg.ok ? "text-[var(--mint-text)]" : "text-[#a8281e]"}`}>{msg.text}</p>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1059,7 +1282,59 @@ function GstSettings({ invoice, business }: { invoice: InvoiceSettings; business
             ))}
           </div>
           <span className="block text-xs text-[var(--muted)] mt-1">
-            Numbers look like {f.prefixes.tax || "INV"}2627-00001: prefix, financial year, running number. Up to 5 letters or digits.
+            {f.numberingStyle === "running"
+              ? `Numbers look like ${f.prefixes.tax || "INV"}${"1".padStart(Number(f.numberingDigits) || 6, "0")}: prefix, then a number that keeps counting across years.`
+              : `Numbers look like ${f.prefixes.tax || "INV"}2627-00001: prefix, financial year, running number.`}{" "}
+            Up to 5 letters or digits.
+          </span>
+        </div>
+        <div>
+          <span className="block text-sm font-medium text-[var(--ink-2)] mb-1.5">Invoice numbers</span>
+          <Choice
+            value={f.numberingStyle}
+            onChange={(v) => set("numberingStyle", v)}
+            options={[
+              ["fy", "New series each year", "INV2627-00001"],
+              ["running", "One running series", "A004262, A004263…"],
+            ]}
+          />
+          {f.numberingStyle === "running" && (
+            <Field label="Digits after the prefix" hint="A004262 has 6. 3 to 8." className="max-w-[12rem] mt-3">
+              <input
+                className="input"
+                inputMode="numeric"
+                maxLength={1}
+                value={f.numberingDigits}
+                onChange={(e) => set("numberingDigits", e.target.value.replace(/\D/g, ""))}
+              />
+            </Field>
+          )}
+          {saved.numberingStyle === "running" && <NextNumbers />}
+        </div>
+        <Toggle
+          checked={f.ratesIncludeGst}
+          onChange={(v) => set("ratesIncludeGst", v)}
+          label="Rates include GST"
+          hint="Product rates, price lists and special rates already have GST in them (the RATE most dealer billing software prints). GST is taken out of each line instead of added on top. Applies to orders placed after you switch."
+        />
+        <Toggle
+          checked={f.roundOff === "rupee"}
+          onChange={(v) => set("roundOff", v ? "rupee" : "none")}
+          label="Round bills to the rupee"
+          hint="Every bill total is rounded to the whole rupee (50 paise and above go up). The paise show on the bill as Round off and go to the Rounding off account. Credit and debit notes are rounded the same way. Applies to orders placed after you switch."
+        />
+        <div>
+          <span className="block text-sm font-medium text-[var(--ink-2)] mb-1.5">Bill layout</span>
+          <Choice
+            value={f.layout}
+            onChange={(v) => set("layout", v)}
+            options={[
+              ["standard", "Standard", "Clean GST invoice"],
+              ["trade", "Trade bill", "Cases, MRP, salesman, GST table"],
+            ]}
+          />
+          <span className="block text-xs text-[var(--muted)] mt-1">
+            Trade bill prints cases and pieces, MRP, rate with GST, net rate, SGST/CGST %, the salesman, the due date, a GST class table and sign boxes.
           </span>
         </div>
         <Field label="SAC code for the delivery charge" hint="Printed on the delivery charge line. 996511 is road transport of goods." className="max-w-xs">

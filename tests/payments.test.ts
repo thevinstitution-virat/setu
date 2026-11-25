@@ -410,7 +410,10 @@ describe("bank statement matching", () => {
     const imps = by(7_700);
     expect(imps.status).toBe("SUGGESTED");
     expect((imps.suggestions as { kind: string; retailerId?: string }[]).find((s) => s.kind === "NEW_PAYMENT")?.retailerId).toBe(shop.d);
-    expect(lines.find((l) => l.debit > 0)).toMatchObject({ status: "IGNORED" });
+    // Money out is never matched on its own; bank charges are suggested as an expense.
+    const charges = lines.find((l) => l.debit > 0)!;
+    expect(charges.status).toBe("SUGGESTED");
+    expect((charges.suggestions as { kind: string }[]).map((x) => x.kind)).toEqual(["NEW_EXPENSE"]);
 
     expect((await tenantDb(T).payment.findUniqueOrThrow({ where: { id: pendingId } })).state).toBe("CONFIRMED");
     expect((await tenantDb(T).cheque.findUniqueOrThrow({ where: { id: chequeId } })).status).toBe("CLEARED");

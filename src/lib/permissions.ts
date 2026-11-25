@@ -51,6 +51,13 @@ export const PERMISSIONS = {
   "bank.reconcile": "Import bank statements and match them to payments",
   "integrations.manage": "API keys and webhooks for the business's own software; maps",
   "reports.view": "See business reports: sales, collections, stock, delivery, team, shops, schemes, routes and returns",
+  "accounts.view": "See the books: chart of accounts, ledgers, day book, cash and bank books, final accounts",
+  "accounts.post": "Enter vouchers and journal entries",
+  "accounts.setup": "Chart of accounts, bank accounts, TDS sections and opening balances",
+  "accounts.lock": "Close the books up to a date (only the owner opens them again)",
+  "purchases.manage": "Purchase bills, and notes to and from suppliers",
+  "payables.pay": "Pay suppliers",
+  "claims.manage": "Claims on companies: schemes, damages, rate difference",
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
@@ -64,7 +71,40 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   DELIVERY_AGENT: ["delivery.work", "payments.collect", "stock.spot_sell", "attendance.mark", "stores.propose"],
   // No team.view: supervisors see their own team through /api/team/*, never the full staff list.
   SUPERVISOR: ["orders.place", "attendance.mark", "stores.propose", "team.supervise", "field.offbeat", "tickets.raise"],
+  // The books, and the money pages they need (khata, invoices, payments, cash, bank, reports). No orders, delivery, team or settings.
+  ACCOUNTANT: [
+    "accounts.view",
+    "accounts.post",
+    "accounts.setup",
+    "accounts.lock",
+    "purchases.manage",
+    "payables.pay",
+    "claims.manage",
+    "ledger.view",
+    "ledger.adjust",
+    "invoices.view",
+    "invoices.manage",
+    "payments.collect",
+    "payments.verify",
+    "cheques.manage",
+    "cash.handover",
+    "bank.reconcile",
+    "reports.view",
+    "stock.view",
+  ],
 };
+
+/**
+ * The parts of the office (/admin) an accountant may open. The proxy checks
+ * this on every request, so a page outside it never renders for them.
+ */
+export const ACCOUNTANT_AREAS = ["/admin/books", "/admin/khata", "/admin/invoices", "/admin/payments", "/admin/cash", "/admin/bank", "/admin/reports"] as const;
+
+export function officeAllows(role: string, path: string): boolean {
+  if (role === "ADMIN") return true;
+  if (role === "ACCOUNTANT") return ACCOUNTANT_AREAS.some((p) => path === p || path.startsWith(`${p}/`));
+  return false;
+}
 
 export function can(role: Role, perm: Permission | Permission[]): boolean {
   const granted = ROLE_PERMISSIONS[role] ?? [];

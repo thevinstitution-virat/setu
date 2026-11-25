@@ -23,6 +23,7 @@ type Purchase = {
   supplier: { id: string; name: string; gstin: string | null; phone: string | null };
   location: { id: string; name: string };
   po: { id: string; number: string } | null;
+  bill: { id: string; number: string; cancelledAt: string | null } | null;
   billNo: string | null;
   billDate: string | null;
   note: string | null;
@@ -84,6 +85,17 @@ export default function PurchasePage({ params }: { params: Promise<{ id: string 
           </Item>
           <Item label="Supplier bill">
             <p className="font-semibold">{p.billNo ? `${p.billNo}${p.billDate ? ` · ${dayText(p.billDate)}` : ""}` : "Not entered"}</p>
+          </Item>
+          <Item label="Purchase bill (books)">
+            {p.bill ? (
+              <Link href={`/admin/books/purchases/${p.bill.id}`} className="font-semibold text-[var(--kesar-text)]">
+                {p.bill.number}
+              </Link>
+            ) : (
+              <Link href={`/admin/books/purchases/new?grn=${p.id}`} className="font-semibold text-[var(--kesar-text)]">
+                Make the purchase bill
+              </Link>
+            )}
           </Item>
           <Item label="Purchase order">
             {p.po ? (

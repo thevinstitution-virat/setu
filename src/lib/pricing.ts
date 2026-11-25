@@ -1,6 +1,6 @@
 import type { Tx } from "@/lib/db";
 import type { Scheme } from "@/generated/prisma/client";
-import { formatINR, gstOn } from "@/lib/money";
+import { formatINR, gstOn, lineMoney, roundRupee } from "@/lib/money";
 import { applySchemes, describeScheme, type AppliedScheme, type EngineLine, type EngineScheme, type SchemeParams } from "@/lib/schemes";
 import { cartSettings, deliveryChargeFor, deliveryDays } from "@/lib/cart-settings";
 import { invoiceSettings } from "@/lib/invoice-settings";
@@ -47,10 +47,10 @@ export function inWindow(s: { startsAt: Date | null; endsAt: Date | null }, now:
   return (!s.startsAt || s.startsAt <= now) && (!s.endsAt || s.endsAt >= now);
 }
 
-/** Retailer's margin % on MRP after paying this rate plus GST (one decimal). */
-export function marginPct(price: number, gstRate: number, mrp: number): number | null {
+/** Retailer's margin % on MRP after paying this rate plus GST (one decimal). inclusive: the rate already has GST in it. */
+export function marginPct(price: number, gstRate: number, mrp: number, inclusive = false): number | null {
   if (mrp <= 0) return null;
-  const landed = price * (1 + gstRate / 100);
+  const landed = inclusive ? price : price * (1 + gstRate / 100);
   return Math.round(((mrp - landed) / mrp) * 1000) / 10;
 }
 
@@ -109,7 +109,7 @@ export async function categoryPaths(tx: Tx): Promise<Map<string, string[]>> {
 export async function catalogueFor(
   tx: Tx,
   r: RetailerCtx,
-  opts: { productIds?: string[]; includeHidden?: boolean } = {}
+  opts: { productIds?: string[]; includeHidden?: boolean; inclusive?: boolean } = {}
 ): Promise<CatalogueProduct[]> {
   const idFilter = opts.productIds ? { id: { in: opts.productIds } } : {};
   const [products, paths, listItems, special] = await Promise.all([
@@ -162,7 +162,7 @@ export async function catalogueFor(
         basePrice: p.price,
         price,
         priceSource,
-        margin: marginPct(price, p.gstRate, p.mrp),
+        margin: marginPct(price, p.gstRate, p.mrp, opts.inclusive),
         search: searchText([p.name, p.nameHi, p.aliases, p.sku, p.brand?.name, p.category.name]),
       };
     });
@@ -266,11 +266,16 @@ export type QuoteLine = {
   mrp: number;
   gstRate: number;
   priceSource: PriceSource;
+  /** Before GST (also when rates include GST), so gross − discount = taxable. */
   gross: number;
   discount: number;
   taxable: number;
   gst: number;
   total: number;
+  /** Scheme discount as charged against the rate (includes GST when rates do) — what the order line stores. */
+  itemDiscount: number;
+  /** price includes GST. */
+  inclusive: boolean;
   /** Scheme names that changed this line. */
   schemes: string[];
 };
@@ -288,6 +293,8 @@ export type Quote = {
   deliveryGstRate: number;
   subtotal: number;
   gstAmount: number;
+  /** Paise added (+) or taken off (−) to round the total to the rupee; 0 when the business doesn't round. */
+  roundOff: number;
   totalAmount: number;
   minOrderValue: number;
   /** Paise more goods needed to reach the minimum; 0 = fine. */
@@ -374,11 +381,12 @@ export async function quoteCart(
   const byScheme = new Map(engine.map((s) => [s.id, s]));
   const offerById = new Map(offers.map((o) => [o.id, o]));
 
+  const inclusive = invoiceSettings(tenantSettings).ratesIncludeGst;
   const lines: QuoteLine[] = cartLines.map((l, i) => {
-    const gross = l.p.price * l.quantity;
-    const discount = result.discounts[i];
-    const taxable = gross - discount;
-    const gst = gstOn(taxable, taxRate(l.p.gstRate));
+    const itemDiscount = result.discounts[i];
+    const m = lineMoney(l.p.price, l.quantity, itemDiscount, taxRate(l.p.gstRate), inclusive);
+    const { gross, discount, taxable } = m;
+    const gst = m.tax;
     return {
       productId: l.p.id,
       name: l.p.name,
@@ -396,6 +404,8 @@ export async function quoteCart(
       taxable,
       gst,
       total: taxable + gst,
+      itemDiscount,
+      inclusive,
       schemes: [],
     };
   });
@@ -458,6 +468,8 @@ export async function quoteCart(
     if (!coupon.valid) problems.push(coupon.message);
   }
 
+  const rounded = invoiceSettings(tenantSettings).roundOff === "rupee" ? roundRupee(subtotal + gstAmount) : { roundOff: 0, total: subtotal + gstAmount };
+
   return {
     lines,
     free,
@@ -469,7 +481,8 @@ export async function quoteCart(
     deliveryGstRate,
     subtotal,
     gstAmount,
-    totalAmount: subtotal + gstAmount,
+    roundOff: rounded.roundOff,
+    totalAmount: rounded.total,
     minOrderValue: cart.minOrderValue,
     shortBy,
     deliveryDates: dates,
