@@ -128,8 +128,8 @@ describe("sales bills into the books (rolled back)", () => {
       ]);
 
       const a = await tx.invoice.findFirstOrThrow({ where: { number: ours }, include: { lines: { orderBy: { sl: "asc" } } } });
-      // Tea 3873.80 incl. 5%; soap 10 × ₹59 incl. 18% = 590.00 → 4463.80.
-      expect(a).toMatchObject({ type: "TAX_INVOICE", orderId: null, retailerId: shopId, total: 446380, einvStatus: "NOT_REQUIRED" });
+      // Tea 3873.80 incl. 5%; soap 10 × ₹59 incl. 18% = 590.00 → 4463.80; the old bill printed ₹4,464, so 20 paise are its round-off.
+      expect(a).toMatchObject({ type: "TAX_INVOICE", orderId: null, retailerId: shopId, roundOff: 20, total: 446400, einvStatus: "NOT_REQUIRED" });
       expect(a.date.toISOString().slice(0, 10)).toBe("2026-11-21");
       expect(a.lines.map((l) => [l.description, l.quantity, l.freeQty, l.total])).toEqual([
         [tea.name, 48, 0, 387380],
@@ -137,7 +137,7 @@ describe("sales bills into the books (rolled back)", () => {
         [soap.name, 10, 0, 59000],
       ]);
       const bill = await tx.bill.findFirstOrThrow({ where: { number: ours } });
-      expect(bill).toMatchObject({ retailerId: shopId, amount: 446380, paid: 0, kind: "ORDER" });
+      expect(bill).toMatchObject({ retailerId: shopId, amount: 446400, paid: 0, kind: "ORDER" });
       const entry = await tx.journalEntry.findUniqueOrThrow({ where: { id: a.entryId! }, include: { lines: true } });
       expect(entry.kind).toBe("SALE");
       expect(entry.lines.reduce((x, l) => x + l.amount, 0)).toBe(0);

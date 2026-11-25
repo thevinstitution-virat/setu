@@ -96,6 +96,7 @@ export function buildIrnPayload(doc: InvoiceDoc) {
       CgstVal: rupees(doc.cgst),
       SgstVal: rupees(doc.sgst),
       IgstVal: rupees(doc.igst),
+      RndOffAmt: rupees(doc.roundOff),
       TotInvVal: rupees(doc.total),
     },
   };

@@ -129,7 +129,7 @@ function doc(type: ExportDoc["type"], number: string, lines: ReturnType<typeof l
   return {
     id: number, tenantId: "t", type, number, fy: "2627", date: new Date("2026-11-19T06:00:00Z"), orderId: null, retailerId: "r1",
     originalId: null, noteKind: null, reason: null, seller: sellerParty as never, buyer: party() as never, b2b: true, placeOfSupply: inter ? "24" : "27",
-    interState: inter, taxable: sum("taxable"), cgst: sum("cgst"), sgst: sum("sgst"), igst: sum("igst"), total: sum("total"), entryId: null, createdById: null,
+    interState: inter, taxable: sum("taxable"), cgst: sum("cgst"), sgst: sum("sgst"), igst: sum("igst"), roundOff: 0, total: sum("total"), entryId: null, createdById: null,
     createdAt: new Date(), updatedAt: new Date(), einvStatus: "NOT_REQUIRED", irn: null, ackNo: null, ackDate: null, signedQr: null, einvError: null,
     einvAttempts: 0, shareVersion: 0, einvCancelledAt: null, ewbNo: null, ewbDate: null, ewbValidUntil: null, ewbVehicle: null, ewbDistanceKm: null, salesman: null,
     lines: lines as never, original: null, order: { orderNumber: "SO-1" }, ...over,

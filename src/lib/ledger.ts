@@ -1047,6 +1047,8 @@ export async function bookSale(ctx: Ctx, orderId: string, now = new Date()) {
       { account: { type: "RECEIVABLE", retailerId: order.retailerId }, amount: invoice.total },
       { account: { type: "SALES" }, amount: -invoice.taxable },
       { account: { type: "GST_OUTPUT" }, amount: -(invoice.cgst + invoice.sgst + invoice.igst) },
+      // Rounded up = a small gain, rounded down = a small loss (post() drops a zero line).
+      { account: { type: "ROUND_OFF" }, amount: -invoice.roundOff },
     ],
   });
   await createBill(ctx, {
@@ -1083,6 +1085,7 @@ export async function issueCreditNote(ctx: Ctx, input: Omit<NoteInput, "type">, 
     lines: [
       { account: { type: "SALES" }, amount: note.taxable },
       { account: { type: "GST_OUTPUT" }, amount: note.cgst + note.sgst + note.igst },
+      { account: { type: "ROUND_OFF" }, amount: note.roundOff },
       { account: { type: "RECEIVABLE", retailerId: note.retailerId }, amount: -note.total },
     ],
   });
@@ -1124,6 +1127,7 @@ export async function issueDebitNote(ctx: Ctx, input: Omit<NoteInput, "type" | "
       { account: { type: "RECEIVABLE", retailerId: note.retailerId }, amount: note.total },
       { account: { type: "SALES" }, amount: -note.taxable },
       { account: { type: "GST_OUTPUT" }, amount: -(note.cgst + note.sgst + note.igst) },
+      { account: { type: "ROUND_OFF" }, amount: -note.roundOff },
     ],
   });
   await createBill(ctx, {
@@ -1148,7 +1152,7 @@ export async function issueDebitNote(ctx: Ctx, input: Omit<NoteInput, "type" | "
  */
 export async function bookImportedSale(
   ctx: Ctx,
-  p: { retailerId: string; number: string; date: Date; dueDate: Date | null; salesmanId: string | null; salesman: string | null; drafts: Draft[] }
+  p: { retailerId: string; number: string; date: Date; dueDate: Date | null; salesmanId: string | null; salesman: string | null; drafts: Draft[]; roundOff?: number }
 ) {
   await lockRetailer(ctx, p.retailerId);
   const taken = await ctx.tx.bill.findFirst({ where: { number: p.number }, select: { kind: true } });
@@ -1164,6 +1168,8 @@ export async function bookImportedSale(
       { account: { type: "RECEIVABLE", retailerId: p.retailerId }, amount: invoice.total },
       { account: { type: "SALES" }, amount: -invoice.taxable },
       { account: { type: "GST_OUTPUT" }, amount: -(invoice.cgst + invoice.sgst + invoice.igst) },
+      // Rounded up = a small gain, rounded down = a small loss (post() drops a zero line).
+      { account: { type: "ROUND_OFF" }, amount: -invoice.roundOff },
     ],
   });
   await createBill(ctx, {

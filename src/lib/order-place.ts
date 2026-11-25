@@ -48,6 +48,8 @@ export async function placeOrder(
       deliveryGstRate: quote.deliveryCharge > 0 ? quote.deliveryGstRate : 0,
       subtotal: quote.subtotal,
       gstAmount: quote.gstAmount,
+      roundTotal: invoiceSettings(tenant.settings).roundOff === "rupee",
+      roundOff: quote.roundOff,
       totalAmount: quote.totalAmount,
       couponCode: quote.coupon?.valid ? quote.coupon.code : null,
       deliveryDate: quote.deliveryDate ? new Date(`${quote.deliveryDate}T00:00:00Z`) : null,

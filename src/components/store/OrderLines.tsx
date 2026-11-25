@@ -34,6 +34,8 @@ export type OrderTotals = {
   deliveryCharge?: number | null;
   subtotal?: number | null;
   gstAmount: number;
+  /** Paise added (+) or taken off (−) to round the total to the rupee. */
+  roundOff?: number | null;
   totalAmount: number;
   couponCode?: string | null;
   deliveryDate?: string | Date | null;
@@ -143,6 +145,7 @@ export default function OrderLines({
         {discount > 0 && <Row label="Scheme discount" value={`−${formatINR(discount)}`} tone="mint" />}
         {delivery > 0 && <Row label="Delivery charge" value={formatINR(delivery)} />}
         {order.gstAmount > 0 && <Row label="GST" value={formatINR(order.gstAmount)} />}
+        {!!order.roundOff && <Row label="Round off" value={`${order.roundOff > 0 ? "+" : "−"}${formatINR(Math.abs(order.roundOff))}`} />}
         <div className="flex justify-between font-bold pt-1">
           <span>Total</span>
           <span>{formatINR(order.totalAmount)}</span>

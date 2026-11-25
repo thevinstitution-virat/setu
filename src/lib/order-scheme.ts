@@ -66,7 +66,7 @@ export async function setLineScheme(ctx: Ctx, orderId: string, itemId: string, i
   const t = repriceOrder(order, items.map((i) => ({ item: i, delivered: i.quantity })));
   return tx.order.update({
     where: { id: orderId },
-    data: { grossAmount: t.grossAmount, discountAmount: t.discountAmount, subtotal: t.subtotal, gstAmount: t.gstAmount, totalAmount: t.totalAmount },
+    data: { grossAmount: t.grossAmount, discountAmount: t.discountAmount, subtotal: t.subtotal, gstAmount: t.gstAmount, roundOff: t.roundOff, totalAmount: t.totalAmount },
     include: { items: true },
   });
 }

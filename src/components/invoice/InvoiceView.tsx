@@ -60,6 +60,8 @@ export type InvoiceJson = {
   cgst: number;
   sgst: number;
   igst: number;
+  /** Paise added (+) or taken off (−) to round the total to the rupee. */
+  roundOff?: number;
   total: number;
   words: string;
   reason: string | null;
@@ -207,6 +209,7 @@ export function InvoiceView({ doc }: { doc: InvoiceJson }) {
               <div className="flex justify-between"><dt className="text-[var(--muted)]">SGST</dt><dd>{formatINR(doc.sgst)}</dd></div>
             </>
           ) : null}
+          {!!doc.roundOff && <div className="flex justify-between"><dt className="text-[var(--muted)]">Round off</dt><dd>{`${doc.roundOff > 0 ? "+" : "−"}${formatINR(Math.abs(doc.roundOff))}`}</dd></div>}
           <div className="flex justify-between font-semibold text-base border-t border-[var(--line)] pt-1"><dt>Total</dt><dd>{formatINR(doc.total)}</dd></div>
         </dl>
       </div>

@@ -42,7 +42,17 @@ export function gstInside(amount: Paise, rate: number): Paise {
   return 2 * Math.round((amount * rate) / (2 * (100 + rate)));
 }
 
-export type LineMoney = { gross: Paise; discount: Paise; taxable: Paise; tax: Paise; total: Paise };
+/**
+ * A bill total rounded to the whole rupee (50 paise and above go up).
+ * `roundOff` is what was added (+) or taken off (−), so exact + roundOff = total.
+ * ₹1,234.50 → +50 paise, ₹1,235.00; ₹1,234.49 → −49 paise, ₹1,234.00.
+ */
+export function roundRupee(exact: Paise): { roundOff: Paise; total: Paise } {
+  const total = Math.sign(exact) * Math.round(Math.abs(exact) / 100) * 100;
+  return { roundOff: total - exact, total };
+}
+
+export type LineMoney ={ gross: Paise; discount: Paise; taxable: Paise; tax: Paise; total: Paise };
 
 /**
  * One line's money. price and discount are as stored on the order: before

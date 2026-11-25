@@ -758,6 +758,7 @@ type GstForm = {
   issueAt: InvoiceSettings["issueAt"];
   prefixes: InvoiceSettings["prefixes"];
   ratesIncludeGst: boolean;
+  roundOff: InvoiceSettings["roundOff"];
   layout: InvoiceSettings["layout"];
   numberingStyle: InvoiceSettings["numbering"]["style"];
   numberingDigits: string;
@@ -776,7 +777,7 @@ type GstForm = {
 };
 
 const BUSINESS_KEYS = ["legalName", "gstin", "stateCode", "address", "phone"] as const;
-const INVOICE_KEYS = ["scheme", "issueAt", "ratesIncludeGst", "layout", "city", "pinCode", "terms", "bankName", "bankAccount", "bankIfsc", "upiQr", "deliverySac"] as const;
+const INVOICE_KEYS = ["scheme", "issueAt", "ratesIncludeGst", "roundOff", "layout", "city", "pinCode", "terms", "bankName", "bankAccount", "bankIfsc", "upiQr", "deliverySac"] as const;
 const STATE_OPTIONS = Object.entries(STATE_NAMES).sort((a, b) => a[1].localeCompare(b[1]));
 const TALLY_FIELDS: { key: keyof InvoiceSettings["tally"]; label: string; hint?: string }[] = [
   { key: "sales", label: "Sales", hint: "Put {rate} in the name for one ledger per GST rate, e.g. “Sales @{rate}%” becomes Sales @18%." },
@@ -784,6 +785,7 @@ const TALLY_FIELDS: { key: keyof InvoiceSettings["tally"]; label: string; hint?:
   { key: "cgst", label: "CGST" },
   { key: "sgst", label: "SGST" },
   { key: "igst", label: "IGST" },
+  { key: "roundOff", label: "Round off", hint: "Paise added or taken off when bills are rounded to the rupee." },
   { key: "cash", label: "Cash" },
   { key: "bank", label: "Bank", hint: "UPI, bank transfer and cheque receipts." },
   { key: "debtorsGroup", label: "Retailers' group", hint: "Group for retailer ledgers, usually Sundry Debtors." },
@@ -800,6 +802,7 @@ function toGstForm(inv: InvoiceSettings, b: Business): GstForm {
     issueAt: inv.issueAt,
     prefixes: { ...inv.prefixes },
     ratesIncludeGst: inv.ratesIncludeGst,
+    roundOff: inv.roundOff,
     layout: inv.layout,
     numberingStyle: inv.numbering.style,
     numberingDigits: String(inv.numbering.digits),
@@ -1205,6 +1208,12 @@ function GstSettings({ invoice, business }: { invoice: InvoiceSettings; business
           onChange={(v) => set("ratesIncludeGst", v)}
           label="Rates include GST"
           hint="Product rates, price lists and special rates already have GST in them (the RATE most dealer billing software prints). GST is taken out of each line instead of added on top. Applies to orders placed after you switch."
+        />
+        <Toggle
+          checked={f.roundOff === "rupee"}
+          onChange={(v) => set("roundOff", v ? "rupee" : "none")}
+          label="Round bills to the rupee"
+          hint="Every bill total is rounded to the whole rupee (50 paise and above go up). The paise show on the bill as Round off and go to the Rounding off account. Credit and debit notes are rounded the same way. Applies to orders placed after you switch."
         />
         <div>
           <span className="block text-sm font-medium text-[var(--ink-2)] mb-1.5">Bill layout</span>

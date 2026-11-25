@@ -172,7 +172,7 @@ export async function deliverOrder(ctx: Ctx, input: DeliverInput, now = new Date
       }
       await ctx.tx.order.update({
         where: { id: order.id },
-        data: { grossAmount: r.grossAmount, discountAmount: r.discountAmount, subtotal: r.subtotal, gstAmount: r.gstAmount, totalAmount: r.totalAmount, orderedTotal: order.totalAmount },
+        data: { grossAmount: r.grossAmount, discountAmount: r.discountAmount, subtotal: r.subtotal, gstAmount: r.gstAmount, roundOff: r.roundOff, totalAmount: r.totalAmount, orderedTotal: order.totalAmount },
       });
       totalAmount = r.totalAmount;
     } else {

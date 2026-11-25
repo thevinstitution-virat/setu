@@ -1,7 +1,7 @@
 import type { Invoice, InvoiceLine, InvoiceType, Prisma } from "@/generated/prisma/client";
 import type { Tx } from "@/lib/db";
 import { MoneyError } from "@/lib/money-error";
-import { formatINR, gstOn, lineMoney } from "@/lib/money";
+import { formatINR, gstOn, lineMoney, roundRupee } from "@/lib/money";
 import { nextSequence } from "@/lib/orders";
 import { invoiceSettings, type InvoiceSettings } from "@/lib/invoice-settings";
 import { amountInWords, creditNoteDeadline, docNumber, fyCode, runningNumber, splitTax, uqc } from "@/lib/gst";
@@ -263,7 +263,7 @@ export async function keepSeriesPast(ctx: Ctx, s: InvoiceSettings, type: Invoice
  * number and date, no order. Same seller / buyer snapshots, GST split and
  * document type as an invoice made here. Does not post to the ledger.
  */
-export async function issueImportedInvoice(ctx: Ctx, p: { retailerId: string; number: string; date: Date; salesman: string | null; drafts: Draft[] }) {
+export async function issueImportedInvoice(ctx: Ctx, p: { retailerId: string; number: string; date: Date; salesman: string | null; drafts: Draft[]; roundOff?: number }) {
   const { seller, settings } = await sellerOf(ctx);
   const buyer = await buyerOf(ctx, p.retailerId, seller.stateCode);
   const interState = buyer.stateCode !== seller.stateCode;
@@ -292,7 +292,8 @@ export async function issueImportedInvoice(ctx: Ctx, p: { retailerId: string; nu
       cgst: f.cgst,
       sgst: f.sgst,
       igst: f.igst,
-      total: f.total,
+      roundOff: p.roundOff ?? 0,
+      total: f.total + (p.roundOff ?? 0),
       salesman: p.salesman,
       createdById: ctx.actorId,
       // Already billed in the old book: nothing to send to the e-invoice portal.
@@ -347,7 +348,8 @@ export async function issueSaleInvoice(ctx: Ctx, orderId: string, now = new Date
       cgst: f.cgst,
       sgst: f.sgst,
       igst: f.igst,
-      total: f.total,
+      roundOff: order.roundOff,
+      total: f.total + order.roundOff,
       salesman,
       createdById: ctx.actorId,
       einvStatus: einvoiceRequired(settings, type, b2b, seller.gstin) ? "PENDING" : "NOT_REQUIRED",
@@ -471,6 +473,22 @@ export async function issueNoteDoc(ctx: Ctx, input: NoteInput, now = new Date())
   if (f.total <= 0) throw new MoneyError(input.kind === "cancel" ? "Nothing is left on this invoice to credit" : "The note has no value");
 
   const { settings } = await sellerOf(ctx);
+  // Round-off. What is still owed on the invoice as documents (its total, plus
+  // debit notes, less earlier credit notes) is the most a credit note can be.
+  // A credit that takes every line's remaining value takes exactly that, so the
+  // invoice's own round-off goes back with it and the bill nets to zero. Any
+  // other note is rounded to the rupee when the business rounds its bills.
+  const docLeft = original.total + original.notes.reduce((a, n) => a + (n.type === "DEBIT_NOTE" ? n.total : -n.total), 0);
+  const credited = new Map(drafts.map((d) => [d.originalLineId, d.gross - d.discount]));
+  const takesAll = credit && original.lines.every((l) => left(l).value - (credited.get(l.id) ?? 0) <= 0);
+  let total = f.total;
+  if (takesAll) total = Math.max(docLeft, 0);
+  else if (settings.roundOff === "rupee") {
+    const r = roundRupee(f.total).total;
+    if (r > 0) total = credit ? Math.min(r, Math.max(docLeft, 0)) : r;
+  }
+  if (total <= 0 || Math.abs(total - f.total) >= 100) total = f.total;
+  const roundOff = total - f.total;
   const seller = original.seller as unknown as Party;
   const { fy, number } = await nextDocNumber(ctx, settings, input.type, now);
   const note = await ctx.tx.invoice.create({
@@ -493,7 +511,8 @@ export async function issueNoteDoc(ctx: Ctx, input: NoteInput, now = new Date())
       cgst: f.cgst,
       sgst: f.sgst,
       igst: f.igst,
-      total: f.total,
+      roundOff,
+      total,
       createdById: ctx.actorId,
       einvStatus:
         original.type === "TAX_INVOICE" && einvoiceRequired(settings, input.type, original.b2b, seller.gstin) ? "PENDING" : "NOT_REQUIRED",

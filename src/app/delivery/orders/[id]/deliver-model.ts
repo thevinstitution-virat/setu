@@ -1,5 +1,5 @@
 import { repriceOrder, shortCredit } from "@/lib/delivery-math";
-import { lineMoney } from "@/lib/money";
+import { lineMoney, roundRupee } from "@/lib/money";
 import { SHORT_REASONS } from "@/lib/delivery-settings";
 import type { DeliveryInvoice } from "./DeliveryInvoiceCard";
 
@@ -49,7 +49,7 @@ export const shortReasonLabel = (r: string | null | undefined) =>
  * `full` is the value if everything is handed over.
  */
 export function orderAmount(
-  order: { totalAmount: number; deliveryCharge: number; deliveryGstRate: number; taxInclusive?: boolean },
+  order: { totalAmount: number; deliveryCharge: number; deliveryGstRate: number; taxInclusive?: boolean; roundTotal?: boolean },
   items: DeliverItem[],
   lines: LineState,
   invoices: DeliveryInvoice[]
@@ -65,7 +65,9 @@ export function orderAmount(
         return { taxable, gstRate: i.gstRate, quantity: ordered, short: ordered - deliveredOf(lines, i) };
       })
     );
-    return { invoiced, booked, full: booked, amount: booked - credit, anyShort };
+    // A business that rounds its bills rounds the credit note for short goods too.
+    const less = order.roundTotal ? Math.min(roundRupee(credit).total, booked) : credit;
+    return { invoiced, booked, full: booked, amount: booked - less, anyShort };
   }
   const amount = anyShort
     ? repriceOrder(order, items.map((item) => ({ item, delivered: deliveredOf(lines, item) }))).totalAmount

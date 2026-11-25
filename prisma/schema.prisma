@@ -600,6 +600,10 @@ model Order {
   subtotal         Int             @default(0)
   gstAmount        Int             @default(0)
   totalAmount      Int
+  /// Bill totals are rounded to the rupee (frozen at order time, like taxInclusive).
+  roundTotal       Boolean         @default(false)
+  /// Paise added (+) or taken off (-) to reach the rounded total: totalAmount = subtotal + gstAmount + roundOff.
+  roundOff         Int             @default(0)
   notes            String?
   /// Placed over the credit limit or with overdue bills: needs approval before it moves on.
   creditHold       Boolean         @default(false)
@@ -1711,6 +1715,8 @@ model Invoice {
   cgst          Int
   sgst          Int
   igst          Int
+  /// Paise added (+) or taken off (-) to round the document: total = taxable + cgst + sgst + igst + roundOff.
+  roundOff      Int             @default(0)
   total         Int
   /// The ledger entry this document posted.
   entryId       String?

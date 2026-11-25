@@ -1,4 +1,4 @@
-import { gstOn, lineMoney } from "@/lib/money";
+import { gstOn, lineMoney, roundRupee } from "@/lib/money";
 
 /**
  * Pure delivery maths, safe to import in the browser (the driver's screen
@@ -24,7 +24,7 @@ export type DeliveryItem = {
  * Same rounding as the cart quote, so the invoice check still passes.
  */
 export function repriceOrder(
-  order: { deliveryCharge: number; deliveryGstRate: number; taxInclusive?: boolean },
+  order: { deliveryCharge: number; deliveryGstRate: number; taxInclusive?: boolean; roundTotal?: boolean },
   lines: { item: DeliveryItem; delivered: number }[]
 ) {
   const items = lines.map(({ item, delivered }) => {
@@ -40,7 +40,8 @@ export function repriceOrder(
   const goodsTax = money.reduce((a, m) => a + m.tax, 0);
   const subtotal = grossAmount - discountAmount + order.deliveryCharge;
   const gstAmount = goodsTax + gstOn(order.deliveryCharge, order.deliveryGstRate);
-  return { items, grossAmount, discountAmount, subtotal, gstAmount, totalAmount: subtotal + gstAmount };
+  const rounded = order.roundTotal ? roundRupee(subtotal + gstAmount) : { roundOff: 0, total: subtotal + gstAmount };
+  return { items, grossAmount, discountAmount, subtotal, gstAmount, roundOff: rounded.roundOff, totalAmount: rounded.total };
 }
 
 /**

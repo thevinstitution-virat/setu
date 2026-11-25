@@ -296,6 +296,7 @@ export async function renderInvoicePdf(doc: InvoiceDoc, opts: { accent?: string;
   const totals: [string, number, boolean?][] = [["Taxable value", doc.taxable]];
   if (inter) totals.push(["IGST", doc.igst]);
   else totals.push(["CGST", doc.cgst], ["SGST", doc.sgst]);
+  if (doc.roundOff) totals.push(["Round off", doc.roundOff]);
   for (const [k, v] of totals) {
     text(c, k, tx, ty, { size: 9, color: MUTED });
     text(c, money(v), tx + 100, ty, { size: 9, align: "right", width: 100 });

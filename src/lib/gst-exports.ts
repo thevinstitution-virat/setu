@@ -196,11 +196,11 @@ export async function salesRegisterWorkbook(docs: ExportDoc[]) {
   sheet(
     wb,
     "Register",
-    ["Date", "Number", "Type", "Party", "GSTIN", "Place of supply", "Taxable", "CGST", "SGST", "IGST", "Total", "Order", "Against", "Reason", "e-Invoice", "IRN", "E-way bill"],
+    ["Date", "Number", "Type", "Party", "GSTIN", "Place of supply", "Taxable", "CGST", "SGST", "IGST", "Round off", "Total", "Order", "Against", "Reason", "e-Invoice", "IRN", "E-way bill"],
     docs.map((d) => {
       const s = sign(d);
       const p = party(d);
-      return [ddMonyyyy(d.date), d.number, TYPE[d.type], p.legalName, p.gstin ?? "", stateLabel(d.placeOfSupply), rupees(d.taxable * s), rupees(d.cgst * s), rupees(d.sgst * s), rupees(d.igst * s), rupees(d.total * s), d.order?.orderNumber ?? "", d.original?.number ?? "", d.reason ?? "", d.einvStatus, d.irn ?? "", d.ewbNo ?? ""];
+      return [ddMonyyyy(d.date), d.number, TYPE[d.type], p.legalName, p.gstin ?? "", stateLabel(d.placeOfSupply), rupees(d.taxable * s), rupees(d.cgst * s), rupees(d.sgst * s), rupees(d.igst * s), rupees(d.roundOff * s), rupees(d.total * s), d.order?.orderNumber ?? "", d.original?.number ?? "", d.reason ?? "", d.einvStatus, d.irn ?? "", d.ewbNo ?? ""];
     })
   );
   sheet(
@@ -293,6 +293,9 @@ export function tallyXml(docs: ExportDoc[], receipts: ExportReceipt[], t: Invoic
     for (const [name, head] of [[t.cgst, "Central Tax"], [t.sgst, "State Tax"], [t.igst, "Integrated Tax"]] as const) {
       msgs.push(`<LEDGER NAME="${esc(name)}" ACTION="Create"><NAME.LIST><NAME>${esc(name)}</NAME></NAME.LIST><PARENT>Duties &amp; Taxes</PARENT><TAXTYPE>GST</TAXTYPE><GSTDUTYHEAD>${head}</GSTDUTYHEAD></LEDGER>`);
     }
+    if (docs.some((d) => d.roundOff)) {
+      msgs.push(`<LEDGER NAME="${esc(t.roundOff)}" ACTION="Create"><NAME.LIST><NAME>${esc(t.roundOff)}</NAME></NAME.LIST><PARENT>Indirect Expenses</PARENT></LEDGER>`);
+    }
     if (receipts.some((r) => r.method !== "CASH")) {
       msgs.push(`<LEDGER NAME="${esc(t.bank)}" ACTION="Create"><NAME.LIST><NAME>${esc(t.bank)}</NAME></NAME.LIST><PARENT>Bank Accounts</PARENT></LEDGER>`);
     }
@@ -314,6 +317,8 @@ export function tallyXml(docs: ExportDoc[], receipts: ExportReceipt[], t: Invoic
     if (d.cgst) lines.push(entry(t.cgst, credit, d.cgst));
     if (d.sgst) lines.push(entry(t.sgst, credit, d.sgst));
     if (d.igst) lines.push(entry(t.igst, credit, d.igst));
+    // Rounded up: the party owes a little more, so round-off sits on the sales side; rounded down: the other side.
+    if (d.roundOff) lines.push(entry(t.roundOff, d.roundOff > 0 ? credit : !credit, Math.abs(d.roundOff)));
     const narration = [d.order ? `Order ${d.order.orderNumber}` : "", d.original ? `Against ${d.original.number}` : "", d.reason ?? "", d.irn ? `IRN ${d.irn}` : ""].filter(Boolean).join(". ");
     msgs.push(
       `<VOUCHER VCHTYPE="${vtype}" ACTION="Create" OBJVIEW="Accounting Voucher View"><DATE>${tallyDate(d.date)}</DATE><VOUCHERTYPENAME>${vtype}</VOUCHERTYPENAME>` +

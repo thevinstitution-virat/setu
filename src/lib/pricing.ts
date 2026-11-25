@@ -1,6 +1,6 @@
 import type { Tx } from "@/lib/db";
 import type { Scheme } from "@/generated/prisma/client";
-import { formatINR, gstOn, lineMoney } from "@/lib/money";
+import { formatINR, gstOn, lineMoney, roundRupee } from "@/lib/money";
 import { applySchemes, describeScheme, type AppliedScheme, type EngineLine, type EngineScheme, type SchemeParams } from "@/lib/schemes";
 import { cartSettings, deliveryChargeFor, deliveryDays } from "@/lib/cart-settings";
 import { invoiceSettings } from "@/lib/invoice-settings";
@@ -293,6 +293,8 @@ export type Quote = {
   deliveryGstRate: number;
   subtotal: number;
   gstAmount: number;
+  /** Paise added (+) or taken off (−) to round the total to the rupee; 0 when the business doesn't round. */
+  roundOff: number;
   totalAmount: number;
   minOrderValue: number;
   /** Paise more goods needed to reach the minimum; 0 = fine. */
@@ -466,6 +468,8 @@ export async function quoteCart(
     if (!coupon.valid) problems.push(coupon.message);
   }
 
+  const rounded = invoiceSettings(tenantSettings).roundOff === "rupee" ? roundRupee(subtotal + gstAmount) : { roundOff: 0, total: subtotal + gstAmount };
+
   return {
     lines,
     free,
@@ -477,7 +481,8 @@ export async function quoteCart(
     deliveryGstRate,
     subtotal,
     gstAmount,
-    totalAmount: subtotal + gstAmount,
+    roundOff: rounded.roundOff,
+    totalAmount: rounded.total,
     minOrderValue: cart.minOrderValue,
     shortBy,
     deliveryDates: dates,

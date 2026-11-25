@@ -156,7 +156,7 @@ describe("trade bill", () => {
     return {
       id: "x", tenantId: "t", type: "TAX_INVOICE", number: "A004231", fy: "2627", date: new Date("2026-11-21T06:00:00Z"),
       orderId: null, retailerId: "r", originalId: null, noteKind: null, reason: null, seller: seller as never, buyer: buyer as never,
-      b2b: true, placeOfSupply: "09", interState: false, taxable: sum("taxable"), cgst: sum("cgst"), sgst: sum("sgst"), igst: 0,
+      b2b: true, placeOfSupply: "09", interState: false, taxable: sum("taxable"), cgst: sum("cgst"), sgst: sum("sgst"), igst: 0, roundOff: 0,
       total: sum("total"), entryId: null, createdById: null, createdAt: new Date(), updatedAt: new Date(), einvStatus: "NOT_REQUIRED",
       irn: null, ackNo: null, ackDate: null, signedQr: null, einvError: null, einvAttempts: 0, shareVersion: 0, einvCancelledAt: null,
       ewbNo: null, ewbDate: null, ewbValidUntil: null, ewbVehicle: null, ewbDistanceKm: null, salesman: "Ravi Sales",

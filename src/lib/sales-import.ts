@@ -87,11 +87,14 @@ export async function importSales(ctx: Ctx, bills: SalesImportBill[]): Promise<S
           drafts.push({ ...common, description: `${p.name} (free)`, quantity: l.freeQty, freeQty: l.freeQty, rate: 0, gross: 0, discount: 0, tax: 0, inclRate: 0 });
         }
       }
+      // The old book's printed total: the paise between it and the lines are the bill's round-off.
+      let roundOff = 0;
       if (b.billTotal !== null) {
         const total = drafts.reduce((a, d) => a + d.gross - d.discount + d.tax, 0);
-        if (Math.abs(total - b.billTotal) > 100) {
+        if (Math.abs(total - b.billTotal) >= 100) {
           throw new MoneyError(`Bill ${b.number}: the lines come to ₹${(total / 100).toFixed(2)}, ₹${(Math.abs(total - b.billTotal) / 100).toFixed(2)} away from bill_total. Check the lines.`);
         }
+        roundOff = b.billTotal - total;
       }
       await ctx.tx.$executeRawUnsafe("SAVEPOINT sales_import");
       try {
@@ -103,6 +106,7 @@ export async function importSales(ctx: Ctx, bills: SalesImportBill[]): Promise<S
           salesmanId: salesman?.id ?? null,
           salesman: salesman?.name ?? null,
           drafts,
+          roundOff,
         });
         await ctx.tx.$executeRawUnsafe("RELEASE SAVEPOINT sales_import");
       } catch (e) {

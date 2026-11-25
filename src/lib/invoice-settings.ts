@@ -15,6 +15,11 @@ export type InvoiceSettings = {
    * GST is then taken out of each line instead of added on top. Applies to orders placed after the switch.
    */
   ratesIncludeGst: boolean;
+  /**
+   * "rupee": every bill total is rounded to the whole rupee and the paise go to the Round off account.
+   * "none": totals stay exact to the paisa. Applies to orders placed after the switch.
+   */
+  roundOff: "none" | "rupee";
   prefixes: { tax: string; bos: string; credit: string; debit: string };
   /**
    * "fy": <prefix><FY>-00001, starting again each April (INV2627-00042).
@@ -50,6 +55,7 @@ export type InvoiceSettings = {
     cgst: string;
     sgst: string;
     igst: string;
+    roundOff: string;
     cash: string;
     bank: string;
     debtorsGroup: string;
@@ -60,6 +66,7 @@ export const INVOICE_DEFAULTS: InvoiceSettings = {
   scheme: "regular",
   issueAt: "dispatch",
   ratesIncludeGst: false,
+  roundOff: "none",
   prefixes: { tax: "INV", bos: "BOS", credit: "CN", debit: "DN" },
   numbering: { style: "fy", digits: 6 },
   layout: "standard",
@@ -79,6 +86,7 @@ export const INVOICE_DEFAULTS: InvoiceSettings = {
     cgst: "Output CGST",
     sgst: "Output SGST",
     igst: "Output IGST",
+    roundOff: "Round Off",
     cash: "Cash",
     bank: "Bank",
     debtorsGroup: "Sundry Debtors",
@@ -114,6 +122,10 @@ export function parseInvoiceSettings(input: Record<string, unknown>, current: In
     out.issueAt = input.issueAt;
   }
   if ("ratesIncludeGst" in input) out.ratesIncludeGst = !!input.ratesIncludeGst;
+  if ("roundOff" in input) {
+    if (input.roundOff !== "none" && input.roundOff !== "rupee") return "Round off must be none or rupee";
+    out.roundOff = input.roundOff;
+  }
   if ("layout" in input) {
     if (input.layout !== "standard" && input.layout !== "trade") return "Bill layout must be standard or trade";
     out.layout = input.layout;
