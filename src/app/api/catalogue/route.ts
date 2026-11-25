@@ -35,7 +35,7 @@ export async function GET(req: Request) {
       tx.brand.findMany({ where: { active: true }, orderBy: [{ sort: "asc" }, { name: "asc" }], select: { id: true, name: true, logoKey: true } }),
       tx.banner.findMany({ where: { active: true }, orderBy: [{ sort: "asc" }, { createdAt: "desc" }] }),
       tx.orderItem.findMany({
-        where: { order: { retailerId: r.id, status: { not: "CANCELLED" } }, freeSchemeId: null },
+        where: { order: { retailerId: r.id, status: { not: "CANCELLED" } }, freeSchemeId: null, price: { gt: 0 } },
         orderBy: { order: { createdAt: "desc" } },
         take: 200,
         select: { productId: true },

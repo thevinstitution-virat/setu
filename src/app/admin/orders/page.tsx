@@ -7,7 +7,9 @@ import { formatINR } from "@/lib/money";
 import { STATUS_COLOR, nextStatus } from "@/lib/orders";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import type { OrderStatus } from "@/generated/prisma/client";
-import OrderLines, { type OrderLineItem, type OrderTotals } from "@/components/store/OrderLines";
+import OrderLines, { isFreeLine, type OrderLineItem, type OrderTotals } from "@/components/store/OrderLines";
+import { readRupees, rupeeText } from "@/components/admin/AdminKit";
+import { dealFree, parseDeal } from "@/lib/deal";
 
 type Order = OrderTotals & {
   id: string;
@@ -55,6 +57,8 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
   const [counts, setCounts] = useState<Partial<Record<OrderStatus, number>>>({});
   const [agents, setAgents] = useState<Agent[]>([]);
   const [salesmen, setSalesmen] = useState<Salesman[]>([]);
+  /** Can put a scheme or deal on a line (the people who set schemes). */
+  const [canScheme, setCanScheme] = useState(false);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>(
     typeof initialStatus === "string" && (FILTERS as string[]).includes(initialStatus) ? (initialStatus as OrderStatus) : "ALL"
   );
@@ -75,6 +79,7 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
       setOrders(list);
       setCounts(o.counts ?? {});
       setSalesmen(o.salesmen ?? []);
+      setCanScheme(!!o.canScheme);
       setAgents(aRes.ok ? (a.agents ?? []) : []);
       setLoadError(null);
       // Opened from a link to one order (dashboard): show it straight away.
@@ -120,6 +125,8 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
       if (deliveryAgentId) send(id, `/api/orders/${id}/assign-delivery`, "POST", { deliveryAgentId });
     },
     salesman: (id: string, salesmanId: string | null) => send(id, `/api/orders/${id}/salesman`, "POST", { salesmanId }),
+    lineScheme: (id: string, itemId: string, scheme: number, deal: { buy: number; get: number } | null) =>
+      send(id, `/api/orders/${id}/line-scheme`, "POST", { itemId, scheme, deal }),
   };
 
   const needle = q.trim().toLowerCase();
@@ -283,6 +290,7 @@ export default function AdminOrdersPage({ searchParams }: { searchParams: Promis
             order={selected}
             agents={agents}
             salesmen={salesmen}
+            canScheme={canScheme}
             busy={busyId === selected.id}
             error={actionError?.id === selected.id && !actionError.ok ? actionError.message : null}
             note={actionError?.id === selected.id && actionError.ok ? actionError.message : null}
@@ -305,6 +313,7 @@ function OrderPanel({
   order: o,
   agents,
   salesmen,
+  canScheme,
   busy,
   error,
   note,
@@ -314,6 +323,7 @@ function OrderPanel({
   order: Order;
   agents: Agent[];
   salesmen: Salesman[];
+  canScheme: boolean;
   busy: boolean;
   error: string | null;
   note: string | null;
@@ -323,6 +333,7 @@ function OrderPanel({
     cancel: (id: string) => void;
     assign: (id: string, agentId: string) => void;
     salesman: (id: string, salesmanId: string | null) => void;
+    lineScheme: (id: string, itemId: string, scheme: number, deal: { buy: number; get: number } | null) => void;
   };
   onClose: () => void;
 }) {
@@ -467,6 +478,10 @@ function OrderPanel({
             <OrderLines items={o.items} order={o} />
           </div>
 
+          {canScheme && !o.invoices?.[0] && (o.status === "PLACED" || o.status === "CONFIRMED" || o.status === "PACKED") && (
+            <LineScheme order={o} busy={busy} onSave={(itemId, scheme, deal) => actions.lineScheme(o.id, itemId, scheme, deal)} />
+          )}
+
           {o.invoices?.[0] && (
             <Link href={`/admin/invoices/${o.invoices[0].id}`} className="btn btn-outline btn-sm w-full">
               <Icon name="receipt" className="h-4 w-4" /> Invoice {o.invoices[0].number}
@@ -475,5 +490,90 @@ function OrderPanel({
         </div>
       </section>
     </div>
+  );
+}
+
+/**
+ * A scheme (₹ off) or a deal (10+1) the office puts on one line before the
+ * order is billed, on top of the automatic schemes. The server works the
+ * order's totals out again.
+ */
+function LineScheme({
+  order: o,
+  busy,
+  onSave,
+}: {
+  order: Order;
+  busy: boolean;
+  onSave: (itemId: string, scheme: number, deal: { buy: number; get: number } | null) => void;
+}) {
+  const sold = o.items.filter((i) => !isFreeLine(i) && i.price > 0);
+  const [itemId, setItemId] = useState(sold[0]?.id ?? "");
+  const item = sold.find((i) => i.id === itemId) ?? null;
+  const [scheme, setScheme] = useState(rupeeText(item?.extraScheme || null));
+  const [deal, setDeal] = useState(item?.dealBuy && item.dealGet ? `${item.dealBuy}+${item.dealGet}` : "");
+  const [err, setErr] = useState<string | null>(null);
+  if (!sold.length) return null;
+
+  function pick(id: string) {
+    const it = sold.find((i) => i.id === id);
+    setItemId(id);
+    setScheme(rupeeText(it?.extraScheme || null));
+    setDeal(it?.dealBuy && it.dealGet ? `${it.dealBuy}+${it.dealGet}` : "");
+    setErr(null);
+  }
+
+  const s = readRupees(scheme);
+  const d = parseDeal(deal);
+  const free = item && d && d !== "bad" ? dealFree(item, d) : 0;
+
+  function save() {
+    if (!item) return;
+    if (s === "bad") return setErr("Write the scheme in rupees");
+    if (d === "bad") return setErr("Write the deal like 10+1 (1 free for every 10)");
+    if (d && free === 0) return setErr(`${d.buy}+${d.get} gives nothing on this quantity`);
+    setErr(null);
+    onSave(item.id, s ?? 0, d);
+  }
+
+  return (
+    <details className="rounded-xl border border-[var(--app-line)] px-3.5 py-3" open={sold.some((i) => (i.extraScheme ?? 0) > 0 || !!i.dealBuy)}>
+      <summary className="cursor-pointer text-sm font-semibold">Scheme or deal on a line</summary>
+      <div className="mt-3 space-y-2.5">
+        <label className="block">
+          <span className="block text-xs font-semibold text-[var(--muted)] mb-1">Line</span>
+          <select className="input !py-2.5" value={itemId} disabled={busy} onChange={(e) => pick(e.target.value)}>
+            {sold.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.product.name} · {i.cases && i.caseSize ? `${i.cases} × ${i.caseSize}` : i.quantity}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="grid grid-cols-2 gap-2.5">
+          <label className="block">
+            <span className="block text-xs font-semibold text-[var(--muted)] mb-1">Scheme (₹)</span>
+            <input className="input !py-2.5" inputMode="decimal" value={scheme} disabled={busy} onChange={(e) => setScheme(e.target.value)} />
+          </label>
+          <label className="block">
+            <span className="block text-xs font-semibold text-[var(--muted)] mb-1">Deal</span>
+            <input className="input !py-2.5" placeholder="10+1" value={deal} disabled={busy} onChange={(e) => setDeal(e.target.value)} />
+          </label>
+        </div>
+        <p className="text-xs text-[var(--muted)]">
+          {o.taxInclusive ? "₹ off the line at the bill's rates (with GST)." : "₹ off the line before GST."}
+          {item?.cases && item.caseSize ? " The deal counts cases." : ""}
+          {free > 0 && item ? ` ${free} ${item.product.unit ?? ""} free.` : ""} Blank clears it.
+        </p>
+        {err && (
+          <p className="text-sm text-[#a8281e]" role="alert">
+            {err}
+          </p>
+        )}
+        <button type="button" disabled={busy || !item} onClick={save} className="btn btn-mor btn-sm w-full">
+          Save scheme and deal
+        </button>
+      </div>
+    </details>
   );
 }

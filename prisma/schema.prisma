@@ -661,6 +661,13 @@ model OrderItem {
   deliveredQty Int?
   /// Why less than ordered was delivered.
   shortReason  String?
+  /// Scheme the office typed on this line, paise (already in `discount`, against the rate as charged).
+  extraScheme   Int     @default(0)
+  /// Deal the office typed on this line: dealGet free for every dealBuy (cases when ordered in cases).
+  dealBuy       Int?
+  dealGet       Int?
+  /// Free goods line made by the office's deal on that line (price 0).
+  dealForItemId String?
 
   @@index([tenantId, orderId])
 }

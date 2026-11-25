@@ -18,6 +18,13 @@ export type OrderLineItem = {
   cases?: number | null;
   caseSize?: number | null;
   freeSchemeId?: string | null;
+  /** Scheme the office typed on this line, paise (already in discount). */
+  extraScheme?: number | null;
+  /** Deal the office typed on this line (dealGet free for every dealBuy). */
+  dealBuy?: number | null;
+  dealGet?: number | null;
+  /** Free goods from the office's deal on that line. */
+  dealForItemId?: string | null;
   product: { name: string; unit?: string | null; caseUnit?: string | null };
 };
 
@@ -34,7 +41,8 @@ export type OrderTotals = {
   taxInclusive?: boolean | null;
 };
 
-export const isFreeLine = (i: Pick<OrderLineItem, "price" | "freeSchemeId">) => i.price === 0 && !!i.freeSchemeId;
+/** Free goods: a scheme's gift or the office's deal (price 0). */
+export const isFreeLine = (i: Pick<OrderLineItem, "price" | "freeSchemeId" | "dealForItemId">) => i.price === 0 && (!!i.freeSchemeId || !!i.dealForItemId);
 
 /** Line value after scheme discount, with GST. inclusive: the rate already includes GST. */
 export function lineTotal(i: OrderLineItem, inclusive = false): number {
@@ -97,8 +105,17 @@ export default function OrderLines({
                 {i.gstRate > 0 && (order.taxInclusive ? ` · incl. GST ${i.gstRate}%` : ` · GST ${i.gstRate}%`)}
               </p>
               {(i.discount ?? 0) > 0 && (
-                <p className="text-xs font-semibold text-[var(--mint-text)] mt-0.5">Scheme discount −{formatINR(i.discount!)}</p>
+                <p className="text-xs font-semibold text-[var(--mint-text)] mt-0.5">
+                  Scheme discount −{formatINR(i.discount!)}
+                  {(i.extraScheme ?? 0) > 0 && (i.extraScheme ?? 0) < i.discount! ? ` (incl. ${formatINR(i.extraScheme!)} added by the office)` : ""}
+                </p>
               )}
+              {i.dealBuy && i.dealGet ? (
+                <p className="text-xs font-semibold text-[var(--mint-text)] mt-0.5">
+                  Deal {i.dealBuy}+{i.dealGet}
+                  {i.cases ? " (cases)" : ""}
+                </p>
+              ) : null}
             </div>
             <span className="shrink-0 font-semibold">{formatINR(lineTotal(i, !!order.taxInclusive))}</span>
           </div>
@@ -108,7 +125,9 @@ export default function OrderLines({
             <div key={i.id} className="py-2 flex items-start justify-between gap-3 text-sm">
               <div className="min-w-0">
                 <p className="font-medium break-words">{i.product.name}</p>
-                <p className="text-xs text-[var(--muted)] mt-0.5">{qtyLabel(i.quantity, i.product.unit)} · scheme gift</p>
+                <p className="text-xs text-[var(--muted)] mt-0.5">
+                  {qtyLabel(i.quantity, i.product.unit)} · {i.dealForItemId ? "deal" : "scheme gift"}
+                </p>
               </div>
               <span className="chip chip-mint shrink-0">FREE</span>
             </div>
