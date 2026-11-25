@@ -4,7 +4,7 @@ import { getTenant } from "@/lib/tenant";
 import { verifyPassword } from "@/lib/password";
 import { requestIp } from "@/lib/audit";
 import { platformAudit } from "@/lib/platform-auth";
-import { setPlatformPending } from "@/lib/platform-mfa";
+import { platformStepOne } from "@/lib/platform-mfa";
 import { lockedMessage, loginLocked, recordLogin } from "@/lib/login-limit";
 
 /** Platform console sign-in. Body: { email, password }. Wrong tries are limited (lib/login-limit.ts). */
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   }
   await recordLogin("platform", email, ip, true);
   // Step one only: the console opens after the authenticator code (lib/platform-mfa.ts).
-  await setPlatformPending({ platformUserId: u.id, via: "password" });
+  const to = await platformStepOne({ platformUserId: u.id, via: "password" });
   await platformAudit(u.id, "auth.password_ok", { ip: ip ?? undefined });
-  return NextResponse.json({ ok: true, redirect: "/platform/login/2fa" });
+  return NextResponse.json({ ok: true, redirect: to });
 }

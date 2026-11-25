@@ -32,6 +32,8 @@ services:
       # "Continue with Google" (redirect URI https://<PLATFORM_DOMAIN>/api/oauth/google/callback). Empty = no Google button.
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      # 1 = demo mode: no authenticator step; an emailed code/link signs staff and console in on its own.
+      TWO_STEP_OFF: ${TWO_STEP_OFF:-}
       # Email through Resend: sign-in codes and password-reset links. EMAIL_FROM like "VBiz Pro <no-reply@vpd.ceo>".
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-}

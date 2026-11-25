@@ -25,7 +25,14 @@ import { hashRecovery, matchTotp, newRecoveryCodes, newTotpSecret, spendRecovery
 export type Via = NonNullable<SessionPayload["via"]>;
 
 /** Staff always; a shop only after turning it on. */
-export const mfaRequired = (role: Role, totpEnabledAt: Date | null | undefined) => role !== "RETAILER" || !!totpEnabledAt;
+export const twoStepOff = () => process.env.TWO_STEP_OFF === "1";
+
+/**
+ * TWO_STEP_OFF=1 (demo mode) skips the authenticator step for everyone: a
+ * confirmed email code or link signs in on its own. Unset it to bring back the
+ * mandatory step for staff and the console.
+ */
+export const mfaRequired = (role: Role, totpEnabledAt: Date | null | undefined) => !twoStepOff() && (role !== "RETAILER" || !!totpEnabledAt);
 
 /**
  * The SMS fallback proves the phone. When step one already did (mobile OTP

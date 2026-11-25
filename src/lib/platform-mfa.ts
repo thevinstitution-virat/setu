@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { platformSecret } from "@/lib/auth";
 import { createPlatformCookie } from "@/lib/platform-auth";
-import type { MfaStore } from "@/lib/mfa";
+import { twoStepOff, type MfaStore } from "@/lib/mfa";
 
 /**
  * The console's second step: mandatory for every console login (Owner and
@@ -45,6 +45,16 @@ export async function completePlatformSignIn(p: PlatformPending) {
   await createPlatformCookie({ platformUserId: u.id, name: u.name, role: u.role });
   (await cookies()).delete(COOKIE);
   return true;
+}
+
+/**
+ * End of step one on the console. Returns where to send the browser: the
+ * authenticator page, or (TWO_STEP_OFF=1) straight into the console.
+ */
+export async function platformStepOne(p: PlatformPending): Promise<string> {
+  if (twoStepOff()) return (await completePlatformSignIn(p)) ? "/platform" : "/platform/login";
+  await setPlatformPending(p);
+  return "/platform/login/2fa";
 }
 
 export function platformMfaStore(id: string): MfaStore {
