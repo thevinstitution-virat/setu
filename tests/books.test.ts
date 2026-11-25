@@ -211,7 +211,9 @@ describe("ledger, day book, trial balance, check", () => {
   it("day book has every entry with debits = credits", async () => {
     const d = await books((ctx) => dayBook(ctx, today, today));
     expect(d.debit).toBe(d.credit);
-    expect(d.entries.some((e) => e.memo === "Test ledger 2500")).toBe(true);
+    // Other tests leave many entries dated today in the demo tenant, past the day book's cap, so look among the opening entries.
+    const openings = await books((ctx) => dayBook(ctx, today, today, "OPENING"));
+    expect(openings.entries.some((e) => e.memo === "Test ledger 2500")).toBe(true);
     const only = await books((ctx) => dayBook(ctx, yesterday, today, "OPENING"));
     expect(only.entries.every((e) => e.kind === "OPENING")).toBe(true);
     expect((await renderSheetPdf(dayBookSheet(only), { name: "Test" })).byteLength).toBeGreaterThan(1000);
