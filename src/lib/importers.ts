@@ -8,8 +8,8 @@ import { parseDiscounts } from "@/lib/purchase-math";
  * retailers by phone, products by SKU.
  */
 
-export type ImportType = "retailers" | "products" | "balances" | "prices" | "bills" | "bill_shares" | "suppliers" | "supplier_bills" | "purchases";
-export const IMPORT_TYPES: ImportType[] = ["retailers", "products", "balances", "prices", "bills", "bill_shares", "suppliers", "supplier_bills", "purchases"];
+export type ImportType = "retailers" | "products" | "balances" | "prices" | "bills" | "bill_shares" | "sales" | "suppliers" | "supplier_bills" | "purchases";
+export const IMPORT_TYPES: ImportType[] = ["retailers", "products", "balances", "prices", "bills", "bill_shares", "sales", "suppliers", "supplier_bills", "purchases"];
 /** Imports that write to the books (they also need purchases.manage). */
 export const BOOKS_IMPORTS: ImportType[] = ["suppliers", "supplier_bills", "purchases"];
 export type Row = Record<string, string>;
@@ -70,6 +70,15 @@ export const TEMPLATES: Record<ImportType, { columns: string[]; required: string
     columns: ["supplier", "bill_no", "date", "amount", "paid", "due_date"],
     required: ["supplier", "amount"],
     example: ["Chaiwala Foods Pvt Ltd", "CF/2526/0912", "18/03/2026", "48250", "10000", "17/04/2026"],
+  },
+  sales: {
+    // Sales bills from the old book, one row per line; the rows of a bill share invoice_no (and its shop and date).
+    // The shop by phone, else by party (+ area). sku = one of our products. gst_rate blank = the product's rate.
+    // rates_include_gst blank = Settings → GST & invoices. discount_pct can be 10+5. scheme_amount = Rs off the line
+    // after the %. deal = 10+1 (fills free_qty). bill_total = the bill's total, to check the lines (within Rs 1).
+    columns: ["party", "area", "phone", "invoice_no", "date", "due_date", "salesman", "sku", "qty", "free_qty", "rate", "mrp", "discount_pct", "scheme_amount", "deal", "gst_rate", "rates_include_gst", "bill_total"],
+    required: ["invoice_no", "date", "sku", "qty", "rate"],
+    example: ["Shree Ganesh Kirana", "Station Road", "9876543210", "A004231", "21/11/2026", "", "Ravi Sales", "BEV-001", "48", "", "95", "120", "10+5", "25", "24+1", "5", "yes", "3874"],
   },
   purchases: {
     // Purchase bills, one row per line; the rows of a bill share supplier + bill_no (and its date).
@@ -791,6 +800,152 @@ export function validatePurchases(rows: Row[], today = new Date(), opts: { purch
     }
     if (b.lines.length > 300) {
       for (const x of b.rows) errors.push({ row: x, message: `Bill ${b.number} has more than 300 lines` });
+      continue;
+    }
+    valid.push(b);
+  }
+  errors.sort((a, c) => a.row - c.row);
+  return { valid, errors };
+}
+
+// ───────────────────────────── sales bills ─────────────────────────────
+
+export type SalesImportLine = {
+  row: number;
+  sku: string;
+  quantity: number;
+  freeQty: number;
+  /** Rate per unit, paise (with GST when the bill's rates include it). */
+  rate: number;
+  discountPct: number;
+  discount2Pct: number;
+  discount3Pct: number;
+  /** Rs off the line after the % discounts, paise (in the rate's terms). */
+  schemeAmount: number;
+  deal?: { buy: number; get: number };
+  mrp: number | null;
+  gstRate: number | null;
+};
+
+export type SalesImportBill = {
+  rows: number[];
+  number: string;
+  party: string;
+  area: string;
+  phone: string | null;
+  date: string;
+  dueDate: string | null;
+  salesman: string;
+  ratesIncludeGst: boolean;
+  billTotal: number | null;
+  lines: SalesImportLine[];
+};
+
+/**
+ * Sales bills from the old book: one row per line, grouped by invoice_no. A
+ * bill with a bad row is left out whole. Shops, products and the salesman are
+ * matched when importing.
+ */
+export function validateSales(rows: Row[], today = new Date(), opts: { ratesIncludeGst?: boolean } = {}): { valid: SalesImportBill[]; errors: RowError[] } {
+  const errors: RowError[] = [];
+  const bills = new Map<string, SalesImportBill>();
+  const now = istToday(today);
+  const numberOf = (r: Row) => (r.invoice_no ?? "").trim().toUpperCase();
+  rows.forEach((r, i) => {
+    const row = i + 2;
+    const miss = missing(r, TEMPLATES.sales.required);
+    if (miss.length) return errors.push({ row, message: `Missing ${miss.join(", ")}` });
+    const number = numberOf(r);
+    if (!/^[A-Z0-9/-]{1,16}$/.test(number)) return errors.push({ row, message: `Invoice number "${r.invoice_no}" may have only letters, digits, / and - (16 at most)` });
+    const party = (r.party ?? "").trim().replace(/\s+/g, " ");
+    const phone = (r.phone ?? "").trim() ? cleanPhone(r.phone) : null;
+    if (phone !== null && !/^[6-9]\d{9}$/.test(phone)) return errors.push({ row, message: `Phone "${r.phone}" is not a 10-digit mobile number` });
+    if (!party && !phone) return errors.push({ row, message: "Give the shop: party (and area) or phone" });
+    const date = importDay(r.date);
+    if (!date) return errors.push({ row, message: `Date "${r.date}" should look like 21/11/2026 or 2026-11-21` });
+    if (date > now) return errors.push({ row, message: "Date is in the future" });
+    const dueDate = (r.due_date ?? "").trim() ? importDay(r.due_date) : null;
+    if ((r.due_date ?? "").trim() && !dueDate) return errors.push({ row, message: `Due date "${r.due_date}" should look like 21/11/2026 or 2026-11-21` });
+    if (dueDate && dueDate < date) return errors.push({ row, message: "Due date is before the bill date" });
+    const quantity = num(r.qty);
+    const freeQty = num(r.free_qty);
+    if (!Number.isInteger(quantity) || quantity <= 0) return errors.push({ row, message: "qty must be a whole number more than 0" });
+    if (!Number.isInteger(freeQty) || freeQty < 0) return errors.push({ row, message: "free_qty must be a whole number" });
+    let rate: number;
+    try {
+      rate = toPaise(r.rate);
+    } catch {
+      return errors.push({ row, message: "rate must be a number in rupees" });
+    }
+    if (rate <= 0) return errors.push({ row, message: "rate must be more than 0" });
+    const discounts = parseDiscounts((r.discount_pct ?? "").trim());
+    if (!discounts || discounts.some((d) => d >= 100)) return errors.push({ row, message: `discount_pct "${r.discount_pct}" should look like 3, or 10+5 for one discount after another (up to three, each under 100)` });
+    const [discountPct = 0, discount2Pct = 0, discount3Pct = 0] = discounts;
+    let schemeAmount = 0;
+    let mrp: number | null = null;
+    let billTotal: number | null = null;
+    try {
+      if ((r.scheme_amount ?? "").trim()) schemeAmount = toPaise(r.scheme_amount);
+    } catch {
+      return errors.push({ row, message: "scheme_amount must be a number in rupees" });
+    }
+    try {
+      if ((r.mrp ?? "").trim()) mrp = toPaise(r.mrp);
+    } catch {
+      return errors.push({ row, message: "mrp must be a number in rupees" });
+    }
+    try {
+      if ((r.bill_total ?? "").trim()) billTotal = toPaise(r.bill_total);
+    } catch {
+      return errors.push({ row, message: "bill_total must be a number in rupees" });
+    }
+    if (schemeAmount < 0 || (mrp !== null && mrp < 0)) return errors.push({ row, message: "scheme_amount and mrp can't be below 0" });
+    let deal: SalesImportLine["deal"];
+    const dealText = (r.deal ?? "").trim();
+    if (dealText) {
+      const dm = /^(\d+)\s*\+\s*(\d+)$/.exec(dealText);
+      if (!dm || Number(dm[1]) < 1 || Number(dm[2]) < 1) return errors.push({ row, message: `deal "${dealText}" should look like 10+1 (1 free for every 10)` });
+      deal = { buy: Number(dm[1]), get: Number(dm[2]) };
+      const free = Math.floor(quantity / deal.buy) * deal.get;
+      if (freeQty && freeQty !== free) return errors.push({ row, message: `free_qty ${freeQty} doesn't match deal ${deal.buy}+${deal.get} (that gives ${free})` });
+      if (!free) return errors.push({ row, message: `deal ${deal.buy}+${deal.get} gives nothing on ${quantity}` });
+    }
+    const gstText = (r.gst_rate ?? "").trim().replace(/%$/, "");
+    const gstRate = gstText ? Number(gstText) : null;
+    if (gstRate !== null && (!Number.isFinite(gstRate) || gstRate < 0 || gstRate > 40)) return errors.push({ row, message: "gst_rate must be a number, like 5 or 18" });
+    const inclusive = (r.rates_include_gst ?? "").trim() ? yes(r.rates_include_gst) : !!opts.ratesIncludeGst;
+
+    let b = bills.get(number);
+    if (!b) {
+      b = { rows: [], number, party, area: (r.area ?? "").trim(), phone, date, dueDate, salesman: (r.salesman ?? "").trim(), ratesIncludeGst: inclusive, billTotal, lines: [] };
+      bills.set(number, b);
+    } else if (b.date !== date) return errors.push({ row, message: `Bill ${number} has another date on row ${b.rows[0]}` });
+    else if ((party || phone) && (b.phone ?? "") + "|" + b.party.toLowerCase() !== (phone ?? "") + "|" + party.toLowerCase()) {
+      return errors.push({ row, message: `Bill ${number} has another shop on row ${b.rows[0]}` });
+    } else if (billTotal !== null && b.billTotal !== null && billTotal !== b.billTotal) return errors.push({ row, message: `Bill ${number} has another bill_total on row ${b.rows[0]}` });
+    else if (b.ratesIncludeGst !== inclusive) return errors.push({ row, message: `Bill ${number} has another rates_include_gst on row ${b.rows[0]}` });
+    if (b.billTotal === null && billTotal !== null) b.billTotal = billTotal;
+    if (!b.dueDate && dueDate) b.dueDate = dueDate;
+    if (!b.salesman && (r.salesman ?? "").trim()) b.salesman = (r.salesman ?? "").trim();
+    b.rows.push(row);
+    b.lines.push({ row, sku: r.sku.trim(), quantity, freeQty: deal ? Math.floor(quantity / deal.buy) * deal.get : freeQty, rate, discountPct, discount2Pct, discount3Pct, schemeAmount, mrp, gstRate, ...(deal ? { deal } : {}) });
+  });
+  // A bill with a bad row is left out whole, so it isn't entered half.
+  const bad = new Set(errors.map((e) => e.row));
+  const badBills = new Map<string, number>();
+  for (const e of errors) {
+    const r = rows[e.row - 2];
+    if (r && !badBills.has(numberOf(r))) badBills.set(numberOf(r), e.row);
+  }
+  const valid: SalesImportBill[] = [];
+  for (const [number, b] of bills) {
+    const hit = badBills.get(number);
+    if (hit) {
+      for (const x of b.rows) if (!bad.has(x)) errors.push({ row: x, message: `Bill ${number} has a problem on row ${hit}` });
+      continue;
+    }
+    if (b.lines.length > 300) {
+      for (const x of b.rows) errors.push({ row: x, message: `Bill ${number} has more than 300 lines` });
       continue;
     }
     valid.push(b);

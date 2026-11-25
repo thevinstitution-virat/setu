@@ -8,6 +8,7 @@ import { MoneyError, openingBalance, openingBills, type OpeningBill } from "@/li
 import { can } from "@/lib/permissions";
 import type { Role } from "@/generated/prisma/client";
 import { importPurchases, importSupplierBills, importSuppliers } from "@/lib/books-import";
+import { importSales } from "@/lib/sales-import";
 import { invoiceSettings } from "@/lib/invoice-settings";
 import { inventorySettings } from "@/lib/inventory-settings";
 import {
@@ -32,6 +33,8 @@ import {
   type RetailerRow,
   type RowError,
   validatePurchases,
+  validateSales,
+  type SalesImportBill,
   validateSupplierBills,
   validateSuppliers,
   type PurchaseImportBill,
@@ -444,6 +447,8 @@ export async function POST(req: Request) {
             ? validateBills(rows)
             : type === "bill_shares"
               ? validateBillShares(rows)
+              : type === "sales"
+                ? validateSales(rows, new Date(), { ratesIncludeGst: invoiceSettings(tenant.settings).ratesIncludeGst })
               : type === "suppliers"
                 ? validateSuppliers(rows)
                 : type === "supplier_bills"
@@ -470,6 +475,8 @@ export async function POST(req: Request) {
                   ? await importBills(tx, checked.valid as BillRow[], tenant.id, session.userId)
                   : type === "bill_shares"
                     ? await importBillShares(tx, checked.valid as BillShareRow[])
+                    : type === "sales"
+                      ? { ...(await importSales({ tx, tenantId: tenant.id, actorId: session.userId }, checked.valid as SalesImportBill[])), newRegions: 0, newAreas: 0 }
                     : BOOKS_IMPORTS.includes(type)
                       ? await importBooks(tx, type, checked.valid, tenant.id, session.userId)
                       : await importBalances(tx, checked.valid as BalanceRow[], tenant.id, session.userId);

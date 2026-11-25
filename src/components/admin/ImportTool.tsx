@@ -41,6 +41,10 @@ const TYPES = {
     label: "Company split of open bills",
     hint: "invoice_no, company, value (₹). From your old software's company-wise outstanding: how much of each open bill is each company's, one row per bill and company. A bill's rows must add up to the bill (up to ₹1 off is fine) and replace any split it had. New companies are added as suppliers. Import open bills first; bills raised in VBiz Pro are split from their invoices.",
   },
+  sales: {
+    label: "Sales bills",
+    hint: "party, area, phone, invoice_no, date, due_date, salesman, sku, qty, free_qty, rate (₹), mrp (₹), discount_pct (3, or 10+5 for one discount after another), scheme_amount (₹ off the line, after the %), deal (like 10+1: 1 free for every 10, which fills free_qty), gst_rate, rates_include_gst (yes/no; blank = your setting), bill_total (₹, checks the lines to within ₹1). One row per line; the rows of one bill share invoice_no, shop and date. Each bill keeps its number and date, goes into the books as a sale (GST returns, day book, the shop's khata) and is outstanding until paid; record payments against it as usual. Goods are not taken out of stock: count the stock instead. Don't import a bill that is already in as an open bill. Import shops and products first.",
+  },
   suppliers: {
     label: "Suppliers",
     hint: "name, kind (goods, services or other), gstin, pan, state_code, phone, email, contact_name, address, credit_days, tds_section, bank_name, bank_ifsc, bank_account_no. Only the name is needed. A supplier already here (same name) is updated with the cells you filled; blank cells leave it as it is. PAN and state come from the GSTIN when blank.",

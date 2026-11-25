@@ -117,7 +117,7 @@ export function einvoiceRequired(s: InvoiceSettings, type: InvoiceType, b2b: boo
   return s.einvoice.enabled && b2b && !!sellerGstin && type !== "BILL_OF_SUPPLY";
 }
 
-type Draft = {
+export type Draft = {
   productId: string | null;
   orderItemId: string | null;
   originalLineId: string | null;
@@ -234,6 +234,72 @@ export function orderDrafts(
     );
   }
   return drafts;
+}
+
+/**
+ * A number from another book's series may be one ours would issue later
+ * (A004300 while ours is at A004262): move our counter past it so the same
+ * number is never issued twice. Numbers outside our series are left alone.
+ */
+export async function keepSeriesPast(ctx: Ctx, s: InvoiceSettings, type: InvoiceType, number: string) {
+  const prefix = prefixFor(s, type).replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+  let key: string | null = null;
+  let seq = 0;
+  if (s.numbering.style === "running") {
+    const m = new RegExp(`^${prefix}(\\d+)$`).exec(number);
+    if (m && m[1].length === s.numbering.digits) [key, seq] = [runningKey(type), Number(m[1])];
+  } else {
+    const m = new RegExp(`^${prefix}(\\d{4})-(\\d+)$`).exec(number);
+    if (m) [key, seq] = [`doc:${type}:${m[1]}`, Number(m[2])];
+  }
+  if (!key) return;
+  const row = await ctx.tx.counter.findUnique({ where: { tenantId_key: { tenantId: ctx.tenantId, key } } });
+  if (!row) await ctx.tx.counter.create({ data: { tenantId: ctx.tenantId, key, value: seq } });
+  else if (row.value < seq) await ctx.tx.counter.update({ where: { tenantId_key: { tenantId: ctx.tenantId, key } }, data: { value: seq } });
+}
+
+/**
+ * A sale invoice brought in from the old book (sales bill import): its own
+ * number and date, no order. Same seller / buyer snapshots, GST split and
+ * document type as an invoice made here. Does not post to the ledger.
+ */
+export async function issueImportedInvoice(ctx: Ctx, p: { retailerId: string; number: string; date: Date; salesman: string | null; drafts: Draft[] }) {
+  const { seller, settings } = await sellerOf(ctx);
+  const buyer = await buyerOf(ctx, p.retailerId, seller.stateCode);
+  const interState = buyer.stateCode !== seller.stateCode;
+  const f = finalise(p.drafts, interState);
+  const tax = f.cgst + f.sgst + f.igst;
+  const type: InvoiceType = settings.scheme === "composition" || !seller.gstin || tax === 0 ? "BILL_OF_SUPPLY" : "TAX_INVOICE";
+  if (type === "BILL_OF_SUPPLY" && tax > 0) {
+    throw new MoneyError("GST was charged on this bill but the business has no GSTIN. Add the GSTIN in Settings → GST & invoices.", 409);
+  }
+  const taken = await ctx.tx.invoice.findFirst({ where: { number: p.number }, select: { id: true } });
+  if (taken) throw new MoneyError(`Invoice ${p.number} is already in VBiz Pro`, 409);
+  await keepSeriesPast(ctx, settings, type, p.number);
+  return ctx.tx.invoice.create({
+    data: {
+      type,
+      number: p.number,
+      fy: fyCode(p.date),
+      date: p.date,
+      retailerId: p.retailerId,
+      seller: seller as unknown as Prisma.InputJsonValue,
+      buyer: buyer as unknown as Prisma.InputJsonValue,
+      b2b: !!buyer.gstin,
+      placeOfSupply: buyer.stateCode,
+      interState,
+      taxable: f.taxable,
+      cgst: f.cgst,
+      sgst: f.sgst,
+      igst: f.igst,
+      total: f.total,
+      salesman: p.salesman,
+      createdById: ctx.actorId,
+      // Already billed in the old book: nothing to send to the e-invoice portal.
+      einvStatus: "NOT_REQUIRED",
+      lines: { create: f.lines },
+    },
+  });
 }
 
 /**

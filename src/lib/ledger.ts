@@ -9,7 +9,7 @@ import type {
 } from "@/generated/prisma/client";
 import { withTenantTx, type Tx } from "@/lib/db";
 import { MoneyError } from "@/lib/money-error";
-import { issueNoteDoc, issueSaleInvoice, type NoteInput } from "@/lib/invoice";
+import { issueImportedInvoice, issueNoteDoc, issueSaleInvoice, type Draft, type NoteInput } from "@/lib/invoice";
 import { fyLabel, nextSequence } from "@/lib/orders";
 import { formatINR } from "@/lib/money";
 import { moneySettings, termsFor, type MoneySettings } from "@/lib/money-settings";
@@ -1125,6 +1125,48 @@ export async function issueDebitNote(ctx: Ctx, input: Omit<NoteInput, "type" | "
   });
   const linked = await ctx.tx.invoice.update({ where: { id: note.id }, data: { entryId: entry.id } });
   await allocateRetailer(ctx, note.retailerId);
+  return linked;
+}
+
+/**
+ * A sales bill from the old book (sales bill import): its invoice with the
+ * old number and date, the sale booked on that date (Receivable = Sales +
+ * GST output) and a bill for the outstanding. Stock doesn't move (count it).
+ */
+export async function bookImportedSale(
+  ctx: Ctx,
+  p: { retailerId: string; number: string; date: Date; dueDate: Date | null; salesmanId: string | null; salesman: string | null; drafts: Draft[] }
+) {
+  await lockRetailer(ctx, p.retailerId);
+  const taken = await ctx.tx.bill.findFirst({ where: { number: p.number }, select: { kind: true } });
+  if (taken) throw new MoneyError(`Bill ${p.number} is already in VBiz Pro${taken.kind === "OPENING" ? " as an open bill from the old book" : ""}`, 409);
+  const invoice = await issueImportedInvoice(ctx, p);
+  const { terms } = await loadTerms(ctx, p.retailerId);
+  const sale = await post(ctx, {
+    kind: "SALE",
+    memo: `Invoice ${invoice.number} (imported from a sheet)`,
+    retailerId: p.retailerId,
+    occurredAt: p.date,
+    lines: [
+      { account: { type: "RECEIVABLE", retailerId: p.retailerId }, amount: invoice.total },
+      { account: { type: "SALES" }, amount: -invoice.taxable },
+      { account: { type: "GST_OUTPUT" }, amount: -(invoice.cgst + invoice.sgst + invoice.igst) },
+    ],
+  });
+  await createBill(ctx, {
+    retailerId: p.retailerId,
+    kind: "ORDER",
+    number: invoice.number,
+    date: p.date,
+    dueDate: p.dueDate ?? undefined,
+    amount: invoice.total,
+    creditDays: terms.mode === "PREPAID" ? 0 : terms.creditDays,
+    entryId: sale.id,
+    note: "Imported from a sheet",
+    salesmanId: p.salesmanId,
+  });
+  const linked = await ctx.tx.invoice.update({ where: { id: invoice.id }, data: { entryId: sale.id } });
+  await allocateRetailer(ctx, p.retailerId);
   return linked;
 }
 
