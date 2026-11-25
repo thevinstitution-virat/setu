@@ -400,8 +400,9 @@ async function createBill(
 
 /**
  * Match confirmed DUES payments' unallocated money to open bills, oldest
- * first. A payment collected against an order goes to that order's bill first.
- * Idempotent: run it after any bill or payment change.
+ * first. A receipt taken against chosen bills pays those first, in the order
+ * chosen; a payment collected against an order goes to that order's bill
+ * first. Idempotent: run it after any bill or payment change.
  */
 export async function allocateRetailer(ctx: Ctx, retailerId: string) {
   const bills = await ctx.tx.bill.findMany({
@@ -432,7 +433,9 @@ export async function allocateRetailer(ctx: Ctx, retailerId: string) {
     let left = p.amount - p.allocated;
     const forBill = noteFor.get(p.number);
     const target = p.orderId ? bills.find((b) => b.orderId === p.orderId) : forBill ? bills.find((b) => b.number === forBill) : undefined;
-    const order = target ? [target, ...bills.filter((b) => b !== target)] : bills;
+    const chosen = p.forBillIds.map((id) => bills.find((b) => b.id === id)).filter((b): b is (typeof bills)[number] => !!b);
+    const first = [...new Set([...chosen, ...(target ? [target] : [])])];
+    const order = first.length ? [...first, ...bills.filter((b) => !first.includes(b))] : bills;
     for (const b of order) {
       if (left <= 0) break;
       const room = billLeft.get(b.id)!;
@@ -520,7 +523,24 @@ export type PaymentInput = {
   gateway?: { intentId: string | null; paymentId: string } | null;
   /** Method TDS: the section the shop kept it back under. */
   tdsSection?: string | null;
+  /** Bills this receipt is against, in order (dues only). Anything left over goes oldest first. */
+  billIds?: string[] | null;
 };
+
+/** The retailer's open bills named by a receipt, checked and in the order given. */
+async function chosenBills(ctx: Ctx, retailerId: string, billIds: string[] | null | undefined, alsoPaidBy?: string) {
+  const ids = [...new Set((billIds ?? []).filter((x) => typeof x === "string" && x))];
+  if (!ids.length) return [];
+  if (ids.length > 50) throw new MoneyError("Pick up to 50 bills");
+  const bills = await ctx.tx.bill.findMany({ where: { id: { in: ids }, retailerId }, select: { id: true, number: true, settled: true, allocations: { select: { paymentId: true } } } });
+  for (const id of ids) {
+    const b = bills.find((x) => x.id === id);
+    if (!b) throw new MoneyError("One of the bills picked isn't this retailer's", 400);
+    // A bill already paid in full can only be named by the receipt that is paying it (when its bills are changed).
+    if (b.settled && !b.allocations.some((a) => a.paymentId === alsoPaidBy)) throw new MoneyError(`Bill ${b.number} is already paid in full`, 409);
+  }
+  return ids;
+}
 
 export async function recordPayment(ctx: Ctx, p: PaymentInput) {
   const purpose = p.purpose ?? "DUES";
@@ -534,6 +554,8 @@ export async function recordPayment(ctx: Ctx, p: PaymentInput) {
     throw new MoneyError("Cheque number and bank are required");
   }
   await lockRetailer(ctx, p.retailerId);
+  if (p.billIds?.length && (purpose !== "DUES" || p.method === "CREDIT_NOTE")) throw new MoneyError("Only a payment of dues can be taken against chosen bills");
+  const forBillIds = await chosenBills(ctx, p.retailerId, p.billIds);
   // A cheque dated after today is held until that day: nothing is posted and no bill is paid yet.
   const postDated = p.method === "CHEQUE" && isPostDated(p.cheque!.date, p.occurredAt ?? new Date());
 
@@ -558,6 +580,7 @@ export async function recordPayment(ctx: Ctx, p: PaymentInput) {
       proofKey: p.proofKey ?? null,
       note: p.note ?? null,
       orderId: p.orderId ?? null,
+      forBillIds,
       collectedById: p.collectorId !== undefined ? p.collectorId : ctx.actorId,
       collectedAt: p.occurredAt ?? new Date(),
       ...(p.gateway ? { intentId: p.gateway.intentId, gatewayPaymentId: p.gateway.paymentId } : {}),
@@ -640,6 +663,25 @@ export async function verifyPayment(ctx: Ctx, paymentId: string, approve: boolea
     atOffice: true,
   });
   return ctx.tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+}
+
+/**
+ * Change which bills a receipt is against. A counted receipt is taken off the
+ * bills it paid and put on the chosen ones (in order), the rest going oldest
+ * first; one still waiting (to verify, or a held post-dated cheque) just
+ * remembers the choice for when it counts. An empty list = oldest first.
+ */
+export async function tagPayment(ctx: Ctx, paymentId: string, billIds: string[]) {
+  const pay = await ctx.tx.payment.findUnique({ where: { id: paymentId } });
+  if (!pay) throw new MoneyError("Payment not found", 404);
+  if (pay.purpose !== "DUES" || pay.method === "CREDIT_NOTE" || pay.method === "WALLET") throw new MoneyError("Only a payment of dues can be moved between bills", 409);
+  if (pay.state !== "CONFIRMED" && pay.state !== "PENDING_VERIFICATION" && pay.state !== "POST_DATED") throw new MoneyError("This payment is not active", 409);
+  await lockRetailer(ctx, pay.retailerId);
+  const forBillIds = await chosenBills(ctx, pay.retailerId, billIds, pay.id);
+  if (pay.state === "CONFIRMED") await deallocatePayment(ctx, pay.id);
+  await ctx.tx.payment.update({ where: { id: pay.id }, data: { forBillIds } });
+  if (pay.state === "CONFIRMED") await allocateRetailer(ctx, pay.retailerId);
+  return ctx.tx.payment.findUniqueOrThrow({ where: { id: pay.id }, include: { allocations: { select: { amount: true, bill: { select: { id: true, number: true } } } } } });
 }
 
 /** Cancel a confirmed payment entered by mistake. */

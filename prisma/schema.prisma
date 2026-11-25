@@ -1357,6 +1357,8 @@ model Payment {
   entryId       String?
   /// Paise of this payment already allocated to bills.
   allocated     Int             @default(0)
+  /// Bills this receipt was taken against, in order: they are paid first, anything left goes oldest first.
+  forBillIds    String[]        @default([])
   createdAt     DateTime        @default(now())
 
   /// Paid through the gateway: our request and the gateway's payment id (never posted twice).

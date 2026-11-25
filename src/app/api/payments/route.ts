@@ -80,6 +80,8 @@ export async function POST(req: Request) {
     orderId = o.id;
   }
 
+  const billIds = Array.isArray(body?.billIds) ? body.billIds.filter((x): x is string => typeof x === "string").slice(0, 50) : null;
+
   let payment;
   try {
     payment = await withMoney(tenant.id, session.userId, (ctx) =>
@@ -88,6 +90,7 @@ export async function POST(req: Request) {
         retailerId,
         purpose,
         orderId,
+        billIds,
         collectorId: session.userId,
         atOffice: scope.office,
         needsVerification: fieldNeedsCheck(parsed.method, scope.office, tenant.settings),

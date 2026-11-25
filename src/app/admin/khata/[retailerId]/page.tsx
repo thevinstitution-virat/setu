@@ -351,7 +351,7 @@ export default function RetailerKhataPage({ params }: { params: Promise<{ retail
         </div>
 
         <div className="space-y-5 print:hidden">
-          <RecordPayment retailerId={retailerId} receivable={balances.receivable} onDone={reload} />
+          <RecordPayment retailerId={retailerId} receivable={balances.receivable} bills={data.openBills} onDone={reload} />
           <PaymentLinkCard retailerId={retailerId} outletName={data.retailer.outletName} receivable={balances.receivable} onDone={reload} />
           <CreditTerms retailerId={retailerId} terms={terms} override={data.termsOverride} onDone={reload} />
           <GstDetails retailerId={retailerId} onDone={reload} />
@@ -861,8 +861,14 @@ function Toggle<T extends string>({ value, options, onChange }: { value: T; opti
   );
 }
 
-function RecordPayment({ retailerId, receivable, onDone }: { retailerId: string; receivable: number; onDone: (msg?: string) => Promise<void> }) {
+function RecordPayment({ retailerId, receivable, bills, onDone }: { retailerId: string; receivable: number; bills: Bill[]; onDone: (msg?: string) => Promise<void> }) {
   const [purpose, setPurpose] = useState<"DUES" | "WALLET">("DUES");
+  // Bills this payment is against, in the order picked. Empty = oldest bills first.
+  const [choose, setChoose] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  const canChoose = purpose === "DUES" && bills.length > 1;
+  const pickedIds = canChoose && choose ? picked.filter((id) => bills.some((b) => b.id === id)) : [];
+  const pickedDue = bills.filter((b) => pickedIds.includes(b.id)).reduce((a, b) => a + b.due, 0);
   const [value, setValue] = useState<PaymentValue>(() => emptyPayment());
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -876,9 +882,10 @@ function RecordPayment({ retailerId, receivable, onDone }: { retailerId: string;
     try {
       const collect = await toCollectBody(value);
       if (!collect) throw new Error("Pick a payment method");
-      const { payment } = await send("/api/payments", "POST", { retailerId, ...collect, purpose, note: note.trim() || undefined });
+      const { payment } = await send("/api/payments", "POST", { retailerId, ...collect, purpose, note: note.trim() || undefined, billIds: pickedIds.length ? pickedIds : undefined });
       setValue(emptyPayment(undefined, value.method));
       setNote("");
+      setPicked([]);
       await onDone(`${payment?.number ?? "Payment"} recorded: ${formatINR(collect.amount)}`);
     } catch (e) {
       setError(errText(e));
@@ -919,6 +926,58 @@ function RecordPayment({ retailerId, receivable, onDone }: { retailerId: string;
             ) : null
           }
         />
+        {canChoose && (
+          <div className="space-y-2">
+            <Toggle
+              value={choose ? "PICK" : "OLDEST"}
+              onChange={(v) => setChoose(v === "PICK")}
+              options={[
+                { key: "OLDEST", label: "Oldest bills first" },
+                { key: "PICK", label: "Choose bills" },
+              ]}
+            />
+            {choose && (
+              <>
+                <div className="rounded-xl border border-[var(--line)] divide-y divide-[var(--line)] max-h-60 overflow-y-auto">
+                  {bills.map((b) => {
+                    const at = pickedIds.indexOf(b.id);
+                    return (
+                      <label key={b.id} className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={at >= 0}
+                          onChange={() => setPicked(at >= 0 ? pickedIds.filter((x) => x !== b.id) : [...pickedIds, b.id])}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="font-mono">{b.number}</span>{" "}
+                          <span className="text-xs text-[var(--muted)]">
+                            {fmtDate(b.date)}
+                            {b.overdue && " · overdue"}
+                          </span>
+                        </span>
+                        {at >= 0 && <span className="chip">{at + 1}</span>}
+                        <span className="font-medium shrink-0">{formatINR(b.due)}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-[var(--muted)]">
+                  {pickedIds.length ? (
+                    <>
+                      Picked {formatINR(pickedDue)}.{" "}
+                      <button type="button" className="font-bold text-[var(--kesar-text)]" onClick={() => setValue({ ...value, amount: toRupeeInput(pickedDue) })}>
+                        Fill this amount
+                      </button>{" "}
+                      Bills are paid in the order picked; anything more goes to the oldest bills.
+                    </>
+                  ) : (
+                    "Tick the bills this payment is for, in the order to pay them."
+                  )}
+                </p>
+              </>
+            )}
+          </div>
+        )}
         <label className="block">
           <span className="text-xs font-semibold text-[var(--ink-2)]">Note (optional)</span>
           <input className="input mt-1" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} />
