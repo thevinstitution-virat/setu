@@ -123,7 +123,7 @@ export default function CartReview({
           {quote && (quote.shortBy > 0 || freeDeliveryGap > 0) && (
             <div className="space-y-1.5">
               {quote.shortBy > 0 && (
-                <p className="flex items-center gap-2 rounded-[14px] bg-[var(--scheme)] text-[#1a1200] px-3 py-2.5 text-sm font-bold">
+                <p className="flex items-center gap-2 rounded-[14px] bg-[var(--scheme)] text-[var(--on-scheme)] px-3 py-2.5 text-sm font-bold">
                   <Icon3D name="gift-box" size={32} />
                   Add {formatINR(quote.shortBy)} more to order (minimum {formatINR(quote.minOrderValue, { whole: true })} of goods)
                 </p>

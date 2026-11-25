@@ -5,7 +5,7 @@ export type StatTone = "accent" | "money" | "scheme" | "neutral" | "risk";
 const TONE: Record<StatTone, { box: string; label: string; delta: string }> = {
   accent: { box: "bg-[var(--accent)] text-[var(--accent-on)] border-transparent", label: "opacity-90", delta: "opacity-90" },
   money: { box: "bg-[var(--money)] text-white border-transparent", label: "opacity-85", delta: "text-[var(--genda)]" },
-  scheme: { box: "bg-[var(--scheme)] text-[#1a1200] border-transparent", label: "opacity-80", delta: "opacity-85" },
+  scheme: { box: "bg-[var(--scheme)] text-[var(--on-scheme)] border-transparent", label: "opacity-80", delta: "opacity-85" },
   neutral: { box: "bg-[var(--surface)] text-[var(--ink)] border-[var(--line)]", label: "text-[var(--muted)]", delta: "text-[var(--muted)]" },
   risk: { box: "bg-[var(--surface)] text-[var(--ink)] border-[var(--line)]", label: "text-[var(--muted)]", delta: "text-[var(--muted)]" },
 };

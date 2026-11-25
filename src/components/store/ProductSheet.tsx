@@ -87,7 +87,7 @@ export default function ProductSheet({
           {p.margin !== null && (
             <div className="min-w-0">
               <p className="text-[11px] text-[var(--muted)]">Your margin</p>
-              <p className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--scheme)] text-[#1a1200] px-2 py-0.5 text-sm font-extrabold">
+              <p className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--scheme)] text-[var(--on-scheme)] px-2 py-0.5 text-sm font-extrabold">
                 <Icon3D name="percent-tag" size={20} /> {p.margin}%
               </p>
             </div>

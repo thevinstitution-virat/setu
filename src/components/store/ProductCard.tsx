@@ -93,9 +93,9 @@ export default function ProductCard({
           ) : (
             <ProductThumb name={p.name} category={p.category.name} className="h-full w-full !rounded-none bg-transparent" iconSize={64} />
           )}
-          {showMargin && <span className="absolute left-1.5 top-1.5 rounded-md bg-[var(--scheme)] text-[#1a1200] text-[10.5px] font-extrabold px-1.5 py-0.5">{p.margin}% margin</span>}
+          {showMargin && <span className="absolute left-1.5 top-1.5 rounded-md bg-[var(--scheme)] text-[var(--on-scheme)] text-[10.5px] font-extrabold px-1.5 py-0.5">{p.margin}% margin</span>}
           {offerText && (
-            <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-[var(--scheme)] text-[#1a1200] text-[10.5px] font-extrabold px-2 py-0.5 truncate">
+            <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-[var(--scheme)] text-[var(--on-scheme)] text-[10.5px] font-extrabold px-2 py-0.5 truncate">
               <Icon name="tag" className="h-3 w-3 shrink-0" weight="fill" />
               <span className="truncate">{offerText}</span>
             </span>

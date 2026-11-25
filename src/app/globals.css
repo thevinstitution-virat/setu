@@ -271,7 +271,7 @@ textarea.input {
 }
 .btn-scheme {
   background: var(--scheme);
-  color: #1a1200;
+  color: var(--on-scheme);
 }
 .btn-scheme:hover {
   filter: brightness(0.95);

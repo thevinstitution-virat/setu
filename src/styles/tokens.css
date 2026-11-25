@@ -16,7 +16,7 @@
 
   /* 2. Semantic (fixed) */
   --money: #2A4BA0; --money-dark: #173180; --money-tint: #EEF1F9; --money-line: #C9D4F0;
-  --scheme: #F2B33D; --scheme-tint: #FFF6E3; --scheme-text: #6E4E00;
+  --scheme: #F2B33D; --scheme-tint: #FFF6E3; --scheme-text: #6E4E00; --on-scheme: #1A1200;
   --risk: #E5484D; --risk-text: #A8281E; --risk-tint: #FDECEC;
   --success: #3CC9A0; --success-text: #0E6B52; --success-tint: #DDF6EC;
 

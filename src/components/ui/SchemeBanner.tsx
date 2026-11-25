@@ -49,7 +49,7 @@ export function SchemeBanner({ b, bob = false, className = "" }: { b: SchemeBann
       )}
     </>
   );
-  const cls = `scheme-card relative block overflow-hidden text-left rounded-[28px] bg-[var(--scheme)] text-[#1a1200] p-4 min-h-[136px] ${className}`;
+  const cls = `scheme-card relative block overflow-hidden text-left rounded-[28px] bg-[var(--scheme)] text-[var(--on-scheme)] p-4 min-h-[136px] ${className}`;
   if (b.href) {
     const external = /^https?:\/\//i.test(b.href);
     return external ? (
