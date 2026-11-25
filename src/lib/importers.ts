@@ -1,4 +1,5 @@
 import { toPaise } from "@/lib/money";
+import { parseDiscounts } from "@/lib/purchase-math";
 
 /**
  * Bulk import of retailers and products from CSV or Excel (.xlsx).
@@ -74,9 +75,10 @@ export const TEMPLATES: Record<ImportType, { columns: string[]; required: string
     // Purchase bills, one row per line; the rows of a bill share supplier + bill_no (and its date).
     // sku = one of our products; else head = an account head (rent, freight ...) by name.
     // gst_rate blank = the product's rate. bill_total = the total printed on the bill (rounding up to Rs 1).
-    columns: ["supplier", "bill_no", "date", "due_date", "sku", "head", "item", "qty", "free_qty", "rate", "discount_pct", "gst_rate", "rates_include_gst", "reverse_charge", "bill_total"],
+    // mrp = MRP per unit (goods only). discount_pct can be 10+5 (up to three, each on what is left).
+    columns: ["supplier", "bill_no", "date", "due_date", "sku", "head", "item", "qty", "free_qty", "rate", "mrp", "discount_pct", "gst_rate", "rates_include_gst", "reverse_charge", "bill_total"],
     required: ["supplier", "bill_no", "date", "qty", "rate"],
-    example: ["Chaiwala Foods Pvt Ltd", "CF/2627/0457", "21/11/2026", "", "BEV-001", "", "", "48", "2", "70.50", "3", "5", "no", "no", "3388"],
+    example: ["Chaiwala Foods Pvt Ltd", "CF/2627/0457", "21/11/2026", "", "BEV-001", "", "", "48", "2", "70.50", "95", "3", "5", "no", "no", "3388"],
   },
 };
 
@@ -90,7 +92,7 @@ export function templateCsv(type: ImportType, opts: { purchaseCases?: boolean } 
     const at = t.columns.indexOf("rate") + 1;
     const cols = [...t.columns.slice(0, at), ...PURCHASE_CASE_COLUMNS, ...t.columns.slice(at)];
     const plain = [...t.example.slice(0, at), "", "", "", "", ...t.example.slice(at)];
-    const byCase = ["Chaiwala Foods Pvt Ltd", "CF/2627/0457", "21/11/2026", "", "BEV-002", "", "", "", "", "", "10", "6", "24", "1680.50", "10", "5", "no", "no", "3388"];
+    const byCase = ["Chaiwala Foods Pvt Ltd", "CF/2627/0457", "21/11/2026", "", "BEV-002", "", "", "", "", "", "10", "6", "24", "1680.50", "120", "10+5", "5", "no", "no", "3388"];
     return [cols.join(","), plain.map(csvCell).join(","), byCase.map(csvCell).join(",")].join("\r\n") + "\r\n";
   }
   return [t.columns.join(","), t.example.map(csvCell).join(",")].join("\r\n") + "\r\n";
@@ -629,6 +631,11 @@ export type PurchaseImportLine = {
   freeQty: number;
   rate: number;
   discountPct: number;
+  /** Further discounts, each on what is left after the one before ("10+5" → 10, then 5). */
+  discount2Pct: number;
+  discount3Pct: number;
+  /** MRP per unit, paise (goods only). */
+  mrp: number | null;
   gstRate: number | null;
   /** By the case: whole cases + loose units at caseRate (paise); caseSize null = the product's. quantity 0 = work it out. */
   byCase?: { cases: number; loose: number; caseSize: number | null; caseRate: number };
@@ -675,9 +682,21 @@ export function validatePurchases(rows: Row[], today = new Date(), opts: { purch
     const sku = (r.sku ?? "").trim() || null;
     const head = (r.head ?? "").trim() || null;
     if (!sku && !head) return errors.push({ row, message: "Give the sku of one of our products, or the account head (like Rent or Freight)" });
+    if (!sku && (r.mrp ?? "").trim()) return errors.push({ row, message: "mrp goes only on a product (sku) line" });
     const quantity = num(r.qty);
     const freeQty = num(r.free_qty);
-    const discountPct = num(r.discount_pct);
+    const discounts = parseDiscounts((r.discount_pct ?? "").trim());
+    if (!discounts || discounts.some((d) => d >= 100)) return errors.push({ row, message: `discount_pct "${r.discount_pct}" should look like 3, or 10+5 for one discount after another (up to three, each under 100)` });
+    const [discountPct = 0, discount2Pct = 0, discount3Pct = 0] = discounts;
+    let mrp: number | null = null;
+    if ((r.mrp ?? "").trim()) {
+      try {
+        mrp = toPaise(r.mrp);
+      } catch {
+        return errors.push({ row, message: "mrp must be a number in rupees" });
+      }
+      if (mrp < 0) return errors.push({ row, message: "mrp can't be below 0" });
+    }
     const gstText = (r.gst_rate ?? "").trim().replace(/%$/, "");
     const gstRate = gstText ? Number(gstText) : null;
     let byCase: PurchaseImportLine["byCase"];
@@ -709,7 +728,6 @@ export function validatePurchases(rows: Row[], today = new Date(), opts: { purch
       if (!Number.isInteger(quantity) || quantity <= 0) return errors.push({ row, message: "qty must be a whole number more than 0" });
     } else if (!Number.isInteger(quantity) || quantity < 0) return errors.push({ row, message: "qty must be a whole number" });
     if (!Number.isInteger(freeQty) || freeQty < 0) return errors.push({ row, message: "free_qty must be a whole number" });
-    if (!Number.isFinite(discountPct) || discountPct < 0 || discountPct >= 100) return errors.push({ row, message: "discount_pct must be 0 to 99.99" });
     if (gstRate !== null && !Number.isFinite(gstRate)) return errors.push({ row, message: "gst_rate must be a number, like 5 or 18" });
     if (!caseLine && rate <= 0) return errors.push({ row, message: "rate must be more than 0" });
     let billTotal: number | null = null;
@@ -730,7 +748,7 @@ export function validatePurchases(rows: Row[], today = new Date(), opts: { purch
     if (b.billTotal === null && billTotal !== null) b.billTotal = billTotal;
     if (!b.dueDate && dueDate) b.dueDate = dueDate;
     b.rows.push(row);
-    b.lines.push({ row, sku, head, item: (r.item ?? "").trim() || null, quantity, freeQty, rate, discountPct: Math.round(discountPct * 100) / 100, gstRate, ...(byCase ? { byCase } : {}) });
+    b.lines.push({ row, sku, head, item: (r.item ?? "").trim() || null, quantity, freeQty, rate, discountPct, discount2Pct, discount3Pct, mrp, gstRate, ...(byCase ? { byCase } : {}) });
   });
   // A bill with a bad row is left out whole, so it isn't entered half.
   const bad = new Set(errors.map((e) => e.row));

@@ -139,17 +139,17 @@ export async function importPurchases(ctx: Ctx, bills: PurchaseImportBill[]): Pr
             bad = `Row ${l.row}: qty ${l.quantity} isn't ${l.byCase.cases} × ${size} + ${l.byCase.loose}`;
             break;
           }
-          lines.push({ target: "GOODS", productId: p.id, description: l.item, quantity: 0, rate: 0, cases: l.byCase.cases, loose: l.byCase.loose, caseSize: size, caseRate: l.byCase.caseRate, freeQty: l.freeQty, discountPct: l.discountPct, gstRate: l.gstRate ?? p.gstRate });
+          lines.push({ target: "GOODS", productId: p.id, description: l.item, quantity: 0, rate: 0, cases: l.byCase.cases, loose: l.byCase.loose, caseSize: size, caseRate: l.byCase.caseRate, freeQty: l.freeQty, discountPct: l.discountPct, discount2Pct: l.discount2Pct, discount3Pct: l.discount3Pct, mrp: l.mrp, gstRate: l.gstRate ?? p.gstRate });
           continue;
         }
-        lines.push({ target: "GOODS", productId: p.id, description: l.item, quantity: l.quantity, freeQty: l.freeQty, rate: l.rate, discountPct: l.discountPct, gstRate: l.gstRate ?? p.gstRate });
+        lines.push({ target: "GOODS", productId: p.id, description: l.item, quantity: l.quantity, freeQty: l.freeQty, rate: l.rate, discountPct: l.discountPct, discount2Pct: l.discount2Pct, discount3Pct: l.discount3Pct, mrp: l.mrp, gstRate: l.gstRate ?? p.gstRate });
       } else {
         const h = heads.get(norm(l.head!));
         if (!h) {
           bad = `Row ${l.row}: no account head called ${l.head} (add it under Books → Accounts)`;
           break;
         }
-        lines.push({ target: "HEAD", headId: h.id, description: l.item ?? h.name, quantity: l.quantity, rate: l.rate, discountPct: l.discountPct, gstRate: l.gstRate ?? 0 });
+        lines.push({ target: "HEAD", headId: h.id, description: l.item ?? h.name, quantity: l.quantity, rate: l.rate, discountPct: l.discountPct, discount2Pct: l.discount2Pct, discount3Pct: l.discount3Pct, gstRate: l.gstRate ?? 0 });
       }
     }
     if (bad) {

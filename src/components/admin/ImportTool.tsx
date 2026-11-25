@@ -51,7 +51,7 @@ const TYPES = {
   },
   purchases: {
     label: "Purchase bills",
-    hint: "supplier, bill_no, date, due_date, sku, head, item, qty, free_qty, rate (₹), discount_pct, gst_rate, rates_include_gst (yes/no), reverse_charge (yes/no), bill_total (₹). One row per line; the rows of one bill share supplier, bill_no and date. sku = one of your products, else head = an account head such as Freight. gst_rate blank = the product's rate. Goods are not moved into stock: count the stock instead. A bill with a bad row is left out whole.",
+    hint: "supplier, bill_no, date, due_date, sku, head, item, qty, free_qty, rate (₹), mrp (₹ per unit, products only), discount_pct (3, or 10+5 for one discount after another, up to three), gst_rate, rates_include_gst (yes/no), reverse_charge (yes/no), bill_total (₹). One row per line; the rows of one bill share supplier, bill_no and date. sku = one of your products, else head = an account head such as Freight. gst_rate blank = the product's rate. Goods are not moved into stock: count the stock instead. A bill with a bad row is left out whole.",
   },
 } as const;
 

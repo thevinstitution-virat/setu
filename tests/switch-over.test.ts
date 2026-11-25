@@ -91,6 +91,37 @@ describe("sheet checks", () => {
   });
 });
 
+describe("purchase bills: MRP and discounts one after another", () => {
+  it("reads mrp and 10+5 discounts, and refuses what doesn't fit", () => {
+    const r = validatePurchases(
+      rows(
+        ["supplier", "bill_no", "date", "sku", "head", "qty", "rate", "mrp", "discount_pct"],
+        ["Acme", "M-1", "21/11/2026", "SKU1", "", "10", "100", "120", "10+5"],
+        ["Acme", "M-1", "21/11/2026", "SKU2", "", "1", "50", "", " 10 + 5 + 2 "],
+        ["Acme", "M-1", "21/11/2026", "", "Freight", "1", "200", "", "2"],
+        ["Acme", "M-2", "21/11/2026", "SKU1", "", "1", "10", "", "10+5+2+1"],
+        ["Acme", "M-3", "21/11/2026", "SKU1", "", "1", "10", "", "100"],
+        ["Acme", "M-4", "21/11/2026", "", "Freight", "1", "10", "20", ""],
+        ["Acme", "M-5", "21/11/2026", "SKU1", "", "1", "10", "abc", ""],
+      ),
+      new Date("2026-11-25T06:00:00Z"),
+    );
+    expect(r.valid.map((b) => b.number)).toEqual(["M-1"]);
+    expect(r.valid[0].lines.map((l) => [l.discountPct, l.discount2Pct, l.discount3Pct, l.mrp])).toEqual([
+      [10, 5, 0, 120_00],
+      [10, 5, 2, null],
+      [2, 0, 0, null],
+    ]);
+    expect(r.errors.map((e) => e.message)).toEqual([
+      expect.stringMatching(/10\+5 for one discount after another/),
+      expect.stringMatching(/each under 100/),
+      expect.stringMatching(/mrp goes only on a product/),
+      expect.stringMatching(/mrp must be a number/),
+    ]);
+    expect(templateCsv("purchases").split("\r\n")[0]).toContain("rate,mrp,discount_pct");
+  });
+});
+
 describe("purchase bills by the case", () => {
   const head = ["supplier", "bill_no", "date", "sku", "head", "qty", "rate", "cases", "loose", "case_size", "case_rate"];
   const day = new Date("2026-11-25T06:00:00Z");
@@ -125,7 +156,7 @@ describe("purchase bills by the case", () => {
       expect.stringMatching(/case_rate/),
     ]);
     const tpl = templateCsv("purchases", { purchaseCases: true }).split("\r\n");
-    expect(tpl[0]).toContain("rate,cases,loose,case_size,case_rate,discount_pct");
+    expect(tpl[0]).toContain("rate,cases,loose,case_size,case_rate,mrp,discount_pct");
     expect(tpl[2]).toContain("1680.50");
   });
 });
@@ -183,6 +214,12 @@ describe("books imports (rolled back)", () => {
       const pears = await ctx.tx.purchaseBill.findFirstOrThrow({ where: { supplierId: sup.id, supplierRef: "PB-C" }, include: { lines: true } });
       expect(pears.lines[0]).toMatchObject({ quantity: 1440, cases: 10, caseSize: 144, caseRate: 2391_55, taxable: 23915_50 });
       if (nocase) expect(c1.errors[0].message).toMatch(/has no case size/);
+
+      // MRP and 10+5: stored on the line, each discount on what is left (100000 → 90000 → 85500).
+      const m1 = await importPurchases(ctx, validatePurchases(rows(["supplier", "bill_no", "date", "sku", "qty", "rate", "mrp", "discount_pct", "gst_rate"], [name, "PB-M", "18/06/2002", cased.sku, "100", "10", "12.50", "10+5", "18"])).valid);
+      expect(m1).toMatchObject({ created: 1, errors: [] });
+      const mb = await ctx.tx.purchaseBill.findFirstOrThrow({ where: { supplierId: sup.id, supplierRef: "PB-M" }, include: { lines: true } });
+      expect(mb.lines[0]).toMatchObject({ discountPct: 10, discount2Pct: 5, discount3Pct: 0, mrp: 12_50, taxable: 855_00 });
     });
   }, 30_000);
 });
