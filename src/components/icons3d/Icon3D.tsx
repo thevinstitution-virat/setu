@@ -43,6 +43,10 @@ export function Icon3D({ name, size = 64, animate = "none", tinted = false, alt 
         fetchPriority={priority ? "high" : "auto"}
         decoding="async"
         draggable={false}
+        // An image that finished loading before React hydrated never fires onLoad here: check on mount.
+        ref={(el) => {
+          if (el?.complete && el.naturalWidth > 0) setLoaded(true);
+        }}
         onLoad={() => setLoaded(true)}
         className={motion}
       />

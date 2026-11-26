@@ -43,6 +43,14 @@ const TILE: Record<IconKey, Icon3DName> = {
   chat: "chat-order", camera: "camera", brand: "sparkle", cart: "kirana-shop", mic: "mic", bell: "bell", star: "trophy", route: "beat-map",
   clock: "calendar-slot", shield: "success-tick", lang: "chat-order", phone: "upi-phone",
 };
+/** The shop's catalogue in the retailer phone mock-up: name, price line, 3D icon, tile tint. */
+const PRODS = [
+  ["Atta 10 kg", "₹395 · MRP ₹430", "atta", "#fcefd0"],
+  ["Mustard oil 1 L", "₹162 · MRP ₹180", "hair-oil", "#ddf6ec"], // switch to "cooking-oil" once that icon exists
+  ["Tea 500 g", "₹238 · MRP ₹260", "tea", "#fde7d7"],
+  ["Detergent 1 kg", "₹96 · MRP ₹110", "detergent", "#e3eeec"],
+] as const satisfies readonly (readonly [string, string, Icon3DName, string])[];
+
 function LineIcon({ name }: { name: IconKey }) {
   return <Icon name={LINE[name]} className="h-full w-full" />;
 }
@@ -314,8 +322,12 @@ export default function BtLanding() {
                     <div className="bt-search">{m.typeOrder}</div>
                   </div>
                   <div className="bt-prods">
-                    {([["Atta 10 kg", "₹395 · MRP ₹430", "#fcefd0, #f2b33d"], ["Mustard oil 1 L", "₹162 · MRP ₹180", "#ddf6ec, #3cc9a0"], ["Tea 500 g", "₹238 · MRP ₹260", "#fde7d7, #db5c17"], ["Detergent 1 kg", "₹96 · MRP ₹110", "#e3eeec, #155651"]] as const).map(([n, pr, g]) => (
-                      <div className="bt-prod" key={n}><i style={{ background: `linear-gradient(135deg, ${g})` }} /><b>{n}</b><small>{pr}</small></div>
+                    {PRODS.map(([n, pr, icon, tint]) => (
+                      <div className="bt-prod" key={n}>
+                        <i style={{ background: tint }}><Icon3D name={icon} size={52} /></i>
+                        <b>{n}</b>
+                        <small>{pr}</small>
+                      </div>
                     ))}
                   </div>
                   <div className="bt-place" style={{ justifyContent: "space-between", minHeight: 46, margin: "auto 14px 16px" }}><span>{m.cart} · {t.mock.items}</span><span>₹4,133</span></div>

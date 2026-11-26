@@ -10,7 +10,10 @@ const RULES: [Icon3DName, string[]][] = [
   ["frozen-snacks", ["frozen","ready to cook","ready-to-cook","फ्रोज़न"]],
   ["health-drink", ["health drink","malt","nutrition","हेल्थ"]],
   ["conditioner", ["conditioner","कंडीशनर"]],
-  ["hair-oil", ["hair oil","coconut oil","तेल","केश"]],
+  // Bare "तेल" / "oil" is ambiguous, so hair oil needs its own words; cooking oil and ghee are staples.
+  ["hair-oil", ["hair oil","coconut oil","बालों का तेल","केश"]],
+  // No cooking-oil render yet: the staples icon stands in (switch to "cooking-oil" once that icon exists).
+  ["atta", ["cooking oil","edible oil","mustard oil","sunflower oil","refined oil","groundnut oil","ghee","सरसों","घी","खाद्य तेल"]],
   ["soap", ["soap","साबुन","bath bar","beauty bar"]],
   ["body-wash", ["body wash","shower gel","बॉडी वॉश"]],
   ["deo", ["deo","deodorant","perfume","body spray","डियो"]],
