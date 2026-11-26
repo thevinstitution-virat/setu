@@ -66,10 +66,10 @@ export async function userByEmail(db: TenantDb, email: string) {
 }
 
 /** A new sign-in or verification code for this person and address (returned for the caller to send). */
-export async function issueEmailCode(db: TenantDb, userId: string, email: string, purpose: "SIGN_IN" | "VERIFY", now = Date.now()): Promise<string> {
+export async function issueEmailCode(db: TenantDb, userId: string, email: string, purpose: "SIGN_IN" | "VERIFY", now = Date.now(), useCode?: string): Promise<string> {
   const recent = await db.emailChallenge.count({ where: { email, purpose, createdAt: { gte: new Date(now - SEND_WINDOW_MS) } } });
   if (recent >= MAX_SENDS) throw new EmailAuthError("Too many codes asked for. Please wait 10 minutes and try again.", 429);
-  const code = String(randomInt(100000, 1000000));
+  const code = useCode ?? String(randomInt(100000, 1000000));
   await db.emailChallenge.create({ data: { userId, email, purpose, codeHash: codeHash(purpose, email, code), expiresAt: new Date(now + CODE_TTL_MS) } });
   return code;
 }
@@ -192,6 +192,29 @@ export const spendPlatformResetToken = (id: string, platformUserId: string, now 
 export const issuePlatformSignInLink = (platformUserId: string, now = Date.now()) => issuePlatformToken(platformUserId, "link", now, SIGN_IN_LINK_TTL_MS);
 export const readPlatformSignInLink = (token: unknown, now = Date.now()) => readPlatformToken(token, "link", now);
 export const spendPlatformSignInLink = (id: string, platformUserId: string, now = Date.now()) => spendPlatformToken(id, platformUserId, "link", now);
+
+// ---- Console one-time codes (the main address's emailed code, for the console login) ----
+
+const PLATFORM_CODE_TTL_MS = 10 * 60_000;
+
+/** Stores the code for a console login (10 minutes); at most 3 per 10 minutes. */
+export async function issuePlatformCode(platformUserId: string, code: string, now = Date.now()): Promise<void> {
+  const recent = await prisma.platformPasswordReset.count({ where: { platformUserId, purpose: "code", createdAt: { gte: new Date(now - SEND_WINDOW_MS) } } });
+  if (recent >= MAX_SENDS) throw new EmailAuthError("Too many codes asked for. Please wait 10 minutes and try again.", 429);
+  const id = randomBytes(12).toString("base64url");
+  await prisma.platformPasswordReset.create({ data: { id, platformUserId, purpose: "code", tokenHash: linkHash("platform-code", id, code), expiresAt: new Date(now + PLATFORM_CODE_TTL_MS) } });
+}
+
+/** True (and the code used up) when this is a live code of the console login. Caller rate-limits tries. */
+export async function checkPlatformCode(platformUserId: string, codeRaw: string, now = Date.now()): Promise<boolean> {
+  const code = codeRaw.replace(/\s/g, "");
+  if (!/^\d{6}$/.test(code)) return false;
+  const rows = await prisma.platformPasswordReset.findMany({ where: { platformUserId, purpose: "code", usedAt: null, expiresAt: { gt: new Date(now) } }, orderBy: { createdAt: "desc" }, take: 3 });
+  const hit = rows.find((r) => sameHex(r.tokenHash, linkHash("platform-code", r.id, code)));
+  if (!hit) return false;
+  const won = await prisma.platformPasswordReset.updateMany({ where: { id: hit.id, usedAt: null }, data: { usedAt: new Date(now) } });
+  return won.count === 1;
+}
 
 // ---- New passwords -----------------------------------------------------------
 

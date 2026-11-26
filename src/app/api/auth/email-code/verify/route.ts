@@ -5,6 +5,7 @@ import { requestIp, audit } from "@/lib/audit";
 import { HOUR, limited } from "@/lib/rate-limit";
 import { checkEmailCode, EmailAuthError, normaliseEmail } from "@/lib/email-auth";
 import { finishSignIn } from "@/lib/mfa";
+import { checkMainCode } from "@/lib/main-code";
 
 /**
  * POST { email, code } — checks the emailed code and signs in. The code itself proves the
@@ -13,7 +14,6 @@ import { finishSignIn } from "@/lib/mfa";
  */
 export async function POST(req: Request) {
   const tenant = await getTenant();
-  if (!tenant) return NextResponse.json({ error: "Unknown business address" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
   const email = normaliseEmail(body?.email);
@@ -24,6 +24,13 @@ export async function POST(req: Request) {
   const ip = requestIp(req);
   if (ip && (await limited("email-check-ip", ip, 60, HOUR))) {
     return NextResponse.json({ error: "Too many tries from this network. Please wait an hour." }, { status: 429 });
+  }
+
+  // The main address: the code opens whichever logins it belongs to; the browser is handed on to them.
+  if (!tenant) {
+    const places = await checkMainCode(email, code);
+    if (!places.length) return NextResponse.json({ error: "That code is wrong or has expired" }, { status: 400 });
+    return NextResponse.json(places.length === 1 ? { ok: true, redirect: places[0].url } : { ok: true, choose: places });
   }
 
   const db = tenantDb(tenant.id);

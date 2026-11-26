@@ -6,6 +6,8 @@ import { DAY, HOUR, limited } from "@/lib/rate-limit";
 import { EmailAuthError, issueEmailCode, normaliseEmail, userByEmail, validEmail } from "@/lib/email-auth";
 import { EmailError, emailDevMode, sendEmail } from "@/lib/email";
 import { signInCodeMail } from "@/lib/email-messages";
+import { issueMainCode } from "@/lib/main-code";
+import { APP_NAME } from "@/lib/brand";
 
 /** "rajesh.kumar99@x.com" → "Rajesh Kumar": a placeholder name until the first-sign-in form. */
 const nameFromEmail = (email: string) =>
@@ -28,13 +30,26 @@ const nameFromEmail = (email: string) =>
  */
 export async function POST(req: Request) {
   const tenant = await getTenant();
-  if (!tenant) return NextResponse.json({ error: "Unknown business address" }, { status: 404 });
-
   const body = await req.json().catch(() => null);
   const email = normaliseEmail(body?.email);
   if (!validEmail(email)) return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
-
   const ip = requestIp(req);
+
+  // The main address (no business in the web address): one code for every login this address has.
+  if (!tenant) {
+    if ((ip && (await limited("email-code-ip", ip, 20, HOUR))) || (await limited("email-code-day:main", email, 10, DAY))) {
+      return NextResponse.json({ error: "Too many codes asked for. Please try again later." }, { status: 429 });
+    }
+    try {
+      const code = await issueMainCode(email);
+      if (code) await sendEmail(signInCodeMail(email, APP_NAME, code));
+      return NextResponse.json({ ok: true, ...(code && emailDevMode() ? { devCode: code } : {}) });
+    } catch (e) {
+      if (e instanceof EmailAuthError || e instanceof EmailError) return NextResponse.json({ error: e.message }, { status: e.status });
+      throw e;
+    }
+  }
+
   if ((ip && (await limited("email-code-ip", ip, 20, HOUR))) || (await limited(`email-code-day:${tenant.id}`, email, 10, DAY))) {
     return NextResponse.json({ error: "Too many codes asked for. Please try again later." }, { status: 429 });
   }

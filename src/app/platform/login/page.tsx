@@ -2,13 +2,13 @@ import { redirect } from "next/navigation";
 import { getTenant } from "@/lib/tenant";
 import { getPlatformSession } from "@/lib/platform-auth";
 import LoginForm from "@/components/platform/LoginForm";
-import EmailLinkForm from "@/components/auth/EmailLinkForm";
+import EmailCodeForm from "@/components/auth/EmailCodeForm";
 import ConsoleAuthFrame from "@/components/platform/ConsoleAuthFrame";
 import GoogleButton from "@/components/auth/GoogleButton";
 import { googleConfigured } from "@/lib/google";
 import { noticeText } from "@/lib/login-notices";
 
-/** For now the console signs in by emailed link (or Google); the password form comes back by setting this to true. */
+/** The console signs in by an emailed one-time code (or Google); the password form comes back by setting this to true. */
 const SHOW_PASSWORD = false;
 
 export default async function PlatformLoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -26,7 +26,7 @@ export default async function PlatformLoginPage({ searchParams }: { searchParams
   }
 
   return (
-    <ConsoleAuthFrame kick="Platform" title="Sign in to the console" sub="For the VBiz Pro team: businesses, plans, invoices and health." below="After the link, the console asks for the code from your authenticator app.">
+    <ConsoleAuthFrame kick="Platform" title="Sign in to the console" sub="For the VBiz Pro team: businesses, plans, invoices and health." below="No password and no link: just the code we email you.">
       {notice && (
         <p role="status" className="text-sm rounded-lg bg-[var(--scheme-tint)] text-[var(--scheme-text)] px-3 py-2 mb-4 break-words">
           {notice}
@@ -43,7 +43,7 @@ export default async function PlatformLoginPage({ searchParams }: { searchParams
             </div>
           </>
         )}
-        {SHOW_PASSWORD ? <LoginForm /> : <EmailLinkForm hint="We email a one-click link to the console login with this address. It works once, for 15 minutes." />}
+        {SHOW_PASSWORD ? <LoginForm /> : <EmailCodeForm hint="We email a one-time code to the console login with this address. It works once, for 10 minutes." />}
       </div>
     </ConsoleAuthFrame>
   );

@@ -11,7 +11,7 @@ import { Icon3D } from "@/components/icons3d/Icon3D";
 import OtpInput from "@/components/ui/OtpInput";
 import Icon from "@/components/Icon";
 import GoogleButton from "@/components/auth/GoogleButton";
-import EmailLinkForm from "@/components/auth/EmailLinkForm";
+import EmailCodeForm from "@/components/auth/EmailCodeForm";
 
 /**
  * For now sign-in is email (and Google once its keys are set): no
@@ -184,27 +184,8 @@ export default function LoginCard({
  * business the confirmed address belongs to (and the console).
  */
 function SimpleSignIn({ business }: { business: boolean }) {
-  const { t } = useLanguage();
-  if (!business) {
-    return (
-      <EmailLinkForm
-        text={{
-          label: t("login.emailLabel"),
-          send: t("link.send"),
-          wait: t("login.wait"),
-          sent: t("link.sent"),
-          again: t("link.again"),
-          hint: t("link.hint"),
-          bad: t("login.error"),
-        }}
-      />
-    );
-  }
-  return (
-    <div className="space-y-4">
-      <EmailCodeLogin />
-    </div>
-  );
+  void business;
+  return <EmailCodeForm />;
 }
 
 /** The error under a form, or the "business paused" box for a 423. */
