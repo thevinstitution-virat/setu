@@ -20,6 +20,7 @@ import { decryptSecret, encryptSecret } from "@/lib/secrets";
 import { gatewayOn, gatewaySettings, parseGatewaySettings, publicGateway, GATEWAY_DEFAULTS } from "@/lib/gateway-settings";
 import { signWebhook, validWebhook } from "@/lib/razorpay";
 import { applyGatewayPayment, cancelIntent, createIntent, handleRazorpayWebhook, simulatePay, syncOpen } from "@/lib/gateway";
+import { ensureBooks } from "@/lib/books";
 import { importStatement, ignoreLine, lineHasRef, matchLine, parseBankAmount, parseBankDate, parseStatement, refsIn, unmatchLine } from "@/lib/bank";
 import { checkKey, keyFrom, makeKey, parseScopes } from "@/lib/api-keys";
 import { listResource } from "@/lib/public-api";
@@ -378,6 +379,9 @@ describe("bank statement matching", () => {
 
   it("imports, matches the sure lines and suggests the rest", async () => {
     await setGateway({ provider: "none" });
+    // Bank charges are suggested only once the books are open (the "Bank charges" head).
+    // Open them here so this file does not lean on another test file having done it.
+    await as(adminId, (ctx) => ensureBooks(ctx));
     const [bank0, upi0, cash0, chq0] = [await bal("BANK"), await bal("UPI_CLEARING"), await bal("OFFICE_CASH"), await bal("CHEQUES_IN_HAND")];
     // A shop reported a UPI payment (waiting); the office took a UPI payment and a cheque.
     pendingId = (await as(user.d, (ctx) => recordPayment(ctx, { retailerId: shop.d, amount: 12_345, method: "UPI", reference: rrnPending, needsVerification: true }))).id;
