@@ -295,7 +295,7 @@ export default function BtLanding() {
             {p.problems.tabs.map((tab, i) => {
               const r = RINGS[i];
               return (
-                <li key={tab.tab}>
+                <li key={tab.tab} className="i3d-host">
                   <span className="bt-ring" aria-hidden="true" style={{ "--bt-a": r.a, "--bt-b": r.b, "--bt-arc": r.arc, "--bt-sp": r.sp } as CSSProperties}>
                     <span><span style={{ background: r.bg, color: r.fg }}><Icon3D name={TILE[r.icon]} size={46} /></span></span>
                   </span>
@@ -349,7 +349,7 @@ export default function BtLanding() {
               <p className="bt-sub">{p.retail.sub}</p>
               <ul className="bt-feats">
                 {p.retail.items.map((it) => (
-                  <li key={it.t}>
+                  <li key={it.t} className="i3d-host">
                     <span aria-hidden="true"><Icon3D name={TILE[it.icon]} size={40} /></span>
                     <span><b>{it.t}</b><small>{it.d}</small></span>
                   </li>
@@ -486,7 +486,7 @@ export default function BtLanding() {
           </div>
           <ul className="bt-grid">
             {p.grid.items.map((it, i) => (
-              <li className="bt-gcard" key={it.t}>
+              <li className="bt-gcard i3d-host" key={it.t}>
                 <span className={`bt-gic ${(i + Math.floor(i / 4)) % 2 ? "bt-gic-m" : "bt-gic-k"}`} aria-hidden="true"><Icon3D name={TILE[it.icon]} size={36} /></span>
                 <h3>{it.t}</h3>
                 <p>{it.d}</p>

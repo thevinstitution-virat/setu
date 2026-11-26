@@ -17,10 +17,12 @@ export type Icon3DProps = {
   alt?: string;
   /** Above-the-fold icons (home category grid, success screen): load eagerly. */
   priority?: boolean;
+  /** Hover lift + glow and a click burst for an icon that is not inside a .i3d-host tile. */
+  interactive?: boolean;
   className?: string;
 };
 
-export function Icon3D({ name, size = 64, animate = "none", tinted = false, alt = "", priority = false, className = "" }: Icon3DProps) {
+export function Icon3D({ name, size = 64, animate = "none", tinted = false, alt = "", priority = false, interactive = false, className = "" }: Icon3DProps) {
   const [loaded, setLoaded] = useState(false);
   const meta = ICON3D[name] ?? ICON3D["box-sealed"];
   const file = ICON3D[name] ? name : "box-sealed";
@@ -31,6 +33,7 @@ export function Icon3D({ name, size = 64, animate = "none", tinted = false, alt 
       className={`i3d ${tinted ? "i3d-tinted" : ""} ${className}`}
       style={{ width: size, height: size, ["--i3d-hue" as string]: meta.hue }}
       data-loaded={loaded || undefined}
+      data-fx={interactive || undefined}
     >
       <img
         src={`/icons3d/${file}.webp`}

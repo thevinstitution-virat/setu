@@ -18,7 +18,7 @@ export default function EmptyState({
 }) {
   return (
     <div className={`flex flex-col items-center text-center gap-1.5 px-4 py-8 ${className}`}>
-      <Icon3D name={icon} size={120} animate="pop" />
+      <Icon3D name={icon} size={120} animate="pop" interactive />
       <p className="font-heading font-bold text-lg mt-2">{title}</p>
       {text && <p className="text-sm text-[var(--muted)] max-w-[34ch]">{text}</p>}
       {action &&

@@ -4,6 +4,7 @@ import "./globals.css";
 import { APP_NAME } from "@/lib/brand";
 import { currentBrand } from "@/lib/branding-server";
 import { appNameOf, themeColour, themeCss, themeVars } from "@/lib/branding";
+import Icon3DFx from "@/components/icons3d/Icon3DFx";
 import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
 import { getServerLang } from "@/lib/i18n/server";
 
@@ -85,6 +86,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       )}
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <LanguageProvider initialLang={lang}>{children}</LanguageProvider>
+        <Icon3DFx />
         <script
           dangerouslySetInnerHTML={{
             __html: `if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); }); }`,

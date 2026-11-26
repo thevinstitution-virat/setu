@@ -755,3 +755,9 @@
 .bt-gic { background: var(--bt-paper, #fff7ec) !important; box-shadow: none !important; width: 56px; height: 56px; }
 .bt-feats > li > span:first-child .i3d { flex: none; }
 .bt-gcard > .bt-gic .i3d { display: block; }
+
+/* Icon tiles on the landing react to hover and click (see styles/icon3d.css). */
+.bt-five > li, .bt-feats > li, .bt-gcard { cursor: pointer; }
+.bt-gcard { transition: transform .25s var(--ease-out, ease), box-shadow .25s; }
+@media (hover: hover) { .bt-gcard:hover { transform: translateY(-3px); box-shadow: 0 22px 40px -22px rgba(6,30,29,.35); } }
+.bt-ring > span > span { overflow: visible; }

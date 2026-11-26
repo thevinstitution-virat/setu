@@ -97,7 +97,7 @@ export default function LoginCard({
         </div>
 
         <div className={`card ${brand.business ? "" : "card-deco"} p-6 sm:p-7`}>
-          <Icon3D name="kirana-shop" size={88} animate="pop" priority className="mb-2" />
+          <Icon3D name="kirana-shop" size={88} animate="pop" priority interactive className="mb-2" />
           {!EMAIL_AND_GOOGLE_ONLY && <p className="page-kick">{mode === "retailer" ? t("login.retailerTab") : t("login.teamTab")}</p>}
           <h1 className="page-title">{t("login.title")}</h1>
           <p className="page-sub mb-6">{brand.tagline || t("brand.tagline")}</p>
