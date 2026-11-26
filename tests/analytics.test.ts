@@ -220,7 +220,9 @@ beforeAll(async () => {
   driverId = driver.deliveryAgentProfile!.id;
   for (const [k, area, i] of [["A", kothrud, 1], ["B", kothrud, 2], ["C", baner, 3], ["D", baner, 4]] as const) {
     const u = await db.user.create({
-      data: { name: `Shop ${k}`, phone: `90000${rand().replace(/\D/g, "").padEnd(5, "0").slice(0, 5)}`, role: "RETAILER", retailerProfile: { create: { outletName: `Shop ${k}`, shopNumber: String(i), complexName: "M", pinCode: "411038", areaId: area.id, salesAgentId: agentId, creditDays: 7 } } },
+      // Ten digits ending in the shop's own number, so the four shops never share a phone
+      // (random letters stripped to digits and padded with zeros often gave the same number twice).
+      data: { name: `Shop ${k}`, phone: `9${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}${i}`, role: "RETAILER", retailerProfile: { create: { outletName: `Shop ${k}`, shopNumber: String(i), complexName: "M", pinCode: "411038", areaId: area.id, salesAgentId: agentId, creditDays: 7 } } },
       include: { retailerProfile: true },
     });
     shop[k] = u.retailerProfile!.id;
